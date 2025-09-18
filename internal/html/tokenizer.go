@@ -62,6 +62,15 @@ const (
 	State_CommentStart
 	State_DOCTYPE
 	State_CDATA_Section
+	State_CommentStartDash
+	State_Comment
+	State_CommentEnd
+	State_CommentLessThanSign
+	State_CommentEndDash
+	State_CommentLessThanSignBang
+	State_CommentLessThanSignBangDash
+	State_CommentLessThanSignBangDashDash
+	State_CommentEndBang
 )
 
 type Token struct {
@@ -1568,16 +1577,274 @@ func (t *Tokenizer) MarkupDeclarationOpenState() error {
 
 	return nil
 }
-func (t *Tokenizer) Comment_Start_State()                          {}
-func (t *Tokenizer) Comment_StartDash_State()                      {}
-func (t *Tokenizer) Comment_State()                                {}
-func (t *Tokenizer) Comment_LessThanSignState()                    {}
-func (t *Tokenizer) Comment_LessThanSign_Bang_State()              {}
-func (t *Tokenizer) Comment_LessThanSign_BangDash_State()          {}
-func (t *Tokenizer) Comment_LessThanSign_BanDashDash_State()       {}
-func (t *Tokenizer) Comment_EndDash_State()                        {}
-func (t *Tokenizer) Comment_End_State()                            {}
-func (t *Tokenizer) Comment_EndBang_State()                        {}
+
+// https://html.spec.whatwg.org/#comment-start-state
+func (t *Tokenizer) Comment_Start_State() error {
+	char, err := t.Consume()
+
+	if err != nil {
+		return err
+	}
+
+	if char == '-' {
+		t.state = State_CommentStartDash
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.reconsume = true
+	t.state = State_Comment
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-start-dash-state
+func (t *Tokenizer) Comment_StartDash_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '-' {
+		t.state = State_CommentEnd
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.value += "-"
+	t.reconsume = true
+	t.state = State_Comment
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-state
+func (t *Tokenizer) Comment_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return err
+	}
+
+	if char == '<' {
+		t.workingToken.value += string(char)
+		t.state = State_CommentLessThanSign
+		return nil
+	}
+
+	if char == '-' {
+		t.state = State_CommentEndDash
+		return nil
+	}
+
+	if char == '\u0000' {
+		t.workingToken.value += string(rune('\uFFFD'))
+		return nil
+	}
+
+	t.workingToken.value += string(char)
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-less-than-sign-state
+func (t *Tokenizer) Comment_LessThanSignState() error {
+	char, err := t.Consume()
+
+	if err != nil {
+		return err
+	}
+
+	if char == '!' {
+		t.workingToken.value += "!"
+		t.state = State_CommentLessThanSignBang
+		return nil
+	}
+
+	if char == '<' {
+		t.workingToken.value += "<"
+	}
+
+	t.reconsume = true
+	t.state = State_Comment
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-less-than-sign-bang-state
+func (t *Tokenizer) Comment_LessThanSign_Bang_State() error {
+	char, err := t.Consume()
+
+	if err != nil {
+		return err
+	}
+
+	if char == '-' {
+		t.state = State_CommentLessThanSignBangDash
+		return nil
+	}
+
+	t.reconsume = true
+	t.state = State_Comment
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-less-than-sign-bang-dash-state
+func (t *Tokenizer) Comment_LessThanSign_BangDash_State() error {
+	char, err := t.Consume()
+
+	if err != nil {
+		return err
+	}
+
+	if char == '-' {
+		t.state = State_CommentLessThanSignBangDashDash
+		return nil
+	}
+
+	t.reconsume = true
+	t.state = State_CommentEndDash
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-less-than-sign-bang-dash-dash-state
+func (t *Tokenizer) Comment_LessThanSign_BangDashDash_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF || char == '>' {
+		t.reconsume = true
+		t.state = State_CommentEnd
+		return nil
+	}
+
+	// This is a nested-comment parse error.
+	t.reconsume = true
+	t.state = State_CommentEnd
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-end-dash-state
+func (t *Tokenizer) Comment_EndDash_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return err
+	}
+
+	if char == '-' {
+		t.state = State_CommentEnd
+		return nil
+	}
+
+	t.workingToken.value += "-"
+	t.reconsume = true
+	t.state = State_Comment
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-end-state
+func (t *Tokenizer) Comment_End_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		return err
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '!' {
+		t.state = State_CommentEndBang
+		return nil
+	}
+
+	if char == '-' {
+		t.workingToken.value += "-"
+		return nil
+	}
+
+	t.workingToken.value += "--"
+	t.reconsume = true
+	t.state = State_Comment
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#comment-end-bang-state
+func (t *Tokenizer) Comment_EndBang_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if char == '-' {
+		t.workingToken.value += "--!"
+		t.state = State_CommentEnd
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.value += "--!"
+	t.reconsume = true
+	t.state = State_Comment
+
+	return nil
+}
 func (t *Tokenizer) DocType_State()                                {}
 func (t *Tokenizer) BeforeDocTypeNameState()                       {}
 func (t *Tokenizer) DocTypeNameState()                             {}
