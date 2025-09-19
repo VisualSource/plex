@@ -15,6 +15,7 @@ const (
 	Token_StartTag
 	Token_Comment
 	Token_EndTag
+	Token_DOCTYPE
 )
 
 const (
@@ -71,6 +72,28 @@ const (
 	State_CommentLessThanSignBangDash
 	State_CommentLessThanSignBangDashDash
 	State_CommentEndBang
+	State_BeforeDOCTYPEName
+	State_DOCTYPE_Name
+	State_AfterDOCTYPE_PublicKeyword
+	State_AfterDOCTYPE_SystemKeyword
+	State_BogusDOCTYPE
+	State_AfterDOCTYPE_Name
+	State_BeforeDOCTYPE_PublicIDentifier
+	State_DOCTYPE_PublicIdentifier_DoubleQuoted
+	State_DOCTYPE_PublicIdentifier_SingleQuoted
+	State_AfterDOCTYPE_PublicIdentifier
+	State_BetweenDOCTYPE_PublicAndSystemIdentifiers
+	State_DOCTYPE_SystemIdentifier_DoubleQuoted
+	State_DOCTYPE_SystemIdentifier_SingleQuoted
+	State_AfterDOCTYPE_SystemIdentifier
+	State_CDATA_SectionBracket
+	State_CDATA_SectionEnd
+	State_NamedCharacterReference
+	State_NumericCharacterReference
+	State_AmbiguousAmpersand
+	State_HexadeciamCharacterReferenceStart
+	State_DecimalCharacterReferenceStart
+	State_NumericCharacterReferenceEnd
 )
 
 type Token struct {
@@ -78,6 +101,7 @@ type Token struct {
 	char        rune
 	value       string
 	selfClosing bool
+	state       map[string]string
 }
 
 func NewEOFToken() Token {
@@ -94,12 +118,10 @@ func NewCharToken(value rune) Token {
 
 // https://html.spec.whatwg.org/#tokenization
 type Tokenizer struct {
-	reader    runeio.RuneReader
-	char      rune
-	state     int
-	rstate    int
-	reconsume bool
-	tokens    []Token
+	reader runeio.RuneReader
+	state  int
+	rstate int
+	tokens []Token
 
 	tempbuffer string
 
@@ -108,18 +130,39 @@ type Tokenizer struct {
 	cAttrValue   string
 }
 
-func (t *Tokenizer) Consume() (rune, error) {
-	if t.reconsume {
-		t.reconsume = false
-		return t.char, nil
+func (t *Tokenizer) Parse() ([]Token, error) {
+
+	var err error = nil
+	for {
+		switch t.state {
+		case State_CharacterReference:
+			err = t.CharacterReferenceState()
+		case State_TagOpen:
+			err = t.TagOpenState()
+		case State_RCData:
+			err = t.RCDataState()
+		case State_RCData_LessThanSign:
+			err = t.RCData_LessThenState()
+
+		}
+
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
 	}
+
+	return t.tokens, nil
+}
+
+func (t *Tokenizer) Consume() (rune, error) {
 	r, _, err := t.reader.ReadRune()
 
 	if err != nil {
 		return r, err
 	}
-
-	t.char = r
 
 	return r, nil
 }
@@ -294,7 +337,10 @@ func (t *Tokenizer) TagOpenState() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.reconsume = true
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.state = State_TagName
 
 		t.workingToken = &Token{token: Token_StartTag, value: ""}
@@ -303,7 +349,10 @@ func (t *Tokenizer) TagOpenState() error {
 	}
 
 	if char == '?' {
-		t.reconsume = true
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.state = State_BogusComment
 
 		t.workingToken = &Token{token: Token_Comment, value: ""}
@@ -311,8 +360,11 @@ func (t *Tokenizer) TagOpenState() error {
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('>'))
-	t.reconsume = true
 	t.state = State_Data
 
 	return nil
@@ -335,7 +387,10 @@ func (t *Tokenizer) EndTagOpenState() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_BogusComment
 
 	return nil
@@ -403,7 +458,10 @@ func (t *Tokenizer) RCData_LessThenState() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'))
 
 	return nil
@@ -418,16 +476,21 @@ func (t *Tokenizer) RCData_EndTagOpenState() error {
 	}
 
 	if unicode.IsLetter(char) {
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.workingToken = &Token{token: Token_EndTag, value: ""}
-		t.reconsume = true
-
 		t.state = State_RCData_EndTagName
 
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	t.reconsume = true
 	t.state = State_RCData
 
 	return nil
@@ -487,7 +550,10 @@ func (t *Tokenizer) RCData_EndTagNameState() error {
 		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_RCData
 
 	return nil
@@ -507,9 +573,11 @@ func (t *Tokenizer) RawText_LessThenSignState() error {
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'))
-	t.reconsume = true
-
 	t.state = State_RawText
 
 	return nil
@@ -524,15 +592,22 @@ func (t *Tokenizer) RawText_EndTagOpenState() error {
 	}
 
 	if unicode.IsLetter(char) {
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.workingToken = &Token{token: Token_EndTag, value: ""}
-		t.reconsume = true
 		t.state = State_RawText_EndTagName
 
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
 	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	t.reconsume = true
 	t.state = State_RawText
 
 	return nil
@@ -582,8 +657,11 @@ func (t *Tokenizer) RawText_EndTagNameState() error {
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	t.reconsume = true
 	t.state = State_RawText
 
 	for x := range t.tempbuffer {
@@ -613,8 +691,11 @@ func (t *Tokenizer) ScriptData_LessThanSignState() error {
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'))
-	t.reconsume = true
 	t.state = State_ScriptData
 
 	return nil
@@ -628,14 +709,20 @@ func (t *Tokenizer) ScriptData_EndTagOpenState() error {
 	}
 
 	if unicode.IsLetter(char) {
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.workingToken = &Token{token: Token_EndTag, value: ""}
-		t.reconsume = true
 		t.state = State_ScriptData_EndTagName
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	t.reconsume = true
 	t.state = State_ScriptData
 
 	return nil
@@ -682,7 +769,10 @@ func (t *Tokenizer) ScriptData_EndTagNameState() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_ScriptData
 	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
 
@@ -706,7 +796,10 @@ func (t *Tokenizer) ScriptData_Escape_StartState() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_ScriptData
 
 	return nil
@@ -725,7 +818,10 @@ func (t *Tokenizer) ScriptData_Escape_StartDashState() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_ScriptData
 
 	return nil
@@ -856,15 +952,21 @@ func (t *Tokenizer) ScriptData_Escaped_LessThanSign_State() error {
 	}
 
 	if unicode.IsLetter(char) {
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.tempbuffer = ""
 		t.tokens = append(t.tokens, NewCharToken('<'))
-		t.reconsume = true
 		t.state = State_ScriptData_DoubleEscapeStart
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'))
-	t.reconsume = true
 	t.state = State_ScriptData_Escaped
 
 	return nil
@@ -878,17 +980,22 @@ func (t *Tokenizer) ScriptData_Escaped_EndTagOpen_State() error {
 	}
 
 	if unicode.IsLetter(char) {
-
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.tokens = append(t.tokens, *t.workingToken)
 		t.workingToken = nil
-		t.reconsume = true
 		t.state = State_ScriptData_EscapedEndTagName
 
 		return nil
 	}
 
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	t.reconsume = true
 	t.state = State_ScriptData_Escaped
 
 	return nil
@@ -939,7 +1046,10 @@ func (t *Tokenizer) ScriptData_Escaped_EndTagName_State() error {
 		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_ScriptData_Escaped
 
 	return nil
@@ -977,7 +1087,10 @@ func (t *Tokenizer) ScriptData_Double_Escaped_Start_State() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_ScriptData_Escaped
 
 	return nil
@@ -1107,7 +1220,10 @@ func (t *Tokenizer) ScriptData_Double_Escaped_LessThanSign_State() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_ScriptData_DoubleEscaped
 
 	return nil
@@ -1145,7 +1261,10 @@ func (t *Tokenizer) ScriptData_Double_Escaped_End_State() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_ScriptData_DoubleEscaped
 
 	return nil
@@ -1166,7 +1285,10 @@ func (t *Tokenizer) BeforeAttributeNameState() error {
 	}
 
 	if char == '/' || char == '>' || isEOF {
-		t.reconsume = true
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.state = State_AfterAttributeName
 
 		return nil
@@ -1193,7 +1315,10 @@ func (t *Tokenizer) AttributeNameState() error {
 	}
 
 	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' || char == '/' || char == '>' || isEOF {
-		t.reconsume = true
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.state = State_AfterAttributeName
 		return nil
 	}
@@ -1259,8 +1384,12 @@ func (t *Tokenizer) AfterAttributeNameState() error {
 
 	t.cAttrName = ""
 	t.cAttrValue = ""
-	t.reconsume = true
 	t.state = State_AttributeName
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -1294,7 +1423,10 @@ func (t *Tokenizer) BeforeAttributeValueState() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_AttributValue_Unquoted
 
 	return nil
@@ -1443,7 +1575,10 @@ func (t *Tokenizer) AfterAttributeValue_QuotedState() error {
 	}
 
 	//  missing-whitespace-between-attributes parse error.
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_BeforeAttributeName
 
 	return nil
@@ -1470,7 +1605,10 @@ func (t *Tokenizer) SelfClosingStartTagState() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_BeforeAttributeName
 
 	return nil
@@ -1598,7 +1736,10 @@ func (t *Tokenizer) Comment_Start_State() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_Comment
 
 	return nil
@@ -1631,7 +1772,10 @@ func (t *Tokenizer) Comment_StartDash_State() error {
 	}
 
 	t.workingToken.value += "-"
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_Comment
 
 	return nil
@@ -1690,7 +1834,10 @@ func (t *Tokenizer) Comment_LessThanSignState() error {
 		t.workingToken.value += "<"
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_Comment
 
 	return nil
@@ -1709,7 +1856,10 @@ func (t *Tokenizer) Comment_LessThanSign_Bang_State() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_Comment
 
 	return nil
@@ -1728,7 +1878,10 @@ func (t *Tokenizer) Comment_LessThanSign_BangDash_State() error {
 		return nil
 	}
 
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_CommentEndDash
 
 	return nil
@@ -1743,13 +1896,19 @@ func (t *Tokenizer) Comment_LessThanSign_BangDashDash_State() error {
 	}
 
 	if isEOF || char == '>' {
-		t.reconsume = true
+		err = t.reader.UnreadRune()
+		if err != nil {
+			return err
+		}
 		t.state = State_CommentEnd
 		return nil
 	}
 
 	// This is a nested-comment parse error.
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_CommentEnd
 
 	return nil
@@ -1775,7 +1934,10 @@ func (t *Tokenizer) Comment_EndDash_State() error {
 	}
 
 	t.workingToken.value += "-"
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_Comment
 
 	return nil
@@ -1812,7 +1974,10 @@ func (t *Tokenizer) Comment_End_State() error {
 	}
 
 	t.workingToken.value += "--"
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_Comment
 
 	return nil
@@ -1840,35 +2005,922 @@ func (t *Tokenizer) Comment_EndBang_State() error {
 	}
 
 	t.workingToken.value += "--!"
-	t.reconsume = true
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
 	t.state = State_Comment
 
 	return nil
 }
-func (t *Tokenizer) DocType_State()                                {}
-func (t *Tokenizer) BeforeDocTypeNameState()                       {}
-func (t *Tokenizer) DocTypeNameState()                             {}
-func (t *Tokenizer) After_DOCTYPE_Name()                           {}
-func (t *Tokenizer) After_DOCTYPE_PublicKeywordState()             {}
-func (t *Tokenizer) Before_DOCTYPE_PublicIdentifierState()         {}
-func (t *Tokenizer) DOCTYPE_PublicIdentifier_DoubleQuoted_State()  {}
-func (t *Tokenizer) DOCKTYPE_PublicIdentifier_SingleQuoted_State() {}
-func (t *Tokenizer) After_DOCTYPE_PublicIdentifier_State()         {}
-func (t *Tokenizer) Between_DOCTYPE_PublicAndSystemIdent_State()   {}
-func (t *Tokenizer) After_DOCTYPE_SystemKeyword_State()            {}
-func (t *Tokenizer) Before_DOCTYPE_SystemIdentifier_State()        {}
-func (t *Tokenizer) DOCTYPE_SystemIdentifier_DoubleQuoted_State()  {}
-func (t *Tokenizer) DOCTYPE_SystemIdentifier_SingleQuoted_State()  {}
-func (t *Tokenizer) After_DOCTYPE_SystemIdentifer_State()          {}
-func (t *Tokenizer) Bogus_DOCTYPE_State()                          {}
-func (t *Tokenizer) CDATA_Section_State()                          {}
-func (t *Tokenizer) CDATA_Section_Bracket_State()                  {}
-func (t *Tokenizer) CDATA_Section_End_State()                      {}
-func (t *Tokenizer) CharacterReferenceState()                      {}
-func (t *Tokenizer) NamedCharacterReferenceState()                 {}
-func (t *Tokenizer) NumericCharacterReferenceState()               {}
-func (t *Tokenizer) HexadecimalCharacterReferenceStartState()      {}
-func (t *Tokenizer) DecimalCharacterReferenceStartState()          {}
-func (t *Tokenizer) HexadecimalCharacterReferenceState()           {}
-func (t *Tokenizer) DeciamalCharacterReferenceState()              {}
-func (t *Tokenizer) NumericCharacterReferenceEndState()            {}
+
+// https://html.spec.whatwg.org/#doctype-state
+func (t *Tokenizer) DOCTYPE_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, Token{token: Token_DOCTYPE}, NewEOFToken())
+		return nil
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		t.state = State_BeforeDOCTYPEName
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_BeforeDOCTYPEName
+		err = t.reader.UnreadRune()
+		return err
+	}
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+	t.state = State_BeforeDOCTYPEName
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#before-doctype-name-state
+func (t *Tokenizer) BeforeDocTypeNameState() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, Token{token: Token_DOCTYPE})
+		t.state = State_Data
+		return nil
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		return nil
+	}
+
+	if unicode.IsLetter(char) && unicode.IsUpper(char) {
+		t.workingToken = &Token{token: Token_DOCTYPE, value: string(unicode.ToLower(char))}
+		t.state = State_DOCTYPE_Name
+		return nil
+	}
+
+	if char == '\u0000' {
+		t.workingToken = &Token{token: Token_DOCTYPE, value: string(rune('\uFFFD'))}
+		t.state = State_DOCTYPE_Name
+		return nil
+	}
+
+	if char == '>' {
+		t.tokens = append(t.tokens, Token{token: Token_DOCTYPE})
+		t.state = State_Data
+		return nil
+	}
+
+	t.workingToken = &Token{token: Token_DOCTYPE, value: string(char)}
+	t.state = State_DOCTYPE_Name
+	return nil
+}
+
+// https://html.spec.whatwg.org/#doctype-name-state
+func (t *Tokenizer) DOCTYPE_NameState() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+
+		return err
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		t.state = State_AfterDOCTYPE_Name
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+
+		return nil
+	}
+
+	if unicode.IsLetter(char) && unicode.IsUpper(char) {
+		t.workingToken.value += string(unicode.ToLower(char))
+		return nil
+	}
+
+	if char == '\u0000' {
+		t.workingToken.value += string(rune('\uFFFD'))
+		return nil
+	}
+
+	t.workingToken.value += string(char)
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#after-doctype-name-state
+func (t *Tokenizer) After_DOCTYPE_Name() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+
+		return err
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+
+		return nil
+	}
+
+	ptest, err := t.reader.Peek(6)
+	if err != nil {
+		return err
+	}
+
+	text := strings.ToUpper(string(ptest))
+
+	if text == "PUBLIC" {
+		v := make([]rune, 6)
+
+		_, err = t.reader.Read(v)
+		if err != nil {
+			return err
+		}
+
+		t.state = State_AfterDOCTYPE_PublicKeyword
+		return nil
+	}
+
+	if text == "SYSTEM" {
+		v := make([]rune, 6)
+
+		_, err = t.reader.Read(v)
+		if err != nil {
+			return err
+		}
+
+		t.state = State_AfterDOCTYPE_SystemKeyword
+		return nil
+	}
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	t.state = State_BogusDOCTYPE
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#after-doctype-public-keyword-state
+func (t *Tokenizer) AfterDOCTYPE_PublicKeywordState() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		t.state = State_BeforeDOCTYPE_PublicIDentifier
+		return nil
+	}
+
+	if char == '"' {
+		t.workingToken.state["publicIdentifier"] = ""
+		t.state = State_DOCTYPE_PublicIdentifier_DoubleQuoted
+		return nil
+	}
+
+	if char == '\'' {
+		t.workingToken.state["publicIdentifier"] = ""
+		t.state = State_DOCTYPE_PublicIdentifier_SingleQuoted
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.state["forceQuirks"] = "true"
+	t.state = State_BogusDOCTYPE
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#before-doctype-public-identifier-state
+func (t *Tokenizer) Before_DOCTYPE_PublicIdentifierState() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		t.state = State_Data
+		return nil
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		return nil
+	}
+
+	if char == '"' {
+		t.workingToken.state["publicIdentifier"] = ""
+		t.state = State_DOCTYPE_PublicIdentifier_DoubleQuoted
+		return nil
+	}
+
+	if char == '\'' {
+		t.workingToken.state["publicIdentifier"] = ""
+		t.state = State_DOCTYPE_PublicIdentifier_SingleQuoted
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.state["forceQuirks"] = "true"
+	t.state = State_BogusDOCTYPE
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#doctype-public-identifier-(double-quoted)-state
+func (t *Tokenizer) DOCTYPE_PublicIdentifier_DoubleQuoted_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return io.EOF
+	}
+
+	if char == '"' {
+		t.state = State_AfterDOCTYPE_PublicIdentifier
+		return nil
+	}
+
+	if char == '\u0000' {
+		t.workingToken.state["publicIdentifier"] += string(rune('\uFFFD'))
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		t.state = State_Data
+		return nil
+	}
+
+	t.workingToken.state["publicIdentifier"] += string(char)
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#doctype-public-identifier-(single-quoted)-state
+func (t *Tokenizer) DOCKTYPE_PublicIdentifier_SingleQuoted_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if char == '\'' {
+		t.state = State_AfterDOCTYPE_PublicIdentifier
+		return nil
+	}
+
+	if char == '\u0000' {
+		t.workingToken.state["publicIdentifier"] += string(char)
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.state["publicIdentifier"] += string(char)
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#after-doctype-public-identifier-state
+func (t *Tokenizer) After_DOCTYPE_PublicIdentifier_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return io.EOF
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		t.state = State_BetweenDOCTYPE_PublicAndSystemIdentifiers
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '"' {
+		t.workingToken.state["publicIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		return nil
+	}
+
+	if char == '\'' {
+		t.workingToken.state["publicIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		return nil
+	}
+
+	t.workingToken.state["forceQuirks"] = "true"
+	t.state = State_BogusDOCTYPE
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#between-doctype-public-and-system-identifiers-state
+func (t *Tokenizer) Between_DOCTYPE_PublicAndSystemIdent_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+
+		return io.EOF
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+
+		return nil
+	}
+
+	if char == '"' {
+		t.workingToken.state["systemIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		return nil
+	}
+
+	if char == '\'' {
+		t.workingToken.state["systemIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		return nil
+	}
+
+	t.workingToken.state["forceQuirks"] = "true"
+	t.state = State_BogusDOCTYPE
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#after-doctype-system-keyword-state
+func (t *Tokenizer) After_DOCTYPE_SystemKeyword_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		return nil
+	}
+
+	if char == '"' {
+		t.workingToken.state["systemIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		return nil
+	}
+
+	if char == '\'' {
+		t.workingToken.state["systemIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.state["forceQuirks"] = "true"
+	t.state = State_BogusDOCTYPE
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#before-doctype-system-identifier-state
+func (t *Tokenizer) Before_DOCTYPE_SystemIdentifier_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		return nil
+	}
+
+	if char == '"' {
+		t.workingToken.state["systemIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		return nil
+	}
+
+	if char == '\'' {
+		t.workingToken.state["systemIdentifier"] = ""
+		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.state["forceQuirks"] = "true"
+	t.state = State_BogusDOCTYPE
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#doctype-system-identifier-(double-quoted)-state
+func (t *Tokenizer) DOCTYPE_SystemIdentifier_DoubleQuoted_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '"' {
+		t.state = State_AfterDOCTYPE_SystemIdentifier
+		return nil
+	}
+
+	if char == '\u0000' {
+		t.workingToken.state["systemIdentifier"] += string(rune('\uFFFD'))
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.state["systemIdentifier"] += string(char)
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#doctype-system-identifier-(single-quoted)-state
+func (t *Tokenizer) DOCTYPE_SystemIdentifier_SingleQuoted_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '\'' {
+		t.state = State_AfterDOCTYPE_SystemIdentifier
+		return nil
+	}
+
+	if char == '\u0000' {
+		t.workingToken.state["systemIdentifier"] += string(rune('\uFFFD'))
+		return nil
+	}
+
+	if char == '>' {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.workingToken.state["systemIdentifier"] += string(char)
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#after-doctype-system-identifier-state
+func (t *Tokenizer) After_DOCTYPE_SystemIdentifer_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.workingToken.state["forceQuirks"] = "true"
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+		return nil
+	}
+
+	if char == '\t' || char == '\u000A' || char == '\u000C' || char == '\u0020' {
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	t.state = State_BogusDOCTYPE
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#bogus-doctype-state
+func (t *Tokenizer) Bogus_DOCTYPE_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, *t.workingToken, NewEOFToken())
+		t.workingToken = nil
+
+		return io.EOF
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.tokens = append(t.tokens, *t.workingToken)
+		t.workingToken = nil
+		return nil
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#cdata-section-state
+func (t *Tokenizer) CDATA_Section_State() error {
+	char, err := t.Consume()
+	isEOF := err == io.EOF
+	if err != nil && !isEOF {
+		return err
+	}
+
+	if isEOF {
+		t.tokens = append(t.tokens, NewEOFToken())
+		return io.EOF
+	}
+
+	if char == ']' {
+		t.state = State_CDATA_SectionBracket
+		return nil
+	}
+
+	t.tokens = append(t.tokens, NewCharToken(char))
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#cdata-section-bracket-state
+func (t *Tokenizer) CDATA_Section_Bracket_State() error {
+	char, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	if char == ']' {
+		t.state = State_CDATA_SectionEnd
+		return nil
+	}
+
+	t.tokens = append(t.tokens, NewCharToken(']'))
+	t.state = State_CDATA_Section
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return nil
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#cdata-section-end-state
+func (t *Tokenizer) CDATA_Section_End_State() error {
+	char, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	if char == ']' {
+		t.tokens = append(t.tokens, NewCharToken(']'))
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		return nil
+	}
+
+	t.tokens = append(t.tokens, NewCharToken(']'), NewCharToken(']'))
+	t.state = State_CDATA_Section
+
+	err = t.reader.UnreadRune()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#character-reference-state
+func (t *Tokenizer) CharacterReferenceState() error {
+	t.tempbuffer = "&"
+
+	char, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	if unicode.IsNumber(char) || unicode.IsLetter(char) {
+		t.state = State_NamedCharacterReference
+
+		err = t.reader.UnreadRune()
+		return err
+	}
+
+	if char == '#' {
+		t.tempbuffer += "#"
+		t.state = State_NumericCharacterReference
+		return nil
+	}
+
+	if t.cAttrName != "" {
+		t.cAttrName += t.tempbuffer
+	} else {
+		for x := range t.tempbuffer {
+			t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
+		}
+	}
+
+	t.state = t.rstate
+
+	return t.reader.UnreadRune()
+}
+
+// https://html.spec.whatwg.org/#named-character-reference-state
+func (t *Tokenizer) NamedCharacterReferenceState() error {
+
+	// TODO: impl parsing
+
+	t.state = State_AmbiguousAmpersand
+
+	// flush
+
+	return nil
+}
+
+// https://html.spec.whatwg.org/#ambiguous-ampersand-state
+func (t *Tokenizer) NumericCharacterReferenceState() error {
+	char, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	if unicode.IsLetter(char) || unicode.IsNumber(char) {
+		if t.cAttrValue != "" {
+			t.cAttrValue += string(char)
+			return nil
+		}
+
+		t.tokens = append(t.tokens, NewCharToken(char))
+		return nil
+	}
+
+	//  unknown-named-character-reference parse error.
+	/*if char == ';' {
+		t.state = t.rstate
+		return t.reader.UnreadRune()
+	}*/
+
+	t.state = t.rstate
+	return t.reader.UnreadRune()
+}
+
+// https://html.spec.whatwg.org/#numeric-character-reference-state
+func (t *Tokenizer) HexadecimalCharacterReferenceStartState() error {
+	char, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	if char == '\u0078' || char == '\u0058' {
+		t.tempbuffer += string(char)
+		t.state = State_HexadeciamCharacterReferenceStart
+		return nil
+	}
+
+	t.state = State_DecimalCharacterReferenceStart
+	return t.reader.UnreadRune()
+}
+
+// https://html.spec.whatwg.org/#hexadecimal-character-reference-start-state
+func (t *Tokenizer) DecimalCharacterReferenceStartState() error {
+	_, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	//TODO if hex digit
+	// reconusme
+	// state = hexadeciam
+
+	// flush
+	t.state = t.rstate
+	return t.reader.UnreadRune()
+}
+
+// https://html.spec.whatwg.org/#hexadecimal-character-reference-state
+func (t *Tokenizer) HexadecimalCharacterReferenceState() error {
+	char, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	if char == ';' {
+		t.state = State_NumericCharacterReferenceEnd
+		return nil
+	}
+
+	t.state = State_NumericCharacterReferenceEnd
+	return t.reader.UnreadRune()
+}
+
+// https://html.spec.whatwg.org/#decimal-character-reference-state
+func (t *Tokenizer) DeciamalCharacterReferenceState() error {
+	char, err := t.Consume()
+	if err != nil {
+		return err
+	}
+
+	if char == ';' {
+		t.state = State_NumericCharacterReferenceEnd
+		return nil
+	}
+
+	t.state = State_NumericCharacterReferenceEnd
+	return t.reader.UnreadRune()
+}
+
+// https://html.spec.whatwg.org/#numeric-character-reference-end-state
+func (t *Tokenizer) NumericCharacterReferenceEndState() error {
+	t.state = t.rstate
+	return nil
+}

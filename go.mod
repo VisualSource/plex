@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/golangci/golangci-lint v1.64.8
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel/trace v1.38.0
 	go.uber.org/automaxprocs v1.6.0
@@ -88,7 +87,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hexops/gotextdiff v1.0.3 // indirect
-	github.com/ianlewis/runeio v1.1.1 // indirect
+	github.com/ianlewis/runeio v1.1.1 // direct
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jgautheron/goconst v1.7.1 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
