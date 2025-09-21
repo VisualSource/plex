@@ -259,12 +259,12 @@ func (t *Token) Tag_IsSelfClosingSet() (bool, error) {
 
 //#endregion
 
-func NewEOFToken() Token {
-	return Token{token: Token_EOF}
+func NewEOFToken() *Token {
+	return &Token{token: Token_EOF}
 }
 
-func NewReplacementToken() Token {
-	return Token{
+func NewReplacementToken() *Token {
+	return &Token{
 		token: Token_Character,
 		data:  string(utf8.RuneError),
 	}
@@ -284,8 +284,8 @@ func (t *Token) Comment_AppendString(value string) error {
 	return nil
 }
 
-func NewCharToken(value rune) Token {
-	return Token{
+func NewCharToken(value rune) *Token {
+	return &Token{
 		token: Token_Character,
 		data:  string(value),
 	}

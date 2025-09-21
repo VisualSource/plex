@@ -115,10 +115,11 @@ type Tokenizer struct {
 	reader                 *runeio.RuneReader
 	state                  int
 	rstate                 int
-	tokens                 []Token
+	tokens                 []*Token
 	characterReferenceCode int
 	tempbuffer             string
 	workingToken           *Token
+	lastStartTag           *string
 }
 
 func NewTokenizer(stream io.RuneReader) Tokenizer {
@@ -130,198 +131,189 @@ func NewTokenizer(stream io.RuneReader) Tokenizer {
 	}
 }
 
-func (t *Tokenizer) Parse() ([]Token, error) {
-
+func (t *Tokenizer) Parse() error {
 	var err error = nil
-	for {
-		switch t.state {
-		case State_Data:
-			err = t.DataState()
-		case State_RCData:
-			err = t.RCDataState()
-		case State_RawText:
-			err = t.RawTextState()
-		case State_ScriptData:
-			err = t.ScriptDataState()
-		case State_PlainText:
-			err = t.PlainTextState()
 
-		case State_TagOpen:
-			err = t.TagOpenState()
-		case State_EndTagOpen:
-			err = t.EndTagOpenState()
-		case State_TagName:
-			err = t.TagNameState()
+	switch t.state {
+	case State_Data:
+		err = t.DataState()
+	case State_RCData:
+		err = t.RCDataState()
+	case State_RawText:
+		err = t.RawTextState()
+	case State_ScriptData:
+		err = t.ScriptDataState()
+	case State_PlainText:
+		err = t.PlainTextState()
 
-		case State_RCData_LessThanSign:
-			err = t.RCData_LessThenState()
-		case State_RCData_EndTagOpen:
-			err = t.RCData_EndTagOpenState()
-		case State_RCData_EndTagName:
-			err = t.RCData_EndTagNameState()
-		case State_RawText_LessThanSign:
-			err = t.RawText_LessThenSignState()
-		case State_RawText_EndTagOpen:
-			err = t.RawText_EndTagOpenState()
-		case State_RawText_EndTagName:
-			err = t.RawText_EndTagNameState()
+	case State_TagOpen:
+		err = t.TagOpenState()
+	case State_EndTagOpen:
+		err = t.EndTagOpenState()
+	case State_TagName:
+		err = t.TagNameState()
 
-		case State_ScriptData_LessThanSign:
-			err = t.ScriptData_LessThanSignState()
-		case State_ScriptData_EndTagOpen:
-			err = t.ScriptData_EndTagOpenState()
-		case State_ScriptData_EndTagName:
-			err = t.ScriptData_EndTagNameState()
-		case State_ScriptData_EscapeStart:
-			err = t.ScriptData_Escape_StartState()
-		case State_ScriptData_EscapeStartDash:
-			err = t.ScriptData_Escape_StartDashState()
+	case State_RCData_LessThanSign:
+		err = t.RCData_LessThenState()
+	case State_RCData_EndTagOpen:
+		err = t.RCData_EndTagOpenState()
+	case State_RCData_EndTagName:
+		err = t.RCData_EndTagNameState()
+	case State_RawText_LessThanSign:
+		err = t.RawText_LessThenSignState()
+	case State_RawText_EndTagOpen:
+		err = t.RawText_EndTagOpenState()
+	case State_RawText_EndTagName:
+		err = t.RawText_EndTagNameState()
 
-		case State_ScriptData_Escaped:
-			err = t.ScriptData_Escaped_State()
-		case State_ScriptData_EscapedDash:
-			err = t.ScriptData_Escaped_Dash_State()
-		case State_ScriptData_EscapedDashDash:
-			err = t.ScriptData_Escaped_DashDash_State()
-		case State_ScriptData_EscapedLessThanSign:
-			err = t.ScriptData_Escaped_LessThanSign_State()
-		case State_ScriptData_EscapedEndTagOpen:
-			err = t.ScriptData_Escaped_EndTagOpen_State()
-		case State_ScriptData_EscapedEndTagName:
-			err = t.ScriptData_Escaped_EndTagName_State()
+	case State_ScriptData_LessThanSign:
+		err = t.ScriptData_LessThanSignState()
+	case State_ScriptData_EndTagOpen:
+		err = t.ScriptData_EndTagOpenState()
+	case State_ScriptData_EndTagName:
+		err = t.ScriptData_EndTagNameState()
+	case State_ScriptData_EscapeStart:
+		err = t.ScriptData_Escape_StartState()
+	case State_ScriptData_EscapeStartDash:
+		err = t.ScriptData_Escape_StartDashState()
 
-		case State_ScriptData_DoubleEscapedStart:
-			err = t.ScriptData_Double_Escaped_Start_State()
-		case State_ScriptData_DoubleEscaped:
-			err = t.ScriptData_Double_Escaped_State()
-		case State_ScriptData_DoubleEscapedDash:
-			err = t.ScriptData_Double_Escaped_Dash_State()
-		case State_ScriptData_DoubleEscapedDashDash:
-			err = t.ScriptData_Double_Escaped_DashDash_State()
-		case State_ScriptData_DoubleEscapedLessThanSign:
-			err = t.ScriptData_Double_Escaped_LessThanSign_State()
-		case State_ScriptData_DoubleEscapeEnd:
-			err = t.ScriptData_Double_Escaped_End_State()
+	case State_ScriptData_Escaped:
+		err = t.ScriptData_Escaped_State()
+	case State_ScriptData_EscapedDash:
+		err = t.ScriptData_Escaped_Dash_State()
+	case State_ScriptData_EscapedDashDash:
+		err = t.ScriptData_Escaped_DashDash_State()
+	case State_ScriptData_EscapedLessThanSign:
+		err = t.ScriptData_Escaped_LessThanSign_State()
+	case State_ScriptData_EscapedEndTagOpen:
+		err = t.ScriptData_Escaped_EndTagOpen_State()
+	case State_ScriptData_EscapedEndTagName:
+		err = t.ScriptData_Escaped_EndTagName_State()
 
-		case State_BeforeAttributeName:
-			err = t.BeforeAttributeNameState()
-		case State_AttributeName:
-			err = t.AttributeNameState()
-		case State_AfterAttributeName:
-			err = t.AfterAttributeNameState()
+	case State_ScriptData_DoubleEscapedStart:
+		err = t.ScriptData_Double_Escaped_Start_State()
+	case State_ScriptData_DoubleEscaped:
+		err = t.ScriptData_Double_Escaped_State()
+	case State_ScriptData_DoubleEscapedDash:
+		err = t.ScriptData_Double_Escaped_Dash_State()
+	case State_ScriptData_DoubleEscapedDashDash:
+		err = t.ScriptData_Double_Escaped_DashDash_State()
+	case State_ScriptData_DoubleEscapedLessThanSign:
+		err = t.ScriptData_Double_Escaped_LessThanSign_State()
+	case State_ScriptData_DoubleEscapeEnd:
+		err = t.ScriptData_Double_Escaped_End_State()
 
-		case State_BeforeAttributeValue:
-			err = t.BeforeAttributeValueState()
-		case State_AttributValue_DoubleQuoted:
-			err = t.AttributeValue_DoubleQuote_State()
-		case State_AttributValue_SingleQuoted:
-			err = t.AttributeValue_Signle_Quote_State()
-		case State_AttributValue_Unquoted:
-			err = t.AttributeValue_Unquoted_State()
-		case State_AfterAttributeValue_Quoted:
-			err = t.AfterAttributeValue_QuotedState()
-		case State_SelfClosingStartTag:
-			err = t.SelfClosingStartTagState()
-		case State_BogusComment:
-			err = t.BogusCommentState()
-		case State_MarkupDeclarationOpen:
-			err = t.MarkupDeclarationOpenState()
+	case State_BeforeAttributeName:
+		err = t.BeforeAttributeNameState()
+	case State_AttributeName:
+		err = t.AttributeNameState()
+	case State_AfterAttributeName:
+		err = t.AfterAttributeNameState()
 
-		case State_CommentStart:
-			err = t.Comment_Start_State()
-		case State_CommentStartDash:
-			err = t.Comment_StartDash_State()
-		case State_Comment:
-			err = t.Comment_State()
-		case State_CommentLessThanSign:
-			err = t.Comment_LessThanSignState()
-		case State_CommentLessThanSignBang:
-			err = t.Comment_LessThanSign_Bang_State()
-		case State_CommentLessThanSignBangDash:
-			err = t.Comment_LessThanSign_BangDash_State()
-		case State_CommentLessThanSignBangDashDash:
-			err = t.Comment_LessThanSign_BangDashDash_State()
-		case State_CommentEndDash:
-			err = t.Comment_EndDash_State()
-		case State_CommentEnd:
-			err = t.Comment_End_State()
-		case State_CommentEndBang:
-			err = t.Comment_EndBang_State()
+	case State_BeforeAttributeValue:
+		err = t.BeforeAttributeValueState()
+	case State_AttributValue_DoubleQuoted:
+		err = t.AttributeValue_DoubleQuote_State()
+	case State_AttributValue_SingleQuoted:
+		err = t.AttributeValue_Signle_Quote_State()
+	case State_AttributValue_Unquoted:
+		err = t.AttributeValue_Unquoted_State()
+	case State_AfterAttributeValue_Quoted:
+		err = t.AfterAttributeValue_QuotedState()
+	case State_SelfClosingStartTag:
+		err = t.SelfClosingStartTagState()
+	case State_BogusComment:
+		err = t.BogusCommentState()
+	case State_MarkupDeclarationOpen:
+		err = t.MarkupDeclarationOpenState()
 
-		case State_DOCTYPE:
-			err = t.DOCTYPE_State()
-		case State_BeforeDOCTYPEName:
-			err = t.BeforeDOCTYPENameState()
-		case State_DOCTYPE_Name:
-			err = t.DOCTYPE_NameState()
-		case State_AfterDOCTYPE_Name:
-			err = t.After_DOCTYPE_Name()
+	case State_CommentStart:
+		err = t.Comment_Start_State()
+	case State_CommentStartDash:
+		err = t.Comment_StartDash_State()
+	case State_Comment:
+		err = t.Comment_State()
+	case State_CommentLessThanSign:
+		err = t.Comment_LessThanSignState()
+	case State_CommentLessThanSignBang:
+		err = t.Comment_LessThanSign_Bang_State()
+	case State_CommentLessThanSignBangDash:
+		err = t.Comment_LessThanSign_BangDash_State()
+	case State_CommentLessThanSignBangDashDash:
+		err = t.Comment_LessThanSign_BangDashDash_State()
+	case State_CommentEndDash:
+		err = t.Comment_EndDash_State()
+	case State_CommentEnd:
+		err = t.Comment_End_State()
+	case State_CommentEndBang:
+		err = t.Comment_EndBang_State()
 
-		case State_AfterDOCTYPE_PublicKeyword:
-			err = t.AfterDOCTYPE_PublicKeywordState()
-		case State_BeforeDOCTYPE_PublicIdentifier:
-			err = t.Before_DOCTYPE_PublicIdentifierState()
-		case State_DOCTYPE_PublicIdentifier_DoubleQuoted:
-			err = t.DOCTYPE_PublicIdentifier_DoubleQuoted_State()
-		case State_DOCTYPE_PublicIdentifier_SingleQuoted:
-			err = t.DOCKTYPE_PublicIdentifier_SingleQuoted_State()
-		case State_AfterDOCTYPE_PublicIdentifier:
-			err = t.After_DOCTYPE_PublicIdentifier_State()
+	case State_DOCTYPE:
+		err = t.DOCTYPE_State()
+	case State_BeforeDOCTYPEName:
+		err = t.BeforeDOCTYPENameState()
+	case State_DOCTYPE_Name:
+		err = t.DOCTYPE_NameState()
+	case State_AfterDOCTYPE_Name:
+		err = t.After_DOCTYPE_Name()
 
-		case State_BetweenDOCTYPE_PublicAndSystemIdentifiers:
-			err = t.Between_DOCTYPE_PublicAndSystemIdent_State()
+	case State_AfterDOCTYPE_PublicKeyword:
+		err = t.AfterDOCTYPE_PublicKeywordState()
+	case State_BeforeDOCTYPE_PublicIdentifier:
+		err = t.Before_DOCTYPE_PublicIdentifierState()
+	case State_DOCTYPE_PublicIdentifier_DoubleQuoted:
+		err = t.DOCTYPE_PublicIdentifier_DoubleQuoted_State()
+	case State_DOCTYPE_PublicIdentifier_SingleQuoted:
+		err = t.DOCKTYPE_PublicIdentifier_SingleQuoted_State()
+	case State_AfterDOCTYPE_PublicIdentifier:
+		err = t.After_DOCTYPE_PublicIdentifier_State()
 
-		case State_AfterDOCTYPE_SystemKeyword:
-			err = t.After_DOCTYPE_SystemKeyword_State()
-		case State_BeforeDOCTYPE_SystemIdentifer:
-			err = t.Before_DOCTYPE_SystemIdentifier_State()
-		case State_DOCTYPE_SystemIdentifier_DoubleQuoted:
-			err = t.DOCTYPE_SystemIdentifier_DoubleQuoted_State()
-		case State_DOCTYPE_SystemIdentifier_SingleQuoted:
-			err = t.DOCTYPE_SystemIdentifier_SingleQuoted_State()
-		case State_AfterDOCTYPE_SystemIdentifier:
-			err = t.After_DOCTYPE_SystemIdentifer_State()
+	case State_BetweenDOCTYPE_PublicAndSystemIdentifiers:
+		err = t.Between_DOCTYPE_PublicAndSystemIdent_State()
 
-		case State_BogusDOCTYPE:
-			err = t.Bogus_DOCTYPE_State()
+	case State_AfterDOCTYPE_SystemKeyword:
+		err = t.After_DOCTYPE_SystemKeyword_State()
+	case State_BeforeDOCTYPE_SystemIdentifer:
+		err = t.Before_DOCTYPE_SystemIdentifier_State()
+	case State_DOCTYPE_SystemIdentifier_DoubleQuoted:
+		err = t.DOCTYPE_SystemIdentifier_DoubleQuoted_State()
+	case State_DOCTYPE_SystemIdentifier_SingleQuoted:
+		err = t.DOCTYPE_SystemIdentifier_SingleQuoted_State()
+	case State_AfterDOCTYPE_SystemIdentifier:
+		err = t.After_DOCTYPE_SystemIdentifer_State()
 
-		case State_CDATA_Section:
-			err = t.CDATA_Section_State()
-		case State_CDATA_SectionBracket:
-			err = t.CDATA_Section_Bracket_State()
-		case State_CDATA_SectionEnd:
-			err = t.CDATA_Section_End_State()
+	case State_BogusDOCTYPE:
+		err = t.Bogus_DOCTYPE_State()
 
-		case State_CharacterReference:
-			err = t.CharacterReferenceState()
-		case State_NamedCharacterReference:
-			err = t.NamedCharacterReferenceState()
-		case State_AmbiguousAmpersand:
-			err = t.AmbiguousAmpersandState()
+	case State_CDATA_Section:
+		err = t.CDATA_Section_State()
+	case State_CDATA_SectionBracket:
+		err = t.CDATA_Section_Bracket_State()
+	case State_CDATA_SectionEnd:
+		err = t.CDATA_Section_End_State()
 
-		case State_NumericCharacterReference:
-			err = t.NumericCharacterReferenceState()
-		case State_HexadecimalCharacterReferenceStart:
-			err = t.HexadecimalCharacterReferenceStartState()
-		case State_DecimalCharacterReferenceStart:
-			err = t.DeciamalCharacterReferenceState()
-		case State_HexadecimalCharacterReference:
-			err = t.HexadecimalCharacterReferenceState()
-		case State_DecimalCharacterReference:
-			err = t.DeciamalCharacterReferenceState()
-		case State_NumericCharacterReferenceEnd:
-			err = t.NumericCharacterReferenceEndState()
-		}
+	case State_CharacterReference:
+		err = t.CharacterReferenceState()
+	case State_NamedCharacterReference:
+		err = t.NamedCharacterReferenceState()
+	case State_AmbiguousAmpersand:
+		err = t.AmbiguousAmpersandState()
 
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
+	case State_NumericCharacterReference:
+		err = t.NumericCharacterReferenceState()
+	case State_HexadecimalCharacterReferenceStart:
+		err = t.HexadecimalCharacterReferenceStartState()
+	case State_DecimalCharacterReferenceStart:
+		err = t.DeciamalCharacterReferenceState()
+	case State_HexadecimalCharacterReference:
+		err = t.HexadecimalCharacterReferenceState()
+	case State_DecimalCharacterReference:
+		err = t.DeciamalCharacterReferenceState()
+	case State_NumericCharacterReferenceEnd:
+		err = t.NumericCharacterReferenceEndState()
 	}
 
-	return t.tokens, nil
+	return err
 }
 
 //#region Support
@@ -347,21 +339,50 @@ func (t *Tokenizer) Flush() {
 
 func (t *Tokenizer) Consume() (rune, error) {
 	r, _, err := t.reader.ReadRune()
-
 	if err != nil {
-		return r, err
+		return utf8.RuneError, err
+	}
+
+	if r == '\r' {
+		rs, err := t.reader.Peek(1)
+		if err != nil {
+			return utf8.RuneError, err
+		}
+
+		if rs[0] == '\n' {
+			m := make([]rune, 1)
+			_, err := t.reader.Read(m)
+			if err != nil {
+				return utf8.MaxRune, err
+			}
+			return '\n', nil
+		}
+
+		return '\n', nil
 	}
 
 	return r, nil
 }
 
-func (t *Tokenizer) EmitCurrentWithTokens(tokens ...Token) {
+func (t *Tokenizer) ConsumeToken() *Token {
+	if len(t.tokens) == 0 {
+		return nil
+	}
+
+	x, a := t.tokens[0], t.tokens[1:]
+
+	t.tokens = a
+
+	return x
+}
+
+func (t *Tokenizer) EmitCurrentWithTokens(tokens ...*Token) {
 
 	if t.workingToken != nil {
 		if t.workingToken.token == Token_EndTag || t.workingToken.token == Token_StartTag {
 			t.workingToken.Tag_FinishAttr()
 		}
-		t.tokens = append(t.tokens, *t.workingToken)
+		t.tokens = append(t.tokens, t.workingToken)
 	}
 
 	t.tokens = append(t.tokens, tokens...)
@@ -376,15 +397,11 @@ func (t *Tokenizer) HasApproriateEndTagToken() bool {
 		return false
 	}
 
-	for i := len(t.tokens) - 1; i >= 0; i-- {
-		if t.tokens[i].token == Token_StartTag {
-			if t.tokens[i].tagData.name == t.workingToken.tagData.name {
-				return true
-			}
-		}
+	if t.lastStartTag == nil {
+		return false
 	}
 
-	return false
+	return *t.lastStartTag == t.workingToken.tagData.name
 }
 
 //#region Entry
@@ -400,7 +417,7 @@ func (t *Tokenizer) DataState() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '&' {
@@ -436,7 +453,7 @@ func (t *Tokenizer) RCDataState() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '&' {
@@ -472,7 +489,7 @@ func (t *Tokenizer) RawTextState() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '<' {
@@ -502,7 +519,7 @@ func (t *Tokenizer) ScriptDataState() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '<' {
@@ -562,7 +579,7 @@ func (t *Tokenizer) TagOpenState() error {
 	// eof-before-tag-name parse error.
 	if isEOF {
 		t.tokens = append(t.tokens, NewCharToken('<'), NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '!' {
@@ -608,7 +625,7 @@ func (t *Tokenizer) EndTagOpenState() error {
 	//  eof-before-tag-name parse error.
 	if isEOF {
 		t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'), NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if unicode.IsLetter(char) {
@@ -643,7 +660,7 @@ func (t *Tokenizer) TagNameState() error {
 	// eof-in-tag parse error.
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -1000,7 +1017,7 @@ func (t *Tokenizer) ScriptData_Escaped_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '-' {
@@ -1035,7 +1052,7 @@ func (t *Tokenizer) ScriptData_Escaped_Dash_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '-' {
@@ -1072,7 +1089,7 @@ func (t *Tokenizer) ScriptData_Escaped_DashDash_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '-' {
@@ -1248,7 +1265,7 @@ func (t *Tokenizer) ScriptData_Double_Escaped_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '-' {
@@ -1284,7 +1301,7 @@ func (t *Tokenizer) ScriptData_Double_Escaped_Dash_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '-' {
@@ -1322,7 +1339,7 @@ func (t *Tokenizer) ScriptData_Double_Escaped_DashDash_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '-' {
@@ -1489,7 +1506,7 @@ func (t *Tokenizer) AfterAttributeNameState() error {
 	//  eof-in-tag parse error.
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -1561,7 +1578,7 @@ func (t *Tokenizer) AttributeValue_DoubleQuote_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '"' {
@@ -1592,7 +1609,7 @@ func (t *Tokenizer) AttributeValue_Signle_Quote_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\'' {
@@ -1623,7 +1640,7 @@ func (t *Tokenizer) AttributeValue_Unquoted_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -1663,7 +1680,7 @@ func (t *Tokenizer) AfterAttributeValue_QuotedState() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -1699,7 +1716,7 @@ func (t *Tokenizer) SelfClosingStartTagState() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '>' {
@@ -1722,7 +1739,7 @@ func (t *Tokenizer) BogusCommentState() error {
 
 	if isEOF {
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '>' {
@@ -1866,7 +1883,7 @@ func (t *Tokenizer) Comment_State() error {
 
 	if isEOF {
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '<' {
@@ -1977,7 +1994,7 @@ func (t *Tokenizer) Comment_EndDash_State() error {
 
 	if isEOF {
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '-' {
@@ -2001,7 +2018,7 @@ func (t *Tokenizer) Comment_End_State() error {
 
 	if isEOF {
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '>' {
@@ -2036,7 +2053,7 @@ func (t *Tokenizer) Comment_EndBang_State() error {
 
 	if isEOF {
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '-' {
@@ -2146,7 +2163,7 @@ func (t *Tokenizer) DOCTYPE_NameState() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -2186,7 +2203,7 @@ func (t *Tokenizer) After_DOCTYPE_Name() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -2245,7 +2262,7 @@ func (t *Tokenizer) AfterDOCTYPE_PublicKeywordState() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -2329,7 +2346,7 @@ func (t *Tokenizer) DOCTYPE_PublicIdentifier_DoubleQuoted_State() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '"' {
@@ -2365,7 +2382,7 @@ func (t *Tokenizer) DOCKTYPE_PublicIdentifier_SingleQuoted_State() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\'' {
@@ -2401,7 +2418,7 @@ func (t *Tokenizer) After_DOCTYPE_PublicIdentifier_State() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -2444,7 +2461,7 @@ func (t *Tokenizer) Between_DOCTYPE_PublicAndSystemIdent_State() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -2530,7 +2547,7 @@ func (t *Tokenizer) Before_DOCTYPE_SystemIdentifier_State() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -2573,7 +2590,7 @@ func (t *Tokenizer) DOCTYPE_SystemIdentifier_DoubleQuoted_State() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '"' {
@@ -2645,7 +2662,7 @@ func (t *Tokenizer) After_DOCTYPE_SystemIdentifer_State() error {
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return err
+		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
@@ -2673,7 +2690,7 @@ func (t *Tokenizer) Bogus_DOCTYPE_State() error {
 
 	if isEOF {
 		t.EmitCurrentWithTokens(NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == '>' {
@@ -2696,7 +2713,7 @@ func (t *Tokenizer) CDATA_Section_State() error {
 
 	if isEOF {
 		t.tokens = append(t.tokens, NewEOFToken())
-		return io.EOF
+		return nil
 	}
 
 	if char == ']' {
