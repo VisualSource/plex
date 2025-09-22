@@ -2,6 +2,7 @@ package html
 
 import (
 	"io"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -131,7 +132,7 @@ func NewTokenizer(stream io.RuneReader) Tokenizer {
 	}
 }
 
-func (t *Tokenizer) Parse() error {
+func (t *Tokenizer) Next() error {
 	var err error = nil
 
 	switch t.state {
@@ -316,6 +317,10 @@ func (t *Tokenizer) Parse() error {
 	return err
 }
 
+func (t *Tokenizer) SetState(state int) {
+	t.state = state
+}
+
 //#region Support
 
 func WasConsumedAsPartOfAttribute(state int) bool {
@@ -364,13 +369,16 @@ func (t *Tokenizer) Consume() (rune, error) {
 	return r, nil
 }
 
+func (t *Tokenizer) ReconsumeToken(token *Token) {
+	t.tokens = slices.Insert(t.tokens, 0, token)
+}
+
 func (t *Tokenizer) ConsumeToken() *Token {
 	if len(t.tokens) == 0 {
 		return nil
 	}
 
 	x, a := t.tokens[0], t.tokens[1:]
-
 	t.tokens = a
 
 	return x

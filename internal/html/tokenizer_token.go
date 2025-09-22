@@ -44,27 +44,7 @@ func NewDOCTYPEToken() *Token {
 		doctypeData: &doctypeData{},
 	}
 }
-func (t *Token) DOCTYPE_GetName() (*string, error) {
-	if t.token != Token_DOCTYPE {
-		return nil, errors.New("token is not a of type 'DOCTYPE'")
-	}
 
-	return t.doctypeData.name, nil
-}
-func (t *Token) DOCTYPE_GetPublicIdentifer() (*string, error) {
-	if t.token != Token_DOCTYPE {
-		return nil, errors.New("token is not a of type 'DOCTYPE'")
-	}
-
-	return t.doctypeData.publicIdentifier, nil
-}
-func (t *Token) DOCTYPE_GetSystemIdentifer() (*string, error) {
-	if t.token != Token_DOCTYPE {
-		return nil, errors.New("token is not a of type 'DOCTYPE'")
-	}
-
-	return t.doctypeData.systemIdentifier, nil
-}
 func (t *Token) DOCTYPE_GetForceQuirks() (bool, error) {
 	if t.token != Token_DOCTYPE {
 		return false, errors.New("token is not a of type 'DOCTYPE'")
