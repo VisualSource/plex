@@ -17,98 +17,98 @@ const (
 	State_ScriptData
 	State_PlainText
 
-	State_TagOpen
-	State_EndTagOpen
-	State_TagName
+	state_TagOpen
+	state_EndTagOpen
+	state_TagName
 
-	State_RCData_LessThanSign
-	State_RCData_EndTagOpen
-	State_RCData_EndTagName
+	state_RCData_LessThanSign
+	state_RCData_EndTagOpen
+	state_RCData_EndTagName
 
-	State_RawText_LessThanSign
-	State_RawText_EndTagOpen
-	State_RawText_EndTagName
+	state_RawText_LessThanSign
+	state_RawText_EndTagOpen
+	state_RawText_EndTagName
 
-	State_ScriptData_LessThanSign
-	State_ScriptData_EndTagOpen
-	State_ScriptData_EndTagName
-	State_ScriptData_EscapeStart
-	State_ScriptData_EscapeStartDash
+	state_ScriptData_LessThanSign
+	state_ScriptData_EndTagOpen
+	state_ScriptData_EndTagName
+	state_ScriptData_EscapeStart
+	state_ScriptData_EscapeStartDash
 
-	State_ScriptData_Escaped
-	State_ScriptData_EscapedDash
-	State_ScriptData_EscapedDashDash
-	State_ScriptData_EscapedLessThanSign
-	State_ScriptData_EscapedEndTagOpen
-	State_ScriptData_EscapedEndTagName
+	state_ScriptData_Escaped
+	state_ScriptData_EscapedDash
+	state_ScriptData_EscapedDashDash
+	state_ScriptData_EscapedLessThanSign
+	state_ScriptData_EscapedEndTagOpen
+	state_ScriptData_EscapedEndTagName
 
-	State_ScriptData_DoubleEscapedStart
-	State_ScriptData_DoubleEscaped
-	State_ScriptData_DoubleEscapedDash
-	State_ScriptData_DoubleEscapedDashDash
-	State_ScriptData_DoubleEscapedLessThanSign
-	State_ScriptData_DoubleEscapeEnd
+	state_ScriptData_DoubleEscapedStart
+	state_ScriptData_DoubleEscaped
+	state_ScriptData_DoubleEscapedDash
+	state_ScriptData_DoubleEscapedDashDash
+	state_ScriptData_DoubleEscapedLessThanSign
+	state_ScriptData_DoubleEscapeEnd
 
-	State_BeforeAttributeName
-	State_AttributeName
-	State_AfterAttributeName
+	state_BeforeAttributeName
+	state_AttributeName
+	state_AfterAttributeName
 
-	State_BeforeAttributeValue
-	State_AttributValue_DoubleQuoted
-	State_AttributValue_SingleQuoted
-	State_AttributValue_Unquoted
-	State_AfterAttributeValue_Quoted
+	state_BeforeAttributeValue
+	state_AttributValue_DoubleQuoted
+	state_AttributValue_SingleQuoted
+	state_AttributValue_Unquoted
+	state_AfterAttributeValue_Quoted
 
-	State_SelfClosingStartTag
-	State_BogusComment
-	State_MarkupDeclarationOpen
+	state_SelfClosingStartTag
+	state_BogusComment
+	state_MarkupDeclarationOpen
 
-	State_CommentStart
-	State_CommentStartDash
-	State_Comment
-	State_CommentLessThanSign
-	State_CommentLessThanSignBang
-	State_CommentLessThanSignBangDash
-	State_CommentLessThanSignBangDashDash
-	State_CommentEndDash
-	State_CommentEnd
-	State_CommentEndBang
+	state_CommentStart
+	state_CommentStartDash
+	state_Comment
+	state_CommentLessThanSign
+	state_CommentLessThanSignBang
+	state_CommentLessThanSignBangDash
+	state_CommentLessThanSignBangDashDash
+	state_CommentEndDash
+	state_CommentEnd
+	state_CommentEndBang
 
-	State_DOCTYPE
-	State_BeforeDOCTYPEName
-	State_DOCTYPE_Name
-	State_AfterDOCTYPE_Name
+	state_DOCTYPE
+	state_BeforeDOCTYPEName
+	state_DOCTYPE_Name
+	state_AfterDOCTYPE_Name
 
-	State_AfterDOCTYPE_PublicKeyword
-	State_BeforeDOCTYPE_PublicIdentifier
-	State_DOCTYPE_PublicIdentifier_DoubleQuoted
-	State_DOCTYPE_PublicIdentifier_SingleQuoted
-	State_AfterDOCTYPE_PublicIdentifier
+	state_AfterDOCTYPE_PublicKeyword
+	state_BeforeDOCTYPE_PublicIdentifier
+	state_DOCTYPE_PublicIdentifier_DoubleQuoted
+	state_DOCTYPE_PublicIdentifier_SingleQuoted
+	state_AfterDOCTYPE_PublicIdentifier
 
-	State_BetweenDOCTYPE_PublicAndSystemIdentifiers
+	state_BetweenDOCTYPE_PublicAndSystemIdentifiers
 
-	State_AfterDOCTYPE_SystemKeyword
-	State_BeforeDOCTYPE_SystemIdentifer // ?
-	State_DOCTYPE_SystemIdentifier_DoubleQuoted
-	State_DOCTYPE_SystemIdentifier_SingleQuoted
-	State_AfterDOCTYPE_SystemIdentifier
+	state_AfterDOCTYPE_SystemKeyword
+	state_BeforeDOCTYPE_SystemIdentifer
+	state_DOCTYPE_SystemIdentifier_DoubleQuoted
+	state_DOCTYPE_SystemIdentifier_SingleQuoted
+	state_AfterDOCTYPE_SystemIdentifier
 
-	State_BogusDOCTYPE
+	state_BogusDOCTYPE
 
-	State_CDATA_Section
-	State_CDATA_SectionBracket
-	State_CDATA_SectionEnd
+	state_CDATA_Section
+	state_CDATA_SectionBracket
+	state_CDATA_SectionEnd
 
-	State_CharacterReference
-	State_NamedCharacterReference
-	State_AmbiguousAmpersand
+	state_CharacterReference
+	state_NamedCharacterReference
+	state_AmbiguousAmpersand
 
-	State_NumericCharacterReference
-	State_HexadecimalCharacterReferenceStart
-	State_DecimalCharacterReferenceStart
-	State_HexadecimalCharacterReference
-	State_DecimalCharacterReference
-	State_NumericCharacterReferenceEnd
+	state_NumericCharacterReference
+	state_HexadecimalCharacterReferenceStart
+	state_DecimalCharacterReferenceStart
+	state_HexadecimalCharacterReference
+	state_DecimalCharacterReference
+	state_NumericCharacterReferenceEnd
 )
 
 // https://html.spec.whatwg.org/#tokenization
@@ -137,181 +137,181 @@ func (t *Tokenizer) Next() error {
 
 	switch t.state {
 	case State_Data:
-		err = t.DataState()
+		err = t.state_Data()
 	case State_RCData:
-		err = t.RCDataState()
+		err = t.state_RCData()
 	case State_RawText:
-		err = t.RawTextState()
+		err = t.state_RawText()
 	case State_ScriptData:
-		err = t.ScriptDataState()
+		err = t.state_ScriptData()
 	case State_PlainText:
-		err = t.PlainTextState()
+		err = t.state_PlainText()
 
-	case State_TagOpen:
-		err = t.TagOpenState()
-	case State_EndTagOpen:
-		err = t.EndTagOpenState()
-	case State_TagName:
-		err = t.TagNameState()
+	case state_TagOpen:
+		err = t.state_TagOpen()
+	case state_EndTagOpen:
+		err = t.state_EndTagOpen()
+	case state_TagName:
+		err = t.state_TagName()
 
-	case State_RCData_LessThanSign:
-		err = t.RCData_LessThenState()
-	case State_RCData_EndTagOpen:
-		err = t.RCData_EndTagOpenState()
-	case State_RCData_EndTagName:
-		err = t.RCData_EndTagNameState()
-	case State_RawText_LessThanSign:
-		err = t.RawText_LessThenSignState()
-	case State_RawText_EndTagOpen:
-		err = t.RawText_EndTagOpenState()
-	case State_RawText_EndTagName:
-		err = t.RawText_EndTagNameState()
+	case state_RCData_LessThanSign:
+		err = t.state_RCData_LessThen()
+	case state_RCData_EndTagOpen:
+		err = t.state_RCData_EndTagOpen()
+	case state_RCData_EndTagName:
+		err = t.state_RCData_EndTagName()
+	case state_RawText_LessThanSign:
+		err = t.state_RawText_LessThenSign()
+	case state_RawText_EndTagOpen:
+		err = t.state_RawText_EndTagOpen()
+	case state_RawText_EndTagName:
+		err = t.state_RawText_EndTagName()
 
-	case State_ScriptData_LessThanSign:
-		err = t.ScriptData_LessThanSignState()
-	case State_ScriptData_EndTagOpen:
-		err = t.ScriptData_EndTagOpenState()
-	case State_ScriptData_EndTagName:
-		err = t.ScriptData_EndTagNameState()
-	case State_ScriptData_EscapeStart:
-		err = t.ScriptData_Escape_StartState()
-	case State_ScriptData_EscapeStartDash:
-		err = t.ScriptData_Escape_StartDashState()
+	case state_ScriptData_LessThanSign:
+		err = t.state_ScriptData_LessThanSign()
+	case state_ScriptData_EndTagOpen:
+		err = t.state_ScriptData_EndTagOpen()
+	case state_ScriptData_EndTagName:
+		err = t.state_ScriptData_EndTagName()
+	case state_ScriptData_EscapeStart:
+		err = t.state_ScriptData_Escape_Start()
+	case state_ScriptData_EscapeStartDash:
+		err = t.state_ScriptData_Escape_StartDash()
 
-	case State_ScriptData_Escaped:
-		err = t.ScriptData_Escaped_State()
-	case State_ScriptData_EscapedDash:
-		err = t.ScriptData_Escaped_Dash_State()
-	case State_ScriptData_EscapedDashDash:
-		err = t.ScriptData_Escaped_DashDash_State()
-	case State_ScriptData_EscapedLessThanSign:
-		err = t.ScriptData_Escaped_LessThanSign_State()
-	case State_ScriptData_EscapedEndTagOpen:
-		err = t.ScriptData_Escaped_EndTagOpen_State()
-	case State_ScriptData_EscapedEndTagName:
-		err = t.ScriptData_Escaped_EndTagName_State()
+	case state_ScriptData_Escaped:
+		err = t.state_ScriptData_Escaped()
+	case state_ScriptData_EscapedDash:
+		err = t.state_ScriptData_Escaped_Dash()
+	case state_ScriptData_EscapedDashDash:
+		err = t.state_ScriptData_Escaped_DashDash()
+	case state_ScriptData_EscapedLessThanSign:
+		err = t.state_ScriptData_Escaped_LessThanSign()
+	case state_ScriptData_EscapedEndTagOpen:
+		err = t.state_ScriptData_Escaped_EndTagOpen()
+	case state_ScriptData_EscapedEndTagName:
+		err = t.state_ScriptData_Escaped_EndTagName()
 
-	case State_ScriptData_DoubleEscapedStart:
-		err = t.ScriptData_Double_Escaped_Start_State()
-	case State_ScriptData_DoubleEscaped:
-		err = t.ScriptData_Double_Escaped_State()
-	case State_ScriptData_DoubleEscapedDash:
-		err = t.ScriptData_Double_Escaped_Dash_State()
-	case State_ScriptData_DoubleEscapedDashDash:
-		err = t.ScriptData_Double_Escaped_DashDash_State()
-	case State_ScriptData_DoubleEscapedLessThanSign:
-		err = t.ScriptData_Double_Escaped_LessThanSign_State()
-	case State_ScriptData_DoubleEscapeEnd:
-		err = t.ScriptData_Double_Escaped_End_State()
+	case state_ScriptData_DoubleEscapedStart:
+		err = t.state_ScriptData_DoubleEscapedStart()
+	case state_ScriptData_DoubleEscaped:
+		err = t.state_ScriptData_DoubleEscaped()
+	case state_ScriptData_DoubleEscapedDash:
+		err = t.state_ScriptData_DoubleEscapedDash()
+	case state_ScriptData_DoubleEscapedDashDash:
+		err = t.state_ScriptData_DoubleEscapedDashDash()
+	case state_ScriptData_DoubleEscapedLessThanSign:
+		err = t.state_ScriptData_DoubleEscaped_LessThanSign()
+	case state_ScriptData_DoubleEscapeEnd:
+		err = t.state_ScriptData_DoubleEscapedEnd()
 
-	case State_BeforeAttributeName:
-		err = t.BeforeAttributeNameState()
-	case State_AttributeName:
-		err = t.AttributeNameState()
-	case State_AfterAttributeName:
-		err = t.AfterAttributeNameState()
+	case state_BeforeAttributeName:
+		err = t.state_BeforeAttributeName()
+	case state_AttributeName:
+		err = t.state_AttributeName()
+	case state_AfterAttributeName:
+		err = t.state_AfterAttributeName()
 
-	case State_BeforeAttributeValue:
-		err = t.BeforeAttributeValueState()
-	case State_AttributValue_DoubleQuoted:
-		err = t.AttributeValue_DoubleQuote_State()
-	case State_AttributValue_SingleQuoted:
-		err = t.AttributeValue_Signle_Quote_State()
-	case State_AttributValue_Unquoted:
-		err = t.AttributeValue_Unquoted_State()
-	case State_AfterAttributeValue_Quoted:
-		err = t.AfterAttributeValue_QuotedState()
-	case State_SelfClosingStartTag:
-		err = t.SelfClosingStartTagState()
-	case State_BogusComment:
-		err = t.BogusCommentState()
-	case State_MarkupDeclarationOpen:
-		err = t.MarkupDeclarationOpenState()
+	case state_BeforeAttributeValue:
+		err = t.state_BeforeAttributeValue()
+	case state_AttributValue_DoubleQuoted:
+		err = t.state_AttributeValue_DoubleQuote()
+	case state_AttributValue_SingleQuoted:
+		err = t.state_AttributeValue_SignleQuote()
+	case state_AttributValue_Unquoted:
+		err = t.state_AttributeValue_Unquoted()
+	case state_AfterAttributeValue_Quoted:
+		err = t.state_AfterAttributeValue_Quoted()
+	case state_SelfClosingStartTag:
+		err = t.state_SelfClosingStartTag()
+	case state_BogusComment:
+		err = t.state_BogusComment()
+	case state_MarkupDeclarationOpen:
+		err = t.state_MarkupDeclarationOpen()
 
-	case State_CommentStart:
-		err = t.Comment_Start_State()
-	case State_CommentStartDash:
-		err = t.Comment_StartDash_State()
-	case State_Comment:
-		err = t.Comment_State()
-	case State_CommentLessThanSign:
-		err = t.Comment_LessThanSignState()
-	case State_CommentLessThanSignBang:
-		err = t.Comment_LessThanSign_Bang_State()
-	case State_CommentLessThanSignBangDash:
-		err = t.Comment_LessThanSign_BangDash_State()
-	case State_CommentLessThanSignBangDashDash:
-		err = t.Comment_LessThanSign_BangDashDash_State()
-	case State_CommentEndDash:
-		err = t.Comment_EndDash_State()
-	case State_CommentEnd:
-		err = t.Comment_End_State()
-	case State_CommentEndBang:
-		err = t.Comment_EndBang_State()
+	case state_CommentStart:
+		err = t.state_CommentStart()
+	case state_CommentStartDash:
+		err = t.state_Comment_StartDash()
+	case state_Comment:
+		err = t.state_Comment()
+	case state_CommentLessThanSign:
+		err = t.state_Comment_LessThanSign()
+	case state_CommentLessThanSignBang:
+		err = t.state_Comment_LessThanSign_Bang()
+	case state_CommentLessThanSignBangDash:
+		err = t.state_Comment_LessThanSign_BangDash()
+	case state_CommentLessThanSignBangDashDash:
+		err = t.state_Comment_LessThanSign_BangDashDash()
+	case state_CommentEndDash:
+		err = t.state_Comment_EndDash()
+	case state_CommentEnd:
+		err = t.state_CommentEnd()
+	case state_CommentEndBang:
+		err = t.state_Comment_EndBang()
 
-	case State_DOCTYPE:
-		err = t.DOCTYPE_State()
-	case State_BeforeDOCTYPEName:
-		err = t.BeforeDOCTYPENameState()
-	case State_DOCTYPE_Name:
-		err = t.DOCTYPE_NameState()
-	case State_AfterDOCTYPE_Name:
-		err = t.After_DOCTYPE_Name()
+	case state_DOCTYPE:
+		err = t.state_DOCTYPE()
+	case state_BeforeDOCTYPEName:
+		err = t.state_BeforeDOCTYPEName()
+	case state_DOCTYPE_Name:
+		err = t.state_DOCTYPE_Name()
+	case state_AfterDOCTYPE_Name:
+		err = t.state_AfterDOCTYPE_Name()
 
-	case State_AfterDOCTYPE_PublicKeyword:
-		err = t.AfterDOCTYPE_PublicKeywordState()
-	case State_BeforeDOCTYPE_PublicIdentifier:
-		err = t.Before_DOCTYPE_PublicIdentifierState()
-	case State_DOCTYPE_PublicIdentifier_DoubleQuoted:
-		err = t.DOCTYPE_PublicIdentifier_DoubleQuoted_State()
-	case State_DOCTYPE_PublicIdentifier_SingleQuoted:
-		err = t.DOCKTYPE_PublicIdentifier_SingleQuoted_State()
-	case State_AfterDOCTYPE_PublicIdentifier:
-		err = t.After_DOCTYPE_PublicIdentifier_State()
+	case state_AfterDOCTYPE_PublicKeyword:
+		err = t.state_AfterDOCTYPE_PublicKeyword()
+	case state_BeforeDOCTYPE_PublicIdentifier:
+		err = t.state_BeforeDOCTYPE_PublicIdentifier()
+	case state_DOCTYPE_PublicIdentifier_DoubleQuoted:
+		err = t.state_DOCTYPE_PublicIdentifier_DoubleQuoted()
+	case state_DOCTYPE_PublicIdentifier_SingleQuoted:
+		err = t.state_DOCKTYPE_PublicIdentifier_SingleQuoted()
+	case state_AfterDOCTYPE_PublicIdentifier:
+		err = t.state_AfterDOCTYPE_PublicIdentifier()
 
-	case State_BetweenDOCTYPE_PublicAndSystemIdentifiers:
-		err = t.Between_DOCTYPE_PublicAndSystemIdent_State()
+	case state_BetweenDOCTYPE_PublicAndSystemIdentifiers:
+		err = t.state_BetweenDOCTYPE_PublicAndSystemIdent()
 
-	case State_AfterDOCTYPE_SystemKeyword:
-		err = t.After_DOCTYPE_SystemKeyword_State()
-	case State_BeforeDOCTYPE_SystemIdentifer:
-		err = t.Before_DOCTYPE_SystemIdentifier_State()
-	case State_DOCTYPE_SystemIdentifier_DoubleQuoted:
-		err = t.DOCTYPE_SystemIdentifier_DoubleQuoted_State()
-	case State_DOCTYPE_SystemIdentifier_SingleQuoted:
-		err = t.DOCTYPE_SystemIdentifier_SingleQuoted_State()
-	case State_AfterDOCTYPE_SystemIdentifier:
-		err = t.After_DOCTYPE_SystemIdentifer_State()
+	case state_AfterDOCTYPE_SystemKeyword:
+		err = t.state_AfterDOCTYPE_SystemKeyword()
+	case state_BeforeDOCTYPE_SystemIdentifer:
+		err = t.state_BeforeDOCTYPE_SystemIdentifier()
+	case state_DOCTYPE_SystemIdentifier_DoubleQuoted:
+		err = t.state_DOCTYPE_SystemIdentifier_DoubleQuoted()
+	case state_DOCTYPE_SystemIdentifier_SingleQuoted:
+		err = t.state_DOCTYPE_SystemIdentifier_SingleQuoted()
+	case state_AfterDOCTYPE_SystemIdentifier:
+		err = t.state_AfterDOCTYPE_SystemIdentifer()
 
-	case State_BogusDOCTYPE:
-		err = t.Bogus_DOCTYPE_State()
+	case state_BogusDOCTYPE:
+		err = t.state_Bogus_DOCTYPE()
 
-	case State_CDATA_Section:
-		err = t.CDATA_Section_State()
-	case State_CDATA_SectionBracket:
-		err = t.CDATA_Section_Bracket_State()
-	case State_CDATA_SectionEnd:
-		err = t.CDATA_Section_End_State()
+	case state_CDATA_Section:
+		err = t.state_CDATA_Section()
+	case state_CDATA_SectionBracket:
+		err = t.state_CDATA_SectionBracket()
+	case state_CDATA_SectionEnd:
+		err = t.state_CDATA_SectionEnd()
 
-	case State_CharacterReference:
-		err = t.CharacterReferenceState()
-	case State_NamedCharacterReference:
-		err = t.NamedCharacterReferenceState()
-	case State_AmbiguousAmpersand:
-		err = t.AmbiguousAmpersandState()
+	case state_CharacterReference:
+		err = t.state_CharacterReference()
+	case state_NamedCharacterReference:
+		err = t.state_NamedCharacterReference()
+	case state_AmbiguousAmpersand:
+		err = t.state_AmbiguousAmpersand()
 
-	case State_NumericCharacterReference:
-		err = t.NumericCharacterReferenceState()
-	case State_HexadecimalCharacterReferenceStart:
-		err = t.HexadecimalCharacterReferenceStartState()
-	case State_DecimalCharacterReferenceStart:
-		err = t.DeciamalCharacterReferenceState()
-	case State_HexadecimalCharacterReference:
-		err = t.HexadecimalCharacterReferenceState()
-	case State_DecimalCharacterReference:
-		err = t.DeciamalCharacterReferenceState()
-	case State_NumericCharacterReferenceEnd:
-		err = t.NumericCharacterReferenceEndState()
+	case state_NumericCharacterReference:
+		err = t.state_NumericCharacterReference()
+	case state_HexadecimalCharacterReferenceStart:
+		err = t.state_HexadecimalCharacterReferenceStart()
+	case state_DecimalCharacterReferenceStart:
+		err = t.state_DecimalCharacterReferenceStart()
+	case state_HexadecimalCharacterReference:
+		err = t.state_HexadecimalCharacterReference()
+	case state_DecimalCharacterReference:
+		err = t.state_DeciamalCharacterReference()
+	case state_NumericCharacterReferenceEnd:
+		err = t.state_NumericCharacterReferenceEnd()
 	}
 
 	return err
@@ -321,18 +321,35 @@ func (t *Tokenizer) SetState(state int) {
 	t.state = state
 }
 
+func (t *Tokenizer) ReconsumeToken(token *Token) {
+	t.tokens = slices.Insert(t.tokens, 0, token)
+}
+
+func (t *Tokenizer) ConsumeToken() *Token {
+	if len(t.tokens) == 0 {
+		return nil
+	}
+
+	x, a := t.tokens[0], t.tokens[1:]
+	t.tokens = a
+
+	return x
+}
+
+//#region private
+
 //#region Support
 
-func WasConsumedAsPartOfAttribute(state int) bool {
-	return state == State_AttributValue_DoubleQuoted || state == State_AttributValue_SingleQuoted || state == State_AttributeName
+func wasconsumedAsPartOfAttribute(state int) bool {
+	return state == state_AttributValue_DoubleQuoted || state == state_AttributValue_SingleQuoted || state == state_AttributeName
 }
 
 // When a state says to flush code points consumed as a character reference,
 // it means that for each code point in the temporary buffer (in the order they were added to the buffer),
 // the user agent must append the code point from the buffer to the current attribute's value if the character reference
 // was consumed as part of an attribute, or emit the code point as a character token otherwise.
-func (t *Tokenizer) Flush() {
-	if WasConsumedAsPartOfAttribute(t.rstate) {
+func (t *Tokenizer) flush() {
+	if wasconsumedAsPartOfAttribute(t.rstate) {
 		t.workingToken.Tag_AppendString_ToCurrentAttrValue(t.tempbuffer)
 		return
 	}
@@ -342,7 +359,7 @@ func (t *Tokenizer) Flush() {
 	}
 }
 
-func (t *Tokenizer) Consume() (rune, error) {
+func (t *Tokenizer) consume() (rune, error) {
 	r, _, err := t.reader.ReadRune()
 	if err != nil {
 		return utf8.RuneError, err
@@ -369,22 +386,7 @@ func (t *Tokenizer) Consume() (rune, error) {
 	return r, nil
 }
 
-func (t *Tokenizer) ReconsumeToken(token *Token) {
-	t.tokens = slices.Insert(t.tokens, 0, token)
-}
-
-func (t *Tokenizer) ConsumeToken() *Token {
-	if len(t.tokens) == 0 {
-		return nil
-	}
-
-	x, a := t.tokens[0], t.tokens[1:]
-	t.tokens = a
-
-	return x
-}
-
-func (t *Tokenizer) EmitCurrentWithTokens(tokens ...*Token) {
+func (t *Tokenizer) emitCurrentWithTokens(tokens ...*Token) {
 
 	if t.workingToken != nil {
 		if t.workingToken.token == Token_EndTag || t.workingToken.token == Token_StartTag {
@@ -400,7 +402,7 @@ func (t *Tokenizer) EmitCurrentWithTokens(tokens ...*Token) {
 // An appropriate end tag token is an end tag token whose tag name matches the tag name of the last start tag to have been
 // emitted from this tokenizer, if any. If no start tag has been emitted from this tokenizer,
 // then no end tag token is appropriate.
-func (t *Tokenizer) HasApproriateEndTagToken() bool {
+func (t *Tokenizer) hasApproriateEndTagToken() bool {
 	if t.workingToken.token != Token_EndTag {
 		return false
 	}
@@ -412,11 +414,13 @@ func (t *Tokenizer) HasApproriateEndTagToken() bool {
 	return *t.lastStartTag == t.workingToken.tagData.name
 }
 
+//#endregion
+
 //#region Entry
 
 // https://html.spec.whatwg.org/#data-state
-func (t *Tokenizer) DataState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Data() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -430,12 +434,12 @@ func (t *Tokenizer) DataState() error {
 
 	if char == '&' {
 		t.rstate = t.state
-		t.state = State_CharacterReference
+		t.state = state_CharacterReference
 		return nil
 	}
 
 	if char == '<' {
-		t.state = State_TagOpen
+		t.state = state_TagOpen
 		return nil
 	}
 
@@ -451,8 +455,8 @@ func (t *Tokenizer) DataState() error {
 }
 
 // https://html.spec.whatwg.org/#rcdata-state
-func (t *Tokenizer) RCDataState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RCData() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -466,12 +470,12 @@ func (t *Tokenizer) RCDataState() error {
 
 	if char == '&' {
 		t.rstate = State_RCData
-		t.state = State_CharacterReference
+		t.state = state_CharacterReference
 		return nil
 	}
 
 	if char == '<' {
-		t.state = State_RCData_LessThanSign
+		t.state = state_RCData_LessThanSign
 		return nil
 	}
 
@@ -487,8 +491,8 @@ func (t *Tokenizer) RCDataState() error {
 }
 
 // https://html.spec.whatwg.org/#rawtext-state
-func (t *Tokenizer) RawTextState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RawText() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -501,7 +505,7 @@ func (t *Tokenizer) RawTextState() error {
 	}
 
 	if char == '<' {
-		t.state = State_RawText_LessThanSign
+		t.state = state_RawText_LessThanSign
 		return nil
 	}
 
@@ -517,8 +521,8 @@ func (t *Tokenizer) RawTextState() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-state
-func (t *Tokenizer) ScriptDataState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -531,7 +535,7 @@ func (t *Tokenizer) ScriptDataState() error {
 	}
 
 	if char == '<' {
-		t.state = State_ScriptData_LessThanSign
+		t.state = state_ScriptData_LessThanSign
 		return nil
 	}
 
@@ -547,8 +551,8 @@ func (t *Tokenizer) ScriptDataState() error {
 }
 
 // https://html.spec.whatwg.org/#plaintext-state
-func (t *Tokenizer) PlainTextState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_PlainText() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -576,8 +580,8 @@ func (t *Tokenizer) PlainTextState() error {
 //#region Tag
 
 // https://html.spec.whatwg.org/#tag-open-state
-func (t *Tokenizer) TagOpenState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_TagOpen() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -591,17 +595,17 @@ func (t *Tokenizer) TagOpenState() error {
 	}
 
 	if char == '!' {
-		t.state = State_MarkupDeclarationOpen
+		t.state = state_MarkupDeclarationOpen
 		return nil
 	}
 
 	if char == '/' {
-		t.state = State_EndTagOpen
+		t.state = state_EndTagOpen
 		return nil
 	}
 
 	if unicode.IsLetter(char) {
-		t.state = State_TagName
+		t.state = state_TagName
 		t.workingToken = NewStartTagToken()
 		t.workingToken.Tag_SetName("")
 		return t.reader.UnreadRune()
@@ -610,7 +614,7 @@ func (t *Tokenizer) TagOpenState() error {
 	//  unexpected-question-mark-instead-of-tag-name parse error.
 	if char == '?' {
 		t.workingToken = NewCommentToken()
-		t.state = State_BogusComment
+		t.state = state_BogusComment
 		return t.reader.UnreadRune()
 	}
 
@@ -622,8 +626,8 @@ func (t *Tokenizer) TagOpenState() error {
 }
 
 // https://html.spec.whatwg.org/#end-tag-open-state
-func (t *Tokenizer) EndTagOpenState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_EndTagOpen() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -639,7 +643,7 @@ func (t *Tokenizer) EndTagOpenState() error {
 	if unicode.IsLetter(char) {
 		t.workingToken = NewEndTagToken()
 		t.workingToken.DOCTYPE_SetName("")
-		t.state = State_TagName
+		t.state = state_TagName
 		return t.reader.UnreadRune()
 	}
 
@@ -652,13 +656,13 @@ func (t *Tokenizer) EndTagOpenState() error {
 	// invalid-first-character-of-tag-name parse error.
 	t.workingToken = NewCommentToken()
 
-	t.state = State_BogusComment
+	t.state = state_BogusComment
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#tag-name-state
-func (t *Tokenizer) TagNameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_TagName() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -672,18 +676,18 @@ func (t *Tokenizer) TagNameState() error {
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_BeforeAttributeName
+		t.state = state_BeforeAttributeName
 		return nil
 	}
 
 	if char == '/' {
-		t.state = State_SelfClosingStartTag
+		t.state = state_SelfClosingStartTag
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -699,18 +703,20 @@ func (t *Tokenizer) TagNameState() error {
 	return t.workingToken.Tag_AppendStringToName(string(char))
 }
 
+//#endregion
+
 //#region RCDATA
 
 // https://html.spec.whatwg.org/#rcdata-less-than-sign-state
-func (t *Tokenizer) RCData_LessThenState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RCData_LessThen() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
 
 	if char == '/' {
 		t.tempbuffer = ""
-		t.state = State_RCData_EndTagOpen
+		t.state = state_RCData_EndTagOpen
 		return nil
 	}
 
@@ -721,8 +727,8 @@ func (t *Tokenizer) RCData_LessThenState() error {
 }
 
 // https://html.spec.whatwg.org/#rcdata-end-tag-open-state
-func (t *Tokenizer) RCData_EndTagOpenState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RCData_EndTagOpen() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
@@ -732,7 +738,7 @@ func (t *Tokenizer) RCData_EndTagOpenState() error {
 		t.workingToken = NewEndTagToken()
 		t.workingToken.Tag_SetName("")
 
-		t.state = State_RCData_EndTagName
+		t.state = state_RCData_EndTagName
 		return t.reader.UnreadRune()
 	}
 
@@ -743,31 +749,31 @@ func (t *Tokenizer) RCData_EndTagOpenState() error {
 }
 
 // https://html.spec.whatwg.org/#rcdata-end-tag-name-state
-func (t *Tokenizer) RCData_EndTagNameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RCData_EndTagName() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_BeforeAttributeName
+		if t.hasApproriateEndTagToken() {
+			t.state = state_BeforeAttributeName
 			return nil
 		}
 	}
 
 	if char == '/' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_SelfClosingStartTag
+		if t.hasApproriateEndTagToken() {
+			t.state = state_SelfClosingStartTag
 			return nil
 		}
 	}
 
 	if char == '>' {
-		if t.HasApproriateEndTagToken() {
+		if t.hasApproriateEndTagToken() {
 			t.state = State_Data
-			t.EmitCurrentWithTokens()
+			t.emitCurrentWithTokens()
 			return nil
 		}
 	}
@@ -792,11 +798,13 @@ func (t *Tokenizer) RCData_EndTagNameState() error {
 	return t.reader.UnreadRune()
 }
 
+//#endregion
+
 //#region RAWTEXT
 
 // https://html.spec.whatwg.org/#rawtext-less-than-sign-state
-func (t *Tokenizer) RawText_LessThenSignState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RawText_LessThenSign() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
@@ -804,7 +812,7 @@ func (t *Tokenizer) RawText_LessThenSignState() error {
 
 	if char == '/' {
 		t.tempbuffer = ""
-		t.state = State_RawText_EndTagOpen
+		t.state = state_RawText_EndTagOpen
 		return nil
 	}
 
@@ -815,8 +823,8 @@ func (t *Tokenizer) RawText_LessThenSignState() error {
 }
 
 // https://html.spec.whatwg.org/#rawtext-end-tag-open-state
-func (t *Tokenizer) RawText_EndTagOpenState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RawText_EndTagOpen() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
@@ -825,7 +833,7 @@ func (t *Tokenizer) RawText_EndTagOpenState() error {
 	if unicode.IsLetter(char) {
 		t.workingToken = NewEndTagToken()
 		t.workingToken.Tag_SetName("")
-		t.state = State_RawText_EndTagName
+		t.state = state_RawText_EndTagName
 
 		return t.reader.UnreadRune()
 	}
@@ -837,31 +845,31 @@ func (t *Tokenizer) RawText_EndTagOpenState() error {
 }
 
 // https://html.spec.whatwg.org/#rawtext-end-tag-name-state
-func (t *Tokenizer) RawText_EndTagNameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_RawText_EndTagName() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_BeforeAttributeName
+		if t.hasApproriateEndTagToken() {
+			t.state = state_BeforeAttributeName
 			return nil
 		}
 	}
 
 	if char == '/' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_SelfClosingStartTag
+		if t.hasApproriateEndTagToken() {
+			t.state = state_SelfClosingStartTag
 			return nil
 		}
 	}
 
 	if char == '>' {
-		if t.HasApproriateEndTagToken() {
+		if t.hasApproriateEndTagToken() {
 			t.state = State_Data
-			t.EmitCurrentWithTokens()
+			t.emitCurrentWithTokens()
 			return nil
 		}
 	}
@@ -885,10 +893,12 @@ func (t *Tokenizer) RawText_EndTagNameState() error {
 	return t.reader.UnreadRune()
 }
 
+//#endregion
+
 // #region Script
 // https://html.spec.whatwg.org/#script-data-less-than-sign-state
-func (t *Tokenizer) ScriptData_LessThanSignState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_LessThanSign() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
@@ -896,12 +906,12 @@ func (t *Tokenizer) ScriptData_LessThanSignState() error {
 
 	if char == '/' {
 		t.tempbuffer = ""
-		t.state = State_ScriptData_EndTagOpen
+		t.state = state_ScriptData_EndTagOpen
 		return nil
 	}
 
 	if char == '!' {
-		t.state = State_ScriptData_EscapeStart
+		t.state = state_ScriptData_EscapeStart
 		t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('!'))
 		return nil
 	}
@@ -913,8 +923,8 @@ func (t *Tokenizer) ScriptData_LessThanSignState() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-end-tag-open-state
-func (t *Tokenizer) ScriptData_EndTagOpenState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
@@ -922,7 +932,7 @@ func (t *Tokenizer) ScriptData_EndTagOpenState() error {
 	if unicode.IsLetter(char) {
 		t.workingToken = NewEndTagToken()
 		t.workingToken.Tag_SetName("")
-		t.state = State_ScriptData_EndTagName
+		t.state = state_ScriptData_EndTagName
 		return t.reader.UnreadRune()
 	}
 
@@ -933,30 +943,30 @@ func (t *Tokenizer) ScriptData_EndTagOpenState() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-end-tag-name-state
-func (t *Tokenizer) ScriptData_EndTagNameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_EndTagName() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_BeforeAttributeName
+		if t.hasApproriateEndTagToken() {
+			t.state = state_BeforeAttributeName
 			return nil
 		}
 	}
 
 	if char == '/' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_SelfClosingStartTag
+		if t.hasApproriateEndTagToken() {
+			t.state = state_SelfClosingStartTag
 			return nil
 		}
 	}
 
 	if char == '>' {
-		if t.HasApproriateEndTagToken() {
+		if t.hasApproriateEndTagToken() {
 			t.state = State_Data
-			t.EmitCurrentWithTokens()
+			t.emitCurrentWithTokens()
 			return nil
 		}
 	}
@@ -981,14 +991,14 @@ func (t *Tokenizer) ScriptData_EndTagNameState() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-escape-start-state
-func (t *Tokenizer) ScriptData_Escape_StartState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escape_Start() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
 
 	if char == '-' {
-		t.state = State_ScriptData_EscapeStartDash
+		t.state = state_ScriptData_EscapeStartDash
 		t.tokens = append(t.tokens, NewCharToken('-'))
 		return nil
 	}
@@ -998,14 +1008,14 @@ func (t *Tokenizer) ScriptData_Escape_StartState() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-escape-start-dash-state
-func (t *Tokenizer) ScriptData_Escape_StartDashState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escape_StartDash() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
 
 	if char == '-' {
-		t.state = State_ScriptData_EscapedDashDash
+		t.state = state_ScriptData_EscapedDashDash
 		t.tokens = append(t.tokens, NewCharToken('-'))
 		return nil
 	}
@@ -1015,8 +1025,8 @@ func (t *Tokenizer) ScriptData_Escape_StartDashState() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-state
-func (t *Tokenizer) ScriptData_Escaped_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escaped() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1029,13 +1039,13 @@ func (t *Tokenizer) ScriptData_Escaped_State() error {
 	}
 
 	if char == '-' {
-		t.state = State_ScriptData_EscapedDash
+		t.state = state_ScriptData_EscapedDash
 		t.tokens = append(t.tokens, NewCharToken('-'))
 		return nil
 	}
 
 	if char == '<' {
-		t.state = State_ScriptData_EscapedLessThanSign
+		t.state = state_ScriptData_EscapedLessThanSign
 		return nil
 	}
 
@@ -1050,8 +1060,8 @@ func (t *Tokenizer) ScriptData_Escaped_State() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-dash-state
-func (t *Tokenizer) ScriptData_Escaped_Dash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escaped_Dash() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1064,31 +1074,31 @@ func (t *Tokenizer) ScriptData_Escaped_Dash_State() error {
 	}
 
 	if char == '-' {
-		t.state = State_ScriptData_EscapedDashDash
+		t.state = state_ScriptData_EscapedDashDash
 		t.tokens = append(t.tokens, NewCharToken('-'))
 		return nil
 	}
 
 	if char == '<' {
-		t.state = State_ScriptData_EscapedLessThanSign
+		t.state = state_ScriptData_EscapedLessThanSign
 		return nil
 	}
 
 	if char == '\u0000' {
-		t.state = State_ScriptData_Escaped
+		t.state = state_ScriptData_Escaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
 
-	t.state = State_ScriptData_Escaped
+	t.state = state_ScriptData_Escaped
 	t.tokens = append(t.tokens, NewCharToken(char))
 
 	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-dash-dash-state
-func (t *Tokenizer) ScriptData_Escaped_DashDash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1106,7 +1116,7 @@ func (t *Tokenizer) ScriptData_Escaped_DashDash_State() error {
 	}
 
 	if char == '<' {
-		t.state = State_ScriptData_EscapedLessThanSign
+		t.state = state_ScriptData_EscapedLessThanSign
 		return nil
 	}
 
@@ -1117,20 +1127,20 @@ func (t *Tokenizer) ScriptData_Escaped_DashDash_State() error {
 	}
 
 	if char == '\u0000' {
-		t.state = State_ScriptData_Escaped
+		t.state = state_ScriptData_Escaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
 
-	t.state = State_ScriptData_Escaped
+	t.state = state_ScriptData_Escaped
 	t.tokens = append(t.tokens, NewCharToken(char))
 
 	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-less-than-sign-state
-func (t *Tokenizer) ScriptData_Escaped_LessThanSign_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escaped_LessThanSign() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1139,67 +1149,67 @@ func (t *Tokenizer) ScriptData_Escaped_LessThanSign_State() error {
 
 	if char == '/' {
 		t.tempbuffer = ""
-		t.state = State_ScriptData_EscapedEndTagOpen
+		t.state = state_ScriptData_EscapedEndTagOpen
 		return nil
 	}
 
 	if unicode.IsLetter(char) {
 		t.tempbuffer = ""
 		t.tokens = append(t.tokens, NewCharToken('<'))
-		t.state = State_ScriptData_DoubleEscapedStart
+		t.state = state_ScriptData_DoubleEscapedStart
 		return t.reader.UnreadRune()
 	}
 
 	t.tokens = append(t.tokens, NewCharToken('<'))
-	t.state = State_ScriptData_Escaped
+	t.state = state_ScriptData_Escaped
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-end-tag-open-state
-func (t *Tokenizer) ScriptData_Escaped_EndTagOpen_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escaped_EndTagOpen() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
 
 	if unicode.IsLetter(char) {
-		t.EmitCurrentWithTokens()
-		t.state = State_ScriptData_EscapedEndTagName
+		t.emitCurrentWithTokens()
+		t.state = state_ScriptData_EscapedEndTagName
 
 		return t.reader.UnreadRune()
 	}
 
 	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	t.state = State_ScriptData_Escaped
+	t.state = state_ScriptData_Escaped
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-end-tag-name-state
-func (t *Tokenizer) ScriptData_Escaped_EndTagName_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_BeforeAttributeName
+		if t.hasApproriateEndTagToken() {
+			t.state = state_BeforeAttributeName
 			return nil
 		}
 	}
 
 	if char == '/' {
-		if t.HasApproriateEndTagToken() {
-			t.state = State_SelfClosingStartTag
+		if t.hasApproriateEndTagToken() {
+			t.state = state_SelfClosingStartTag
 			return nil
 		}
 	}
 
 	if char == '>' {
-		if t.HasApproriateEndTagToken() {
+		if t.hasApproriateEndTagToken() {
 			t.state = State_Data
-			t.EmitCurrentWithTokens()
+			t.emitCurrentWithTokens()
 			return nil
 		}
 	}
@@ -1220,14 +1230,14 @@ func (t *Tokenizer) ScriptData_Escaped_EndTagName_State() error {
 		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
 	}
 
-	t.state = State_ScriptData_Escaped
+	t.state = state_ScriptData_Escaped
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escape-start-state
-func (t *Tokenizer) ScriptData_Double_Escaped_Start_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
@@ -1236,11 +1246,11 @@ func (t *Tokenizer) ScriptData_Double_Escaped_Start_State() error {
 		char == ' ' || char == '/' || char == '>' {
 
 		if t.tempbuffer == "script" {
-			t.state = State_ScriptData_DoubleEscaped
+			t.state = state_ScriptData_DoubleEscaped
 			return nil
 		}
 
-		t.state = State_ScriptData_Escaped
+		t.state = state_ScriptData_Escaped
 		t.tokens = append(t.tokens, NewCharToken(char))
 		return nil
 	}
@@ -1257,14 +1267,14 @@ func (t *Tokenizer) ScriptData_Double_Escaped_Start_State() error {
 		return nil
 	}
 
-	t.state = State_ScriptData_Escaped
+	t.state = state_ScriptData_Escaped
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-state
-func (t *Tokenizer) ScriptData_Double_Escaped_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_DoubleEscaped() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1277,13 +1287,13 @@ func (t *Tokenizer) ScriptData_Double_Escaped_State() error {
 	}
 
 	if char == '-' {
-		t.state = State_ScriptData_DoubleEscapedDash
+		t.state = state_ScriptData_DoubleEscapedDash
 		t.tokens = append(t.tokens, NewCharToken('-'))
 		return nil
 	}
 
 	if char == '<' {
-		t.state = State_ScriptData_DoubleEscapedLessThanSign
+		t.state = state_ScriptData_DoubleEscapedLessThanSign
 		t.tokens = append(t.tokens, NewCharToken('<'))
 		return nil
 	}
@@ -1299,8 +1309,8 @@ func (t *Tokenizer) ScriptData_Double_Escaped_State() error {
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-dash-state
-func (t *Tokenizer) ScriptData_Double_Escaped_Dash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_DoubleEscapedDash() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1313,32 +1323,32 @@ func (t *Tokenizer) ScriptData_Double_Escaped_Dash_State() error {
 	}
 
 	if char == '-' {
-		t.state = State_ScriptData_DoubleEscapedDashDash
+		t.state = state_ScriptData_DoubleEscapedDashDash
 		t.tokens = append(t.tokens, NewCharToken('-'))
 		return nil
 	}
 
 	if char == '<' {
-		t.state = State_ScriptData_DoubleEscapedLessThanSign
+		t.state = state_ScriptData_DoubleEscapedLessThanSign
 		t.tokens = append(t.tokens, NewCharToken('<'))
 		return nil
 	}
 
 	if char == '\u0000' {
-		t.state = State_ScriptData_Escaped
+		t.state = state_ScriptData_Escaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
 
-	t.state = State_ScriptData_DoubleEscaped
+	t.state = state_ScriptData_DoubleEscaped
 	t.tokens = append(t.tokens, NewCharToken(char))
 
 	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-dash-dash-state
-func (t *Tokenizer) ScriptData_Double_Escaped_DashDash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_DoubleEscapedDashDash() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1357,7 +1367,7 @@ func (t *Tokenizer) ScriptData_Double_Escaped_DashDash_State() error {
 
 	if char == '<' {
 		t.tokens = append(t.tokens, NewCharToken('<'))
-		t.state = State_ScriptData_DoubleEscapedLessThanSign
+		t.state = state_ScriptData_DoubleEscapedLessThanSign
 		return nil
 	}
 
@@ -1368,39 +1378,39 @@ func (t *Tokenizer) ScriptData_Double_Escaped_DashDash_State() error {
 	}
 
 	if char == '\u0000' {
-		t.state = State_ScriptData_DoubleEscaped
+		t.state = state_ScriptData_DoubleEscaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
 
-	t.state = State_ScriptData_DoubleEscaped
+	t.state = state_ScriptData_DoubleEscaped
 	t.tokens = append(t.tokens, NewCharToken(char))
 
 	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-less-than-sign-state
-func (t *Tokenizer) ScriptData_Double_Escaped_LessThanSign_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_DoubleEscaped_LessThanSign() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
 
 	if char == '/' {
 		t.tempbuffer = ""
-		t.state = State_ScriptData_DoubleEscapeEnd
+		t.state = state_ScriptData_DoubleEscapeEnd
 		t.tokens = append(t.tokens, NewCharToken('/'))
 		return nil
 	}
 
-	t.state = State_ScriptData_DoubleEscaped
+	t.state = state_ScriptData_DoubleEscaped
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escape-end-state
-func (t *Tokenizer) ScriptData_Double_Escaped_End_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
+	char, err := t.consume()
 	if err != nil {
 		return nil
 	}
@@ -1408,11 +1418,11 @@ func (t *Tokenizer) ScriptData_Double_Escaped_End_State() error {
 	if char == '\t' || char == '\n' || char == '\f' ||
 		char == ' ' || char == '/' || char == '>' {
 		if t.tempbuffer == "script" {
-			t.state = State_ScriptData_Escaped
+			t.state = state_ScriptData_Escaped
 			return nil
 		}
 
-		t.state = State_ScriptData_DoubleEscaped
+		t.state = state_ScriptData_DoubleEscaped
 		t.tokens = append(t.tokens, NewCharToken(char))
 		return nil
 	}
@@ -1428,16 +1438,17 @@ func (t *Tokenizer) ScriptData_Double_Escaped_End_State() error {
 		return nil
 	}
 
-	t.state = State_ScriptData_DoubleEscaped
+	t.state = state_ScriptData_DoubleEscaped
 
 	return t.reader.UnreadRune()
 }
 
+//#endregion
 // #region Attr
 
 // https://html.spec.whatwg.org/#before-attribute-name-state
-func (t *Tokenizer) BeforeAttributeNameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_BeforeAttributeName() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1445,7 +1456,7 @@ func (t *Tokenizer) BeforeAttributeNameState() error {
 	}
 
 	if isEOF || char == '/' || char == '>' {
-		t.state = State_AfterAttributeName
+		t.state = state_AfterAttributeName
 		return t.reader.UnreadRune()
 	}
 
@@ -1456,20 +1467,20 @@ func (t *Tokenizer) BeforeAttributeNameState() error {
 
 	// unexpected-equals-sign-before-attribute-name parse error
 	if char == '=' {
-		t.state = State_AttributeName
+		t.state = state_AttributeName
 		t.workingToken.Tag_NewAttr(string(char), "")
 		return nil
 	}
 
 	t.workingToken.Tag_NewAttr("", "")
-	t.state = State_AttributeName
+	t.state = state_AttributeName
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#attribute-name-state
-func (t *Tokenizer) AttributeNameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AttributeName() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1478,12 +1489,12 @@ func (t *Tokenizer) AttributeNameState() error {
 
 	if isEOF || char == '\t' || char == '\n' || char == '\f' ||
 		char == ' ' || char == '/' || char == '>' {
-		t.state = State_AfterAttributeName
+		t.state = state_AfterAttributeName
 		return t.reader.UnreadRune()
 	}
 
 	if char == '=' {
-		t.state = State_BeforeAttributeValue
+		t.state = state_BeforeAttributeValue
 		return nil
 	}
 
@@ -1503,8 +1514,8 @@ func (t *Tokenizer) AttributeNameState() error {
 }
 
 // https://html.spec.whatwg.org/#after-attribute-name-state
-func (t *Tokenizer) AfterAttributeNameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AfterAttributeName() error {
+	char, err := t.consume()
 
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
@@ -1522,30 +1533,30 @@ func (t *Tokenizer) AfterAttributeNameState() error {
 	}
 
 	if char == '/' {
-		t.state = State_SelfClosingStartTag
+		t.state = state_SelfClosingStartTag
 		return nil
 	}
 
 	if char == '=' {
-		t.state = State_BeforeAttributeValue
+		t.state = state_BeforeAttributeValue
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.workingToken.Tag_NewAttr("", "")
 
-	t.state = State_AttributeName
+	t.state = state_AttributeName
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#before-attribute-value-state
-func (t *Tokenizer) BeforeAttributeValueState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_BeforeAttributeValue() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
@@ -1555,30 +1566,30 @@ func (t *Tokenizer) BeforeAttributeValueState() error {
 	}
 
 	if char == '"' {
-		t.state = State_AttributValue_DoubleQuoted
+		t.state = state_AttributValue_DoubleQuoted
 		return nil
 	}
 
 	if char == '\'' {
-		t.state = State_AttributValue_SingleQuoted
+		t.state = state_AttributValue_SingleQuoted
 		return nil
 	}
 
 	// missing-attribute-value parse error
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
-	t.state = State_AttributValue_Unquoted
+	t.state = state_AttributValue_Unquoted
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#attribute-value-(double-quoted)-state
-func (t *Tokenizer) AttributeValue_DoubleQuote_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -1590,13 +1601,13 @@ func (t *Tokenizer) AttributeValue_DoubleQuote_State() error {
 	}
 
 	if char == '"' {
-		t.state = State_AfterAttributeValue_Quoted
+		t.state = state_AfterAttributeValue_Quoted
 		return nil
 	}
 
 	if char == '&' {
-		t.rstate = State_AttributValue_DoubleQuoted
-		t.state = State_CharacterReference
+		t.rstate = state_AttributValue_DoubleQuoted
+		t.state = state_CharacterReference
 		return nil
 	}
 
@@ -1608,8 +1619,8 @@ func (t *Tokenizer) AttributeValue_DoubleQuote_State() error {
 }
 
 // https://html.spec.whatwg.org/#attribute-value-(single-quoted)-state
-func (t *Tokenizer) AttributeValue_Signle_Quote_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -1621,13 +1632,13 @@ func (t *Tokenizer) AttributeValue_Signle_Quote_State() error {
 	}
 
 	if char == '\'' {
-		t.state = State_AfterAttributeValue_Quoted
+		t.state = state_AfterAttributeValue_Quoted
 		return nil
 	}
 
 	if char == '&' {
-		t.rstate = State_AttributValue_SingleQuoted
-		t.state = State_CharacterReference
+		t.rstate = state_AttributValue_SingleQuoted
+		t.state = state_CharacterReference
 		return nil
 	}
 
@@ -1639,8 +1650,8 @@ func (t *Tokenizer) AttributeValue_Signle_Quote_State() error {
 }
 
 // https://html.spec.whatwg.org/#attribute-value-(unquoted)-state
-func (t *Tokenizer) AttributeValue_Unquoted_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AttributeValue_Unquoted() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -1652,19 +1663,19 @@ func (t *Tokenizer) AttributeValue_Unquoted_State() error {
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_BeforeAttributeName
+		t.state = state_BeforeAttributeName
 		return nil
 	}
 
 	if char == '&' {
-		t.rstate = State_AttributValue_Unquoted
-		t.state = State_CharacterReference
+		t.rstate = state_AttributValue_Unquoted
+		t.state = state_CharacterReference
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -1679,8 +1690,8 @@ func (t *Tokenizer) AttributeValue_Unquoted_State() error {
 }
 
 // https://html.spec.whatwg.org/#after-attribute-value-(quoted)-state
-func (t *Tokenizer) AfterAttributeValue_QuotedState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -1692,31 +1703,32 @@ func (t *Tokenizer) AfterAttributeValue_QuotedState() error {
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_BeforeAttributeName
+		t.state = state_BeforeAttributeName
 		return nil
 	}
 
 	if char == '/' {
-		t.state = State_SelfClosingStartTag
+		t.state = state_SelfClosingStartTag
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	//  missing-whitespace-between-attributes parse error.
-	t.state = State_BeforeAttributeName
+	t.state = state_BeforeAttributeName
 	return t.reader.UnreadRune()
 }
 
 //#endregion
+//#endregion
 
 // https://html.spec.whatwg.org/#self-closing-start-tag-state
-func (t *Tokenizer) SelfClosingStartTagState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_SelfClosingStartTag() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -1730,29 +1742,29 @@ func (t *Tokenizer) SelfClosingStartTagState() error {
 	if char == '>' {
 		t.workingToken.Tag_SetSelfClosing(true)
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
-	t.state = State_BeforeAttributeName
+	t.state = state_BeforeAttributeName
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#bogus-comment-state
-func (t *Tokenizer) BogusCommentState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_BogusComment() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF {
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -1764,7 +1776,7 @@ func (t *Tokenizer) BogusCommentState() error {
 }
 
 // https://html.spec.whatwg.org/#markup-declaration-open-state
-func (t *Tokenizer) MarkupDeclarationOpenState() error {
+func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 
 	runes, err := t.reader.Peek(2)
 	if err != nil {
@@ -1778,7 +1790,7 @@ func (t *Tokenizer) MarkupDeclarationOpenState() error {
 			return err
 		}
 
-		t.state = State_CommentStart
+		t.state = state_CommentStart
 		t.workingToken = NewCommentToken()
 
 		return nil
@@ -1791,7 +1803,7 @@ func (t *Tokenizer) MarkupDeclarationOpenState() error {
 
 	a := string(runes)
 	if strings.ToUpper(a) == "DOCTYPE" {
-		t.state = State_DOCTYPE
+		t.state = state_DOCTYPE
 
 		rs := make([]rune, 7)
 		_, err := t.reader.Read(rs)
@@ -1815,93 +1827,94 @@ func (t *Tokenizer) MarkupDeclarationOpenState() error {
 
 		t.workingToken = NewCommentToken()
 		t.workingToken.Comment_AppendString(a)
-		t.state = State_BogusComment
+		t.state = state_BogusComment
 		return nil
 	}
 
 	t.workingToken = NewCommentToken()
-	t.state = State_BogusComment
+	t.state = state_BogusComment
 
 	return nil
 }
 
+//#endregion
 //#region Comment
 
 // https://html.spec.whatwg.org/#comment-start-state
-func (t *Tokenizer) Comment_Start_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_CommentStart() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
 	}
 
 	if char == '-' {
-		t.state = State_CommentStartDash
+		t.state = state_CommentStartDash
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
-	t.state = State_Comment
+	t.state = state_Comment
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-start-dash-state
-func (t *Tokenizer) Comment_StartDash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment_StartDash() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF {
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '-' {
-		t.state = State_CommentEnd
+		t.state = state_CommentEnd
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.workingToken.Comment_AppendString("-")
-	t.state = State_Comment
+	t.state = state_Comment
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-state
-func (t *Tokenizer) Comment_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF {
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '<' {
 		t.workingToken.Comment_AppendString(string(char))
-		t.state = State_CommentLessThanSign
+		t.state = state_CommentLessThanSign
 		return nil
 	}
 
 	if char == '-' {
-		t.state = State_CommentEndDash
+		t.state = state_CommentEndDash
 		return nil
 	}
 
@@ -1916,8 +1929,8 @@ func (t *Tokenizer) Comment_State() error {
 }
 
 // https://html.spec.whatwg.org/#comment-less-than-sign-state
-func (t *Tokenizer) Comment_LessThanSignState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment_LessThanSign() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
@@ -1925,7 +1938,7 @@ func (t *Tokenizer) Comment_LessThanSignState() error {
 
 	if char == '!' {
 		t.workingToken.Comment_AppendString(string(char))
-		t.state = State_CommentLessThanSignBang
+		t.state = state_CommentLessThanSignBang
 		return nil
 	}
 
@@ -1934,109 +1947,109 @@ func (t *Tokenizer) Comment_LessThanSignState() error {
 		return nil
 	}
 
-	t.state = State_Comment
+	t.state = state_Comment
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-state
-func (t *Tokenizer) Comment_LessThanSign_Bang_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment_LessThanSign_Bang() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
 	}
 
 	if char == '-' {
-		t.state = State_CommentLessThanSignBangDash
+		t.state = state_CommentLessThanSignBangDash
 		return nil
 	}
 
-	t.state = State_Comment
+	t.state = state_Comment
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-dash-state
-func (t *Tokenizer) Comment_LessThanSign_BangDash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment_LessThanSign_BangDash() error {
+	char, err := t.consume()
 
 	if err != nil {
 		return err
 	}
 
 	if char == '-' {
-		t.state = State_CommentLessThanSignBangDashDash
+		t.state = state_CommentLessThanSignBangDashDash
 		return nil
 	}
 
-	t.state = State_CommentEndDash
+	t.state = state_CommentEndDash
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-dash-dash-state
-func (t *Tokenizer) Comment_LessThanSign_BangDashDash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment_LessThanSign_BangDashDash() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF || char == '>' {
-		t.state = State_CommentEnd
+		t.state = state_CommentEnd
 		return t.reader.UnreadRune()
 	}
 
 	// This is a nested-comment parse error.
-	t.state = State_CommentEnd
+	t.state = state_CommentEnd
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-end-dash-state
-func (t *Tokenizer) Comment_EndDash_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment_EndDash() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF {
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '-' {
-		t.state = State_CommentEnd
+		t.state = state_CommentEnd
 		return nil
 	}
 
 	t.workingToken.Comment_AppendString("-")
-	t.state = State_Comment
+	t.state = state_Comment
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-end-state
-func (t *Tokenizer) Comment_End_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_CommentEnd() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF {
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	if char == '!' {
-		t.state = State_CommentEndBang
+		t.state = state_CommentEndBang
 		return nil
 	}
 
@@ -2046,47 +2059,48 @@ func (t *Tokenizer) Comment_End_State() error {
 	}
 
 	t.workingToken.Comment_AppendString("--")
-	t.state = State_Comment
+	t.state = state_Comment
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-end-bang-state
-func (t *Tokenizer) Comment_EndBang_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Comment_EndBang() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF {
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '-' {
 		t.workingToken.Comment_AppendString("--!")
-		t.state = State_CommentEndDash
+		t.state = state_CommentEndDash
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.workingToken.Comment_AppendString("--!")
-	t.state = State_Comment
+	t.state = state_Comment
 
 	return t.reader.UnreadRune()
 }
 
+//#endregion
 // #region DOCTYPE
 
 // https://html.spec.whatwg.org/#doctype-state
-func (t *Tokenizer) DOCTYPE_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DOCTYPE() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2095,27 +2109,27 @@ func (t *Tokenizer) DOCTYPE_State() error {
 	if isEOF {
 		t.workingToken = NewDOCTYPEToken()
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_BeforeDOCTYPEName
+		t.state = state_BeforeDOCTYPEName
 		return nil
 	}
 
 	if char == '>' {
-		t.state = State_BeforeDOCTYPEName
+		t.state = state_BeforeDOCTYPEName
 		return t.reader.UnreadRune()
 	}
 
-	t.state = State_BeforeDOCTYPEName
+	t.state = state_BeforeDOCTYPEName
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#before-doctype-name-state
-func (t *Tokenizer) BeforeDOCTYPENameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_BeforeDOCTYPEName() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2124,7 +2138,7 @@ func (t *Tokenizer) BeforeDOCTYPENameState() error {
 	if isEOF {
 		t.workingToken = NewDOCTYPEToken()
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
@@ -2135,14 +2149,14 @@ func (t *Tokenizer) BeforeDOCTYPENameState() error {
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
 		t.workingToken = NewDOCTYPEToken()
 		t.workingToken.DOCTYPE_SetName(string(unicode.ToLower(char)))
-		t.state = State_DOCTYPE_Name
+		t.state = state_DOCTYPE_Name
 		return nil
 	}
 
 	if char == '\u0000' {
 		t.workingToken = NewDOCTYPEToken()
 		t.workingToken.DOCTYPE_SetName(string(utf8.RuneError))
-		t.state = State_DOCTYPE_Name
+		t.state = state_DOCTYPE_Name
 		return nil
 	}
 
@@ -2156,13 +2170,13 @@ func (t *Tokenizer) BeforeDOCTYPENameState() error {
 	t.workingToken = NewDOCTYPEToken()
 	t.workingToken.DOCTYPE_SetName(string(char))
 
-	t.state = State_DOCTYPE_Name
+	t.state = state_DOCTYPE_Name
 	return nil
 }
 
 // https://html.spec.whatwg.org/#doctype-name-state
-func (t *Tokenizer) DOCTYPE_NameState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DOCTYPE_Name() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2170,18 +2184,18 @@ func (t *Tokenizer) DOCTYPE_NameState() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_AfterDOCTYPE_Name
+		t.state = state_AfterDOCTYPE_Name
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -2201,8 +2215,8 @@ func (t *Tokenizer) DOCTYPE_NameState() error {
 }
 
 // https://html.spec.whatwg.org/#after-doctype-name-state
-func (t *Tokenizer) After_DOCTYPE_Name() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2210,7 +2224,7 @@ func (t *Tokenizer) After_DOCTYPE_Name() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
@@ -2220,7 +2234,7 @@ func (t *Tokenizer) After_DOCTYPE_Name() error {
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -2239,7 +2253,7 @@ func (t *Tokenizer) After_DOCTYPE_Name() error {
 			return err
 		}
 
-		t.state = State_AfterDOCTYPE_PublicKeyword
+		t.state = state_AfterDOCTYPE_PublicKeyword
 		return nil
 	}
 
@@ -2251,17 +2265,17 @@ func (t *Tokenizer) After_DOCTYPE_Name() error {
 			return err
 		}
 
-		t.state = State_AfterDOCTYPE_SystemKeyword
+		t.state = state_AfterDOCTYPE_SystemKeyword
 		return nil
 	}
 
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#after-doctype-public-keyword-state
-func (t *Tokenizer) AfterDOCTYPE_PublicKeywordState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2269,22 +2283,22 @@ func (t *Tokenizer) AfterDOCTYPE_PublicKeywordState() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_BeforeDOCTYPE_PublicIdentifier
+		t.state = state_BeforeDOCTYPE_PublicIdentifier
 		return nil
 	}
 
 	if char == '"' {
-		t.state = State_DOCTYPE_PublicIdentifier_DoubleQuoted
+		t.state = state_DOCTYPE_PublicIdentifier_DoubleQuoted
 		return t.workingToken.DOCTYPE_SetPublicIdentifer("")
 	}
 
 	if char == '\'' {
-		t.state = State_DOCTYPE_PublicIdentifier_SingleQuoted
+		t.state = state_DOCTYPE_PublicIdentifier_SingleQuoted
 		return t.workingToken.DOCTYPE_SetPublicIdentifer("")
 	}
 
@@ -2292,18 +2306,18 @@ func (t *Tokenizer) AfterDOCTYPE_PublicKeywordState() error {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.state = State_Data
 
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.workingToken.DOCTYPE_SetForceQuirks(true)
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#before-doctype-public-identifier-state
-func (t *Tokenizer) Before_DOCTYPE_PublicIdentifierState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2311,7 +2325,7 @@ func (t *Tokenizer) Before_DOCTYPE_PublicIdentifierState() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		t.state = State_Data
 		return nil
 	}
@@ -2322,30 +2336,30 @@ func (t *Tokenizer) Before_DOCTYPE_PublicIdentifierState() error {
 
 	if char == '"' {
 		t.workingToken.DOCTYPE_SetPublicIdentifer("")
-		t.state = State_DOCTYPE_PublicIdentifier_DoubleQuoted
+		t.state = state_DOCTYPE_PublicIdentifier_DoubleQuoted
 		return nil
 	}
 
 	if char == '\'' {
 		t.workingToken.DOCTYPE_SetPublicIdentifer("")
-		t.state = State_DOCTYPE_PublicIdentifier_SingleQuoted
+		t.state = state_DOCTYPE_PublicIdentifier_SingleQuoted
 		return nil
 	}
 
 	if char == '>' {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.workingToken.DOCTYPE_SetForceQuirks(true)
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#doctype-public-identifier-(double-quoted)-state
-func (t *Tokenizer) DOCTYPE_PublicIdentifier_DoubleQuoted_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2353,12 +2367,12 @@ func (t *Tokenizer) DOCTYPE_PublicIdentifier_DoubleQuoted_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '"' {
-		t.state = State_AfterDOCTYPE_PublicIdentifier
+		t.state = state_AfterDOCTYPE_PublicIdentifier
 		return nil
 	}
 
@@ -2369,7 +2383,7 @@ func (t *Tokenizer) DOCTYPE_PublicIdentifier_DoubleQuoted_State() error {
 
 	if char == '>' {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		t.state = State_Data
 		return nil
 	}
@@ -2380,8 +2394,8 @@ func (t *Tokenizer) DOCTYPE_PublicIdentifier_DoubleQuoted_State() error {
 }
 
 // https://html.spec.whatwg.org/#doctype-public-identifier-(single-quoted)-state
-func (t *Tokenizer) DOCKTYPE_PublicIdentifier_SingleQuoted_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2389,12 +2403,12 @@ func (t *Tokenizer) DOCKTYPE_PublicIdentifier_SingleQuoted_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '\'' {
-		t.state = State_AfterDOCTYPE_PublicIdentifier
+		t.state = state_AfterDOCTYPE_PublicIdentifier
 		return nil
 	}
 
@@ -2406,7 +2420,7 @@ func (t *Tokenizer) DOCKTYPE_PublicIdentifier_SingleQuoted_State() error {
 	if char == '>' {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -2416,8 +2430,8 @@ func (t *Tokenizer) DOCKTYPE_PublicIdentifier_SingleQuoted_State() error {
 }
 
 // https://html.spec.whatwg.org/#after-doctype-public-identifier-state
-func (t *Tokenizer) After_DOCTYPE_PublicIdentifier_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2425,42 +2439,42 @@ func (t *Tokenizer) After_DOCTYPE_PublicIdentifier_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_BetweenDOCTYPE_PublicAndSystemIdentifiers
+		t.state = state_BetweenDOCTYPE_PublicAndSystemIdentifiers
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	if char == '"' {
 		t.workingToken.DOCTYPE_AppendStringToSystemIdent("")
-		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
 	}
 
 	if char == '\'' {
 		t.workingToken.DOCTYPE_AppendStringToSystemIdent("")
-		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
 	}
 
 	t.workingToken.DOCTYPE_SetForceQuirks(true)
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#between-doctype-public-and-system-identifiers-state
-func (t *Tokenizer) Between_DOCTYPE_PublicAndSystemIdent_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2468,7 +2482,7 @@ func (t *Tokenizer) Between_DOCTYPE_PublicAndSystemIdent_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
@@ -2478,31 +2492,31 @@ func (t *Tokenizer) Between_DOCTYPE_PublicAndSystemIdent_State() error {
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	if char == '"' {
 		t.workingToken.DOCTYPE_SetSystemIdentifer("")
-		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
 	}
 
 	if char == '\'' {
 		t.workingToken.DOCTYPE_SetSystemIdentifer("")
-		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
 	}
 
 	t.workingToken.DOCTYPE_SetForceQuirks(true)
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#after-doctype-system-keyword-state
-func (t *Tokenizer) After_DOCTYPE_SystemKeyword_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2510,7 +2524,7 @@ func (t *Tokenizer) After_DOCTYPE_SystemKeyword_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
@@ -2520,13 +2534,13 @@ func (t *Tokenizer) After_DOCTYPE_SystemKeyword_State() error {
 
 	if char == '"' {
 		t.workingToken.DOCTYPE_SetSystemIdentifer("")
-		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
 	}
 
 	if char == '\'' {
 		t.workingToken.DOCTYPE_SetSystemIdentifer("")
-		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
 	}
 
@@ -2534,19 +2548,19 @@ func (t *Tokenizer) After_DOCTYPE_SystemKeyword_State() error {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.state = State_Data
 
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.workingToken.DOCTYPE_SetForceQuirks(true)
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#before-doctype-system-identifier-state
-func (t *Tokenizer) Before_DOCTYPE_SystemIdentifier_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2554,7 +2568,7 @@ func (t *Tokenizer) Before_DOCTYPE_SystemIdentifier_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
@@ -2564,32 +2578,32 @@ func (t *Tokenizer) Before_DOCTYPE_SystemIdentifier_State() error {
 
 	if char == '"' {
 		t.workingToken.DOCTYPE_SetSystemIdentifer("")
-		t.state = State_DOCTYPE_SystemIdentifier_DoubleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
 	}
 
 	if char == '\'' {
 		t.workingToken.DOCTYPE_SetSystemIdentifer("")
-		t.state = State_DOCTYPE_SystemIdentifier_SingleQuoted
+		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
 	}
 
 	if char == '>' {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.workingToken.DOCTYPE_SetForceQuirks(true)
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#doctype-system-identifier-(double-quoted)-state
-func (t *Tokenizer) DOCTYPE_SystemIdentifier_DoubleQuoted_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2597,12 +2611,12 @@ func (t *Tokenizer) DOCTYPE_SystemIdentifier_DoubleQuoted_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '"' {
-		t.state = State_AfterDOCTYPE_SystemIdentifier
+		t.state = state_AfterDOCTYPE_SystemIdentifier
 		return nil
 	}
 
@@ -2614,7 +2628,7 @@ func (t *Tokenizer) DOCTYPE_SystemIdentifier_DoubleQuoted_State() error {
 	if char == '>' {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -2624,8 +2638,8 @@ func (t *Tokenizer) DOCTYPE_SystemIdentifier_DoubleQuoted_State() error {
 }
 
 // https://html.spec.whatwg.org/#doctype-system-identifier-(single-quoted)-state
-func (t *Tokenizer) DOCTYPE_SystemIdentifier_SingleQuoted_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2633,12 +2647,12 @@ func (t *Tokenizer) DOCTYPE_SystemIdentifier_SingleQuoted_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '\'' {
-		t.state = State_AfterDOCTYPE_SystemIdentifier
+		t.state = state_AfterDOCTYPE_SystemIdentifier
 		return nil
 	}
 
@@ -2650,7 +2664,7 @@ func (t *Tokenizer) DOCTYPE_SystemIdentifier_SingleQuoted_State() error {
 	if char == '>' {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
@@ -2660,8 +2674,8 @@ func (t *Tokenizer) DOCTYPE_SystemIdentifier_SingleQuoted_State() error {
 }
 
 // https://html.spec.whatwg.org/#after-doctype-system-identifier-state
-func (t *Tokenizer) After_DOCTYPE_SystemIdentifer_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2669,51 +2683,53 @@ func (t *Tokenizer) After_DOCTYPE_SystemIdentifer_State() error {
 
 	if isEOF {
 		t.workingToken.DOCTYPE_SetForceQuirks(true)
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
-		t.state = State_BeforeDOCTYPE_SystemIdentifer
+		t.state = state_BeforeDOCTYPE_SystemIdentifer
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
-	t.state = State_BogusDOCTYPE
+	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#bogus-doctype-state
-func (t *Tokenizer) Bogus_DOCTYPE_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_Bogus_DOCTYPE() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
 	}
 
 	if isEOF {
-		t.EmitCurrentWithTokens(NewEOFToken())
+		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_Data
-		t.EmitCurrentWithTokens()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	return nil
 }
 
-// region CDATA
+//#endregion
+//#region CDATA
+
 // https://html.spec.whatwg.org/#cdata-section-state
-func (t *Tokenizer) CDATA_Section_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_CDATA_Section() error {
+	char, err := t.consume()
 	isEOF := err == io.EOF
 	if err != nil && !isEOF {
 		return err
@@ -2725,7 +2741,7 @@ func (t *Tokenizer) CDATA_Section_State() error {
 	}
 
 	if char == ']' {
-		t.state = State_CDATA_SectionBracket
+		t.state = state_CDATA_SectionBracket
 		return nil
 	}
 
@@ -2735,26 +2751,26 @@ func (t *Tokenizer) CDATA_Section_State() error {
 }
 
 // https://html.spec.whatwg.org/#cdata-section-bracket-state
-func (t *Tokenizer) CDATA_Section_Bracket_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_CDATA_SectionBracket() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
 
 	if char == ']' {
-		t.state = State_CDATA_SectionEnd
+		t.state = state_CDATA_SectionEnd
 		return nil
 	}
 
 	t.tokens = append(t.tokens, NewCharToken(']'))
-	t.state = State_CDATA_Section
+	t.state = state_CDATA_Section
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#cdata-section-end-state
-func (t *Tokenizer) CDATA_Section_End_State() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_CDATA_SectionEnd() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
@@ -2770,40 +2786,41 @@ func (t *Tokenizer) CDATA_Section_End_State() error {
 	}
 
 	t.tokens = append(t.tokens, NewCharToken(']'), NewCharToken(']'))
-	t.state = State_CDATA_Section
+	t.state = state_CDATA_Section
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#character-reference-state
-func (t *Tokenizer) CharacterReferenceState() error {
+func (t *Tokenizer) state_CharacterReference() error {
 	t.tempbuffer = "&"
 
-	char, err := t.Consume()
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
 
 	if unicode.IsNumber(char) || unicode.IsLetter(char) {
-		t.state = State_NamedCharacterReference
+		t.state = state_NamedCharacterReference
 		return t.reader.UnreadRune()
 	}
 
 	if char == '#' {
 		t.tempbuffer += "#"
-		t.state = State_NumericCharacterReference
+		t.state = state_NumericCharacterReference
 		return nil
 	}
 
-	t.Flush()
+	t.flush()
 	t.state = t.rstate
 	return t.reader.UnreadRune()
 }
 
-//region reference
+//#endregion
+//#region reference
 
 // https://html.spec.whatwg.org/#named-character-reference-state
-func (t *Tokenizer) NamedCharacterReferenceState() error {
+func (t *Tokenizer) state_NamedCharacterReference() error {
 
 	/*runes, err := t.reader.Peek(25)
 	if err != nil {
@@ -2811,8 +2828,8 @@ func (t *Tokenizer) NamedCharacterReferenceState() error {
 	}
 
 	if runes[0] == 'a' && runes[1] == 'c' {
-		if WasConsumedAsPartOfAttribute(t.state) && runes[2] != ';' && (runes[2] == '=' || unicode.IsLetter(runes[2]) || unicode.IsNumber(runes[2])) {
-			t.Flush()
+		if wasconsumedAsPartOfAttribute(t.state) && runes[2] != ';' && (runes[2] == '=' || unicode.IsLetter(runes[2]) || unicode.IsNumber(runes[2])) {
+			t.flush()
 			t.state = t.rstate
 			return nil
 		}
@@ -2822,25 +2839,25 @@ func (t *Tokenizer) NamedCharacterReferenceState() error {
 		}
 
 		t.tempbuffer = string(rune('∾'))
-		t.Flush()
+		t.flush()
 		t.state = t.rstate
 		return nil
 	}*/
 
-	t.state = State_AmbiguousAmpersand
-	t.Flush()
+	t.state = state_AmbiguousAmpersand
+	t.flush()
 	return nil
 }
 
 // https://html.spec.whatwg.org/#ambiguous-ampersand-state
-func (t *Tokenizer) AmbiguousAmpersandState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_AmbiguousAmpersand() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
 
 	if unicode.IsLetter(char) || unicode.IsNumber(char) {
-		if WasConsumedAsPartOfAttribute(t.rstate) {
+		if wasconsumedAsPartOfAttribute(t.rstate) {
 			return t.workingToken.Tag_AppendString_ToCurrentAttrValue(string(char))
 		}
 
@@ -2859,8 +2876,8 @@ func (t *Tokenizer) AmbiguousAmpersandState() error {
 }
 
 // https://html.spec.whatwg.org/#numeric-character-reference-state
-func (t *Tokenizer) NumericCharacterReferenceState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_NumericCharacterReference() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
@@ -2869,52 +2886,52 @@ func (t *Tokenizer) NumericCharacterReferenceState() error {
 
 	if char == 'x' || char == 'X' {
 		t.tempbuffer += string(char)
-		t.state = State_HexadecimalCharacterReferenceStart
+		t.state = state_HexadecimalCharacterReferenceStart
 		return nil
 	}
 
-	t.state = State_DecimalCharacterReferenceStart
+	t.state = state_DecimalCharacterReferenceStart
 
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#hexadecimal-character-reference-start-state
-func (t *Tokenizer) HexadecimalCharacterReferenceStartState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_HexadecimalCharacterReferenceStart() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
 
 	if unicode.Is(unicode.ASCII_Hex_Digit, char) {
-		t.state = State_HexadecimalCharacterReference
+		t.state = state_HexadecimalCharacterReference
 		return t.reader.UnreadRune()
 	}
 
-	t.Flush()
+	t.flush()
 	t.state = t.rstate
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#hexadecimal-character-reference-start-state
-func (t *Tokenizer) DecimalCharacterReferenceStartState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DecimalCharacterReferenceStart() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
 
 	if unicode.IsDigit(char) {
-		t.state = State_DecimalCharacterReference
+		t.state = state_DecimalCharacterReference
 		return t.reader.UnreadRune()
 	}
 
-	t.Flush()
+	t.flush()
 	t.state = t.rstate
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#hexadecimal-character-reference-state
-func (t *Tokenizer) HexadecimalCharacterReferenceState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_HexadecimalCharacterReference() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
@@ -2937,17 +2954,17 @@ func (t *Tokenizer) HexadecimalCharacterReferenceState() error {
 	}
 
 	if char == ';' {
-		t.state = State_NumericCharacterReferenceEnd
+		t.state = state_NumericCharacterReferenceEnd
 		return nil
 	}
 
-	t.state = State_NumericCharacterReferenceEnd
+	t.state = state_NumericCharacterReferenceEnd
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#decimal-character-reference-state
-func (t *Tokenizer) DeciamalCharacterReferenceState() error {
-	char, err := t.Consume()
+func (t *Tokenizer) state_DeciamalCharacterReference() error {
+	char, err := t.consume()
 	if err != nil {
 		return err
 	}
@@ -2958,16 +2975,16 @@ func (t *Tokenizer) DeciamalCharacterReferenceState() error {
 	}
 
 	if char == ';' {
-		t.state = State_NumericCharacterReferenceEnd
+		t.state = state_NumericCharacterReferenceEnd
 		return nil
 	}
 
-	t.state = State_NumericCharacterReferenceEnd
+	t.state = state_NumericCharacterReferenceEnd
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#numeric-character-reference-end-state
-func (t *Tokenizer) NumericCharacterReferenceEndState() error {
+func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
 	if t.characterReferenceCode == 0x00 {
 		t.characterReferenceCode = 0xFFFD
@@ -3053,7 +3070,7 @@ func (t *Tokenizer) NumericCharacterReferenceEndState() error {
 
 	t.tempbuffer = string(rune(t.characterReferenceCode))
 
-	t.Flush()
+	t.flush()
 	t.state = t.rstate
 	return nil
 }

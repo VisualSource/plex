@@ -3,6 +3,8 @@ package html
 import (
 	"io"
 	"slices"
+
+	tokenizer "github.com/VisualSource/plex/internal/html/tokenizer"
 )
 
 const (
@@ -43,7 +45,7 @@ type HTMLParser struct {
 	scripting             bool
 	fameset               bool
 	originalInsertionMode int
-	tokenizer             Tokenizer
+	tokenizer             tokenizer.Tokenizer
 	document              *Document
 }
 
@@ -75,7 +77,7 @@ outer:
 	return nil
 }
 
-func (m *HTMLParser) InsertHtmlElement(token *Token, namespace string, onlyAddToElementStack bool) *HTMLElement {
+func (m *HTMLParser) InsertHtmlElement(token *tokenizer.Token, namespace string, onlyAddToElementStack bool) *HTMLElement {
 
 	el := NewHTMLElement(token.tagData.name)
 
@@ -90,7 +92,7 @@ func (m *HTMLParser) InsertHtmlElement(token *Token, namespace string, onlyAddTo
 }
 
 // https://html.spec.whatwg.org/#the-initial-insertion-mode
-func (m *HTMLParser) Mode_Initial(token *Token) error {
+func (m *HTMLParser) Mode_Initial(token *tokenizer.Token) error {
 
 	if token.token == Token_Character && slices.Contains([]string{
 		"\t",
@@ -123,7 +125,7 @@ func (m *HTMLParser) Mode_Initial(token *Token) error {
 	return nil
 }
 
-func (m *HTMLParser) Mode_BeforeHtml(token *Token) error {
+func (m *HTMLParser) Mode_BeforeHtml(token *tokenizer.Token) error {
 	if token.token == Token_DOCTYPE {
 		return nil
 	}
@@ -171,7 +173,7 @@ func (m *HTMLParser) Mode_BeforeHtml(token *Token) error {
 	return nil
 }
 
-func (m *HTMLParser) Mode_BeforeHead(token *Token) error {
+func (m *HTMLParser) Mode_BeforeHead(token *tokenizer.Token) error {
 
 	if token.token == Token_Character && slices.Contains([]string{
 		"\t",
@@ -222,8 +224,8 @@ func (m *HTMLParser) Mode_BeforeHead(token *Token) error {
 }
 
 // https://html.spec.whatwg.org/#parsing-main-inhead
-func (m *HTMLParser) Mode_InHead(token *Token) error {
-	if token.token == Token_Character && slices.Contains([]string{
+func (m *HTMLParser) Mode_InHead(token *tokenizer.Token) error {
+	if token.token == tokenizer.Token_Character && slices.Contains([]string{
 		"\t",
 		"\n",
 		"\f",
@@ -233,7 +235,7 @@ func (m *HTMLParser) Mode_InHead(token *Token) error {
 		return nil
 	}
 
-	if token.token == Token_Comment {
+	if token.token == tokenizer.Token_Comment {
 		node, ok := m.openEls[len(m.openEls)-1].(*HTMLElement)
 		if ok {
 			node.Append(NewCommentNode(token.data))
@@ -241,21 +243,21 @@ func (m *HTMLParser) Mode_InHead(token *Token) error {
 		return nil
 	}
 
-	if token.token == Token_DOCTYPE {
+	if token.token == tokenizer.Token_DOCTYPE {
 		return nil
 	}
 
-	if token.token == Token_StartTag && token.tagData.name == "html" {
+	if token.token == tokenizer.Token_StartTag && token.tagData.name == "html" {
 		return m.Mode_InBody()
 	}
 
-	if token.token == Token_StartTag && slices.Contains([]string{"base", "basefont", "link", "bgsound"}, token.tagData.name) {
+	if token.token == tokenizer.Token_StartTag && slices.Contains([]string{"base", "basefont", "link", "bgsound"}, token.tagData.name) {
 		m.InsertHtmlElement(token, "html", false)
 		m.openEls = slices.Delete(m.openEls, 0, 1)
 		return nil
 	}
 
-	if token.token == Token_StartTag && token.tagData.name == "meta" {
+	if token.token == tokenizer.Token_StartTag && token.tagData.name == "meta" {
 		m.InsertHtmlElement(token, "html", false)
 		m.openEls = slices.Delete(m.openEls, 0, 1)
 
@@ -265,54 +267,54 @@ func (m *HTMLParser) Mode_InHead(token *Token) error {
 		return nil
 	}
 
-	if token.token == Token_StartTag && token.tagData.name == "title" {
+	if token.token == tokenizer.Token_StartTag && token.tagData.name == "title" {
 		return nil
 	}
 
-	if token.token == Token_StartTag && ((token.tagData.name == "noscript" && !m.scripting) || token.tagData.name == "noframes" || token.tagData.name == "style") {
+	if token.token == tokenizer.Token_StartTag && ((token.tagData.name == "noscript" && !m.scripting) || token.tagData.name == "noframes" || token.tagData.name == "style") {
 		m.InsertHtmlElement(token, "html", false)
 
-		m.tokenizer.SetState(State_RawText)
+		m.tokenizer.SetState(tokenizer.State_RawText)
 
 		m.originalInsertionMode = m.insertionMode
 		m.insertionMode = Mode_Text
 		return nil
 	}
 
-	if token.token == Token_StartTag && token.tagData.name == "noscript" && m.scripting {
+	if token.token == tokenizer.Token_StartTag && token.tagData.name == "noscript" && m.scripting {
 		m.InsertHtmlElement(token, "html", false)
 		m.insertionMode = Mode_InHeadNoScript
 		return nil
 	}
 
-	if token.token == Token_StartTag && token.tagData.name == "script" {
+	if token.token == tokenizer.Token_StartTag && token.tagData.name == "script" {
 
 		m.InsertHtmlElement(token, "html", false)
 
-		m.tokenizer.SetState(State_ScriptData)
+		m.tokenizer.SetState(tokenizer.State_ScriptData)
 		m.originalInsertionMode = m.insertionMode
 		m.insertionMode = Mode_Text
 	}
 
-	if token.token == Token_EndTag && token.tagData.name == "head" {
+	if token.token == tokenizer.Token_EndTag && token.tagData.name == "head" {
 		m.openEls = slices.Delete(m.openEls, len(m.openEls)-1, len(m.openEls)-1)
 
 		m.insertionMode = Mode_AfterHead
 		return nil
 	}
 
-	if token.token == Token_StartTag && token.tagData.name == "template" {
+	if token.token == tokenizer.Token_StartTag && token.tagData.name == "template" {
 		return nil
 	}
 
-	if token.token == Token_EndTag && token.tagData.name == "template" {
+	if token.token == tokenizer.Token_EndTag && token.tagData.name == "template" {
 		return nil
 	}
 
-	if token.token == Token_EndTag && slices.Contains([]string{}, token.tagData.name) {
+	if token.token == tokenizer.Token_EndTag && slices.Contains([]string{}, token.tagData.name) {
 	}
 
-	if (token.token == Token_StartTag && token.tagData.name == "head") || token.token == Token_EndTag {
+	if (token.token == tokenizer.Token_StartTag && token.tagData.name == "head") || token.token == tokenizer.Token_EndTag {
 		return nil
 	}
 
