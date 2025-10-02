@@ -116,10 +116,10 @@ type Tokenizer struct {
 	reader                 *runeio.RuneReader
 	state                  int
 	rstate                 int
-	tokens                 []*Token
+	tokens                 []Token
 	characterReferenceCode int
 	tempbuffer             string
-	workingToken           *Token
+	workingToken           Token
 	lastStartTag           *string
 }
 
@@ -340,8 +340,10 @@ func (t *Tokenizer) ConsumeToken() *Token {
 
 //#region Support
 
-func wasconsumedAsPartOfAttribute(state int) bool {
-	return state == state_AttributValue_DoubleQuoted || state == state_AttributValue_SingleQuoted || state == state_AttributeName
+func wasConsumedAsPartOfAttribute(state int) bool {
+	return state == state_AttributValue_DoubleQuoted ||
+		state == state_AttributValue_SingleQuoted ||
+		state == state_AttributeName
 }
 
 // When a state says to flush code points consumed as a character reference,
@@ -349,13 +351,17 @@ func wasconsumedAsPartOfAttribute(state int) bool {
 // the user agent must append the code point from the buffer to the current attribute's value if the character reference
 // was consumed as part of an attribute, or emit the code point as a character token otherwise.
 func (t *Tokenizer) flush() {
-	if wasconsumedAsPartOfAttribute(t.rstate) {
-		t.workingToken.Tag_AppendString_ToCurrentAttrValue(t.tempbuffer)
+	if wasConsumedAsPartOfAttribute(t.rstate) {
+
+		tag, ok := t.workingToken.(TagToken)
+		if ok {
+			tag.AppendStringAttrValue(t.tempbuffer)
+		}
 		return
 	}
 
-	for x := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
+	for _, char := range t.tempbuffer {
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 	}
 }
 
@@ -386,13 +392,12 @@ func (t *Tokenizer) consume() (rune, error) {
 	return r, nil
 }
 
-func (t *Tokenizer) emitCurrentWithTokens(tokens ...*Token) {
+func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 
-	if t.workingToken != nil {
-		if t.workingToken.token == Token_EndTag || t.workingToken.token == Token_StartTag {
-			t.workingToken.Tag_FinishAttr()
-		}
-		t.tokens = append(t.tokens, t.workingToken)
+	tag, ok := t.workingToken.(TagToken)
+	if ok {
+		tag.FinishAttr()
+		t.tokens = append(t.tokens, tag)
 	}
 
 	t.tokens = append(t.tokens, tokens...)
@@ -403,15 +408,16 @@ func (t *Tokenizer) emitCurrentWithTokens(tokens ...*Token) {
 // emitted from this tokenizer, if any. If no start tag has been emitted from this tokenizer,
 // then no end tag token is appropriate.
 func (t *Tokenizer) hasApproriateEndTagToken() bool {
-	if t.workingToken.token != Token_EndTag {
+	tag, ok := t.workingToken.(TagToken)
+	if !ok {
 		return false
 	}
 
-	if t.lastStartTag == nil {
+	if t.lastStartTag == nil || tag.IsType(Token_StartTag) {
 		return false
 	}
 
-	return *t.lastStartTag == t.workingToken.tagData.name
+	return *t.lastStartTag == tag.Name
 }
 
 //#endregion
@@ -445,11 +451,11 @@ func (t *Tokenizer) state_Data() error {
 
 	// unexpected-null-character parse error
 	if char == '\u0000' {
-		t.tokens = append(t.tokens, NewCharToken(char))
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -485,7 +491,7 @@ func (t *Tokenizer) state_RCData() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -515,7 +521,7 @@ func (t *Tokenizer) state_RawText() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -545,7 +551,7 @@ func (t *Tokenizer) state_ScriptData() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -570,7 +576,7 @@ func (t *Tokenizer) state_PlainText() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -590,7 +596,7 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	// eof-before-tag-name parse error.
 	if isEOF {
-		t.tokens = append(t.tokens, NewCharToken('<'), NewEOFToken())
+		t.tokens = append(t.tokens, NewCharacterToken('<'), NewEOFToken())
 		return nil
 	}
 
@@ -606,8 +612,9 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	if unicode.IsLetter(char) {
 		t.state = state_TagName
-		t.workingToken = NewStartTagToken()
-		t.workingToken.Tag_SetName("")
+		tag := NewStartToken()
+		tag.Name = ""
+		t.workingToken = tag
 		return t.reader.UnreadRune()
 	}
 
@@ -620,7 +627,7 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	//  invalid-first-character-of-tag-name parse error.
 
-	t.tokens = append(t.tokens, NewCharToken('>'))
+	t.tokens = append(t.tokens, NewCharacterToken('>'))
 	t.state = State_Data
 	return t.reader.UnreadRune()
 }
@@ -636,13 +643,14 @@ func (t *Tokenizer) state_EndTagOpen() error {
 
 	//  eof-before-tag-name parse error.
 	if isEOF {
-		t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'), NewEOFToken())
+		t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'), NewEOFToken())
 		return nil
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewEndTagToken()
-		t.workingToken.DOCTYPE_SetName("")
+		tag := NewEndToken()
+		tag.Name = ""
+		t.workingToken = tag
 		t.state = state_TagName
 		return t.reader.UnreadRune()
 	}
@@ -692,15 +700,24 @@ func (t *Tokenizer) state_TagName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		return t.workingToken.Tag_AppendStringToName(string(unicode.ToLower(char)))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.Name += string(unicode.ToLower(char))
+		}
+		return nil
 	}
 
 	// unexpected-null-character parse error.
 	if char == '\u0000' {
-		return t.workingToken.Tag_AppendStringToName(string(utf8.RuneError))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.Name += string(utf8.RuneError)
+		}
+		return nil
 	}
 
-	return t.workingToken.Tag_AppendStringToName(string(char))
+	if tag, ok := t.workingToken.(TagToken); ok {
+		tag.Name += string(char)
+	}
+	return nil
 }
 
 //#endregion
@@ -721,7 +738,7 @@ func (t *Tokenizer) state_RCData_LessThen() error {
 	}
 
 	t.state = State_RCData
-	t.tokens = append(t.tokens, NewCharToken('<'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'))
 
 	return t.reader.UnreadRune()
 }
@@ -735,14 +752,15 @@ func (t *Tokenizer) state_RCData_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewEndTagToken()
-		t.workingToken.Tag_SetName("")
+		tag := NewEndToken()
+		tag.Name = ""
+		t.workingToken = tag
 
 		t.state = state_RCData_EndTagName
 		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
 	t.state = State_RCData
 
 	return t.reader.UnreadRune()
@@ -781,17 +799,25 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			return t.workingToken.Tag_AppendStringToName(string(unicode.ToLower(char)))
+
+			if tag, ok := t.workingToken.(TagToken); ok {
+				tag.Name += string(unicode.ToLower(char))
+			}
+
+			return nil
 		}
 
 		t.tempbuffer += string(char)
-		return t.workingToken.Tag_AppendStringToName(string(char))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.Name += string(char)
+		}
+		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
 
-	for x := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
+	for _, char := range t.tempbuffer {
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 	}
 
 	t.state = State_RCData
@@ -816,7 +842,7 @@ func (t *Tokenizer) state_RawText_LessThenSign() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'))
 	t.state = State_RawText
 
 	return t.reader.UnreadRune()
@@ -831,14 +857,15 @@ func (t *Tokenizer) state_RawText_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewEndTagToken()
-		t.workingToken.Tag_SetName("")
+		tag := NewEndToken()
+		tag.Name = ""
+		t.workingToken = tag
 		t.state = state_RawText_EndTagName
 
 		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
 	t.state = State_RawText
 
 	return t.reader.UnreadRune()
@@ -877,16 +904,22 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			return t.workingToken.Tag_AppendStringToName(string(unicode.ToLower(char)))
+			if tag, ok := t.workingToken.(TagToken); ok {
+				tag.Name += string(unicode.ToLower(char))
+			}
+			return nil
 		}
 
 		t.tempbuffer += string(char)
-		return t.workingToken.Tag_AppendStringToName(string(char))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.Name += string(char)
+		}
+		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	for x := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
+	for _, char := range t.tempbuffer {
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 	}
 
 	t.state = State_RawText
@@ -912,11 +945,11 @@ func (t *Tokenizer) state_ScriptData_LessThanSign() error {
 
 	if char == '!' {
 		t.state = state_ScriptData_EscapeStart
-		t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('!'))
+		t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('!'))
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'))
 	t.state = State_ScriptData
 
 	return t.reader.UnreadRune()
@@ -930,13 +963,14 @@ func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewEndTagToken()
-		t.workingToken.Tag_SetName("")
+		tag := NewEndToken()
+		tag.Name = ""
+		t.workingToken = tag
 		t.state = state_ScriptData_EndTagName
 		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
 	t.state = State_ScriptData
 
 	return t.reader.UnreadRune()
@@ -974,16 +1008,22 @@ func (t *Tokenizer) state_ScriptData_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			return t.workingToken.Tag_AppendStringToName(string(unicode.ToLower(char)))
+			if tag, ok := t.workingToken.(TagToken); ok {
+				tag.Name += string(unicode.ToLower(char))
+			}
+			return nil
 		}
 
 		t.tempbuffer += string(char)
-		return t.workingToken.Tag_AppendStringToName(string(char))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.Name += string(char)
+		}
+		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
-	for x := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
+	for _, char := range t.tempbuffer {
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 	}
 
 	t.state = State_ScriptData
@@ -999,7 +1039,7 @@ func (t *Tokenizer) state_ScriptData_Escape_Start() error {
 
 	if char == '-' {
 		t.state = state_ScriptData_EscapeStartDash
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
@@ -1016,7 +1056,7 @@ func (t *Tokenizer) state_ScriptData_Escape_StartDash() error {
 
 	if char == '-' {
 		t.state = state_ScriptData_EscapedDashDash
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
@@ -1040,7 +1080,7 @@ func (t *Tokenizer) state_ScriptData_Escaped() error {
 
 	if char == '-' {
 		t.state = state_ScriptData_EscapedDash
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
@@ -1054,7 +1094,7 @@ func (t *Tokenizer) state_ScriptData_Escaped() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -1075,7 +1115,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_Dash() error {
 
 	if char == '-' {
 		t.state = state_ScriptData_EscapedDashDash
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
@@ -1091,7 +1131,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_Dash() error {
 	}
 
 	t.state = state_ScriptData_Escaped
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -1111,7 +1151,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
 	}
 
 	if char == '-' {
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
@@ -1122,7 +1162,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
 
 	if char == '>' {
 		t.state = State_ScriptData
-		t.tokens = append(t.tokens, NewCharToken('>'))
+		t.tokens = append(t.tokens, NewCharacterToken('>'))
 		return nil
 	}
 
@@ -1133,7 +1173,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
 	}
 
 	t.state = state_ScriptData_Escaped
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -1155,12 +1195,12 @@ func (t *Tokenizer) state_ScriptData_Escaped_LessThanSign() error {
 
 	if unicode.IsLetter(char) {
 		t.tempbuffer = ""
-		t.tokens = append(t.tokens, NewCharToken('<'))
+		t.tokens = append(t.tokens, NewCharacterToken('<'))
 		t.state = state_ScriptData_DoubleEscapedStart
 		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'))
 	t.state = state_ScriptData_Escaped
 	return t.reader.UnreadRune()
 }
@@ -1179,7 +1219,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagOpen() error {
 		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
 	t.state = state_ScriptData_Escaped
 
 	return t.reader.UnreadRune()
@@ -1217,17 +1257,23 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			return t.workingToken.Tag_AppendStringToName(string(unicode.ToLower(char)))
+			if tag, ok := t.workingToken.(TagToken); ok {
+				tag.Name += string(unicode.ToLower(char))
+			}
+			return nil
 		}
 
 		t.tempbuffer += string(char)
-		return t.workingToken.Tag_AppendStringToName(string(char))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.Name += string(char)
+		}
+		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken('<'), NewCharToken('/'))
+	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
 
-	for x := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharToken(rune(t.tempbuffer[x])))
+	for _, char := range t.tempbuffer {
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 	}
 
 	t.state = state_ScriptData_Escaped
@@ -1251,7 +1297,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 		}
 
 		t.state = state_ScriptData_Escaped
-		t.tokens = append(t.tokens, NewCharToken(char))
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 		return nil
 	}
 
@@ -1262,7 +1308,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 			t.tempbuffer += string(char)
 		}
 
-		t.tokens = append(t.tokens, NewCharToken(char))
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 
 		return nil
 	}
@@ -1288,13 +1334,13 @@ func (t *Tokenizer) state_ScriptData_DoubleEscaped() error {
 
 	if char == '-' {
 		t.state = state_ScriptData_DoubleEscapedDash
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
 	if char == '<' {
 		t.state = state_ScriptData_DoubleEscapedLessThanSign
-		t.tokens = append(t.tokens, NewCharToken('<'))
+		t.tokens = append(t.tokens, NewCharacterToken('<'))
 		return nil
 	}
 
@@ -1303,7 +1349,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscaped() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -1324,13 +1370,13 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedDash() error {
 
 	if char == '-' {
 		t.state = state_ScriptData_DoubleEscapedDashDash
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
 	if char == '<' {
 		t.state = state_ScriptData_DoubleEscapedLessThanSign
-		t.tokens = append(t.tokens, NewCharToken('<'))
+		t.tokens = append(t.tokens, NewCharacterToken('<'))
 		return nil
 	}
 
@@ -1341,7 +1387,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedDash() error {
 	}
 
 	t.state = state_ScriptData_DoubleEscaped
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -1361,19 +1407,19 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedDashDash() error {
 	}
 
 	if char == '-' {
-		t.tokens = append(t.tokens, NewCharToken('-'))
+		t.tokens = append(t.tokens, NewCharacterToken('-'))
 		return nil
 	}
 
 	if char == '<' {
-		t.tokens = append(t.tokens, NewCharToken('<'))
+		t.tokens = append(t.tokens, NewCharacterToken('<'))
 		t.state = state_ScriptData_DoubleEscapedLessThanSign
 		return nil
 	}
 
 	if char == '>' {
 		t.state = State_ScriptData
-		t.tokens = append(t.tokens, NewCharToken('>'))
+		t.tokens = append(t.tokens, NewCharacterToken('>'))
 		return nil
 	}
 
@@ -1384,7 +1430,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedDashDash() error {
 	}
 
 	t.state = state_ScriptData_DoubleEscaped
-	t.tokens = append(t.tokens, NewCharToken(char))
+	t.tokens = append(t.tokens, NewCharacterToken(char))
 
 	return nil
 }
@@ -1399,7 +1445,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscaped_LessThanSign() error {
 	if char == '/' {
 		t.tempbuffer = ""
 		t.state = state_ScriptData_DoubleEscapeEnd
-		t.tokens = append(t.tokens, NewCharToken('/'))
+		t.tokens = append(t.tokens, NewCharacterToken('/'))
 		return nil
 	}
 
@@ -1423,7 +1469,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 		}
 
 		t.state = state_ScriptData_DoubleEscaped
-		t.tokens = append(t.tokens, NewCharToken(char))
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 		return nil
 	}
 
@@ -1434,7 +1480,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 			t.tempbuffer += string(char)
 		}
 
-		t.tokens = append(t.tokens, NewCharToken(char))
+		t.tokens = append(t.tokens, NewCharacterToken(char))
 		return nil
 	}
 
@@ -1468,11 +1514,17 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 	// unexpected-equals-sign-before-attribute-name parse error
 	if char == '=' {
 		t.state = state_AttributeName
-		t.workingToken.Tag_NewAttr(string(char), "")
+
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.NewAttr(string(char), "")
+		}
 		return nil
 	}
 
-	t.workingToken.Tag_NewAttr("", "")
+	if tag, ok := t.workingToken.(TagToken); ok {
+		tag.NewAttr("", "")
+	}
+
 	t.state = state_AttributeName
 
 	return t.reader.UnreadRune()
@@ -1499,18 +1551,28 @@ func (t *Tokenizer) state_AttributeName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		return t.workingToken.Tag_AppendString_ToCurrentAttrName(string(unicode.ToLower(char)))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.AppendStringToAttrName(string(unicode.ToLower(char)))
+		}
+		return nil
 	}
 
 	// unexpected-null-character parse error.
 	if char == '\u0000' {
-		return t.workingToken.Tag_AppendString_ToCurrentAttrName(string(utf8.RuneError))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.AppendStringToAttrName(string(utf8.RuneError))
+		}
+		return nil
 	}
 
 	// This is an unexpected-character-in-attribute-name parse error. Treat it as per the "anything else" entry below.
 	//if char == '"' || char == '\'' || char == '<' {}
 
-	return t.workingToken.Tag_AppendString_ToCurrentAttrName(string(char))
+	if tag, ok := t.workingToken.(TagToken); ok {
+		tag.AppendStringToAttrName(string(char))
+	}
+
+	return nil
 }
 
 // https://html.spec.whatwg.org/#after-attribute-name-state
@@ -1548,7 +1610,9 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 		return nil
 	}
 
-	t.workingToken.Tag_NewAttr("", "")
+	if tag, ok := t.workingToken.(TagToken); ok {
+		tag.NewAttr("", "")
+	}
 
 	t.state = state_AttributeName
 	return t.reader.UnreadRune()
@@ -1612,10 +1676,16 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 	}
 
 	if char == '\u0000' {
-		return t.workingToken.Tag_AppendString_ToCurrentAttrValue(string(utf8.RuneError))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.AppendStringAttrValue(string(utf8.RuneError))
+		}
+		return nil
 	}
 
-	return t.workingToken.Tag_AppendString_ToCurrentAttrValue(string(char))
+	if tag, ok := t.workingToken.(TagToken); ok {
+		tag.AppendStringAttrValue(string(char))
+	}
+	return nil
 }
 
 // https://html.spec.whatwg.org/#attribute-value-(single-quoted)-state
@@ -1643,10 +1713,16 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 	}
 
 	if char == '\u0000' {
-		return t.workingToken.Tag_AppendString_ToCurrentAttrValue(string(utf8.RuneError))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.AppendStringAttrValue(string(utf8.RuneError))
+		}
+		return nil
 	}
 
-	return t.workingToken.Tag_AppendString_ToCurrentAttrValue(string(char))
+	if tag, ok := t.workingToken.(TagToken); ok {
+		tag.AppendStringAttrValue(string(char))
+	}
+	return nil
 }
 
 // https://html.spec.whatwg.org/#attribute-value-(unquoted)-state
@@ -1680,13 +1756,18 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 	}
 
 	if char == '\u0000' {
-		return t.workingToken.Tag_AppendString_ToCurrentAttrValue(string(utf8.RuneError))
+		if tag, ok := t.workingToken.(TagToken); ok {
+			tag.AppendStringAttrValue(string(utf8.RuneError))
+		}
+		return nil
 	}
 
 	//  unexpected-character-in-unquoted-attribute-value parse error. Treat it as per the "anything else" entry below.
 	//if char == '"' || char == '\'' || char == '<' || char == '=' || char == '`' {}
-
-	return t.workingToken.Tag_AppendString_ToCurrentAttrValue(string(char))
+	if tag, ok := t.workingToken.(TagToken); ok {
+		tag.AppendStringAttrValue(string(char))
+	}
+	return nil
 }
 
 // https://html.spec.whatwg.org/#after-attribute-value-(quoted)-state
@@ -1740,7 +1821,9 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 	}
 
 	if char == '>' {
-		t.workingToken.Tag_SetSelfClosing(true)
+		if tag, ok := t.workingToken.(TagToken); ok {
+			*tag.Selfclosing = true
+		}
 		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
@@ -1769,10 +1852,16 @@ func (t *Tokenizer) state_BogusComment() error {
 	}
 
 	if char == '\u0000' {
-		return t.workingToken.Comment_AppendString(string(utf8.RuneError))
+		if tag, ok := t.workingToken.(*CommentToken); ok {
+			tag.Data += string(utf8.RuneError)
+		}
+		return nil
 	}
 
-	return t.workingToken.Comment_AppendString(string(char))
+	if tag, ok := t.workingToken.(*CommentToken); ok {
+		tag.Data += string(char)
+	}
+	return nil
 }
 
 // https://html.spec.whatwg.org/#markup-declaration-open-state
@@ -1825,8 +1914,9 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 		//TODO: adjeusted current node check && html namespace check
 		// t.state = State_CDATA_Section
 
-		t.workingToken = NewCommentToken()
-		t.workingToken.Comment_AppendString(a)
+		tag := NewCommentToken()
+		tag.Data += a
+		t.workingToken = tag
 		t.state = state_BogusComment
 		return nil
 	}
@@ -1888,7 +1978,9 @@ func (t *Tokenizer) state_Comment_StartDash() error {
 		return nil
 	}
 
-	t.workingToken.Comment_AppendString("-")
+	if tag, ok := t.workingToken.(*CommentToken); ok {
+		tag.Data += "-"
+	}
 	t.state = state_Comment
 
 	return t.reader.UnreadRune()
@@ -1908,7 +2000,9 @@ func (t *Tokenizer) state_Comment() error {
 	}
 
 	if char == '<' {
-		t.workingToken.Comment_AppendString(string(char))
+		if tag, ok := t.workingToken.(*CommentToken); ok {
+			tag.Data += string(char)
+		}
 		t.state = state_CommentLessThanSign
 		return nil
 	}
@@ -1919,11 +2013,15 @@ func (t *Tokenizer) state_Comment() error {
 	}
 
 	if char == '\u0000' {
-		t.workingToken.Comment_AppendString(string(utf8.RuneError))
+		if tag, ok := t.workingToken.(*CommentToken); ok {
+			tag.Data += string(utf8.RuneError)
+		}
 		return nil
 	}
 
-	t.workingToken.Comment_AppendString(string(char))
+	if tag, ok := t.workingToken.(*CommentToken); ok {
+		tag.Data += string(char)
+	}
 
 	return nil
 }
@@ -1937,13 +2035,17 @@ func (t *Tokenizer) state_Comment_LessThanSign() error {
 	}
 
 	if char == '!' {
-		t.workingToken.Comment_AppendString(string(char))
+		if tag, ok := t.workingToken.(*CommentToken); ok {
+			tag.Data += string(char)
+		}
 		t.state = state_CommentLessThanSignBang
 		return nil
 	}
 
 	if char == '<' {
-		t.workingToken.Comment_AppendString(string(char))
+		if tag, ok := t.workingToken.(*CommentToken); ok {
+			tag.Data += string(char)
+		}
 		return nil
 	}
 
@@ -2022,8 +2124,9 @@ func (t *Tokenizer) state_Comment_EndDash() error {
 		t.state = state_CommentEnd
 		return nil
 	}
-
-	t.workingToken.Comment_AppendString("-")
+	if tag, ok := t.workingToken.(*CommentToken); ok {
+		tag.Data += "-"
+	}
 	t.state = state_Comment
 
 	return t.reader.UnreadRune()
@@ -2054,11 +2157,15 @@ func (t *Tokenizer) state_CommentEnd() error {
 	}
 
 	if char == '-' {
-		t.workingToken.Comment_AppendString(string(char))
+		if tag, ok := t.workingToken.(*CommentToken); ok {
+			tag.Data += string(char)
+		}
 		return nil
 	}
 
-	t.workingToken.Comment_AppendString("--")
+	if tag, ok := t.workingToken.(*CommentToken); ok {
+		tag.Data += "--"
+	}
 	t.state = state_Comment
 
 	return t.reader.UnreadRune()
@@ -2078,7 +2185,9 @@ func (t *Tokenizer) state_Comment_EndBang() error {
 	}
 
 	if char == '-' {
-		t.workingToken.Comment_AppendString("--!")
+		if tag, ok := t.workingToken.(*CommentToken); ok {
+			tag.Data += "--!"
+		}
 		t.state = state_CommentEndDash
 		return nil
 	}
@@ -2089,7 +2198,9 @@ func (t *Tokenizer) state_Comment_EndBang() error {
 		return nil
 	}
 
-	t.workingToken.Comment_AppendString("--!")
+	if tag, ok := t.workingToken.(*CommentToken); ok {
+		tag.Data += "--!"
+	}
 	t.state = state_Comment
 
 	return t.reader.UnreadRune()
@@ -2107,8 +2218,9 @@ func (t *Tokenizer) state_DOCTYPE() error {
 	}
 
 	if isEOF {
-		t.workingToken = NewDOCTYPEToken()
-		t.workingToken.DOCTYPE_SetForceQuirks(true)
+		tag := NewDOCTYPEToken()
+		tag.ForceQuirks = true
+		t.workingToken = tag
 		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
@@ -2136,8 +2248,9 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 	}
 
 	if isEOF {
-		t.workingToken = NewDOCTYPEToken()
-		t.workingToken.DOCTYPE_SetForceQuirks(true)
+		tag := NewDOCTYPEToken()
+		tag.ForceQuirks = true
+		t.workingToken = tag
 		t.emitCurrentWithTokens(NewEOFToken())
 		return nil
 	}
@@ -2147,28 +2260,30 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		t.workingToken = NewDOCTYPEToken()
-		t.workingToken.DOCTYPE_SetName(string(unicode.ToLower(char)))
+		tag := NewDOCTYPEToken()
+		*tag.Name = string(unicode.ToLower(char))
 		t.state = state_DOCTYPE_Name
 		return nil
 	}
 
 	if char == '\u0000' {
-		t.workingToken = NewDOCTYPEToken()
-		t.workingToken.DOCTYPE_SetName(string(utf8.RuneError))
+		tag := NewDOCTYPEToken()
+		*tag.Name = string(utf8.RuneError)
 		t.state = state_DOCTYPE_Name
 		return nil
 	}
 
 	if char == '>' {
-		t.workingToken = NewDOCTYPEToken()
-		t.workingToken.DOCTYPE_SetForceQuirks(true)
+		tag := NewDOCTYPEToken()
+		tag.ForceQuirks = true
+		t.workingToken = tag
 		t.state = State_Data
 		return nil
 	}
 
-	t.workingToken = NewDOCTYPEToken()
-	t.workingToken.DOCTYPE_SetName(string(char))
+	tag := NewDOCTYPEToken()
+	*tag.Name = string(char)
+	t.workingToken = tag
 
 	t.state = state_DOCTYPE_Name
 	return nil
