@@ -108,7 +108,7 @@ func NewEOFToken() *TokenEOF {
 }
 
 type TokenCharacter struct {
-	value rune
+	Data rune
 }
 
 func (c *TokenCharacter) GetType() int {
@@ -121,12 +121,12 @@ func (c *TokenCharacter) IsType(v int) bool {
 
 func NewCharacterToken(value rune) *TokenCharacter {
 	return &TokenCharacter{
-		value: utf8.RuneError,
+		Data: utf8.RuneError,
 	}
 }
 func NewReplacementToken() *TokenCharacter {
 	return &TokenCharacter{
-		value: utf8.RuneError,
+		Data: utf8.RuneError,
 	}
 }
 

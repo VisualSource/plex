@@ -30,3 +30,10 @@ func (d *Document) Prepend(node Node) {
 func (d *Document) Append(node Node) {
 	d.children = append(d.children, node)
 }
+
+func (d *Document) SetHead(head Node) {
+	d.head = head
+}
+func (d *Document) SetDocType(doctype DocumentType) {
+	d.doctype = doctype
+}
