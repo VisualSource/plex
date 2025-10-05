@@ -80,11 +80,30 @@ outer:
 	return nil
 }
 
+func (m *HTMLParser) insertComment(token *tokenizer.CommentToken, target dom.Node) (*dom.CommentNode, error) {
+	comment := dom.NewCommentNode(token.Data)
+
+	if target != nil {
+
+		if tag, ok := target.(*dom.HTMLElement); ok {
+			tag.Append(comment)
+		}
+		return comment, nil
+	}
+
+	node, ok := m.openEls[len(m.openEls)-1].(*dom.HTMLElement)
+	if ok {
+		node.Append(comment)
+	}
+
+	return comment, nil
+}
+
 func (m *HTMLParser) InsertHtmlElement(token tokenizer.Token, namespace string, onlyAddToElementStack bool) (*dom.HTMLElement, error) {
 
 	tag, ok := token.(*tokenizer.TagToken)
 	if !ok {
-		return nil, errors.New("Invalid token type")
+		return nil, errors.New("invalid token type")
 	}
 
 	el := dom.NewHTMLElement(tag.Name)
@@ -100,12 +119,10 @@ func (m *HTMLParser) InsertHtmlElement(token tokenizer.Token, namespace string, 
 }
 
 // https://html.spec.whatwg.org/#the-initial-insertion-mode
-func (m *HTMLParser) Mode_Initial(token tokenizer.Token) error {
+func (m *HTMLParser) mode_Initial(token tokenizer.Token) error {
 
-	if tag, ok := token.(*tokenizer.TokenCharacter); ok {
-		if slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
-			return nil
-		}
+	if tag, ok := token.(*tokenizer.TokenCharacter); ok && slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
+		return nil
 	}
 
 	if tag, ok := token.(*tokenizer.CommentToken); ok {
@@ -131,7 +148,8 @@ func (m *HTMLParser) Mode_Initial(token tokenizer.Token) error {
 	return nil
 }
 
-func (m *HTMLParser) Mode_BeforeHtml(token tokenizer.Token) error {
+// https://html.spec.whatwg.org/#the-before-html-insertion-mode
+func (m *HTMLParser) mode_BeforeHtml(token tokenizer.Token) error {
 
 	if _, ok := token.(*tokenizer.DoctypeToken); ok {
 		return nil
@@ -142,10 +160,8 @@ func (m *HTMLParser) Mode_BeforeHtml(token tokenizer.Token) error {
 		return nil
 	}
 
-	if tag, ok := token.(*tokenizer.TokenCharacter); ok {
-		if slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
-			return nil
-		}
+	if tag, ok := token.(*tokenizer.TokenCharacter); ok && slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
+		return nil
 	}
 
 	if tag, ok := token.(*tokenizer.TagToken); ok {
@@ -158,7 +174,7 @@ func (m *HTMLParser) Mode_BeforeHtml(token tokenizer.Token) error {
 			m.insertionMode = mode_BeforeHead
 			return nil
 		}
-		if tag.IsType(tokenizer.Token_EndTag) && !slices.Contains([]string{}, tag.Name) {
+		if tag.IsType(tokenizer.Token_EndTag) && !slices.Contains([]string{"head", "body", "html", "br"}, tag.Name) {
 			return nil
 		}
 	}
@@ -174,17 +190,15 @@ func (m *HTMLParser) Mode_BeforeHtml(token tokenizer.Token) error {
 	return nil
 }
 
-func (m *HTMLParser) Mode_BeforeHead(token tokenizer.Token) error {
+// https://html.spec.whatwg.org/#the-before-head-insertion-mode
+func (m *HTMLParser) mode_BeforeHead(token tokenizer.Token) error {
 
-	if tag, ok := token.(*tokenizer.TokenCharacter); ok &&
-		slices.Contains([]rune{'\t', '\n', '\f', '\f', '\r', ' '}, tag.Data) {
+	if tag, ok := token.(*tokenizer.TokenCharacter); ok && slices.Contains([]rune{'\t', '\n', '\f', '\f', '\r', ' '}, tag.Data) {
 		return nil
 	}
 
 	if tag, ok := token.(*tokenizer.CommentToken); ok {
-		if node, ok := m.openEls[len(m.openEls)-1].(*dom.HTMLElement); ok {
-			node.Append(dom.NewCommentNode(tag.Data))
-		}
+		m.insertComment(tag, nil)
 		return nil
 	}
 
@@ -321,15 +335,46 @@ func (m *HTMLParser) Mode_InHead(token tokenizer.Token) error {
 	return nil
 }
 
+// https://html.spec.whatwg.org/#parsing-main-inheadnoscript
 func (m *HTMLParser) Mode_InHeaderNoScript(token tokenizer.Token) error {
 	return nil
 }
 
+// https://html.spec.whatwg.org/#the-after-head-insertion-mode
 func (m *HTMLParser) Mode_AfterHead(token tokenizer.Token) error {
 	return nil
 }
 
+// https://html.spec.whatwg.org/#parsing-main-inbody
 func (m *HTMLParser) Mode_InBody(token tokenizer.Token) error {
+
+	if tag, ok := token.(*tokenizer.TagToken); ok {
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "html" {
+			return nil
+		}
+
+		if (tag.IsType(tokenizer.Token_StartTag) &&
+			slices.Contains([]string{"base", "basefont", "bgsound", "link", "meta", "nonframes", "script", "style", "template", "title"}, tag.Name)) ||
+			(tag.IsType(tokenizer.Token_EndTag) && tag.Name == "template") {
+			return m.Mode_InHead(token)
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) {
+			switch tag.Name {
+			case "body":
+				return nil
+			case "frameset":
+				m.insertionMode = mode_Frameset
+				return nil
+			}
+		}
+	}
+
+	if _, ok := token.(*tokenizer.TokenEOF); ok {
+		return nil
+	}
+
 	return nil
 }
 
