@@ -50,6 +50,8 @@ type HTMLParser struct {
 	originalInsertionMode int
 	tokenizer             tokenizer.Tokenizer
 	document              *dom.Document
+	// https://html.spec.whatwg.org/#frameset-ok-flag
+	framesetOk string
 }
 
 func (m *HTMLParser) Parse() error {
@@ -79,6 +81,12 @@ outer:
 
 	return nil
 }
+
+// https://html.spec.whatwg.org/#reconstruct-the-active-formatting-elements
+func (m *HTMLParser) reconstructActiveFormattingEls() {}
+
+// https://html.spec.whatwg.org/#insert-a-character
+func (m *HTMLParser) insertCharacter() {}
 
 func (m *HTMLParser) insertComment(token *tokenizer.CommentToken, target dom.Node) (*dom.CommentNode, error) {
 	comment := dom.NewCommentNode(token.Data)
@@ -348,30 +356,241 @@ func (m *HTMLParser) Mode_AfterHead(token tokenizer.Token) error {
 // https://html.spec.whatwg.org/#parsing-main-inbody
 func (m *HTMLParser) Mode_InBody(token tokenizer.Token) error {
 
+	if tag, ok := token.(*tokenizer.TokenCharacter); ok {
+		if tag.Data == '\u0000' {
+			return nil
+		}
+
+		if !slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
+			m.framesetOk = "not ok"
+		}
+
+		m.reconstructActiveFormattingEls()
+		m.insertCharacter()
+		return nil
+	}
+
 	if tag, ok := token.(*tokenizer.TagToken); ok {
 
 		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "html" {
 			return nil
 		}
 
-		if (tag.IsType(tokenizer.Token_StartTag) &&
-			slices.Contains([]string{"base", "basefont", "bgsound", "link", "meta", "nonframes", "script", "style", "template", "title"}, tag.Name)) ||
-			(tag.IsType(tokenizer.Token_EndTag) && tag.Name == "template") {
-			return m.Mode_InHead(token)
+		if (tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{}, tag.Name)) || (tag.IsType(tokenizer.Token_EndTag) && tag.Name == "template") {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "body" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "frameset" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "body" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "html" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{
+			"address", "article", "aside", "blockquote", "center", "details", "dialog", "dir", "div", "dl",
+			"fieldset", "figcaption", "figure", "footer", "header", "hgroup", "main", "menu", "nav", "ol",
+			"p", "search", "section", "summary", "ul",
+		}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{"h1", "h2", "h3", "h4", "h5", "h6"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{"pre", "listing"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "form" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "li" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{"dd", "dt"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "plaintext" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "button" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && slices.Contains([]string{
+			"address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl",
+			"fieldset", "figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol",
+			"pre", "search", "section", "select", "summary", "ul",
+		}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "form" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "p" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "li" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && slices.Contains([]string{"dd", "dt"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && slices.Contains([]string{"h1", "h2", "h3", "h4", "h5", "h6"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "sarcasm" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "a" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{
+			"b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u",
+		}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "nobr" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && slices.Contains([]string{
+			"a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u",
+		}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{"applet", "marquee", "object"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && slices.Contains([]string{"applet", "marquee", "object"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "table" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "br" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{
+			"area", "br", "embed", "img", "keygen", "wbr",
+		}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "input" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{"param", "source", "track"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "hr" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "image" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "textarea" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "xmp" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "iframe" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && (tag.Name == "noembed" || (tag.Name == "noscript" && m.scripting)) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "select" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "option" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "optgroup" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "option" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{"rb", "rtc"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{"rp", "rt"}, tag.Name) {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "math" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && tag.Name == "svg" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_StartTag) && slices.Contains([]string{
+			"caption", "col", "colgroup", "frame", "head", "tbody",
+			"td", "tfoot", "th", "thead", "tr"}, tag.Name) {
+			return nil
 		}
 
 		if tag.IsType(tokenizer.Token_StartTag) {
-			switch tag.Name {
-			case "body":
-				return nil
-			case "frameset":
-				m.insertionMode = mode_Frameset
-				return nil
-			}
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) {
+			return nil
 		}
 	}
 
-	if _, ok := token.(*tokenizer.TokenEOF); ok {
+	if tag, ok := token.(*tokenizer.CommentToken); ok {
+		_, err := m.insertComment(tag, nil)
+		return err
+	}
+
+	if token.IsType(tokenizer.Token_EOF) {
 		return nil
 	}
 
@@ -379,6 +598,25 @@ func (m *HTMLParser) Mode_InBody(token tokenizer.Token) error {
 }
 
 func (m *HTMLParser) Mode_Text(token tokenizer.Token) error {
+
+	if tag, ok := token.(*tokenizer.TokenCharacter); ok {
+		return nil
+	}
+
+	if token.IsType(tokenizer.Token_DOCTYPE) {
+		return nil
+	}
+
+	if tag, ok := token.(*tokenizer.TagToken); ok {
+		if tag.IsType(tokenizer.Token_EndTag) && tag.Name == "script" {
+			return nil
+		}
+
+		if tag.IsType(tokenizer.Token_EndTag) {
+
+		}
+	}
+
 	return nil
 }
 
