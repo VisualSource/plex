@@ -28,18 +28,11 @@ const (
 	mode_InCell
 	mode_InTemplete
 	mode_AfterBody
-	mode_Frameset
+	mode_InFrameset
 	mode_AfterFrameset
 	mode_AfterAfterBody
 	mode_AfterAfterframeset
 )
-
-func getValue(value *string, defaultValue string) string {
-	if value == nil {
-		return defaultValue
-	}
-	return *value
-}
 
 type HTMLParser struct {
 	openEls               []dom.Node
@@ -86,7 +79,9 @@ outer:
 func (m *HTMLParser) reconstructActiveFormattingEls() {}
 
 // https://html.spec.whatwg.org/#insert-a-character
-func (m *HTMLParser) insertCharacter() {}
+func (m *HTMLParser) insertCharacter(token *tokenizer.TokenCharacter) {
+
+}
 
 func (m *HTMLParser) insertComment(token *tokenizer.CommentToken, target dom.Node) (*dom.CommentNode, error) {
 	comment := dom.NewCommentNode(token.Data)
@@ -105,6 +100,15 @@ func (m *HTMLParser) insertComment(token *tokenizer.CommentToken, target dom.Nod
 	}
 
 	return comment, nil
+}
+
+func (m *HTMLParser) insertElement(node dom.Node, target dom.Node) {
+
+	n, ok := m.openEls[len(m.openEls)-1].(*dom.HTMLElement)
+	if ok {
+		n.Append(node)
+	}
+	m.openEls = append(m.openEls, node)
 }
 
 func (m *HTMLParser) InsertHtmlElement(token tokenizer.Token, namespace string, onlyAddToElementStack bool) (*dom.HTMLElement, error) {
@@ -241,7 +245,7 @@ func (m *HTMLParser) mode_BeforeHead(token tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#parsing-main-inhead
-func (m *HTMLParser) Mode_InHead(token tokenizer.Token) error {
+func (m *HTMLParser) mode_InHead(token tokenizer.Token) error {
 
 	if tag, ok := token.(*tokenizer.TokenCharacter); ok && slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
 		return nil
@@ -344,17 +348,103 @@ func (m *HTMLParser) Mode_InHead(token tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#parsing-main-inheadnoscript
-func (m *HTMLParser) Mode_InHeaderNoScript(token tokenizer.Token) error {
+func (m *HTMLParser) mode_InHeaderNoScript(token tokenizer.Token) error {
+
+	if token.IsType(tokenizer.Token_DOCTYPE) {
+		return nil
+	}
+
+	if tag, ok := token.(*tokenizer.TagToken); ok {
+		if tag.IsStartTag() && tag.Name == "html" {
+			return m.mode_InBody(token)
+		}
+		if tag.IsEndTag() && tag.Name == "noscript" {
+			return m.mode_InBody(token)
+		}
+
+		if (tag.IsStartTag() && slices.Contains([]string{"head", "noscript"}, tag.Name)) || tag.IsEndTag() {
+			return nil
+		}
+	}
+
+	if token.IsType(tokenizer.Token_Comment) ||
+		isAnyRune(token, '\t', '\n', '\f', '\r', ' ') ||
+		isAnyStartTag(token, "basefont", "bgsound", "link", "meta", "noframes", "style") {
+
+		return m.mode_InHead(token)
+	}
+
+	m.openEls = m.openEls[:len(m.openEls)-2]
+	m.tokenizer.ReconsumeToken(token)
+	m.insertionMode = mode_InHead
 	return nil
 }
 
 // https://html.spec.whatwg.org/#the-after-head-insertion-mode
-func (m *HTMLParser) Mode_AfterHead(token tokenizer.Token) error {
+func (m *HTMLParser) mode_AfterHead(token tokenizer.Token) error {
+
+	if isAnyRune(token, '\t', '\n', '\f', '\r', ' ') {
+		m.insertCharacter(token.(*tokenizer.TokenCharacter))
+		return nil
+	}
+
+	if tag, ok := token.(*tokenizer.CommentToken); ok {
+		m.insertComment(tag, nil)
+		return nil
+	}
+
+	if token.IsType(tokenizer.Token_DOCTYPE) {
+		return nil
+	}
+
+	if tag, ok := token.(*tokenizer.TagToken); ok {
+		if tag.IsStartTag() && tag.Name == "html" {
+			return m.mode_InBody(token)
+		}
+
+		if tag.IsStartTag() && tag.Name == "body" {
+			m.InsertHtmlElement(token, "html", true)
+			m.framesetOk = "not ok"
+			m.insertionMode = mode_InBody
+			return nil
+		}
+
+		if tag.IsStartTag() && tag.Name == "frameset" {
+			m.InsertHtmlElement(token, "html", true)
+			m.insertionMode = mode_InFrameset
+			return nil
+		}
+
+		if tag.IsStartTag() && isAnyTag(tag, "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title") {
+
+			m.openEls = append(m.openEls, m.document.GetHead())
+
+			r := m.mode_InHead(token)
+
+			//TODO: remove head element from open stack
+
+			return r
+		}
+
+		if tag.IsEndTag() && tag.Name == "template" {
+			return m.mode_InHead(token)
+		}
+
+		if (tag.IsStartTag() && tag.Name == "head") || tag.IsEndTag() {
+			return nil
+		}
+	}
+
+	el := dom.NewHTMLElement("body")
+	m.insertElement(el, nil)
+
+	m.insertionMode = mode_InBody
+	m.tokenizer.ReconsumeToken(token)
 	return nil
 }
 
 // https://html.spec.whatwg.org/#parsing-main-inbody
-func (m *HTMLParser) Mode_InBody(token tokenizer.Token) error {
+func (m *HTMLParser) mode_InBody(token tokenizer.Token) error {
 
 	if tag, ok := token.(*tokenizer.TokenCharacter); ok {
 		if tag.Data == '\u0000' {
@@ -366,7 +456,7 @@ func (m *HTMLParser) Mode_InBody(token tokenizer.Token) error {
 		}
 
 		m.reconstructActiveFormattingEls()
-		m.insertCharacter()
+		m.insertCharacter(tag)
 		return nil
 	}
 

@@ -63,6 +63,14 @@ func NewEndToken() *TagToken {
 	}
 }
 
+func (t TagToken) IsStartTag() bool {
+	return t.tagType == Token_StartTag
+}
+
+func (t TagToken) IsEndTag() bool {
+	return !t.IsStartTag()
+}
+
 func (t TagToken) GetType() int {
 	return t.tagType
 }

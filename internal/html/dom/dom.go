@@ -34,6 +34,11 @@ func (d *Document) Append(node Node) {
 func (d *Document) SetHead(head Node) {
 	d.head = head
 }
+
+func (d *Document) GetHead() Node {
+	return d.head
+}
+
 func (d *Document) SetDocType(doctype DocumentType) {
 	d.doctype = doctype
 }
