@@ -1,6 +1,8 @@
 package html
 
-import "slices"
+import (
+	"slices"
+)
 
 type HTMLElement struct {
 	children []Node

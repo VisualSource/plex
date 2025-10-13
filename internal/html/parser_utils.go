@@ -6,6 +6,10 @@ import (
 	tokenizer "github.com/VisualSource/plex/internal/html/tokenizer"
 )
 
+func isAny[T comparable](value T, values ...T) bool {
+	return slices.Contains(values, value)
+}
+
 func isAnyRune(token tokenizer.Token, chars ...rune) bool {
 	tag, ok := token.(*tokenizer.TokenCharacter)
 	if !ok {
