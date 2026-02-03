@@ -7,6 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/MadAppGang/dingo/pkg/dgo"
 	"github.com/ianlewis/runeio"
 )
 
@@ -115,12 +116,12 @@ const (
 type Tokenizer struct {
 	reader                 *runeio.RuneReader
 	state                  int
-	rstate                 int
+	rstate                 dgo.Option[int]
 	tokens                 []Token
 	characterReferenceCode int
 	tempbuffer             string
 	workingToken           Token
-	lastStartTag           *string
+	lastStartTag           dgo.Option[string]
 }
 
 func NewTokenizer(stream io.RuneReader) Tokenizer {
@@ -340,10 +341,15 @@ func (t *Tokenizer) ConsumeToken() Token {
 
 //#region Support
 
-func wasConsumedAsPartOfAttribute(state int) bool {
-	return state == state_AttributValue_DoubleQuoted ||
-		state == state_AttributValue_SingleQuoted ||
-		state == state_AttributeName
+func wasConsumedAsPartOfAttribute(state dgo.Option[int]) bool {
+	if state.IsNone() {
+		return false
+	}
+	value := *state.Some
+
+	return value == state_AttributValue_DoubleQuoted ||
+		value == state_AttributValue_SingleQuoted ||
+		value == state_AttributeName
 }
 
 // When a state says to flush code points consumed as a character reference,
@@ -361,7 +367,7 @@ func (t *Tokenizer) flush() {
 	}
 
 	for _, char := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharacterToken(char))
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
 	}
 }
 
@@ -371,25 +377,24 @@ func (t *Tokenizer) consume() (rune, error) {
 		return utf8.RuneError, err
 	}
 
-	if r == '\r' {
-		rs, err := t.reader.Peek(1)
-		if err != nil {
-			return utf8.RuneError, err
-		}
-
-		if rs[0] == '\n' {
-			m := make([]rune, 1)
-			_, err := t.reader.Read(m)
-			if err != nil {
-				return utf8.MaxRune, err
-			}
-			return '\n', nil
-		}
-
-		return '\n', nil
+	if r != '\r' {
+		return r, nil
 	}
 
-	return r, nil
+	rs, err := t.reader.Peek(1)
+	if err != nil {
+		return utf8.RuneError, err
+	}
+
+	if rs[0] == '\n' {
+		m := make([]rune, 1)
+		_, err := t.reader.Read(m)
+		if err != nil {
+			return utf8.MaxRune, err
+		}
+	}
+
+	return '\n', nil
 }
 
 func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
@@ -408,16 +413,12 @@ func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 // emitted from this tokenizer, if any. If no start tag has been emitted from this tokenizer,
 // then no end tag token is appropriate.
 func (t *Tokenizer) hasApproriateEndTagToken() bool {
-	tag, ok := t.workingToken.(TagToken)
+	tag, ok := t.workingToken.(TokenEndTag)
 	if !ok {
 		return false
 	}
 
-	if t.lastStartTag == nil || tag.IsType(Token_StartTag) {
-		return false
-	}
-
-	return *t.lastStartTag == tag.Name
+	return t.lastStartTag.IsSome() && *t.lastStartTag.Some == tag.name
 }
 
 //#endregion
@@ -429,17 +430,17 @@ func (t *Tokenizer) state_Data() error {
 	char, err := t.consume()
 
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		t.tokens = append(t.tokens, NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenEOF())
 		return nil
 	}
 
 	if char == '&' {
-		t.rstate = t.state
+		t.rstate = dgo.Some(t.state)
 		t.state = state_CharacterReference
 		return nil
 	}
@@ -451,11 +452,11 @@ func (t *Tokenizer) state_Data() error {
 
 	// unexpected-null-character parse error
 	if char == '\u0000' {
-		t.tokens = append(t.tokens, NewCharacterToken(char))
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken(char))
+	t.tokens = append(t.tokens, NewTokenCharacter(char))
 
 	return nil
 }
@@ -465,17 +466,17 @@ func (t *Tokenizer) state_RCData() error {
 	char, err := t.consume()
 
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		t.tokens = append(t.tokens, NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenEOF())
 		return nil
 	}
 
 	if char == '&' {
-		t.rstate = State_RCData
+		t.rstate = dgo.Some(State_RCData)
 		t.state = state_CharacterReference
 		return nil
 	}
@@ -491,7 +492,7 @@ func (t *Tokenizer) state_RCData() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken(char))
+	t.tokens = append(t.tokens, NewTokenCharacter(char))
 
 	return nil
 }
@@ -501,12 +502,12 @@ func (t *Tokenizer) state_RawText() error {
 	char, err := t.consume()
 
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		t.tokens = append(t.tokens, NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenEOF())
 		return nil
 	}
 
@@ -521,7 +522,7 @@ func (t *Tokenizer) state_RawText() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken(char))
+	t.tokens = append(t.tokens, NewTokenCharacter(char))
 
 	return nil
 }
@@ -531,12 +532,12 @@ func (t *Tokenizer) state_ScriptData() error {
 	char, err := t.consume()
 
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		t.tokens = append(t.tokens, NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenEOF())
 		return nil
 	}
 
@@ -551,7 +552,7 @@ func (t *Tokenizer) state_ScriptData() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken(char))
+	t.tokens = append(t.tokens, NewTokenCharacter(char))
 
 	return nil
 }
@@ -561,12 +562,12 @@ func (t *Tokenizer) state_PlainText() error {
 	char, err := t.consume()
 
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		t.tokens = append(t.tokens, NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenEOF())
 		return nil
 	}
 
@@ -576,7 +577,7 @@ func (t *Tokenizer) state_PlainText() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken(char))
+	t.tokens = append(t.tokens, NewTokenCharacter(char))
 
 	return nil
 }
@@ -590,13 +591,13 @@ func (t *Tokenizer) state_TagOpen() error {
 	char, err := t.consume()
 
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	// eof-before-tag-name parse error.
 	if isEOF {
-		t.tokens = append(t.tokens, NewCharacterToken('<'), NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenEOF())
 		return nil
 	}
 
@@ -612,22 +613,20 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	if unicode.IsLetter(char) {
 		t.state = state_TagName
-		tag := NewStartToken()
-		tag.Name = ""
-		t.workingToken = tag
+		t.workingToken = NewTokenStartTag("", make(AttributesMap), dgo.None[bool](), "", "")
 		return t.reader.UnreadRune()
 	}
 
 	//  unexpected-question-mark-instead-of-tag-name parse error.
 	if char == '?' {
-		t.workingToken = NewCommentToken()
+		t.workingToken = NewTokenComment("")
 		t.state = state_BogusComment
 		return t.reader.UnreadRune()
 	}
 
 	//  invalid-first-character-of-tag-name parse error.
 
-	t.tokens = append(t.tokens, NewCharacterToken('>'))
+	t.tokens = append(t.tokens, NewTokenCharacter('>'))
 	t.state = State_Data
 	return t.reader.UnreadRune()
 }
@@ -643,14 +642,12 @@ func (t *Tokenizer) state_EndTagOpen() error {
 
 	//  eof-before-tag-name parse error.
 	if isEOF {
-		t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'), NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'), NewTokenEOF())
 		return nil
 	}
 
 	if unicode.IsLetter(char) {
-		tag := NewEndToken()
-		tag.Name = ""
-		t.workingToken = tag
+		t.workingToken = NewTokenEndTag("")
 		t.state = state_TagName
 		return t.reader.UnreadRune()
 	}
@@ -662,7 +659,7 @@ func (t *Tokenizer) state_EndTagOpen() error {
 	}
 
 	// invalid-first-character-of-tag-name parse error.
-	t.workingToken = NewCommentToken()
+	t.workingToken = NewTokenComment("")
 
 	t.state = state_BogusComment
 	return t.reader.UnreadRune()
@@ -673,13 +670,13 @@ func (t *Tokenizer) state_TagName() error {
 	char, err := t.consume()
 
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	// eof-in-tag parse error.
 	if isEOF {
-		t.tokens = append(t.tokens, NewEOFToken())
+		t.tokens = append(t.tokens, NewTokenEOF())
 		return nil
 	}
 
@@ -738,7 +735,7 @@ func (t *Tokenizer) state_RCData_LessThen() error {
 	}
 
 	t.state = State_RCData
-	t.tokens = append(t.tokens, NewCharacterToken('<'))
+	t.tokens = append(t.tokens, NewTokenCharacter('<'))
 
 	return t.reader.UnreadRune()
 }
@@ -752,15 +749,13 @@ func (t *Tokenizer) state_RCData_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		tag := NewEndToken()
-		tag.Name = ""
-		t.workingToken = tag
+		t.workingToken = NewTokenEndTag("")
 
 		t.state = state_RCData_EndTagName
 		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
+	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 	t.state = State_RCData
 
 	return t.reader.UnreadRune()
@@ -814,10 +809,10 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
+	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 
 	for _, char := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharacterToken(char))
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
 	}
 
 	t.state = State_RCData
@@ -842,7 +837,7 @@ func (t *Tokenizer) state_RawText_LessThenSign() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken('<'))
+	t.tokens = append(t.tokens, NewTokenCharacter('<'))
 	t.state = State_RawText
 
 	return t.reader.UnreadRune()
@@ -857,15 +852,13 @@ func (t *Tokenizer) state_RawText_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		tag := NewEndToken()
-		tag.Name = ""
-		t.workingToken = tag
+		t.workingToken = NewTokenEndTag("")
 		t.state = state_RawText_EndTagName
 
 		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
+	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 	t.state = State_RawText
 
 	return t.reader.UnreadRune()
@@ -917,9 +910,9 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 		return nil
 	}
 
-	t.tokens = append(t.tokens, NewCharacterToken('<'), NewCharacterToken('/'))
+	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 	for _, char := range t.tempbuffer {
-		t.tokens = append(t.tokens, NewCharacterToken(char))
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
 	}
 
 	t.state = State_RawText
@@ -3027,7 +3020,7 @@ func (t *Tokenizer) state_CharacterReference() error {
 	}
 
 	t.flush()
-	t.state = t.rstate
+	t.state = t.rstate.MustSome()
 	return t.reader.UnreadRune()
 }
 
@@ -3091,7 +3084,7 @@ func (t *Tokenizer) state_AmbiguousAmpersand() error {
 		return t.reader.UnreadRune()
 	}*/
 
-	t.state = t.rstate
+	t.state = t.rstate.MustSome()
 	return t.reader.UnreadRune()
 }
 
@@ -3128,7 +3121,7 @@ func (t *Tokenizer) state_HexadecimalCharacterReferenceStart() error {
 	}
 
 	t.flush()
-	t.state = t.rstate
+	t.state = t.rstate.MustSome()
 	return t.reader.UnreadRune()
 }
 
@@ -3145,7 +3138,7 @@ func (t *Tokenizer) state_DecimalCharacterReferenceStart() error {
 	}
 
 	t.flush()
-	t.state = t.rstate
+	t.state = t.rstate.MustSome()
 	return t.reader.UnreadRune()
 }
 
@@ -3291,7 +3284,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 	t.tempbuffer = string(rune(t.characterReferenceCode))
 
 	t.flush()
-	t.state = t.rstate
+	t.state = t.rstate.MustSome()
 	return nil
 }
 

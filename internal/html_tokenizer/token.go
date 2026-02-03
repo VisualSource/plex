@@ -2,154 +2,60 @@ package html_tokenizer
 
 import (
 	"unicode/utf8"
+
+	"github.com/MadAppGang/dingo/pkg/dgo"
 )
 
-const (
-	Token_EOF = iota
-	Token_Character
-	Token_StartTag
-	Token_Comment
-	Token_EndTag
-	Token_DOCTYPE
-)
+type AttributesMap map[string]string
 
 // https://html.spec.whatwg.org/#tokenization
-type Token interface {
-	GetType() int
-	IsType(int) bool
-}
-
-type DoctypeToken struct {
-	Name             *string
-	PublicIdentifier *string
-	SystemIdentifer  *string
-	ForceQuirks      bool
-}
-
-func NewDOCTYPEToken() *DoctypeToken {
-	return &DoctypeToken{
-		ForceQuirks: false,
-	}
-}
-
-func (d *DoctypeToken) GetType() int {
-	return Token_DOCTYPE
-}
-
-func (d *DoctypeToken) IsType(t int) bool {
-	return Token_DOCTYPE == t
-}
-
-type TagToken struct {
-	Name        string
-	Attrs       map[string]string
-	Selfclosing *bool
-
-	tagType int
-	cavalue string
-	caname  string
-}
-
-func NewStartToken() *TagToken {
-	return &TagToken{
-		tagType: Token_StartTag,
-		Attrs:   make(map[string]string),
-	}
-}
-func NewEndToken() *TagToken {
-	return &TagToken{
-		tagType: Token_EndTag,
-		Attrs:   make(map[string]string),
-	}
-}
-
-func (t TagToken) IsStartTag() bool {
-	return t.tagType == Token_StartTag
-}
-
-func (t TagToken) IsEndTag() bool {
-	return !t.IsStartTag()
-}
-
-func (t TagToken) GetType() int {
-	return t.tagType
-}
-
-func (t TagToken) IsType(v int) bool {
-	return t.tagType == v
-}
-
-func (t *TagToken) AppendStringToAttrName(value string) {
-	t.caname += value
-}
-func (t *TagToken) AppendStringAttrValue(value string) {
-	t.cavalue += value
-}
-
-// should do a token type check before calling
-func (t *TagToken) FinishAttr() {
-	if t.caname != "" {
-		_, ok := t.Attrs[t.caname]
-		if !ok {
-			t.Attrs[t.caname] = t.cavalue
-		}
-	}
-}
-
-func (t *TagToken) NewAttr(name string, value string) {
-	t.FinishAttr()
-	t.caname = name
-	t.cavalue = value
-}
+type Token interface{ isToken() }
 
 type TokenEOF struct{}
 
-func (e *TokenEOF) GetType() int {
-	return Token_EOF
-}
-func (e *TokenEOF) IsType(v int) bool {
-	return v == Token_DOCTYPE
+func (TokenEOF) isToken() {}
+func NewTokenEOF() Token  { return TokenEOF{} }
+
+type TokenCharacter struct{ Value rune }
+
+func (TokenCharacter) isToken()          {}
+func NewTokenCharacter(value rune) Token { return TokenCharacter{Value: value} }
+
+type TokenStartTag struct {
+	name        string
+	attrs       AttributesMap
+	selfClosing dgo.Option[bool]
+	cavalue     string
+	caname      string
 }
 
-func NewEOFToken() *TokenEOF {
-	return &TokenEOF{}
+func (TokenStartTag) isToken() {}
+func NewTokenStartTag(name string, attrs AttributesMap, selfClosing dgo.Option[bool], cavalue string, caname string) Token {
+	return TokenStartTag{name: name, attrs: attrs, selfClosing: selfClosing, cavalue: cavalue, caname: caname}
 }
 
-type TokenCharacter struct {
-	Data rune
+type TokenComment struct{ Value string }
+
+func (TokenComment) isToken()            {}
+func NewTokenComment(value string) Token { return TokenComment{Value: value} }
+
+type TokenEndTag struct{ name string }
+
+func (TokenEndTag) isToken()           {}
+func NewTokenEndTag(name string) Token { return TokenEndTag{name: name} }
+
+type TokenDOCTYPE struct {
+	name             dgo.Option[string]
+	publicIdentifier dgo.Option[string]
+	systemIdentifier dgo.Option[string]
+	forceQuirks      bool
 }
 
-func (c *TokenCharacter) GetType() int {
-	return Token_Character
+func (TokenDOCTYPE) isToken() {}
+func NewTokenDOCTYPE(name dgo.Option[string], publicIdentifier dgo.Option[string], systemIdentifier dgo.Option[string], forceQuirks bool) Token {
+	return TokenDOCTYPE{name: name, publicIdentifier: publicIdentifier, systemIdentifier: systemIdentifier, forceQuirks: forceQuirks}
 }
 
-func (c *TokenCharacter) IsType(v int) bool {
-	return Token_Character == v
-}
-
-func NewCharacterToken(value rune) *TokenCharacter {
-	return &TokenCharacter{
-		Data: utf8.RuneError,
-	}
-}
-func NewReplacementToken() *TokenCharacter {
-	return &TokenCharacter{
-		Data: utf8.RuneError,
-	}
-}
-
-type CommentToken struct {
-	Data string
-}
-
-func NewCommentToken() *CommentToken {
-	return &CommentToken{}
-}
-
-func (c *CommentToken) GetType() int {
-	return Token_Comment
-}
-
-func (c *CommentToken) IsType(value int) bool {
-	return Token_Comment == value
+func NewReplacementToken() Token {
+	return NewTokenCharacter(utf8.RuneError)
 }
