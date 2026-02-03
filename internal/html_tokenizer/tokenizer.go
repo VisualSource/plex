@@ -1,4 +1,4 @@
-package html
+package html_tokenizer
 
 import (
 	"io"

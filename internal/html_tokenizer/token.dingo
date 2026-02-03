@@ -1,0 +1,35 @@
+package html_tokenizer;
+
+import (
+	"unicode/utf8"
+)
+
+type AttributesMap map[string]string;
+
+// https://html.spec.whatwg.org/#tokenization
+enum Token {
+    EOF,
+    Character(rune),
+    StartTag {
+        name: string,
+        attrs: AttributesMap,
+        selfClosing: Option[bool],
+
+        cavalue: string,
+        caname: string,
+    },
+    Comment(string),
+    EndTag {
+        name: string
+    },
+    DOCTYPE {
+        name: Option[string],
+        publicIdentifier: Option[string],
+        systemIdentifier: Option[string],
+        forceQuirks: bool
+    }
+}
+
+func NewReplacementToken() Token {
+    return NewTokenCharacter(utf8.RuneError)
+}

@@ -1,4 +1,4 @@
-package html
+package dom
 
 const (
 	Node_Element               = 1

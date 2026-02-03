@@ -1,0 +1,6 @@
+[features]
+error_propagation_syntax = "question"
+
+[sourcemaps]
+enabled = true
+format = "separate"

@@ -5,10 +5,12 @@
 # make output
 bin/
 out/
-
+build/
 ##########
 # Golang #
 ##########
+
+.dmap
 
 # Binaries for programs and plugins
 *.exe

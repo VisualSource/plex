@@ -3,15 +3,15 @@ package html
 import (
 	"slices"
 
-	tokenizer "github.com/VisualSource/plex/internal/html/tokenizer"
+	"github.com/VisualSource/plex/internal/html_tokenizer"
 )
 
 func isAny[T comparable](value T, values ...T) bool {
 	return slices.Contains(values, value)
 }
 
-func isAnyRune(token tokenizer.Token, chars ...rune) bool {
-	tag, ok := token.(*tokenizer.TokenCharacter)
+func isAnyRune(token html_tokenizer.Token, chars ...rune) bool {
+	tag, ok := token.(*html_tokenizer.TokenCharacter)
 	if !ok {
 		return false
 	}
@@ -19,8 +19,8 @@ func isAnyRune(token tokenizer.Token, chars ...rune) bool {
 	return slices.Contains(chars, tag.Data)
 }
 
-func isAnyStartTag(token tokenizer.Token, tags ...string) bool {
-	tag, ok := token.(*tokenizer.TagToken)
+func isAnyStartTag(token html_tokenizer.Token, tags ...string) bool {
+	tag, ok := token.(*html_tokenizer.TagToken)
 
 	if !ok || tag.IsEndTag() {
 		return false
@@ -29,12 +29,12 @@ func isAnyStartTag(token tokenizer.Token, tags ...string) bool {
 	return slices.Contains(tags, tag.Name)
 }
 
-func isAnyTag(token *tokenizer.TagToken, tags ...string) bool {
+func isAnyTag(token *html_tokenizer.TagToken, tags ...string) bool {
 	return slices.Contains(tags, token.Name)
 }
 
-func isAnyEndTag(token tokenizer.Token, tags ...string) bool {
-	tag, ok := token.(*tokenizer.TagToken)
+func isAnyEndTag(token html_tokenizer.Token, tags ...string) bool {
+	tag, ok := token.(*html_tokenizer.TagToken)
 
 	if !ok || tag.IsStartTag() {
 		return false
