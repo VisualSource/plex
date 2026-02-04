@@ -407,7 +407,7 @@ func (t *Tokenizer) consume() (rune, error) {
 
 func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 
-	tag, ok := t.workingToken.(TokenStartTag)
+	tag, ok := t.workingToken.(*TokenStartTag)
 	if ok {
 		if tag.caname != "" {
 			_, ok := tag.attrs[tag.caname]
@@ -426,7 +426,7 @@ func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 // emitted from this tokenizer, if any. If no start tag has been emitted from this tokenizer,
 // then no end tag token is appropriate.
 func (t *Tokenizer) hasApproriateEndTagToken() bool {
-	tag, ok := t.workingToken.(TokenEndTag)
+	tag, ok := t.workingToken.(*TokenEndTag)
 	if !ok {
 		return false
 	}
@@ -710,7 +710,7 @@ func (t *Tokenizer) state_TagName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.name += string(unicode.ToLower(char))
 		}
 		return nil
@@ -718,13 +718,13 @@ func (t *Tokenizer) state_TagName() error {
 
 	// unexpected-null-character parse error.
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.name += string(utf8.RuneError)
 		}
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenStartTag); ok {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.name += string(char)
 	}
 	return nil
@@ -808,7 +808,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
 
-			if tag, ok := t.workingToken.(TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenEndTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 
@@ -816,7 +816,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenEndTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -910,14 +910,14 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			if tag, ok := t.workingToken.(TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenEndTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 			return nil
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenEndTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -1012,14 +1012,14 @@ func (t *Tokenizer) state_ScriptData_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			if tag, ok := t.workingToken.(TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenEndTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 			return nil
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenEndTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -1261,14 +1261,14 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			if tag, ok := t.workingToken.(TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenEndTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 			return nil
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenEndTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -1516,14 +1516,14 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 	if char == '=' {
 		t.state = state_AttributeName
 
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.caname = string(char)
 			tag.cavalue = ""
 		}
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenStartTag); ok {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.caname = ""
 		tag.cavalue = ""
 	}
@@ -1553,7 +1553,7 @@ func (t *Tokenizer) state_AttributeName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.caname += string(unicode.ToLower(char))
 		}
 		return nil
@@ -1561,7 +1561,7 @@ func (t *Tokenizer) state_AttributeName() error {
 
 	// unexpected-null-character parse error.
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.caname += string(utf8.RuneError)
 		}
 		return nil
@@ -1570,7 +1570,7 @@ func (t *Tokenizer) state_AttributeName() error {
 	// This is an unexpected-character-in-attribute-name parse error. Treat it as per the "anything else" entry below.
 	//if char == '"' || char == '\'' || char == '<' {}
 
-	if tag, ok := t.workingToken.(TokenStartTag); ok {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.caname += string(char)
 	}
 
@@ -1612,7 +1612,7 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenStartTag); ok {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.caname = ""
 		tag.cavalue = ""
 	}
@@ -1759,7 +1759,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.cavalue += string(utf8.RuneError)
 		}
 		return nil
@@ -1767,7 +1767,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 
 	//  unexpected-character-in-unquoted-attribute-value parse error. Treat it as per the "anything else" entry below.
 	//if char == '"' || char == '\'' || char == '<' || char == '=' || char == '`' {}
-	if tag, ok := t.workingToken.(TokenStartTag); ok {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.cavalue += string(char)
 	}
 	return nil
@@ -1786,7 +1786,7 @@ func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -1824,7 +1824,7 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.selfClosing = dgo.Some(true)
 		}
 		t.state = State_Data
@@ -2198,7 +2198,7 @@ func (t *Tokenizer) state_Comment_EndBang() error {
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenComment); ok {
+	if tag, ok := t.workingToken.(*TokenComment); ok {
 		tag.Value += "--!"
 	}
 	t.state = state_Comment
@@ -2224,7 +2224,7 @@ func (t *Tokenizer) state_DOCTYPE() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		t.state = state_BeforeDOCTYPEName
 		return nil
 	}
@@ -2252,7 +2252,7 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2283,12 +2283,12 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 func (t *Tokenizer) state_DOCTYPE_Name() error {
 	char, err := t.consume()
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 
@@ -2296,7 +2296,7 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		t.state = state_AfterDOCTYPE_Name
 		return nil
 	}
@@ -2308,7 +2308,7 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.name.IsSome() {
 				*tag.name.Some += string(unicode.ToLower(char))
 			}
@@ -2317,14 +2317,14 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.name.IsSome() {
 				*tag.name.Some += string(utf8.RuneError)
 			}
 		}
 		return nil
 	}
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.name.IsSome() {
 			*tag.name.Some += string(char)
 		}
@@ -2337,19 +2337,19 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 	char, err := t.consume()
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2398,26 +2398,26 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 	char, err := t.consume()
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		t.state = state_BeforeDOCTYPE_PublicIdentifier
 		return nil
 	}
 
 	if char == '"' {
 		t.state = state_DOCTYPE_PublicIdentifier_DoubleQuoted
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.publicIdentifier = dgo.Some("")
 		}
 		return nil
@@ -2425,14 +2425,14 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 
 	if char == '\'' {
 		t.state = state_DOCTYPE_PublicIdentifier_SingleQuoted
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.publicIdentifier = dgo.Some("")
 		}
 		return nil
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
@@ -2441,7 +2441,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
 	t.state = state_BogusDOCTYPE
@@ -2452,12 +2452,12 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 	char, err := t.consume()
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
@@ -2465,12 +2465,12 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		return nil
 	}
 
 	if char == '"' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.publicIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_PublicIdentifier_DoubleQuoted
@@ -2478,7 +2478,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 	}
 
 	if char == '\'' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.publicIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_PublicIdentifier_SingleQuoted
@@ -2486,14 +2486,14 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens()
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
 	t.state = state_BogusDOCTYPE
@@ -2509,7 +2509,7 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
@@ -2522,7 +2522,7 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.publicIdentifier.IsSome() {
 				*tag.publicIdentifier.Some += string(utf8.RuneError)
 			}
@@ -2531,14 +2531,14 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens()
 		t.state = State_Data
 		return nil
 	}
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.publicIdentifier.IsSome() {
 			*tag.publicIdentifier.Some += string(char)
 		}
@@ -2556,7 +2556,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
@@ -2569,7 +2569,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.publicIdentifier.IsSome() {
 				*tag.publicIdentifier.Some += string(char)
 			}
@@ -2578,14 +2578,14 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
 	}
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.publicIdentifier.IsSome() {
 			*tag.publicIdentifier.Some += string(char)
 		}
@@ -2610,7 +2610,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		t.state = state_BetweenDOCTYPE_PublicAndSystemIdentifiers
 		return nil
 	}
@@ -2622,7 +2622,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	}
 
 	if char == '"' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
@@ -2630,14 +2630,14 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	}
 
 	if char == '\'' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
 	t.state = state_BogusDOCTYPE
@@ -2661,7 +2661,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2672,7 +2672,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 	}
 
 	if char == '"' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
@@ -2680,14 +2680,14 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 	}
 
 	if char == '\'' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
 	t.state = state_BogusDOCTYPE
@@ -2711,12 +2711,12 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		return nil
 	}
 
 	if char == '"' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
@@ -2724,7 +2724,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	}
 
 	if char == '\'' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
@@ -2732,7 +2732,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
@@ -2741,7 +2741,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
 	t.state = state_BogusDOCTYPE
@@ -2758,19 +2758,19 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		return nil
 	}
 
 	if char == '"' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
@@ -2778,7 +2778,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 	}
 
 	if char == '\'' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
@@ -2786,7 +2786,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
@@ -2794,7 +2794,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
 	t.state = state_BogusDOCTYPE
@@ -2811,7 +2811,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
@@ -2824,7 +2824,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.systemIdentifier.IsSome() {
 				*tag.systemIdentifier.Some += string(utf8.RuneError)
 			}
@@ -2834,7 +2834,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
@@ -2842,7 +2842,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.systemIdentifier.IsSome() {
 			*tag.systemIdentifier.Some += string(char)
 		}
@@ -2860,7 +2860,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
@@ -2873,7 +2873,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.systemIdentifier.IsSome() {
 				*tag.systemIdentifier.Some += string(utf8.RuneError)
 			}
@@ -2882,7 +2882,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
@@ -2890,7 +2890,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.systemIdentifier.IsSome() {
 			*tag.systemIdentifier.Some += string(char)
 		}
@@ -2908,14 +2908,14 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
 		return nil
 	}
 
-	if char == '\t' || char == '\n' || char == '\f' || char == ' ' {
+	if IsWhitespace(char) {
 		t.state = state_BeforeDOCTYPE_SystemIdentifer
 		return nil
 	}
@@ -2953,6 +2953,7 @@ func (t *Tokenizer) state_Bogus_DOCTYPE() error {
 }
 
 //#endregion
+
 //#region CDATA
 
 // https://html.spec.whatwg.org/#cdata-section-state
@@ -3045,6 +3046,7 @@ func (t *Tokenizer) state_CharacterReference() error {
 }
 
 //#endregion
+
 //#region reference
 
 // https://html.spec.whatwg.org/#named-character-reference-state
