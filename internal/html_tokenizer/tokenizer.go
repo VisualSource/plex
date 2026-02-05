@@ -463,10 +463,8 @@ func (t *Tokenizer) state_Data() error {
 		return nil
 	}
 
-	// unexpected-null-character parse error
 	if char == '\u0000' {
-		t.tokens = append(t.tokens, NewTokenCharacter(char))
-		return nil
+		// unexpected-null-character parse error
 	}
 
 	t.tokens = append(t.tokens, NewTokenCharacter(char))
@@ -782,26 +780,20 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_BeforeAttributeName
-			return nil
-		}
+	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+		t.state = state_BeforeAttributeName
+		return nil
 	}
 
-	if char == '/' {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_SelfClosingStartTag
-			return nil
-		}
+	if char == '/' && t.hasApproriateEndTagToken() {
+		t.state = state_SelfClosingStartTag
+		return nil
 	}
 
-	if char == '>' {
-		if t.hasApproriateEndTagToken() {
-			t.state = State_Data
-			t.emitCurrentWithTokens()
-			return nil
-		}
+	if char == '>' && t.hasApproriateEndTagToken() {
+		t.state = State_Data
+		t.emitCurrentWithTokens()
+		return nil
 	}
 
 	if unicode.IsLetter(char) {
@@ -1679,13 +1671,13 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.cavalue += string(utf8.RuneError)
 		}
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenStartTag); ok {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.cavalue += string(char)
 	}
 	return nil
@@ -1716,13 +1708,13 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 	}
 
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.cavalue += string(utf8.RuneError)
 		}
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(TokenStartTag); ok {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.cavalue += string(char)
 	}
 	return nil
@@ -1835,38 +1827,6 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 	return t.reader.UnreadRune()
 }
 
-// https://html.spec.whatwg.org/#bogus-comment-state
-func (t *Tokenizer) state_BogusComment() error {
-	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
-
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
-	}
-
-	if char == '>' {
-		t.state = State_Data
-		t.emitCurrentWithTokens()
-		return nil
-	}
-
-	if char == '\u0000' {
-		if tag, ok := t.workingToken.(*TokenComment); ok {
-			tag.Value += string(utf8.RuneError)
-		}
-		return nil
-	}
-
-	if tag, ok := t.workingToken.(*TokenComment); ok {
-		tag.Value += string(char)
-	}
-	return nil
-}
-
 // https://html.spec.whatwg.org/#markup-declaration-open-state
 func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 
@@ -1929,6 +1889,38 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 
 //#endregion
 //#region Comment
+
+// https://html.spec.whatwg.org/#bogus-comment-state
+func (t *Tokenizer) state_BogusComment() error {
+	char, err := t.consume()
+	isEOF := err == io.EOF
+	if !isEOF && err != nil {
+		return err
+	}
+
+	if isEOF {
+		t.emitCurrentWithTokens(NewTokenEOF())
+		return nil
+	}
+
+	if char == '>' {
+		t.state = State_Data
+		t.emitCurrentWithTokens()
+		return nil
+	}
+
+	if char == '\u0000' {
+		if tag, ok := t.workingToken.(*TokenComment); ok {
+			tag.Value += string(utf8.RuneError)
+		}
+		return nil
+	}
+
+	if tag, ok := t.workingToken.(*TokenComment); ok {
+		tag.Value += string(char)
+	}
+	return nil
+}
 
 // https://html.spec.whatwg.org/#comment-start-state
 func (t *Tokenizer) state_CommentStart() error {
@@ -3020,6 +3012,10 @@ func (t *Tokenizer) state_CDATA_SectionEnd() error {
 	return t.reader.UnreadRune()
 }
 
+//#endregion
+
+//#region reference
+
 // https://html.spec.whatwg.org/#character-reference-state
 func (t *Tokenizer) state_CharacterReference() error {
 	t.tempbuffer = "&"
@@ -3044,10 +3040,6 @@ func (t *Tokenizer) state_CharacterReference() error {
 	t.state = t.rstate.MustSome()
 	return t.reader.UnreadRune()
 }
-
-//#endregion
-
-//#region reference
 
 // https://html.spec.whatwg.org/#named-character-reference-state
 func (t *Tokenizer) state_NamedCharacterReference() error {
