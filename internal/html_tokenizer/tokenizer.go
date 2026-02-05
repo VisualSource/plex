@@ -353,11 +353,13 @@ func wasConsumedAsPartOfAttribute(state dgo.Option[int]) bool {
 	if state.IsNone() {
 		return false
 	}
-	value := *state.Some
 
-	return value == state_AttributValue_DoubleQuoted ||
-		value == state_AttributValue_SingleQuoted ||
-		value == state_AttributeName
+	switch state.MustSome() {
+	case state_AttributValue_SingleQuoted, state_AttributValue_DoubleQuoted, state_AttributeName:
+		return true
+	default:
+		return false
+	}
 }
 
 // When a state says to flush code points consumed as a character reference,
