@@ -345,9 +345,7 @@ func (t *Tokenizer) ConsumeToken() Token {
 	return x
 }
 
-//#region private
-
-//#region Support
+//#region internal utils
 
 func wasConsumedAsPartOfAttribute(state dgo.Option[int]) bool {
 	if state.IsNone() {
@@ -2605,7 +2603,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
@@ -2656,7 +2654,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
@@ -2706,7 +2704,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	}
 
 	if isEOF {
-		if tag, ok := t.workingToken.(TokenDOCTYPE); ok {
+		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
 		t.emitCurrentWithTokens(NewTokenEOF())
