@@ -10,8 +10,10 @@ import (
 	"github.com/VisualSource/plex/internal/utils"
 )
 
+type InsertionMode int
+
 const (
-	mode_Initial = iota
+	mode_Initial InsertionMode = iota
 	mode_BeforeHtml
 	mode_BeforeHead
 	mode_InHead
@@ -34,20 +36,77 @@ const (
 	mode_AfterAfterframeset
 )
 
-type HTMLParser struct {
-	openEls               []dom.Node
-	insertionMode         int
-	activeFormattingEls   []any
-	scripting             bool
-	fameset               bool
-	originalInsertionMode int
-	html_tokenizer        html_tokenizer.Tokenizer
+// https://html.spec.whatwg.org/#parse-state
+type Parser struct {
+	//https://html.spec.whatwg.org/#the-insertion-mode
+	insertionMode InsertionMode
+	// https://html.spec.whatwg.org/#the-stack-of-open-elements
+	openElements []dom.Node
+	//https://html.spec.whatwg.org/#the-list-of-active-formatting-elements
+	activeFormattingElements []dom.Node
+
+	//https://html.spec.whatwg.org/#the-element-pointers
+	head dom.Node
+	form dom.Node
+
+	//https://html.spec.whatwg.org/#other-parsing-state-flags
+	scripting       bool
+	fameset         bool
+	fosterParenting bool
+
+	originalInsertionMode InsertionMode
+	html_tokenizer        *html_tokenizer.Tokenizer
 	document              *dom.Document
 	// https://html.spec.whatwg.org/#frameset-ok-flag
 	framesetOk string
 }
 
-func (m *HTMLParser) Parse() error {
+func NewParser(reader io.RuneReader) *Parser {
+	return &Parser{
+		insertionMode:  mode_Initial,
+		html_tokenizer: html_tokenizer.NewTokenizer(reader),
+		framesetOk:     "ok",
+	}
+}
+
+// https://html.spec.whatwg.org/#creating-and-inserting-nodes
+func (m *Parser) getInsertionLocation(overrideTarget *dom.Node) dom.HTMLElement {
+	var target dom.Node
+	if overrideTarget != nil {
+		target = *overrideTarget
+	} else {
+		// current node = last element on open elements stack
+		target = m.openElements[len(m.openElements)-1]
+	}
+
+	var adjustedInsertionLocation dom.HTMLElement
+
+	if m.fosterParenting && slices.Contains([]string{"table", "tbody", "tfoot", "thread", "tr"}, target.GetNodeName()) {
+		// lastTemplate == last template in stack of open elements
+		// lastTable == last table in open elements
+
+		// if lastTemplate || lastTable && template < table
+		//    adjustedInsertionLocation = lastTemplate.contents
+		//    abort
+
+		// if !lastTable
+		//    adjustedInsertionLocation = openElements[len(openElements)-1]
+		//    abort
+
+		// if lastTable.parent
+		//     adjustedInsertionLocation = lastTable.parent
+		//     abort
+
+		// if previous
+
+	} else {
+		adjustedInsertionLocation = target.(dom.HTMLElement)
+	}
+
+	return adjustedInsertionLocation
+}
+
+func (m *Parser) Parse() error {
 
 outer:
 	for {
@@ -65,7 +124,7 @@ outer:
 				break
 			}
 
-			if token.IsType(html_tokenizer.Token_EOF) {
+			if _, ok := token.(html_tokenizer.TokenEOF); ok {
 				break outer
 			}
 
@@ -76,9 +135,9 @@ outer:
 }
 
 // https://html.spec.whatwg.org/#reconstruct-the-active-formatting-elements
-func (m *HTMLParser) reconstructActiveFormattingEls() {}
+func (m *Parser) reconstructActiveFormattingEls() {}
 
-func (m *HTMLParser) hasElementInScope(target string, elementTypes ...string) bool {
+func (m *Parser) hasElementInScope(target string, elementTypes ...string) bool {
 
 	idx := 1
 	for {
@@ -96,16 +155,16 @@ func (m *HTMLParser) hasElementInScope(target string, elementTypes ...string) bo
 	}
 }
 
-func (m *HTMLParser) hasParticularElementInScope(element string) bool {
+func (m *Parser) hasParticularElementInScope(element string) bool {
 	return m.hasElementInScope(element, "applet", "caption", "html", "table", "td", "th", "marquee", "object", "select", "template", "mi", "mo", "mn", "ms", "mtext", "annotation-xml", "foreignObject", "desc", "title")
 }
 
 // https://html.spec.whatwg.org/#insert-a-character
-func (m *HTMLParser) insertCharacter(token *html_tokenizer.TokenCharacter) {
+func (m *Parser) insertCharacter(token *html_tokenizer.TokenCharacter) {
 
 }
 
-func (m *HTMLParser) insertComment(token *html_tokenizer.CommentToken, target dom.Node) (*dom.CommentNode, error) {
+func (m *Parser) insertComment(token *html_tokenizer.CommentToken, target dom.Node) (*dom.CommentNode, error) {
 	comment := dom.NewCommentNode(token.Data)
 
 	if target != nil {
@@ -124,7 +183,7 @@ func (m *HTMLParser) insertComment(token *html_tokenizer.CommentToken, target do
 	return comment, nil
 }
 
-func (m *HTMLParser) insertElement(node dom.Node, target dom.Node) {
+func (m *Parser) insertElement(node dom.Node, target dom.Node) {
 
 	n, ok := m.openEls[len(m.openEls)-1].(*dom.HTMLElement)
 	if ok {
@@ -133,7 +192,7 @@ func (m *HTMLParser) insertElement(node dom.Node, target dom.Node) {
 	m.openEls = append(m.openEls, node)
 }
 
-func (m *HTMLParser) InsertHtmlElement(token html_tokenizer.Token, namespace string, onlyAddToElementStack bool) (*dom.HTMLElement, error) {
+func (m *Parser) InsertHtmlElement(token html_tokenizer.Token, namespace string, onlyAddToElementStack bool) (*dom.HTMLElement, error) {
 
 	tag, ok := token.(*html_tokenizer.TagToken)
 	if !ok {
@@ -153,7 +212,7 @@ func (m *HTMLParser) InsertHtmlElement(token html_tokenizer.Token, namespace str
 }
 
 // https://html.spec.whatwg.org/#the-initial-insertion-mode
-func (m *HTMLParser) mode_Initial(token html_tokenizer.Token) error {
+func (m *Parser) mode_Initial(token html_tokenizer.Token) error {
 
 	if tag, ok := token.(*html_tokenizer.TokenCharacter); ok && slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
 		return nil
@@ -183,7 +242,7 @@ func (m *HTMLParser) mode_Initial(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#the-before-html-insertion-mode
-func (m *HTMLParser) mode_BeforeHtml(token html_tokenizer.Token) error {
+func (m *Parser) mode_BeforeHtml(token html_tokenizer.Token) error {
 
 	if _, ok := token.(*html_tokenizer.DoctypeToken); ok {
 		return nil
@@ -225,7 +284,7 @@ func (m *HTMLParser) mode_BeforeHtml(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#the-before-head-insertion-mode
-func (m *HTMLParser) mode_BeforeHead(token html_tokenizer.Token) error {
+func (m *Parser) mode_BeforeHead(token html_tokenizer.Token) error {
 
 	if tag, ok := token.(*html_tokenizer.TokenCharacter); ok && slices.Contains([]rune{'\t', '\n', '\f', '\f', '\r', ' '}, tag.Data) {
 		return nil
@@ -267,7 +326,7 @@ func (m *HTMLParser) mode_BeforeHead(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#parsing-main-inhead
-func (m *HTMLParser) mode_InHead(token html_tokenizer.Token) error {
+func (m *Parser) mode_InHead(token html_tokenizer.Token) error {
 
 	if tag, ok := token.(*html_tokenizer.TokenCharacter); ok && slices.Contains([]rune{'\t', '\n', '\f', '\r', ' '}, tag.Data) {
 		return nil
@@ -370,7 +429,7 @@ func (m *HTMLParser) mode_InHead(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#parsing-main-inheadnoscript
-func (m *HTMLParser) mode_InHeaderNoScript(token html_tokenizer.Token) error {
+func (m *Parser) mode_InHeaderNoScript(token html_tokenizer.Token) error {
 
 	if token.IsType(html_tokenizer.Token_DOCTYPE) {
 		return nil
@@ -403,7 +462,7 @@ func (m *HTMLParser) mode_InHeaderNoScript(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#the-after-head-insertion-mode
-func (m *HTMLParser) mode_AfterHead(token html_tokenizer.Token) error {
+func (m *Parser) mode_AfterHead(token html_tokenizer.Token) error {
 
 	if isAnyRune(token, '\t', '\n', '\f', '\r', ' ') {
 		m.insertCharacter(token.(*html_tokenizer.TokenCharacter))
@@ -466,7 +525,7 @@ func (m *HTMLParser) mode_AfterHead(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/#parsing-main-inbody
-func (m *HTMLParser) mode_InBody(token html_tokenizer.Token) error {
+func (m *Parser) mode_InBody(token html_tokenizer.Token) error {
 
 	if tag, ok := token.(*html_tokenizer.TokenCharacter); ok {
 		if tag.Data == '\u0000' {
@@ -515,7 +574,7 @@ func (m *HTMLParser) mode_InBody(token html_tokenizer.Token) error {
 	return nil
 }
 
-func (m *HTMLParser) Mode_Text(token html_tokenizer.Token) error {
+func (m *Parser) Mode_Text(token html_tokenizer.Token) error {
 
 	if _, ok := token.(*html_tokenizer.TokenCharacter); ok {
 		return nil
@@ -538,58 +597,54 @@ func (m *HTMLParser) Mode_Text(token html_tokenizer.Token) error {
 	return nil
 }
 
-func (m *HTMLParser) Mode_InTable(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InTable(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InTableText(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InTableText(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InCaption(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InCaption(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InColumnGroup(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InColumnGroup(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InTableBody(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InTableBody(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InRow(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InRow(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InCell(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InCell(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InTemplate(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InTemplate(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_AfterBody(token html_tokenizer.Token) error {
+func (m *Parser) Mode_AfterBody(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_InFrameset(token html_tokenizer.Token) error {
+func (m *Parser) Mode_InFrameset(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_AfterFrameset(token html_tokenizer.Token) error {
+func (m *Parser) Mode_AfterFrameset(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_AfterAfterBody(token html_tokenizer.Token) error {
+func (m *Parser) Mode_AfterAfterBody(token html_tokenizer.Token) error {
 	panic("not implemented")
 }
 
-func (m *HTMLParser) Mode_AfterAfterFrameset(token html_tokenizer.Token) error {
+func (m *Parser) Mode_AfterAfterFrameset(token html_tokenizer.Token) error {
 	panic("not implemented")
-}
-
-func NewHTMLParser(reader io.RuneReader) *HTMLParser {
-	return &HTMLParser{}
 }

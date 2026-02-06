@@ -23,7 +23,7 @@ func (d *HTMLElement) Append(node Node) {
 	d.children = append(d.children, node)
 }
 
-func (c *HTMLElement) GetNodeType() uint {
+func (c *HTMLElement) GetNodeType() NodeType {
 	return Node_Element
 }
 

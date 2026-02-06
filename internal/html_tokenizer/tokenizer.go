@@ -11,8 +11,11 @@ import (
 	"github.com/ianlewis/runeio"
 )
 
+type TokenizerState int
+
 const (
-	State_Data = iota
+	state_Unset TokenizerState = iota
+	State_Data
 	State_RCData
 	State_RawText
 	State_ScriptData
@@ -115,8 +118,8 @@ const (
 // https://html.spec.whatwg.org/#tokenization
 type Tokenizer struct {
 	reader                 *runeio.RuneReader
-	state                  int
-	rstate                 dgo.Option[int]
+	state                  TokenizerState
+	rstate                 TokenizerState
 	tokens                 []Token
 	characterReferenceCode int
 	tempbuffer             string
@@ -124,12 +127,13 @@ type Tokenizer struct {
 	lastStartTag           dgo.Option[string]
 }
 
-func NewTokenizer(stream io.RuneReader) Tokenizer {
+func NewTokenizer(stream io.RuneReader) *Tokenizer {
 	reader := runeio.NewReader(stream)
 
-	return Tokenizer{
+	return &Tokenizer{
 		reader: reader,
 		state:  State_Data,
+		rstate: state_Unset,
 	}
 }
 
@@ -326,7 +330,7 @@ func (t *Tokenizer) Next() error {
 	return err
 }
 
-func (t *Tokenizer) SetState(state int) {
+func (t *Tokenizer) SetState(state TokenizerState) {
 	t.state = state
 }
 
@@ -347,12 +351,8 @@ func (t *Tokenizer) ConsumeToken() Token {
 
 //#region internal utils
 
-func wasConsumedAsPartOfAttribute(state dgo.Option[int]) bool {
-	if state.IsNone() {
-		return false
-	}
-
-	switch state.MustSome() {
+func wasConsumedAsPartOfAttribute(state TokenizerState) bool {
+	switch state {
 	case state_AttributValue_SingleQuoted, state_AttributValue_DoubleQuoted, state_AttributeName:
 		return true
 	default:
@@ -367,7 +367,7 @@ func wasConsumedAsPartOfAttribute(state dgo.Option[int]) bool {
 func (t *Tokenizer) flush() {
 	if wasConsumedAsPartOfAttribute(t.rstate) {
 
-		tag, ok := t.workingToken.(TokenStartTag)
+		tag, ok := t.workingToken.(*TokenStartTag)
 		if ok {
 			tag.cavalue += t.tempbuffer
 		}
@@ -453,7 +453,7 @@ func (t *Tokenizer) state_Data() error {
 	}
 
 	if char == '&' {
-		t.rstate = dgo.Some(t.state)
+		t.rstate = t.state
 		t.state = state_CharacterReference
 		return nil
 	}
@@ -487,7 +487,7 @@ func (t *Tokenizer) state_RCData() error {
 	}
 
 	if char == '&' {
-		t.rstate = dgo.Some(State_RCData)
+		t.rstate = State_RCData
 		t.state = state_CharacterReference
 		return nil
 	}
@@ -1665,7 +1665,7 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 	}
 
 	if char == '&' {
-		t.rstate = dgo.Some(state_AttributValue_DoubleQuoted)
+		t.rstate = state_AttributValue_DoubleQuoted
 		t.state = state_CharacterReference
 		return nil
 	}
@@ -1702,7 +1702,7 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 	}
 
 	if char == '&' {
-		t.rstate = dgo.Some(state_AttributValue_SingleQuoted)
+		t.rstate = state_AttributValue_SingleQuoted
 		t.state = state_CharacterReference
 		return nil
 	}
@@ -1739,7 +1739,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 	}
 
 	if char == '&' {
-		t.rstate = dgo.Some(state_AttributValue_Unquoted)
+		t.rstate = state_AttributValue_Unquoted
 		t.state = state_CharacterReference
 		return nil
 	}
@@ -3037,7 +3037,7 @@ func (t *Tokenizer) state_CharacterReference() error {
 	}
 
 	t.flush()
-	t.state = t.rstate.MustSome()
+	t.state = t.rstate
 	return t.reader.UnreadRune()
 }
 
@@ -3098,7 +3098,7 @@ func (t *Tokenizer) state_AmbiguousAmpersand() error {
 		return t.reader.UnreadRune()
 	}*/
 
-	t.state = t.rstate.MustSome()
+	t.state = t.rstate
 	return t.reader.UnreadRune()
 }
 
@@ -3135,7 +3135,7 @@ func (t *Tokenizer) state_HexadecimalCharacterReferenceStart() error {
 	}
 
 	t.flush()
-	t.state = t.rstate.MustSome()
+	t.state = t.rstate
 	return t.reader.UnreadRune()
 }
 
@@ -3152,7 +3152,7 @@ func (t *Tokenizer) state_DecimalCharacterReferenceStart() error {
 	}
 
 	t.flush()
-	t.state = t.rstate.MustSome()
+	t.state = t.rstate
 	return t.reader.UnreadRune()
 }
 
@@ -3298,7 +3298,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 	t.tempbuffer = string(rune(t.characterReferenceCode))
 
 	t.flush()
-	t.state = t.rstate.MustSome()
+	t.state = t.rstate
 	return nil
 }
 

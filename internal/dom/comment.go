@@ -4,7 +4,7 @@ type CommentNode struct {
 	data string
 }
 
-func (c *CommentNode) GetNodeType() uint {
+func (c *CommentNode) GetNodeType() NodeType {
 	return Node_Comment
 }
 
