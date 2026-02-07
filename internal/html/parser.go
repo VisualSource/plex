@@ -100,7 +100,7 @@ func (m *Parser) getInsertionLocation(overrideTarget *dom.Node) dom.HTMLElement 
 		// if previous
 
 	} else {
-		adjustedInsertionLocation = target.(dom.HTMLElement)
+		//adjustedInsertionLocation = target.(dom.HTMLElement)
 	}
 
 	return adjustedInsertionLocation

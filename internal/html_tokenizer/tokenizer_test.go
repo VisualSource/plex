@@ -1,10 +1,18 @@
 package html_tokenizer
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+
+	"golang.org/x/text/unicode/norm"
+
+	"github.com/MadAppGang/dingo/pkg/dgo"
 )
 
 type testCase struct {
@@ -21,47 +29,131 @@ type testCase struct {
 	} `json:"errors"`
 }
 
-// https://github.com/html5lib/html5lib-tests
-
 func TestTokenizer(t *testing.T) {
-	tests := []testCase{}
-	for _, tt := range tests {
+	files := loadTestCases(t)
 
-		if len(tt.InitialStates) != 0 {
-			for _, state := range tt.InitialStates {
-				iState := resolveStateStrToType(state)
+	for filename, tests := range files {
+		for _, tt := range tests {
+			if len(tt.InitialStates) != 0 {
+				for _, state := range tt.InitialStates {
+					iState := resolveStateStrToType(state)
 
-				t.Run(fmt.Sprintf("%s: %s", state, tt.Description), func(t *testing.T) {
-					tok := NewTokenizer(strings.NewReader(resolveInputEncoding(tt.Input, tt.DoubleEscaped)))
-					tok.state = iState
+					testname := fmt.Sprintf("[%s](%s): %s", filename, state, tt.Description)
+					input := strings.NewReader(resolveEncoding(tt.Input, tt.DoubleEscaped))
+					t.Run(testname, func(t *testing.T) {
+						tok := NewTokenizer(input)
+						tok.SetState(iState)
 
-					runTest(t, tok, &tt)
-				})
+						if tt.LastStartTag != "" {
+							tok.lastStartTag = dgo.Some(tt.LastStartTag)
+						}
+
+						validate(t, tok, &tt)
+					})
+
+				}
+				continue
 			}
-			continue
-		}
 
-		t.Run(tt.Description, func(t *testing.T) {
-			tok := NewTokenizer(strings.NewReader(resolveInputEncoding(tt.Input, tt.DoubleEscaped)))
-			runTest(t, tok, &tt)
-		})
+			testname := fmt.Sprintf("[%s]: %s", filename, tt.Description)
+			input := strings.NewReader(resolveEncoding(tt.Input, tt.DoubleEscaped))
+			t.Run(testname, func(t *testing.T) {
+				tok := NewTokenizer(input)
+
+				if tt.LastStartTag != "" {
+					tok.lastStartTag = dgo.Some(tt.LastStartTag)
+				}
+
+				validate(t, tok, &tt)
+			})
+		}
 	}
 }
 
-func resolveStateStrToType(value string) TokenizerState {
-	return State_Data
+func loadTestCases(t *testing.T) map[string][]testCase {
+	t.Helper()
+
+	values := os.Getenv("TEST_TOKENIZER_SUBSET")
+	allowed := strings.Split(values, ",")
+	useSubset := len(allowed) != 0
+
+	paths, err := filepath.Glob(filepath.Join("testdata", "*.test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := make(map[string][]testCase)
+
+	for _, path := range paths {
+		_, filename := filepath.Split(path)
+		testname := filename[:len(filename)-len(filepath.Ext(path))]
+
+		if useSubset && !slices.Contains(allowed, testname) {
+			t.Logf("ignore test file '%s'", testname)
+			continue
+		}
+
+		source, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var contents struct {
+			Tests []testCase `json:"tests"`
+		}
+		err = json.Unmarshal(source, &contents)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		tests[testname] = contents.Tests
+	}
+
+	return tests
 }
 
-func resolveInputEncoding(input string, isDoubleEscaped bool) string {
+func resolveStateStrToType(value string) TokenizerState {
+	switch value {
+	case "PLAINTEXT state":
+		return State_PlainText
+	case "RCDATA state":
+		return State_RCData
+	case "RAWTEXT state":
+		return State_RawText
+	case "Script data state":
+		return State_ScriptData
+	case "CDATA section state":
+		return state_CDATA_Section
+	default:
+		return State_Data
+	}
+}
+
+func resolveEncoding(input string, isDoubleEscaped bool) string {
 	if isDoubleEscaped {
-		return input
+		return norm.NFC.String(input)
 	}
 
 	return input
 }
 
-func runTest(t *testing.T, tok *Tokenizer, tt *testCase) {
+func testOptStr(expected *string, value dgo.Option[string], name string, isDoubleEscaped bool, t *testing.T) {
+	if expected == nil && value.Some != nil {
+		t.Fatalf("was expecting DOCTYPE prop %s to be nil but got: '%v'", name, value.Some)
+	}
+
+	if value.IsNone() {
+		t.Fatalf("DOCTYPE prop %s was expected to contain value '%s' but is nil", name, *expected)
+	}
+
+	if resolveEncoding(*expected, isDoubleEscaped) != *value.Some {
+		t.Fatalf("was expecting prop %s to have value '%s' but got '%s'", name, *expected, *value.Some)
+	}
+}
+
+func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 	t.Helper()
+	iters := 0
 	for {
 		err := tok.Next()
 		if err != nil {
@@ -70,41 +162,98 @@ func runTest(t *testing.T, tok *Tokenizer, tt *testCase) {
 			}
 			break
 		}
+		iters++
+
+		if iters > 1000 {
+			t.Fatal("max iteration")
+			break
+		}
 	}
 
-	if len(tt.Output) != 0 {
+	if len(tok.tokens) == 0 && len(tt.Output) != 0 {
+		t.Fatalf("missing tokens")
+	}
 
-		for idx, arg := range tt.Output {
-			if idx > len(tok.tokens) {
-				t.Fatalf("token count does not match expecting output")
+	i := 0
+	for _, arg := range tt.Output {
+
+		if i > len(tok.tokens) {
+			t.Fatalf("failed to access token at idx '%d' tokens(%d)", i, len(tok.tokens))
+			break
+		}
+
+		token := tok.tokens[i]
+		switch arg[0].(string) {
+		case "StartTag":
+			if tag, ok := token.(*TokenStartTag); ok {
+				if resolveEncoding(arg[1].(string), tt.DoubleEscaped) != tag.name {
+					t.Fatalf("was expecting a name of '%s' but was given '%s'", arg[1], tag.name)
+				}
+
+				for name, value := range arg[2].(map[string]string) {
+					tag, hasTag := tag.attrs[resolveEncoding(name, tt.DoubleEscaped)]
+					if !hasTag {
+						t.Fatalf("was expecting to have attribute with a name of '%s' but not was found", name)
+					}
+
+					if resolveEncoding(value, tt.DoubleEscaped) != tag {
+						t.Fatalf("was expecting attribute '%s' to have value of '%s' but got '%s'", name, value, tag)
+					}
+				}
+
+				if len(arg) == 4 && arg[3].(bool) != *tag.selfClosing.Some {
+					t.Fatalf("was expecting self closing flag to be '%v' but was given '%v'", arg[3], tag.selfClosing.Some)
+				}
+			} else {
+				t.Fatalf("was expecting an start tag but got '%v'", token)
 			}
-			token := tok.tokens[idx]
+		case "EndTag":
+			if tag, ok := token.(*TokenEndTag); ok {
+				if resolveEncoding(arg[1].(string), tt.DoubleEscaped) != tag.name {
+					t.Fatalf("was expecting end tag to have tag name of '%s' not '%v'", arg[1], tag.name)
+				}
+			} else {
+				t.Fatalf("was expecting an end tag but got '%v'", token)
+			}
+		case "DOCTYPE":
+			if tag, ok := token.(*TokenDOCTYPE); ok {
+				testOptStr(arg[1].(*string), tag.name, "name", tt.DoubleEscaped, t)
+				testOptStr(arg[2].(*string), tag.publicIdentifier, "public_id", tt.DoubleEscaped, t)
+				testOptStr(arg[3].(*string), tag.systemIdentifier, "system_id", tt.DoubleEscaped, t)
 
-			switch arg[0].(string) {
-			case "StartTag":
+				correctness := arg[4].(bool)
 
-			case "EndTag":
-				if tag, ok := token.(*TokenEndTag); ok {
-					if arg[1].(string) != tag.name {
-						t.Fatalf("was expecting end tag to have tag name of '%s' not '%v'", arg[1], tag.name)
+				if correctness == !tag.forceQuirks {
+					t.Fatalf("was expecting DOCTYPE forceQuirks flag to be '%v' but got '%v'", !correctness, tag.forceQuirks)
+				}
+			} else {
+				t.Fatalf("was expecting an doctype tag but got '%v'", token)
+			}
+		case "Character":
+			for _, char := range resolveEncoding(arg[1].(string), tt.DoubleEscaped) {
+				if tag, ok := tok.tokens[i].(*TokenCharacter); ok {
+
+					if char != tag.Value {
+						t.Fatalf("was expecting character token to have value of '%v' but got '%v'", char, tag.Value)
 					}
 				} else {
-					t.Fatalf("was expecting an end tag but got '%v'", token)
+					t.Fatalf("was expecting a character token but found '%v'", tok.tokens[i])
 				}
-			case "DOCTYPE":
-			case "Character":
-			case "Comment":
-				if tag, ok := token.(*TokenComment); ok {
-					if arg[1].(string) != tag.Value {
-						t.Fatalf("was expecting comment to have value '%s' not '%s'", arg[1], tag.Value)
-					}
+				i++
+			}
 
-				} else {
-					t.Fatalf("was expecting an comment token but got: '%v'", token)
+			continue
+		case "Comment":
+			if tag, ok := token.(*TokenComment); ok {
+				if resolveEncoding(arg[1].(string), tt.DoubleEscaped) != tag.Value {
+					t.Fatalf("was expecting comment to have value '%s' not '%s'", arg[1], tag.Value)
 				}
-
+			} else {
+				t.Fatalf("was expecting an comment token but got: '%v'", token)
 			}
 		}
+
+		i++
 	}
 
 	if len(tt.Errors) != 0 {

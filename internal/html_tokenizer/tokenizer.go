@@ -442,14 +442,11 @@ func (t *Tokenizer) hasApproriateEndTagToken() bool {
 func (t *Tokenizer) state_Data() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '&' {
@@ -476,14 +473,12 @@ func (t *Tokenizer) state_Data() error {
 func (t *Tokenizer) state_RCData() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+			return io.EOF
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '&' {
@@ -512,14 +507,12 @@ func (t *Tokenizer) state_RCData() error {
 func (t *Tokenizer) state_RawText() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+			return io.EOF
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '<' {
@@ -542,14 +535,12 @@ func (t *Tokenizer) state_RawText() error {
 func (t *Tokenizer) state_ScriptData() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+			return io.EOF
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '<' {
@@ -572,14 +563,11 @@ func (t *Tokenizer) state_ScriptData() error {
 func (t *Tokenizer) state_PlainText() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	// unexpected-null-character parse error.
@@ -601,15 +589,12 @@ func (t *Tokenizer) state_PlainText() error {
 func (t *Tokenizer) state_TagOpen() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			// eof-before-tag-name parse error.
+			t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenEOF())
+		}
 		return err
-	}
-
-	// eof-before-tag-name parse error.
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenEOF())
-		return nil
 	}
 
 	if char == '!' {
@@ -646,15 +631,13 @@ func (t *Tokenizer) state_TagOpen() error {
 func (t *Tokenizer) state_EndTagOpen() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
+	if err != nil {
+		if err == io.EOF {
+			//  eof-before-tag-name parse error.
+			t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'), NewTokenEOF())
+		}
 
-	//  eof-before-tag-name parse error.
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'), NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if unicode.IsLetter(char) {
@@ -680,15 +663,12 @@ func (t *Tokenizer) state_EndTagOpen() error {
 func (t *Tokenizer) state_TagName() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		// eof-in-tag parse error.
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	// eof-in-tag parse error.
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if IsWhitespace(char) {
@@ -1064,14 +1044,11 @@ func (t *Tokenizer) state_ScriptData_Escape_StartDash() error {
 func (t *Tokenizer) state_ScriptData_Escaped() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '-' {
@@ -1099,14 +1076,11 @@ func (t *Tokenizer) state_ScriptData_Escaped() error {
 func (t *Tokenizer) state_ScriptData_Escaped_Dash() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '-' {
@@ -1136,14 +1110,11 @@ func (t *Tokenizer) state_ScriptData_Escaped_Dash() error {
 func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '-' {
@@ -1178,8 +1149,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
 func (t *Tokenizer) state_ScriptData_Escaped_LessThanSign() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
 		return err
 	}
 
@@ -1317,14 +1287,11 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 func (t *Tokenizer) state_ScriptData_DoubleEscaped() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '-' {
@@ -1353,14 +1320,11 @@ func (t *Tokenizer) state_ScriptData_DoubleEscaped() error {
 func (t *Tokenizer) state_ScriptData_DoubleEscapedDash() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '-' {
@@ -1391,14 +1355,11 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedDash() error {
 func (t *Tokenizer) state_ScriptData_DoubleEscapedDashDash() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == '-' {
@@ -1573,15 +1534,12 @@ func (t *Tokenizer) state_AttributeName() error {
 func (t *Tokenizer) state_AfterAttributeName() error {
 	char, err := t.consume()
 
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if err != nil {
+		//  eof-in-tag parse error.
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
 		return err
-	}
-
-	//  eof-in-tag parse error.
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
 	}
 
 	if IsWhitespace(char) {
@@ -1649,14 +1607,12 @@ func (t *Tokenizer) state_BeforeAttributeValue() error {
 // https://html.spec.whatwg.org/#attribute-value-(double-quoted)-state
 func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '"' {
@@ -1686,14 +1642,12 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 // https://html.spec.whatwg.org/#attribute-value-(single-quoted)-state
 func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '\'' {
@@ -1723,14 +1677,12 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 // https://html.spec.whatwg.org/#attribute-value-(unquoted)-state
 func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -1768,14 +1720,12 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 // https://html.spec.whatwg.org/#after-attribute-value-(quoted)-state
 func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -1805,14 +1755,12 @@ func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 // https://html.spec.whatwg.org/#self-closing-start-tag-state
 func (t *Tokenizer) state_SelfClosingStartTag() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '>' {
@@ -1893,14 +1841,12 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 // https://html.spec.whatwg.org/#bogus-comment-state
 func (t *Tokenizer) state_BogusComment() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '>' {
@@ -1949,14 +1895,12 @@ func (t *Tokenizer) state_CommentStart() error {
 // https://html.spec.whatwg.org/#comment-start-dash-state
 func (t *Tokenizer) state_Comment_StartDash() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '-' {
@@ -1981,14 +1925,12 @@ func (t *Tokenizer) state_Comment_StartDash() error {
 // https://html.spec.whatwg.org/#comment-state
 func (t *Tokenizer) state_Comment() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '<' {
@@ -2021,7 +1963,6 @@ func (t *Tokenizer) state_Comment() error {
 // https://html.spec.whatwg.org/#comment-less-than-sign-state
 func (t *Tokenizer) state_Comment_LessThanSign() error {
 	char, err := t.consume()
-
 	if err != nil {
 		return err
 	}
@@ -2048,7 +1989,6 @@ func (t *Tokenizer) state_Comment_LessThanSign() error {
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-state
 func (t *Tokenizer) state_Comment_LessThanSign_Bang() error {
 	char, err := t.consume()
-
 	if err != nil {
 		return err
 	}
@@ -2066,7 +2006,6 @@ func (t *Tokenizer) state_Comment_LessThanSign_Bang() error {
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-dash-state
 func (t *Tokenizer) state_Comment_LessThanSign_BangDash() error {
 	char, err := t.consume()
-
 	if err != nil {
 		return err
 	}
@@ -2102,14 +2041,12 @@ func (t *Tokenizer) state_Comment_LessThanSign_BangDashDash() error {
 // https://html.spec.whatwg.org/#comment-end-dash-state
 func (t *Tokenizer) state_Comment_EndDash() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '-' {
@@ -2127,14 +2064,12 @@ func (t *Tokenizer) state_Comment_EndDash() error {
 // https://html.spec.whatwg.org/#comment-end-state
 func (t *Tokenizer) state_CommentEnd() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '>' {
@@ -2166,14 +2101,12 @@ func (t *Tokenizer) state_CommentEnd() error {
 // https://html.spec.whatwg.org/#comment-end-bang-state
 func (t *Tokenizer) state_Comment_EndBang() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+		}
+		return err
 	}
 
 	if char == '-' {
@@ -2205,15 +2138,14 @@ func (t *Tokenizer) state_Comment_EndBang() error {
 // https://html.spec.whatwg.org/#doctype-state
 func (t *Tokenizer) state_DOCTYPE() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
-		t.emitCurrentWithTokens(tag, NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
+			t.emitCurrentWithTokens(tag, NewTokenEOF())
+			return nil
+		}
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2233,15 +2165,12 @@ func (t *Tokenizer) state_DOCTYPE() error {
 // https://html.spec.whatwg.org/#before-doctype-name-state
 func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
+			t.emitCurrentWithTokens(tag, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
-		t.emitCurrentWithTokens(tag, NewTokenEOF())
-		return nil
 	}
 
 	if IsWhitespace(char) {
@@ -2274,18 +2203,16 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 // https://html.spec.whatwg.org/#doctype-name-state
 func (t *Tokenizer) state_DOCTYPE_Name() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
+	if err != nil {
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2328,17 +2255,15 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 // https://html.spec.whatwg.org/#after-doctype-name-state
 func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2389,17 +2314,15 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 // https://html.spec.whatwg.org/#after-doctype-public-keyword-state
 func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2443,18 +2366,16 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 // https://html.spec.whatwg.org/#before-doctype-public-identifier-state
 func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
+			t.state = State_Data
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		t.state = State_Data
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2495,17 +2416,15 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 // https://html.spec.whatwg.org/#doctype-public-identifier-(double-quoted)-state
 func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if char == '"' {
@@ -2542,17 +2461,15 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 // https://html.spec.whatwg.org/#doctype-public-identifier-(single-quoted)-state
 func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if char == '\'' {
@@ -2589,17 +2506,15 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 // https://html.spec.whatwg.org/#after-doctype-public-identifier-state
 func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2640,17 +2555,15 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 // https://html.spec.whatwg.org/#between-doctype-public-and-system-identifiers-state
 func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2690,17 +2603,15 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 // https://html.spec.whatwg.org/#after-doctype-system-keyword-state
 func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2744,17 +2655,15 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 // https://html.spec.whatwg.org/#before-doctype-system-identifier-state
 func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2797,17 +2706,15 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 // https://html.spec.whatwg.org/#doctype-system-identifier-(double-quoted)-state
 func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if char == '"' {
@@ -2846,17 +2753,15 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 // https://html.spec.whatwg.org/#doctype-system-identifier-(single-quoted)-state
 func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if char == '\'' {
@@ -2894,17 +2799,15 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 // https://html.spec.whatwg.org/#after-doctype-system-identifier-state
 func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.forceQuirks = true
+	if err != nil {
+		if err == io.EOF {
+			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+				tag.forceQuirks = true
+			}
+			t.emitCurrentWithTokens(NewTokenEOF())
 		}
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+		return err
 	}
 
 	if IsWhitespace(char) {
@@ -2925,14 +2828,13 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 // https://html.spec.whatwg.org/#bogus-doctype-state
 func (t *Tokenizer) state_Bogus_DOCTYPE() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if err != nil && !isEOF {
-		return err
-	}
 
-	if isEOF {
-		t.emitCurrentWithTokens(NewTokenEOF())
-		return nil
+	if err != nil {
+		if err == io.EOF {
+			t.emitCurrentWithTokens(NewTokenEOF())
+
+		}
+		return err
 	}
 
 	if char == '>' {
@@ -2951,14 +2853,11 @@ func (t *Tokenizer) state_Bogus_DOCTYPE() error {
 // https://html.spec.whatwg.org/#cdata-section-state
 func (t *Tokenizer) state_CDATA_Section() error {
 	char, err := t.consume()
-	isEOF := err == io.EOF
-	if !isEOF && err != nil {
+	if err != nil {
+		if err == io.EOF {
+			t.tokens = append(t.tokens, NewTokenEOF())
+		}
 		return err
-	}
-
-	if isEOF {
-		t.tokens = append(t.tokens, NewTokenEOF())
-		return nil
 	}
 
 	if char == ']' {
@@ -3292,7 +3191,6 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 		case 0x9F:
 			t.characterReferenceCode = 0x0178
 		}
-
 	}
 
 	t.tempbuffer = string(rune(t.characterReferenceCode))
