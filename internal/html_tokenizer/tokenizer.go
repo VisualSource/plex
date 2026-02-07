@@ -415,9 +415,9 @@ func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 				tag.attrs[tag.caname] = tag.cavalue
 			}
 		}
-		t.tokens = append(t.tokens, tag)
 	}
 
+	t.tokens = append(t.tokens, t.workingToken)
 	t.tokens = append(t.tokens, tokens...)
 	t.workingToken = nil
 }
@@ -1809,7 +1809,7 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 		_, err := t.reader.Read(rs)
 
 		if err != nil {
-			return nil
+			return err
 		}
 
 		return nil
