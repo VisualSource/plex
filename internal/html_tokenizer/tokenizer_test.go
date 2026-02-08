@@ -158,6 +158,7 @@ func testOptStr(expected any, value dgo.Option[string], name string, isDoubleEsc
 
 func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 	t.Helper()
+
 	iters := 0
 	for {
 		err := tok.Next()

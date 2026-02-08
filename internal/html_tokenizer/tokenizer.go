@@ -125,6 +125,7 @@ type Tokenizer struct {
 	tempbuffer             string
 	workingToken           Token
 	lastStartTag           dgo.Option[string]
+	errors                 []string
 }
 
 func NewTokenizer(stream io.RuneReader) *Tokenizer {
@@ -409,10 +410,13 @@ func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 
 	tag, ok := t.workingToken.(*TokenStartTag)
 	if ok {
+		t.lastStartTag = dgo.Some(tag.name)
 		if tag.caname != "" {
 			_, ok := tag.attrs[tag.caname]
 			if !ok {
 				tag.attrs[tag.caname] = tag.cavalue
+			} else {
+				t.errors = append(t.errors, "duplicate-attribute")
 			}
 		}
 	}
@@ -461,7 +465,7 @@ func (t *Tokenizer) state_Data() error {
 	}
 
 	if char == '\u0000' {
-		// unexpected-null-character parse error
+		t.errors = append(t.errors, "unexpected-null-character")
 	}
 
 	t.tokens = append(t.tokens, NewTokenCharacter(char))
@@ -492,8 +496,8 @@ func (t *Tokenizer) state_RCData() error {
 		return nil
 	}
 
-	// unexpected-null-character parse error.
 	if char == '\u0000' {
+		t.errors = append(t.errors, "unexpected-null-character")
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -520,8 +524,8 @@ func (t *Tokenizer) state_RawText() error {
 		return nil
 	}
 
-	//  unexpected-null-character parse error.
 	if char == '\u0000' {
+		t.errors = append(t.errors, "unexpected-null-character")
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -548,8 +552,8 @@ func (t *Tokenizer) state_ScriptData() error {
 		return nil
 	}
 
-	// unexpected-null-character parse error.
 	if char == '\u0000' {
+		t.errors = append(t.errors, "unexpected-null-character")
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -570,8 +574,8 @@ func (t *Tokenizer) state_PlainText() error {
 		return err
 	}
 
-	// unexpected-null-character parse error.
 	if char == '\u0000' {
+		t.errors = append(t.errors, "unexpected-null-character")
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -591,7 +595,7 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	if err != nil {
 		if err == io.EOF {
-			// eof-before-tag-name parse error.
+			t.errors = append(t.errors, "eof-before-tag-name")
 			t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenEOF())
 		}
 		return err
@@ -613,16 +617,15 @@ func (t *Tokenizer) state_TagOpen() error {
 		return t.reader.UnreadRune()
 	}
 
-	//  unexpected-question-mark-instead-of-tag-name parse error.
 	if char == '?' {
+		t.errors = append(t.errors, "unexpected-question-mark-instead-of-tag-name")
 		t.workingToken = NewTokenComment("")
 		t.state = state_BogusComment
 		return t.reader.UnreadRune()
 	}
 
-	//  invalid-first-character-of-tag-name parse error.
-
-	t.tokens = append(t.tokens, NewTokenCharacter('>'))
+	t.errors = append(t.errors, "invalid-first-character-of-tag-name")
+	t.tokens = append(t.tokens, NewTokenCharacter('<'))
 	t.state = State_Data
 	return t.reader.UnreadRune()
 }
@@ -633,7 +636,7 @@ func (t *Tokenizer) state_EndTagOpen() error {
 
 	if err != nil {
 		if err == io.EOF {
-			//  eof-before-tag-name parse error.
+			t.errors = append(t.errors, "eof-before-tag-name")
 			t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'), NewTokenEOF())
 		}
 
@@ -646,13 +649,13 @@ func (t *Tokenizer) state_EndTagOpen() error {
 		return t.reader.UnreadRune()
 	}
 
-	// missing-end-tag-name parse error.
 	if char == '>' {
+		t.errors = append(t.errors, "missing-end-tag-name")
 		t.state = State_Data
 		return nil
 	}
 
-	// invalid-first-character-of-tag-name parse error.
+	t.errors = append(t.errors, "invalid-first-character-of-tag-name")
 	t.workingToken = NewTokenComment("")
 
 	t.state = state_BogusComment
@@ -664,8 +667,8 @@ func (t *Tokenizer) state_TagName() error {
 	char, err := t.consume()
 
 	if err != nil {
-		// eof-in-tag parse error.
 		if err == io.EOF {
+			t.errors = append(t.errors, "eof-in-tag")
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
@@ -688,23 +691,33 @@ func (t *Tokenizer) state_TagName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
+		switch tag := t.workingToken.(type) {
+		case *TokenStartTag:
+			tag.name += string(unicode.ToLower(char))
+		case *TokenEndTag:
 			tag.name += string(unicode.ToLower(char))
 		}
 		return nil
 	}
 
-	// unexpected-null-character parse error.
 	if char == '\u0000' {
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
+		t.errors = append(t.errors, "unexpected-null-character")
+		switch tag := t.workingToken.(type) {
+		case *TokenStartTag:
+			tag.name += string(utf8.RuneError)
+		case *TokenEndTag:
 			tag.name += string(utf8.RuneError)
 		}
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
+	switch tag := t.workingToken.(type) {
+	case *TokenStartTag:
+		tag.name += string(char)
+	case *TokenEndTag:
 		tag.name += string(char)
 	}
+
 	return nil
 }
 
@@ -1512,16 +1525,17 @@ func (t *Tokenizer) state_AttributeName() error {
 		return nil
 	}
 
-	// unexpected-null-character parse error.
 	if char == '\u0000' {
+		t.errors = append(t.errors, "unexpected-null-character")
 		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.caname += string(utf8.RuneError)
 		}
 		return nil
 	}
 
-	// This is an unexpected-character-in-attribute-name parse error. Treat it as per the "anything else" entry below.
-	//if char == '"' || char == '\'' || char == '<' {}
+	if char == '"' || char == '\'' || char == '<' {
+		t.errors = append(t.errors, "unexpected-character-in-attribute-name")
+	}
 
 	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.caname += string(char)
@@ -1797,36 +1811,37 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 	}
 
 	runes, err = t.reader.Peek(7)
-	if err != nil {
+	isPeekReadShort := err == io.EOF
+	if !isPeekReadShort && err != nil {
 		return err
 	}
 
-	a := string(runes)
-	if strings.ToUpper(a) == "DOCTYPE" {
-		t.state = state_DOCTYPE
+	if !isPeekReadShort {
+		a := string(runes)
+		if strings.ToUpper(a) == "DOCTYPE" {
+			t.state = state_DOCTYPE
 
-		rs := make([]rune, 7)
-		_, err := t.reader.Read(rs)
+			rs := make([]rune, 7)
+			_, err := t.reader.Read(rs)
 
-		if err != nil {
-			return err
+			if err != nil {
+				return err
+			}
+
+			return nil
+		} else if a == "[CDATA[" {
+			rs := make([]rune, 7)
+			_, err := t.reader.Read(rs)
+			if err != nil {
+				return err
+			}
+
+			//TODO: adjeusted current node check && html namespace check
+			// t.state = State_CDATA_Section
+			t.workingToken = NewTokenComment(a)
+			t.state = state_BogusComment
+			return nil
 		}
-
-		return nil
-	}
-
-	if a == "[CDATA[" {
-		rs := make([]rune, 7)
-		_, err := t.reader.Read(rs)
-		if err != nil {
-			return err
-		}
-
-		//TODO: adjeusted current node check && html namespace check
-		// t.state = State_CDATA_Section
-		t.workingToken = NewTokenComment(a)
-		t.state = state_BogusComment
-		return nil
 	}
 
 	t.workingToken = NewTokenComment("")
@@ -2943,27 +2958,18 @@ func (t *Tokenizer) state_CharacterReference() error {
 // https://html.spec.whatwg.org/#named-character-reference-state
 func (t *Tokenizer) state_NamedCharacterReference() error {
 
-	/*runes, err := t.reader.Peek(25)
-	if err != nil {
-		return err
-	}
-
-	if runes[0] == 'a' && runes[1] == 'c' {
-		if wasconsumedAsPartOfAttribute(t.state) && runes[2] != ';' && (runes[2] == '=' || unicode.IsLetter(runes[2]) || unicode.IsNumber(runes[2])) {
-			t.flush()
-			t.state = t.rstate
-			return nil
-		}
-
-		if runes[2] != ';' {
-
-		}
-
-		t.tempbuffer = string(rune('∾'))
-		t.flush()
-		t.state = t.rstate
-		return nil
-	}*/
+	// find match
+	// if match
+	//    if wasConsumedAsPartOfAttribute(t.rstate) && lastChar != ';' && (nextChar == '=' || unicode.IsAlpha(nextChar))
+	//           flush
+	//           t.state = t.rstate
+	//    else
+	//        if lastChar != ';'
+	//             error("missing-semicolon-after-character-reference")
+	//        t.tempbuffer = chodepoints
+	//        flush
+	//        t.state = t.rstate
+	//   return nil
 
 	t.state = state_AmbiguousAmpersand
 	t.flush()
@@ -2991,11 +2997,9 @@ func (t *Tokenizer) state_AmbiguousAmpersand() error {
 		return nil
 	}
 
-	//  unknown-named-character-reference parse error.
-	/*if char == ';' {
-		t.state = t.rstate
-		return t.reader.UnreadRune()
-	}*/
+	if char == ';' {
+		t.errors = append(t.errors, "unknown-named-character-reference")
+	}
 
 	t.state = t.rstate
 	return t.reader.UnreadRune()
@@ -3033,6 +3037,7 @@ func (t *Tokenizer) state_HexadecimalCharacterReferenceStart() error {
 		return t.reader.UnreadRune()
 	}
 
+	t.errors = append(t.errors, "absence-of-digits-in-numeric-character-reference")
 	t.flush()
 	t.state = t.rstate
 	return t.reader.UnreadRune()
@@ -3050,6 +3055,7 @@ func (t *Tokenizer) state_DecimalCharacterReferenceStart() error {
 		return t.reader.UnreadRune()
 	}
 
+	t.errors = append(t.errors, "absence-of-digits-in-numeric-character-reference")
 	t.flush()
 	t.state = t.rstate
 	return t.reader.UnreadRune()
@@ -3084,6 +3090,7 @@ func (t *Tokenizer) state_HexadecimalCharacterReference() error {
 		return nil
 	}
 
+	t.errors = append(t.errors, "missing-semicolon-after-character-reference")
 	t.state = state_NumericCharacterReferenceEnd
 	return t.reader.UnreadRune()
 }
@@ -3105,6 +3112,7 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 		return nil
 	}
 
+	t.errors = append(t.errors, "missing-semicolon-after-character-reference")
 	t.state = state_NumericCharacterReferenceEnd
 	return t.reader.UnreadRune()
 }
@@ -3113,28 +3121,27 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
 	if t.characterReferenceCode == 0x00 {
+		t.errors = append(t.errors, "null-character-reference")
 		t.characterReferenceCode = 0xFFFD
 	}
 
 	if t.characterReferenceCode > 0x10FFFF {
+		t.errors = append(t.errors, "character-reference-outside-unicode-range")
 		t.characterReferenceCode = 0xFFFD
 	}
 
 	if (t.characterReferenceCode >= 0xD800 && t.characterReferenceCode <= 0xDBFF) ||
 		(t.characterReferenceCode >= 0xCD00 && t.characterReferenceCode <= 0xDFFF) {
+		t.errors = append(t.errors, "surrogate-character-reference")
 		t.characterReferenceCode = 0xFFFD
 	}
 
-	//  noncharacter-character-reference parser error
-	/*if (t.characterReferenceCode >= 0xFDD0 && t.characterReferenceCode <= 0xFDEF) ||
-		slices.Contains([]int{
-			0xFFFE, 0xFFFF, 0x1FFFE, 0x1FFFF, 0x2FFFE, 0x2FFFF, 0x3FFFE, 0x3FFFF, 0x4FFFE, 0x4FFFF, 0x5FFFE, 0x5FFFF,
-			0x6FFFE, 0x6FFFF, 0x7FFFE, 0x7FFFF, 0x8FFFE, 0x8FFFF, 0x9FFFE, 0x9FFFF, 0xAFFFE, 0xAFFFF, 0xBFFFE,
-			0xBFFFF, 0xCFFFE, 0xCFFFF, 0xDFFFE, 0xDFFFF, 0xEFFFE, 0xEFFFF, 0xFFFFE, 0xFFFFF, 0x10FFFE, 0x10FFFF,
-		}, t.characterReferenceCode) {
+	if t.characterReferenceCode >= 0xFDD0 && t.characterReferenceCode <= 0xFDEF {
+		t.errors = append(t.errors, "noncharacter-character-reference")
+	}
 
-	}*/
 	if t.characterReferenceCode == 0x0D || (t.characterReferenceCode >= 0x0000 && t.characterReferenceCode <= 0x001F) {
+		t.errors = append(t.errors, "control-character-reference")
 		switch t.characterReferenceCode {
 		case 0x80:
 			t.characterReferenceCode = 0x20AC
