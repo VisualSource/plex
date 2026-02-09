@@ -125,16 +125,17 @@ type Tokenizer struct {
 	tempbuffer             string
 	workingToken           Token
 	lastStartTag           dgo.Option[string]
-	errors                 []string
+	errors                 []TokenizerError
 }
 
 func NewTokenizer(stream io.RuneReader) *Tokenizer {
 	reader := runeio.NewReader(stream)
 
 	return &Tokenizer{
-		reader: reader,
-		state:  State_Data,
-		rstate: state_Unset,
+		reader:       reader,
+		state:        State_Data,
+		rstate:       state_Unset,
+		lastStartTag: dgo.None[string](),
 	}
 }
 
@@ -406,22 +407,28 @@ func (t *Tokenizer) consume() (rune, error) {
 	return '\n', nil
 }
 
-func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
-
-	tag, ok := t.workingToken.(*TokenStartTag)
-	if ok {
-		t.lastStartTag = dgo.Some(tag.name)
+func (t *Tokenizer) finishAttr() {
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		if tag.caname != "" {
 			_, ok := tag.attrs[tag.caname]
 			if !ok {
 				tag.attrs[tag.caname] = tag.cavalue
 			} else {
-				t.errors = append(t.errors, "duplicate-attribute")
+				t.errors = append(t.errors, NewTokenizerError(ErrDuplicateAttribute, -1, -1))
 			}
 		}
 	}
+}
 
-	t.tokens = append(t.tokens, t.workingToken)
+func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
+	t.finishAttr()
+	if tag, ok := t.workingToken.(*TokenStartTag); ok {
+		t.lastStartTag = dgo.Some(tag.name)
+	}
+
+	if t.workingToken != nil {
+		t.tokens = append(t.tokens, t.workingToken)
+	}
 	t.tokens = append(t.tokens, tokens...)
 	t.workingToken = nil
 }
@@ -434,8 +441,11 @@ func (t *Tokenizer) hasApproriateEndTagToken() bool {
 	if !ok {
 		return false
 	}
+	if t.lastStartTag.IsNone() {
+		return false
+	}
 
-	return t.lastStartTag.IsSome() && *t.lastStartTag.Some == tag.name
+	return t.lastStartTag.MustSome() == tag.name
 }
 
 //#endregion
@@ -465,7 +475,7 @@ func (t *Tokenizer) state_Data() error {
 	}
 
 	if char == '\u0000' {
-		t.errors = append(t.errors, "unexpected-null-character")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 	}
 
 	t.tokens = append(t.tokens, NewTokenCharacter(char))
@@ -497,7 +507,7 @@ func (t *Tokenizer) state_RCData() error {
 	}
 
 	if char == '\u0000' {
-		t.errors = append(t.errors, "unexpected-null-character")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -525,7 +535,7 @@ func (t *Tokenizer) state_RawText() error {
 	}
 
 	if char == '\u0000' {
-		t.errors = append(t.errors, "unexpected-null-character")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -553,7 +563,7 @@ func (t *Tokenizer) state_ScriptData() error {
 	}
 
 	if char == '\u0000' {
-		t.errors = append(t.errors, "unexpected-null-character")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -575,7 +585,7 @@ func (t *Tokenizer) state_PlainText() error {
 	}
 
 	if char == '\u0000' {
-		t.errors = append(t.errors, "unexpected-null-character")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
 	}
@@ -595,7 +605,7 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	if err != nil {
 		if err == io.EOF {
-			t.errors = append(t.errors, "eof-before-tag-name")
+			t.errors = append(t.errors, NewTokenizerError(ErrEofBeforeTagName, -1, -1))
 			t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenEOF())
 		}
 		return err
@@ -618,13 +628,13 @@ func (t *Tokenizer) state_TagOpen() error {
 	}
 
 	if char == '?' {
-		t.errors = append(t.errors, "unexpected-question-mark-instead-of-tag-name")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedQuestionMarkInsteadOfTagName, -1, -1))
 		t.workingToken = NewTokenComment("")
 		t.state = state_BogusComment
 		return t.reader.UnreadRune()
 	}
 
-	t.errors = append(t.errors, "invalid-first-character-of-tag-name")
+	t.errors = append(t.errors, NewTokenizerError(ErrInvalidFirstCharacterOfTagName, -1, -1))
 	t.tokens = append(t.tokens, NewTokenCharacter('<'))
 	t.state = State_Data
 	return t.reader.UnreadRune()
@@ -636,7 +646,7 @@ func (t *Tokenizer) state_EndTagOpen() error {
 
 	if err != nil {
 		if err == io.EOF {
-			t.errors = append(t.errors, "eof-before-tag-name")
+			t.errors = append(t.errors, NewTokenizerError(ErrEofBeforeTagName, -1, -1))
 			t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'), NewTokenEOF())
 		}
 
@@ -650,12 +660,12 @@ func (t *Tokenizer) state_EndTagOpen() error {
 	}
 
 	if char == '>' {
-		t.errors = append(t.errors, "missing-end-tag-name")
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingEndTagName, -1, -1))
 		t.state = State_Data
 		return nil
 	}
 
-	t.errors = append(t.errors, "invalid-first-character-of-tag-name")
+	t.errors = append(t.errors, NewTokenizerError(ErrInvalidFirstCharacterOfTagName, -1, -1))
 	t.workingToken = NewTokenComment("")
 
 	t.state = state_BogusComment
@@ -668,7 +678,7 @@ func (t *Tokenizer) state_TagName() error {
 
 	if err != nil {
 		if err == io.EOF {
-			t.errors = append(t.errors, "eof-in-tag")
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
@@ -701,7 +711,7 @@ func (t *Tokenizer) state_TagName() error {
 	}
 
 	if char == '\u0000' {
-		t.errors = append(t.errors, "unexpected-null-character")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		switch tag := t.workingToken.(type) {
 		case *TokenStartTag:
 			tag.name += string(utf8.RuneError)
@@ -923,27 +933,25 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 // https://html.spec.whatwg.org/#script-data-less-than-sign-state
 func (t *Tokenizer) state_ScriptData_LessThanSign() error {
 	char, err := t.consume()
-
 	if err != nil {
 		return err
 	}
 
-	if char == '/' {
+	switch char {
+	case '/':
 		t.tempbuffer = ""
 		t.state = state_ScriptData_EndTagOpen
 		return nil
-	}
-
-	if char == '!' {
+	case '!':
 		t.state = state_ScriptData_EscapeStart
 		t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('!'))
 		return nil
+	default:
+		t.tokens = append(t.tokens, NewTokenCharacter('<'))
+		t.state = State_ScriptData
+		return t.reader.UnreadRune()
 	}
 
-	t.tokens = append(t.tokens, NewTokenCharacter('<'))
-	t.state = State_ScriptData
-
-	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-end-tag-open-state
@@ -1056,112 +1064,100 @@ func (t *Tokenizer) state_ScriptData_Escape_StartDash() error {
 // https://html.spec.whatwg.org/#script-data-escaped-state
 func (t *Tokenizer) state_ScriptData_Escaped() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInScriptHtmlCommentLikeText, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
 		t.state = state_ScriptData_EscapedDash
 		t.tokens = append(t.tokens, NewTokenCharacter('-'))
 		return nil
-	}
-
-	if char == '<' {
+	case '<':
 		t.state = state_ScriptData_EscapedLessThanSign
 		return nil
-	}
-
-	if char == '\u0000' {
+	case '\u0000':
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
+	default:
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
+		return nil
 	}
-
-	t.tokens = append(t.tokens, NewTokenCharacter(char))
-
-	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-dash-state
 func (t *Tokenizer) state_ScriptData_Escaped_Dash() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInScriptHtmlCommentLikeText, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
 		t.state = state_ScriptData_EscapedDashDash
 		t.tokens = append(t.tokens, NewTokenCharacter('-'))
 		return nil
-	}
-
-	if char == '<' {
+	case '<':
 		t.state = state_ScriptData_EscapedLessThanSign
 		return nil
-	}
-
-	if char == '\u0000' {
+	case '\u0000':
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.state = state_ScriptData_Escaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
+	default:
+		t.state = state_ScriptData_Escaped
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
+		return nil
 	}
-
-	t.state = state_ScriptData_Escaped
-	t.tokens = append(t.tokens, NewTokenCharacter(char))
-
-	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-dash-dash-state
 func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInScriptHtmlCommentLikeText, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
 		t.tokens = append(t.tokens, NewTokenCharacter('-'))
 		return nil
-	}
-
-	if char == '<' {
+	case '<':
 		t.state = state_ScriptData_EscapedLessThanSign
 		return nil
-	}
-
-	if char == '>' {
+	case '>':
 		t.state = State_ScriptData
 		t.tokens = append(t.tokens, NewTokenCharacter('>'))
 		return nil
-	}
-
-	if char == '\u0000' {
+	case '\u0000':
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.state = state_ScriptData_Escaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
+	default:
+		t.state = state_ScriptData_Escaped
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
+		return nil
 	}
-
-	t.state = state_ScriptData_Escaped
-	t.tokens = append(t.tokens, NewTokenCharacter(char))
-
-	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-less-than-sign-state
 func (t *Tokenizer) state_ScriptData_Escaped_LessThanSign() error {
 	char, err := t.consume()
-
 	if err != nil {
 		return err
 	}
@@ -1192,9 +1188,8 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.emitCurrentWithTokens()
+		t.workingToken = NewTokenEndTag("")
 		t.state = state_ScriptData_EscapedEndTagName
-
 		return t.reader.UnreadRune()
 	}
 
@@ -1256,7 +1251,6 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 	}
 
 	t.state = state_ScriptData_Escaped
-
 	return t.reader.UnreadRune()
 }
 
@@ -1268,13 +1262,12 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 	}
 
 	if IsWhitespace(char) || char == '/' || char == '>' {
-
 		if t.tempbuffer == "script" {
 			t.state = state_ScriptData_DoubleEscaped
-			return nil
+		} else {
+			t.state = state_ScriptData_Escaped
 		}
 
-		t.state = state_ScriptData_Escaped
 		t.tokens = append(t.tokens, NewTokenCharacter(char))
 		return nil
 	}
@@ -1287,121 +1280,108 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 		}
 
 		t.tokens = append(t.tokens, NewTokenCharacter(char))
-
 		return nil
 	}
 
 	t.state = state_ScriptData_Escaped
-
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-state
 func (t *Tokenizer) state_ScriptData_DoubleEscaped() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInScriptHtmlCommentLikeText, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
 		t.state = state_ScriptData_DoubleEscapedDash
 		t.tokens = append(t.tokens, NewTokenCharacter('-'))
 		return nil
-	}
-
-	if char == '<' {
+	case '<':
 		t.state = state_ScriptData_DoubleEscapedLessThanSign
 		t.tokens = append(t.tokens, NewTokenCharacter('<'))
 		return nil
-	}
-
-	if char == '\u0000' {
+	case '\u0000':
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
+	default:
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
+		return nil
 	}
-
-	t.tokens = append(t.tokens, NewTokenCharacter(char))
-
-	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-dash-state
 func (t *Tokenizer) state_ScriptData_DoubleEscapedDash() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInScriptHtmlCommentLikeText, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
 		t.state = state_ScriptData_DoubleEscapedDashDash
 		t.tokens = append(t.tokens, NewTokenCharacter('-'))
 		return nil
-	}
-
-	if char == '<' {
+	case '<':
 		t.state = state_ScriptData_DoubleEscapedLessThanSign
 		t.tokens = append(t.tokens, NewTokenCharacter('<'))
 		return nil
-	}
-
-	if char == '\u0000' {
-		t.state = state_ScriptData_Escaped
+	case '\u0000':
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
+		t.state = state_ScriptData_DoubleEscaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
+	default:
+		t.state = state_ScriptData_DoubleEscaped
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
+		return nil
 	}
-
-	t.state = state_ScriptData_DoubleEscaped
-	t.tokens = append(t.tokens, NewTokenCharacter(char))
-
-	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-dash-dash-state
 func (t *Tokenizer) state_ScriptData_DoubleEscapedDashDash() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInScriptHtmlCommentLikeText, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
 		t.tokens = append(t.tokens, NewTokenCharacter('-'))
 		return nil
-	}
-
-	if char == '<' {
+	case '<':
 		t.tokens = append(t.tokens, NewTokenCharacter('<'))
 		t.state = state_ScriptData_DoubleEscapedLessThanSign
 		return nil
-	}
-
-	if char == '>' {
+	case '>':
 		t.state = State_ScriptData
 		t.tokens = append(t.tokens, NewTokenCharacter('>'))
 		return nil
-	}
-
-	if char == '\u0000' {
+	case '\u0000':
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.state = state_ScriptData_DoubleEscaped
 		t.tokens = append(t.tokens, NewReplacementToken())
 		return nil
+	default:
+		t.state = state_ScriptData_DoubleEscaped
+		t.tokens = append(t.tokens, NewTokenCharacter(char))
+		return nil
 	}
-
-	t.state = state_ScriptData_DoubleEscaped
-	t.tokens = append(t.tokens, NewTokenCharacter(char))
-
-	return nil
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escaped-less-than-sign-state
@@ -1419,7 +1399,6 @@ func (t *Tokenizer) state_ScriptData_DoubleEscaped_LessThanSign() error {
 	}
 
 	t.state = state_ScriptData_DoubleEscaped
-
 	return t.reader.UnreadRune()
 }
 
@@ -1433,10 +1412,10 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 	if IsWhitespace(char) || char == '/' || char == '>' {
 		if t.tempbuffer == "script" {
 			t.state = state_ScriptData_Escaped
-			return nil
+		} else {
+			t.state = state_ScriptData_DoubleEscaped
 		}
 
-		t.state = state_ScriptData_DoubleEscaped
 		t.emitCurrentWithTokens(NewTokenCharacter(char))
 		return nil
 	}
@@ -1453,7 +1432,6 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 	}
 
 	t.state = state_ScriptData_DoubleEscaped
-
 	return t.reader.UnreadRune()
 }
 
@@ -1478,10 +1456,11 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 		return nil
 	}
 
-	// unexpected-equals-sign-before-attribute-name parse error
 	if char == '=' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedEqualsSignBeforeAttributeName, -1, -1))
 		t.state = state_AttributeName
 
+		t.finishAttr()
 		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.caname = string(char)
 			tag.cavalue = ""
@@ -1489,6 +1468,7 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 		return nil
 	}
 
+	t.finishAttr()
 	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.caname = ""
 		tag.cavalue = ""
@@ -1526,7 +1506,7 @@ func (t *Tokenizer) state_AttributeName() error {
 	}
 
 	if char == '\u0000' {
-		t.errors = append(t.errors, "unexpected-null-character")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.caname += string(utf8.RuneError)
 		}
@@ -1534,7 +1514,7 @@ func (t *Tokenizer) state_AttributeName() error {
 	}
 
 	if char == '"' || char == '\'' || char == '<' {
-		t.errors = append(t.errors, "unexpected-character-in-attribute-name")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedCharacterInAttributeName, -1, -1))
 	}
 
 	if tag, ok := t.workingToken.(*TokenStartTag); ok {
@@ -1549,8 +1529,8 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 	char, err := t.consume()
 
 	if err != nil {
-		//  eof-in-tag parse error.
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
@@ -1576,6 +1556,7 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 		return nil
 	}
 
+	t.finishAttr()
 	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.caname = ""
 		tag.cavalue = ""
@@ -1606,15 +1587,14 @@ func (t *Tokenizer) state_BeforeAttributeValue() error {
 		return nil
 	}
 
-	// missing-attribute-value parse error
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingAttributeValue, -1, -1))
 		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.state = state_AttributValue_Unquoted
-
 	return t.reader.UnreadRune()
 }
 
@@ -1624,6 +1604,7 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
@@ -1641,6 +1622,7 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.cavalue += string(utf8.RuneError)
 		}
@@ -1659,6 +1641,7 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
@@ -1676,6 +1659,7 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.cavalue += string(utf8.RuneError)
 		}
@@ -1717,14 +1701,17 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenStartTag); ok {
 			tag.cavalue += string(utf8.RuneError)
 		}
 		return nil
 	}
 
-	//  unexpected-character-in-unquoted-attribute-value parse error. Treat it as per the "anything else" entry below.
-	//if char == '"' || char == '\'' || char == '<' || char == '=' || char == '`' {}
+	if char == '"' || char == '\'' || char == '<' || char == '=' || char == '`' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedCharacterInUnquotedAttributeValue, -1, -1))
+	}
+
 	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		tag.cavalue += string(char)
 	}
@@ -1758,7 +1745,7 @@ func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 		return nil
 	}
 
-	//  missing-whitespace-between-attributes parse error.
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceBetweenAttributes, -1, -1))
 	t.state = state_BeforeAttributeName
 	return t.reader.UnreadRune()
 }
@@ -1772,6 +1759,7 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
@@ -1791,13 +1779,13 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 
 // https://html.spec.whatwg.org/#markup-declaration-open-state
 func (t *Tokenizer) state_MarkupDeclarationOpen() error {
-
-	runes, err := t.reader.Peek(2)
-	if err != nil {
+	runes, err := t.reader.Peek(7)
+	nonFilledPeek := err == io.EOF
+	if err != nil && !nonFilledPeek {
 		return err
 	}
 
-	if runes[0] == '-' && runes[1] == '-' {
+	if len(runes) >= 2 && runes[0] == '-' && runes[1] == '-' {
 		out := make([]rune, 2)
 		_, err := t.reader.Read(out)
 		if err != nil {
@@ -1806,47 +1794,40 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 
 		t.state = state_CommentStart
 		t.workingToken = NewTokenComment("")
-
 		return nil
 	}
 
-	runes, err = t.reader.Peek(7)
-	isPeekReadShort := err == io.EOF
-	if !isPeekReadShort && err != nil {
-		return err
-	}
+	if len(runes) == 7 {
+		value := string(runes)
 
-	if !isPeekReadShort {
-		a := string(runes)
-		if strings.ToUpper(a) == "DOCTYPE" {
+		if strings.ToUpper(value) == "DOCTYPE" {
+			out := make([]rune, 7)
+			_, err := t.reader.Read(out)
+			if err != nil {
+				return err
+			}
 			t.state = state_DOCTYPE
-
-			rs := make([]rune, 7)
-			_, err := t.reader.Read(rs)
-
-			if err != nil {
-				return err
-			}
-
 			return nil
-		} else if a == "[CDATA[" {
-			rs := make([]rune, 7)
-			_, err := t.reader.Read(rs)
+		} else if value == "[CDATA[" {
+			out := make([]rune, 7)
+			_, err := t.reader.Read(out)
 			if err != nil {
 				return err
 			}
 
-			//TODO: adjeusted current node check && html namespace check
-			// t.state = State_CDATA_Section
-			t.workingToken = NewTokenComment(a)
+			// TODO
+			// If there is an adjusted current node and it is not an element in the HTML namespace,
+			// then switch to the CDATA section state.
+
+			t.errors = append(t.errors, NewTokenizerError(ErrCdataInHtmlContent, -1, -1))
+			t.workingToken = NewTokenComment(value)
 			t.state = state_BogusComment
 			return nil
 		}
 	}
 
-	t.workingToken = NewTokenComment("")
 	t.state = state_BogusComment
-
+	t.workingToken = NewTokenComment("")
 	return nil
 }
 
@@ -1886,7 +1867,6 @@ func (t *Tokenizer) state_BogusComment() error {
 // https://html.spec.whatwg.org/#comment-start-state
 func (t *Tokenizer) state_CommentStart() error {
 	char, err := t.consume()
-
 	if err != nil {
 		return err
 	}
@@ -1898,43 +1878,42 @@ func (t *Tokenizer) state_CommentStart() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.errors = append(t.errors, NewTokenizerError(ErrAbruptClosingOfEmptyComment, -1, -1))
 		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.state = state_Comment
-
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-start-dash-state
 func (t *Tokenizer) state_Comment_StartDash() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInComment, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
 		t.state = state_CommentEnd
 		return nil
-	}
-
-	if char == '>' {
+	case '>':
 		t.state = State_Data
+		t.errors = append(t.errors, NewTokenizerError(ErrAbruptClosingOfEmptyComment, -1, -1))
 		t.emitCurrentWithTokens()
 		return nil
+	default:
+		t.state = state_Comment
+		if tag, ok := t.workingToken.(*TokenComment); ok {
+			tag.Value += "-"
+		}
+		return t.reader.UnreadRune()
 	}
-
-	if tag, ok := t.workingToken.(*TokenComment); ok {
-		tag.Value += "-"
-	}
-	t.state = state_Comment
-
-	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-state
@@ -1943,36 +1922,34 @@ func (t *Tokenizer) state_Comment() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInComment, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '<' {
+	switch char {
+	case '<':
+		t.state = state_CommentLessThanSign
 		if tag, ok := t.workingToken.(*TokenComment); ok {
 			tag.Value += string(char)
 		}
-		t.state = state_CommentLessThanSign
 		return nil
-	}
-
-	if char == '-' {
+	case '-':
 		t.state = state_CommentEndDash
 		return nil
-	}
-
-	if char == '\u0000' {
+	case '\u0000':
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenComment); ok {
 			tag.Value += string(utf8.RuneError)
 		}
 		return nil
+	default:
+		if tag, ok := t.workingToken.(*TokenComment); ok {
+			tag.Value += string(char)
+		}
+		return nil
 	}
-
-	if tag, ok := t.workingToken.(*TokenComment); ok {
-		tag.Value += string(char)
-	}
-
-	return nil
 }
 
 // https://html.spec.whatwg.org/#comment-less-than-sign-state
@@ -1982,23 +1959,22 @@ func (t *Tokenizer) state_Comment_LessThanSign() error {
 		return err
 	}
 
-	if char == '!' {
-		if tag, ok := t.workingToken.(*TokenComment); ok {
-			tag.Value += string(char)
-		}
+	switch char {
+	case '!':
 		t.state = state_CommentLessThanSignBang
-		return nil
-	}
-
-	if char == '<' {
 		if tag, ok := t.workingToken.(*TokenComment); ok {
 			tag.Value += string(char)
 		}
 		return nil
+	case '<':
+		if tag, ok := t.workingToken.(*TokenComment); ok {
+			tag.Value += string(char)
+		}
+		return nil
+	default:
+		t.state = state_Comment
+		return t.reader.UnreadRune()
 	}
-
-	t.state = state_Comment
-	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-state
@@ -2014,7 +1990,6 @@ func (t *Tokenizer) state_Comment_LessThanSign_Bang() error {
 	}
 
 	t.state = state_Comment
-
 	return t.reader.UnreadRune()
 }
 
@@ -2038,17 +2013,24 @@ func (t *Tokenizer) state_Comment_LessThanSign_BangDash() error {
 func (t *Tokenizer) state_Comment_LessThanSign_BangDashDash() error {
 	char, err := t.consume()
 	isEOF := err == io.EOF
-	if err != nil && !isEOF {
+	if !isEOF && err != nil {
 		return err
 	}
 
-	if isEOF || char == '>' {
-		t.state = state_CommentEnd
-		return t.reader.UnreadRune()
+	t.state = state_CommentEnd
+
+	if !(isEOF || char == '>') {
+		t.errors = append(t.errors, NewTokenizerError(ErrNestedComment, -1, -1))
 	}
 
-	// This is a nested-comment parse error.
-	t.state = state_CommentEnd
+	if isEOF {
+		// spec calls for "to reconsume" but due to reader impl
+		// attempting to call 'UnreadRune' when the previous read call returned an EOF error
+		// when result in a panic of case out of bounds index
+		//
+		// so return nil and let the "Comment End" state handle EOF
+		return nil
+	}
 
 	return t.reader.UnreadRune()
 }
@@ -2056,9 +2038,9 @@ func (t *Tokenizer) state_Comment_LessThanSign_BangDashDash() error {
 // https://html.spec.whatwg.org/#comment-end-dash-state
 func (t *Tokenizer) state_Comment_EndDash() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInComment, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
@@ -2068,82 +2050,78 @@ func (t *Tokenizer) state_Comment_EndDash() error {
 		t.state = state_CommentEnd
 		return nil
 	}
+
+	t.state = state_Comment
 	if tag, ok := t.workingToken.(*TokenComment); ok {
 		tag.Value += "-"
 	}
-	t.state = state_Comment
-
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-end-state
 func (t *Tokenizer) state_CommentEnd() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInComment, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '>' {
+	switch char {
+	case '>':
 		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
-	}
-
-	if char == '!' {
+	case '!':
 		t.state = state_CommentEndBang
 		return nil
-	}
-
-	if char == '-' {
+	case '-':
 		if tag, ok := t.workingToken.(*TokenComment); ok {
 			tag.Value += string(char)
 		}
 		return nil
+	default:
+		t.state = state_Comment
+		if tag, ok := t.workingToken.(*TokenComment); ok {
+			tag.Value += "--"
+		}
+		return t.reader.UnreadRune()
 	}
 
-	if tag, ok := t.workingToken.(*TokenComment); ok {
-		tag.Value += "--"
-	}
-	t.state = state_Comment
-
-	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-end-bang-state
 func (t *Tokenizer) state_Comment_EndBang() error {
 	char, err := t.consume()
-
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInComment, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
 	}
 
-	if char == '-' {
+	switch char {
+	case '-':
+		t.state = state_CommentEndDash
 		if tag, ok := t.workingToken.(*TokenComment); ok {
 			tag.Value += "--!"
 		}
-		t.state = state_CommentEndDash
 		return nil
-	}
-
-	if char == '>' {
+	case '>':
+		t.errors = append(t.errors, NewTokenizerError(ErrIncorrectlyClosedComment, -1, -1))
 		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
+	default:
+		t.state = state_Comment
+		if tag, ok := t.workingToken.(*TokenComment); ok {
+			tag.Value += "--!"
+		}
+		return t.reader.UnreadRune()
 	}
-
-	if tag, ok := t.workingToken.(*TokenComment); ok {
-		tag.Value += "--!"
-	}
-	t.state = state_Comment
-
-	return t.reader.UnreadRune()
 }
 
 //#endregion
@@ -2936,6 +2914,11 @@ func (t *Tokenizer) state_CharacterReference() error {
 
 	char, err := t.consume()
 	if err != nil {
+		if err == io.EOF {
+			t.flush()
+			t.state = t.rstate
+			return nil
+		}
 		return err
 	}
 
@@ -2958,6 +2941,62 @@ func (t *Tokenizer) state_CharacterReference() error {
 // https://html.spec.whatwg.org/#named-character-reference-state
 func (t *Tokenizer) state_NamedCharacterReference() error {
 
+	runes, err := t.reader.Peek(10)
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	idxOfSemicolon := slices.Index(runes, ';')
+	var reference string
+	if idxOfSemicolon == -1 {
+		reference = string(runes[:idxOfSemicolon])
+	} else {
+		reference = string(runes)
+	}
+
+	t.tempbuffer += reference
+	if idxOfSemicolon != -1 {
+		t.tempbuffer += ";"
+	}
+
+	switch reference {
+	case "Aacute":
+	case "aacute":
+	case "Abreve":
+	case "abreve":
+	case "ac":
+	case "acd":
+	case "acE":
+	case "Acirc":
+	case "acirc":
+	case "acute":
+	case "Acy":
+	case "acy":
+	case "AElig":
+	case "aelig":
+	case "af":
+	case "Afr":
+	case "Agrave":
+	case "agrave":
+	case "alefsym":
+	case "aleph":
+	case "Alpha":
+	case "alpha":
+	case "Amacr":
+	case "amacr":
+	case "amalg":
+	case "AMP":
+	case "amp":
+	case "And":
+	case "and":
+	case "andand":
+
+	default:
+
+		t.state = state_AmbiguousAmpersand
+		t.flush()
+		return nil
+	}
 	// find match
 	// if match
 	//    if wasConsumedAsPartOfAttribute(t.rstate) && lastChar != ';' && (nextChar == '=' || unicode.IsAlpha(nextChar))
@@ -2971,9 +3010,6 @@ func (t *Tokenizer) state_NamedCharacterReference() error {
 	//        t.state = t.rstate
 	//   return nil
 
-	t.state = state_AmbiguousAmpersand
-	t.flush()
-	return nil
 }
 
 // https://html.spec.whatwg.org/#ambiguous-ampersand-state
@@ -2998,7 +3034,7 @@ func (t *Tokenizer) state_AmbiguousAmpersand() error {
 	}
 
 	if char == ';' {
-		t.errors = append(t.errors, "unknown-named-character-reference")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnknownNamedCharacterReference, -1, -1))
 	}
 
 	t.state = t.rstate
@@ -3007,12 +3043,18 @@ func (t *Tokenizer) state_AmbiguousAmpersand() error {
 
 // https://html.spec.whatwg.org/#numeric-character-reference-state
 func (t *Tokenizer) state_NumericCharacterReference() error {
+	t.characterReferenceCode = 0
+
 	char, err := t.consume()
 	if err != nil {
+		if err == io.EOF {
+			// "anything else" case
+			// don't call unreadRune do to indexing panic
+			t.state = state_DecimalCharacterReferenceStart
+			return nil
+		}
 		return err
 	}
-
-	t.characterReferenceCode = 0
 
 	if char == 'x' || char == 'X' {
 		t.tempbuffer += string(char)
@@ -3021,43 +3063,51 @@ func (t *Tokenizer) state_NumericCharacterReference() error {
 	}
 
 	t.state = state_DecimalCharacterReferenceStart
-
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#hexadecimal-character-reference-start-state
 func (t *Tokenizer) state_HexadecimalCharacterReferenceStart() error {
 	char, err := t.consume()
-	if err != nil {
+	isEOF := err == io.EOF
+	if !isEOF && err != nil {
 		return err
 	}
 
-	if unicode.Is(unicode.ASCII_Hex_Digit, char) {
+	if !isEOF && unicode.Is(unicode.ASCII_Hex_Digit, char) {
 		t.state = state_HexadecimalCharacterReference
 		return t.reader.UnreadRune()
 	}
 
-	t.errors = append(t.errors, "absence-of-digits-in-numeric-character-reference")
+	t.errors = append(t.errors, NewTokenizerError(ErrAbsenceOfDigitsInNumericCharacterReference, -1, -1))
 	t.flush()
 	t.state = t.rstate
+	if isEOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#hexadecimal-character-reference-start-state
 func (t *Tokenizer) state_DecimalCharacterReferenceStart() error {
 	char, err := t.consume()
-	if err != nil {
+	isEOF := err == io.EOF
+	if !isEOF && err != nil {
 		return err
 	}
 
-	if unicode.IsDigit(char) {
+	if !isEOF && unicode.IsDigit(char) {
 		t.state = state_DecimalCharacterReference
 		return t.reader.UnreadRune()
 	}
 
-	t.errors = append(t.errors, "absence-of-digits-in-numeric-character-reference")
+	t.errors = append(t.errors, NewTokenizerError(ErrAbsenceOfDigitsInNumericCharacterReference, -1, -1))
 	t.flush()
 	t.state = t.rstate
+	if isEOF {
+		// don't unread when EOF was returned
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -3090,7 +3140,7 @@ func (t *Tokenizer) state_HexadecimalCharacterReference() error {
 		return nil
 	}
 
-	t.errors = append(t.errors, "missing-semicolon-after-character-reference")
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingSemicolonAfterCharacterReference, -1, -1))
 	t.state = state_NumericCharacterReferenceEnd
 	return t.reader.UnreadRune()
 }
@@ -3112,7 +3162,7 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 		return nil
 	}
 
-	t.errors = append(t.errors, "missing-semicolon-after-character-reference")
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingSemicolonAfterCharacterReference, -1, -1))
 	t.state = state_NumericCharacterReferenceEnd
 	return t.reader.UnreadRune()
 }
@@ -3121,27 +3171,27 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
 	if t.characterReferenceCode == 0x00 {
-		t.errors = append(t.errors, "null-character-reference")
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.characterReferenceCode = 0xFFFD
 	}
 
 	if t.characterReferenceCode > 0x10FFFF {
-		t.errors = append(t.errors, "character-reference-outside-unicode-range")
+		t.errors = append(t.errors, NewTokenizerError(ErrCharacterReferenceOutsideUnicodeRange, -1, -1))
 		t.characterReferenceCode = 0xFFFD
 	}
 
 	if (t.characterReferenceCode >= 0xD800 && t.characterReferenceCode <= 0xDBFF) ||
 		(t.characterReferenceCode >= 0xCD00 && t.characterReferenceCode <= 0xDFFF) {
-		t.errors = append(t.errors, "surrogate-character-reference")
+		t.errors = append(t.errors, NewTokenizerError(ErrSurrogateCharacterReference, -1, -1))
 		t.characterReferenceCode = 0xFFFD
 	}
 
 	if t.characterReferenceCode >= 0xFDD0 && t.characterReferenceCode <= 0xFDEF {
-		t.errors = append(t.errors, "noncharacter-character-reference")
+		t.errors = append(t.errors, NewTokenizerError(ErrNoncharacterCharacterReference, -1, -1))
 	}
 
 	if t.characterReferenceCode == 0x0D || (t.characterReferenceCode >= 0x0000 && t.characterReferenceCode <= 0x001F) {
-		t.errors = append(t.errors, "control-character-reference")
+		t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterReference, -1, -1))
 		switch t.characterReferenceCode {
 		case 0x80:
 			t.characterReferenceCode = 0x20AC
