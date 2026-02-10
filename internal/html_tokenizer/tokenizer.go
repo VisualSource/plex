@@ -355,7 +355,7 @@ func (t *Tokenizer) ConsumeToken() Token {
 
 func wasConsumedAsPartOfAttribute(state TokenizerState) bool {
 	switch state {
-	case state_AttributValue_SingleQuoted, state_AttributValue_DoubleQuoted, state_AttributeName:
+	case state_AttributValue_DoubleQuoted, state_AttributValue_SingleQuoted, state_AttributValue_Unquoted:
 		return true
 	default:
 		return false
@@ -2954,23 +2954,26 @@ func (t *Tokenizer) state_NamedCharacterReference() error {
 	}
 
 	out := make([]rune, size)
-	_, err = t.reader.Read(out)
-	if err != nil {
+	if _, err = t.reader.Read(out); err != nil {
 		return err
 	}
 
-	if wasConsumedAsPartOfAttribute(t.rstate) && runes[size] != ';' && (runes[size+1] == '=' || unicode.IsLetter(runes[size+1])) {
-		t.flush()
-		t.state = t.rstate
-	} else {
-		if runes[size] != ';' {
-			t.errors = append(t.errors, NewTokenizerError(ErrMissingSemicolonAfterCharacterReference, -1, -1))
-		}
+	t.tempbuffer += string(out)
 
-		t.tempbuffer = string([]rune{rune(codepoint)})
+	lastIdx := size - 1
+	if wasConsumedAsPartOfAttribute(t.rstate) && runes[lastIdx] != ';' && (runes[size] == '=' || unicode.IsDigit(runes[size]) || unicode.IsLetter(runes[size])) {
 		t.flush()
 		t.state = t.rstate
+		return nil
 	}
+
+	if runes[lastIdx] != ';' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingSemicolonAfterCharacterReference, -1, -1))
+	}
+
+	t.tempbuffer = string([]rune{rune(codepoint)})
+	t.flush()
+	t.state = t.rstate
 
 	return nil
 }
@@ -3095,7 +3098,8 @@ func (t *Tokenizer) state_HexadecimalCharacterReference() error {
 		}
 
 		t.characterReferenceCode *= 16
-		t.characterReferenceCode += int(char - '\u0057')
+		t.characterReferenceCode += int(char - 'W')
+		return nil
 	}
 
 	if char == ';' {
@@ -3118,6 +3122,7 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 	if unicode.IsDigit(char) {
 		t.characterReferenceCode *= 10
 		t.characterReferenceCode += int(char - '0')
+		return nil
 	}
 
 	if char == ';' {

@@ -44,7 +44,7 @@ func getCharacterReference(buffer *[]rune) (int, int) {
 
 		if vv, ok := trie.Terminal(); ok {
 			matchedCodepoint = vv
-			size = idx
+			size = idx + 1
 		}
 	}
 
