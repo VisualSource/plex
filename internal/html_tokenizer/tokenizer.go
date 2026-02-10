@@ -2941,75 +2941,38 @@ func (t *Tokenizer) state_CharacterReference() error {
 // https://html.spec.whatwg.org/#named-character-reference-state
 func (t *Tokenizer) state_NamedCharacterReference() error {
 
-	runes, err := t.reader.Peek(10)
+	runes, err := t.reader.Peek(33)
 	if err != nil && err != io.EOF {
 		return err
 	}
 
-	idxOfSemicolon := slices.Index(runes, ';')
-	var reference string
-	if idxOfSemicolon == -1 {
-		reference = string(runes[:idxOfSemicolon])
-	} else {
-		reference = string(runes)
-	}
-
-	t.tempbuffer += reference
-	if idxOfSemicolon != -1 {
-		t.tempbuffer += ";"
-	}
-
-	switch reference {
-	case "Aacute":
-	case "aacute":
-	case "Abreve":
-	case "abreve":
-	case "ac":
-	case "acd":
-	case "acE":
-	case "Acirc":
-	case "acirc":
-	case "acute":
-	case "Acy":
-	case "acy":
-	case "AElig":
-	case "aelig":
-	case "af":
-	case "Afr":
-	case "Agrave":
-	case "agrave":
-	case "alefsym":
-	case "aleph":
-	case "Alpha":
-	case "alpha":
-	case "Amacr":
-	case "amacr":
-	case "amalg":
-	case "AMP":
-	case "amp":
-	case "And":
-	case "and":
-	case "andand":
-
-	default:
-
+	codepoint, size := getCharacterReference(&runes)
+	if codepoint == -1 {
 		t.state = state_AmbiguousAmpersand
 		t.flush()
 		return nil
 	}
-	// find match
-	// if match
-	//    if wasConsumedAsPartOfAttribute(t.rstate) && lastChar != ';' && (nextChar == '=' || unicode.IsAlpha(nextChar))
-	//           flush
-	//           t.state = t.rstate
-	//    else
-	//        if lastChar != ';'
-	//             error("missing-semicolon-after-character-reference")
-	//        t.tempbuffer = chodepoints
-	//        flush
-	//        t.state = t.rstate
-	//   return nil
 
+	out := make([]rune, size)
+	_, err = t.reader.Read(out)
+	if err != nil {
+		return err
+	}
+
+	if wasConsumedAsPartOfAttribute(t.rstate) && runes[size] != ';' && (runes[size+1] == '=' || unicode.IsLetter(runes[size+1])) {
+		t.flush()
+		t.state = t.rstate
+	} else {
+		if runes[size] != ';' {
+			t.errors = append(t.errors, NewTokenizerError(ErrMissingSemicolonAfterCharacterReference, -1, -1))
+		}
+
+		t.tempbuffer = string([]rune{rune(codepoint)})
+		t.flush()
+		t.state = t.rstate
+	}
+
+	return nil
 }
 
 // https://html.spec.whatwg.org/#ambiguous-ampersand-state

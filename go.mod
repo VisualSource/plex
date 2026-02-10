@@ -13,6 +13,11 @@ require (
 require github.com/MadAppGang/dingo v0.13.0
 
 require (
+	github.com/acomagu/trie/v2 v2.0.0 // indirect
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
+)
+
+require (
 	4d63.com/gocheckcompilerdirectives v1.3.0 // indirect
 	4d63.com/gochecknoglobals v0.2.2 // indirect
 	github.com/4meepo/tagalign v1.4.2 // indirect
