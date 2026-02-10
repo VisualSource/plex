@@ -14,11 +14,6 @@ type characterReference struct {
 	Characters string `json:"characters"`
 }
 
-type CharacterReferences struct {
-	Keys   [][]rune
-	Values []int
-}
-
 func main() {
 	gp, err := filepath.Abs("./")
 	if err != nil {
@@ -36,19 +31,18 @@ func main() {
 
 	references := make(map[string]characterReference, 2231)
 
-	err = json.Unmarshal(source, &references)
-	if err != nil {
+	if err = json.Unmarshal(source, &references); err != nil {
 		panic(err)
 	}
 
-	var output CharacterReferences
-
+	var output struct {
+		K [][]rune
+		V []int
+	}
 	for key, value := range references {
-
 		v, _ := strings.CutPrefix(key, "&")
-
-		output.Keys = append(output.Keys, []rune(v))
-		output.Values = append(output.Values, value.Codepoints[0])
+		output.K = append(output.K, []rune(v))
+		output.V = append(output.V, value.Codepoints[0])
 	}
 
 	outputPath := filepath.Join(gp, "internal/html_tokenizer/character_reference.bin")
@@ -60,8 +54,7 @@ func main() {
 	}
 
 	enc := gob.NewEncoder(file)
-	err = enc.Encode(output)
-	if err != nil {
+	if err = enc.Encode(output); err != nil {
 		panic(err)
 	}
 }
