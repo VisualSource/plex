@@ -266,6 +266,12 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 	}
 
 	if len(tt.Errors) != 0 {
-		// check errors
+		for _, err := range tt.Errors {
+			if !slices.ContainsFunc(tok.errors, func(e TokenizerError) bool {
+				return string(e.Reason) == err.Code
+			}) {
+				t.Errorf("was expecting to find tokenizer error '%s' but tokenizer did not return one", err.Code)
+			}
+		}
 	}
 }
