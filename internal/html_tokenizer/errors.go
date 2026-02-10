@@ -33,6 +33,15 @@ var (
 	ErrIncorrectlyOpenedComment                    TokenizerErrorReason = "incorrectly-opened-comment"
 	ErrCdataInHtmlContent                          TokenizerErrorReason = "cdata-in-html-content"
 	ErrEofInScriptHtmlCommentLikeText              TokenizerErrorReason = "eof-in-script-html-comment-like-text"
+	ErrEofInDoctype                                TokenizerErrorReason = "eof-in-doctype"
+	ErrMissingWhitespaceBeforeDoctypeName          TokenizerErrorReason = "missing-whitespace-before-doctype-name"
+	ErrMissingDoctypeName                          TokenizerErrorReason = "missing-doctype-name"
+	ErrInvalidCharacterSequenceAfterDoctypeName    TokenizerErrorReason = "invalid-character-sequence-after-doctype-name"
+	ErrMissingWhitespaceAfterDoctypePublicKeyword  TokenizerErrorReason = "missing-whitespace-after-doctype-public-keyword"
+	ErrMissingDoctypePublicIdentifier              TokenizerErrorReason = "missing-doctype-public-identifier"
+	ErrMissingQuoteBeforeDoctypePublicIdentifer    TokenizerErrorReason = "missing-quote-before-doctype-public-identifier"
+	ErrAbruptDoctypePublicIdentifer                TokenizerErrorReason = "abrupt-doctype-public-identifier"
+	ErrEndTagWithAttributes                        TokenizerErrorReason = "end-tag-with-attributes"
 )
 
 type TokenizerError struct {

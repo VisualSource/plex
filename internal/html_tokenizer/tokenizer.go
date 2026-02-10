@@ -408,6 +408,11 @@ func (t *Tokenizer) consume() (rune, error) {
 }
 
 func (t *Tokenizer) finishAttr() {
+
+	if _, ok := t.workingToken.(*TokenEndTag); ok {
+		t.errors = append(t.errors, NewTokenizerError(ErrEndTagWithAttributes, -1, -1))
+	}
+
 	if tag, ok := t.workingToken.(*TokenStartTag); ok {
 		if tag.caname != "" {
 			_, ok := tag.attrs[tag.caname]
@@ -1475,7 +1480,6 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 	}
 
 	t.state = state_AttributeName
-
 	return t.reader.UnreadRune()
 }
 
@@ -1826,6 +1830,7 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 		}
 	}
 
+	t.errors = append(t.errors, NewTokenizerError(ErrIncorrectlyOpenedComment, -1, -1))
 	t.state = state_BogusComment
 	t.workingToken = NewTokenComment("")
 	return nil
@@ -2134,6 +2139,7 @@ func (t *Tokenizer) state_DOCTYPE() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
 			t.emitCurrentWithTokens(tag, NewTokenEOF())
 			return nil
@@ -2151,6 +2157,7 @@ func (t *Tokenizer) state_DOCTYPE() error {
 		return t.reader.UnreadRune()
 	}
 
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceBeforeDoctypeName, -1, -1))
 	t.state = state_BeforeDOCTYPEName
 	return t.reader.UnreadRune()
 }
@@ -2160,6 +2167,7 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 	char, err := t.consume()
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
 			t.emitCurrentWithTokens(tag, NewTokenEOF())
 		}
@@ -2177,12 +2185,14 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		t.workingToken = NewTokenDOCTYPE(dgo.Some(string(utf8.RuneError)), dgo.None[string](), dgo.None[string](), false)
 		t.state = state_DOCTYPE_Name
 		return nil
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingDoctypeName, -1, -1))
 		t.workingToken = NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
 		t.state = State_Data
 		return nil
@@ -2197,12 +2207,11 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 func (t *Tokenizer) state_DOCTYPE_Name() error {
 	char, err := t.consume()
 	if err != nil {
-
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
-
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
@@ -2229,6 +2238,7 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.name.IsSome() {
 				*tag.name.Some += string(utf8.RuneError)
@@ -2251,6 +2261,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2300,6 +2311,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 		return nil
 	}
 
+	t.errors = append(t.errors, NewTokenizerError(ErrInvalidCharacterSequenceAfterDoctypeName, -1, -1))
 	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
@@ -2310,6 +2322,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2324,6 +2337,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 	}
 
 	if char == '"' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypePublicKeyword, -1, -1))
 		t.state = state_DOCTYPE_PublicIdentifier_DoubleQuoted
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.publicIdentifier = dgo.Some("")
@@ -2332,6 +2346,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 	}
 
 	if char == '\'' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypePublicKeyword, -1, -1))
 		t.state = state_DOCTYPE_PublicIdentifier_SingleQuoted
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.publicIdentifier = dgo.Some("")
@@ -2340,6 +2355,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingDoctypePublicIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
@@ -2352,6 +2368,8 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
+
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingQuoteBeforeDoctypePublicIdentifer, -1, -1))
 	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
@@ -2362,6 +2380,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2392,6 +2411,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingDoctypePublicIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
@@ -2402,6 +2422,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingQuoteBeforeDoctypePublicIdentifer, -1, -1))
 	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
@@ -2412,6 +2433,7 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2426,6 +2448,7 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.publicIdentifier.IsSome() {
 				*tag.publicIdentifier.Some += string(utf8.RuneError)
@@ -2435,6 +2458,7 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrAbruptDoctypePublicIdentifer, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
