@@ -9,8 +9,8 @@ import (
 )
 
 type characterReferences struct {
-	Keys   [][]rune
-	Values []int
+	K [][]rune
+	V []int
 }
 
 //go:embed character_reference.bin
@@ -18,16 +18,14 @@ var characterReferencesRaw []byte
 var characterReferenceTrie = createCharacterReferenceTrie()
 
 func createCharacterReferenceTrie() trie.Tree[rune, int] {
-	buffer := bytes.NewReader(characterReferencesRaw)
-	dec := gob.NewDecoder(buffer)
+	dec := gob.NewDecoder(bytes.NewReader(characterReferencesRaw))
 
 	var data characterReferences
-	err := dec.Decode(&data)
-	if err != nil {
+	if err := dec.Decode(&data); err != nil {
 		panic(err)
 	}
 
-	return trie.New(data.Keys, data.Values)
+	return trie.New(data.K, data.V)
 }
 
 // use a trie and longest match to find an match
