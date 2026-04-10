@@ -388,6 +388,11 @@ func (t *Tokenizer) consume() (rune, error) {
 	}
 
 	if r != '\r' {
+
+		if unicode.IsControl(r) && !(IsWhitespace(r) || r == '\u0000') {
+			t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
+		}
+
 		return r, nil
 	}
 
@@ -1777,6 +1782,9 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 		t.emitCurrentWithTokens()
 		return nil
 	}
+
+	t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedSolidusInTag, -1, -1))
+
 	t.state = state_BeforeAttributeName
 	return t.reader.UnreadRune()
 }
@@ -1857,6 +1865,7 @@ func (t *Tokenizer) state_BogusComment() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenComment); ok {
 			tag.Value += string(utf8.RuneError)
 		}
@@ -2195,6 +2204,9 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrMissingDoctypeName, -1, -1))
 		t.workingToken = NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
 		t.state = State_Data
+
+		t.emitCurrentWithTokens()
+
 		return nil
 	}
 
@@ -2481,6 +2493,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2495,6 +2508,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.publicIdentifier.IsSome() {
 				*tag.publicIdentifier.Some += string(char)
@@ -2504,6 +2518,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrAbruptDoctypePublicIdentifer, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
@@ -2526,6 +2541,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2546,6 +2562,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	}
 
 	if char == '"' {
+		t.errors = append(t.errors, NewTokenizerError(ErrNoWSBetweenDoctypePublicAndSystenIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
@@ -2554,6 +2571,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	}
 
 	if char == '\'' {
+		t.errors = append(t.errors, NewTokenizerError(ErrNoWSBetweenDoctypePublicAndSystenIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
@@ -2564,6 +2582,8 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
+
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingQuoteBeforeDoctypeSystemIdentifier, -1, -1))
 	t.state = state_BogusDOCTYPE
 
 	return t.reader.UnreadRune()
@@ -2575,6 +2595,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2609,6 +2630,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 		return nil
 	}
 
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingQuoteBeforeDoctypeSystemIdentifier, -1, -1))
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
@@ -2623,6 +2645,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2636,6 +2659,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	}
 
 	if char == '"' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypeSystemKeyword, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
@@ -2644,6 +2668,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	}
 
 	if char == '\'' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypeSystemKeyword, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.systemIdentifier = dgo.Some("")
 		}
@@ -2652,6 +2677,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingDoctypeSystemIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
@@ -2661,6 +2687,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 		return nil
 	}
 
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingQuoteBeforeDoctypeSystemIdentifier, -1, -1))
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
@@ -2675,6 +2702,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2704,6 +2732,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrMissingDoctypeSystemIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
@@ -2712,6 +2741,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 		return nil
 	}
 
+	t.errors = append(t.errors, NewTokenizerError(ErrMissingQuoteBeforeDoctypeSystemIdentifier, -1, -1))
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		tag.forceQuirks = true
 	}
@@ -2726,6 +2756,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2740,6 +2771,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.systemIdentifier.IsSome() {
 				*tag.systemIdentifier.Some += string(utf8.RuneError)
@@ -2750,6 +2782,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrAbruptDoctypeSystemIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
@@ -2773,6 +2806,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2787,6 +2821,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 	}
 
 	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.systemIdentifier.IsSome() {
 				*tag.systemIdentifier.Some += string(utf8.RuneError)
@@ -2796,6 +2831,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 	}
 
 	if char == '>' {
+		t.errors = append(t.errors, NewTokenizerError(ErrAbruptDoctypeSystemIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
@@ -2819,6 +2855,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 				tag.forceQuirks = true
 			}
@@ -2838,6 +2875,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 		return nil
 	}
 
+	t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedCharAfterDoctypeSystemIdentifier, -1, -1))
 	t.state = state_BogusDOCTYPE
 	return t.reader.UnreadRune()
 }
@@ -2860,6 +2898,10 @@ func (t *Tokenizer) state_Bogus_DOCTYPE() error {
 		return nil
 	}
 
+	if char == '\u0000' {
+		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
+	}
+
 	return nil
 }
 
@@ -2872,6 +2914,7 @@ func (t *Tokenizer) state_CDATA_Section() error {
 	char, err := t.consume()
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInCDATA, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
@@ -3163,7 +3206,7 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
 	if t.characterReferenceCode == 0x00 {
-		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
+		t.errors = append(t.errors, NewTokenizerError(ErrNullCharacterReference, -1, -1))
 		t.characterReferenceCode = 0xFFFD
 	}
 

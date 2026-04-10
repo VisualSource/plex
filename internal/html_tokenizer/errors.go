@@ -41,7 +41,17 @@ var (
 	ErrMissingDoctypePublicIdentifier              TokenizerErrorReason = "missing-doctype-public-identifier"
 	ErrMissingQuoteBeforeDoctypePublicIdentifer    TokenizerErrorReason = "missing-quote-before-doctype-public-identifier"
 	ErrAbruptDoctypePublicIdentifer                TokenizerErrorReason = "abrupt-doctype-public-identifier"
+	ErrAbruptDoctypeSystemIdentifier               TokenizerErrorReason = "abrupt-doctype-system-identifier"
 	ErrEndTagWithAttributes                        TokenizerErrorReason = "end-tag-with-attributes"
+	ErrUnexpectedSolidusInTag                      TokenizerErrorReason = "unexpected-solidus-in-tag"
+	ErrNullCharacterReference                      TokenizerErrorReason = "null-character-reference"
+	ErrEofInCDATA                                  TokenizerErrorReason = "eof-in-cdata"
+	ErrMissingQuoteBeforeDoctypeSystemIdentifier   TokenizerErrorReason = "missing-quote-before-doctype-system-identifier"
+	ErrMissingDoctypeSystemIdentifier              TokenizerErrorReason = "missing-doctype-system-identifier"
+	ErrNoWSBetweenDoctypePublicAndSystenIdentifier TokenizerErrorReason = "missing-whitespace-between-doctype-public-and-system-identifiers"
+	ErrUnexpectedCharAfterDoctypeSystemIdentifier  TokenizerErrorReason = "unexpected-character-after-doctype-system-identifier"
+	ErrMissingWhitespaceAfterDoctypeSystemKeyword  TokenizerErrorReason = "missing-whitespace-after-doctype-system-keyword"
+	ErrControlCharacterInInputStream               TokenizerErrorReason = "control-character-in-input-stream"
 )
 
 type TokenizerError struct {
