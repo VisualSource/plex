@@ -73,9 +73,11 @@ func TestTokenizer(t *testing.T) {
 func loadTestCases(t *testing.T) map[string][]testCase {
 	t.Helper()
 
-	values := os.Getenv("TEST_TOKENIZER_SUBSET")
+	values := os.Getenv("TEST_HTML_TOKENIZER_SUBSET")
 	allowed := strings.Split(values, ",")
 	useSubset := len(allowed) != 0
+
+	t.Logf("using test subtest: %s", values)
 
 	paths, err := filepath.Glob(filepath.Join("testdata", "*.test"))
 	if err != nil {

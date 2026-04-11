@@ -381,35 +381,39 @@ func (t *Tokenizer) flush() {
 	}
 }
 
+// https://html.spec.whatwg.org/#preprocessing-the-input-stream
+// https://infra.spec.whatwg.org/#normalize-newlines
 func (t *Tokenizer) consume() (rune, error) {
+	rs, err := t.reader.Peek(2)
+
+	if err != nil && err != io.EOF {
+		return utf8.RuneError, err
+	}
+
+	if len(rs) == 0 {
+		return utf8.RuneError, err
+	}
+
+	if rs[0] == '\r' {
+		if err != io.EOF && rs[1] == '\n' {
+			_, err = t.reader.Discard(2)
+		} else {
+			_, _, err = t.reader.ReadRune()
+		}
+
+		return '\n', err
+	}
+
 	r, _, err := t.reader.ReadRune()
 	if err != nil {
 		return utf8.RuneError, err
 	}
 
-	if r != '\r' {
-
-		if unicode.IsControl(r) && !(IsWhitespace(r) || r == '\u0000') {
-			t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
-		}
-
-		return r, nil
+	if unicode.IsControl(r) && !(IsWhitespace(r) || r == '\u0000') {
+		t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
 	}
 
-	rs, err := t.reader.Peek(1)
-	if err != nil {
-		return utf8.RuneError, err
-	}
-
-	if rs[0] == '\n' {
-		m := make([]rune, 1)
-		_, err := t.reader.Read(m)
-		if err != nil {
-			return utf8.MaxRune, err
-		}
-	}
-
-	return '\n', nil
+	return r, nil
 }
 
 func (t *Tokenizer) finishAttr() {

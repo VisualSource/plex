@@ -33,6 +33,11 @@ make lint
 
 Run tests
 
+HTML tokenizer TEST files
+
+`TEST_HTML_TOKENIZER_SUBSET` a comma sperated list of file names, see testdata folder in html_tokenizer 
+
+
 ```bash
 make test
 ```
