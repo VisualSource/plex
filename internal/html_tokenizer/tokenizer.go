@@ -8,7 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/MadAppGang/dingo/pkg/dgo"
-	"github.com/ianlewis/runeio"
+	"github.com/VisualSource/plex/internal/runeio"
 )
 
 type TokenizerState int
@@ -128,11 +128,9 @@ type Tokenizer struct {
 	errors                 []TokenizerError
 }
 
-func NewTokenizer(stream io.RuneReader) *Tokenizer {
-	reader := runeio.NewReader(stream)
-
+func NewTokenizer(stream io.Reader) *Tokenizer {
 	return &Tokenizer{
-		reader:       reader,
+		reader:       runeio.NewReader(stream),
 		state:        State_Data,
 		rstate:       state_Unset,
 		lastStartTag: dgo.None[string](),
@@ -384,36 +382,34 @@ func (t *Tokenizer) flush() {
 // https://html.spec.whatwg.org/#preprocessing-the-input-stream
 // https://infra.spec.whatwg.org/#normalize-newlines
 func (t *Tokenizer) consume() (rune, error) {
-	rs, err := t.reader.Peek(2)
-
-	if err != nil && err != io.EOF {
-		return utf8.RuneError, err
-	}
-
-	if len(rs) == 0 {
-		return utf8.RuneError, err
-	}
-
-	if rs[0] == '\r' {
-		if err != io.EOF && rs[1] == '\n' {
-			_, err = t.reader.Discard(2)
-		} else {
-			_, _, err = t.reader.ReadRune()
-		}
-
-		return '\n', err
-	}
-
-	r, _, err := t.reader.ReadRune()
+	rune, _, err := t.reader.ReadRune()
 	if err != nil {
 		return utf8.RuneError, err
 	}
 
-	if unicode.IsControl(r) && !(IsWhitespace(r) || r == '\u0000') {
-		t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
+	if rune != '\r' {
+		if unicode.IsControl(rune) && !(IsWhitespace(rune) || rune == '\u0000') {
+			t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
+		}
+
+		return rune, nil
 	}
 
-	return r, nil
+	// Remove CRLF (\r\n) line endings
+
+	// if the next run is a '\n' return a '\n' for the '\r\n'
+	// if its a EOF we can ignore it as it should be handle by the consumer on next call
+	// if none conditions above don't apply, unread the call below and replace '\r' with '\n'
+	v, _, err := t.reader.ReadRune()
+	if err == io.EOF || v == '\n' {
+		return '\n', nil
+	}
+
+	if err = t.reader.UnreadRune(); err != nil {
+		return utf8.RuneError, err
+	}
+
+	return '\n', nil
 }
 
 func (t *Tokenizer) finishAttr() {
@@ -1885,7 +1881,7 @@ func (t *Tokenizer) state_BogusComment() error {
 // https://html.spec.whatwg.org/#comment-start-state
 func (t *Tokenizer) state_CommentStart() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -1902,7 +1898,11 @@ func (t *Tokenizer) state_CommentStart() error {
 	}
 
 	t.state = state_Comment
-	return t.reader.UnreadRune()
+	if err != io.EOF {
+		return t.reader.UnreadRune()
+	}
+
+	return nil
 }
 
 // https://html.spec.whatwg.org/#comment-start-dash-state

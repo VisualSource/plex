@@ -180,7 +180,7 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 
 	if len(tt.Output) != 0 {
 		if len(tok.tokens) == 0 && len(tt.Output) != 0 {
-			t.Fatalf("missing tokens")
+			t.Fatalf("missing tokens: was expecting %v", tt.Output)
 		}
 		i := 0
 		for _, arg := range tt.Output {
