@@ -1973,7 +1973,7 @@ func (t *Tokenizer) state_Comment() error {
 // https://html.spec.whatwg.org/#comment-less-than-sign-state
 func (t *Tokenizer) state_Comment_LessThanSign() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -1991,6 +1991,9 @@ func (t *Tokenizer) state_Comment_LessThanSign() error {
 		return nil
 	default:
 		t.state = state_Comment
+		if err == io.EOF {
+			return nil
+		}
 		return t.reader.UnreadRune()
 	}
 }
@@ -2155,7 +2158,7 @@ func (t *Tokenizer) state_DOCTYPE() error {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
 			tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
 			t.emitCurrentWithTokens(tag, NewTokenEOF())
-			return nil
+			return err
 		}
 		return err
 	}
@@ -2216,6 +2219,7 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 
 	t.workingToken = NewTokenDOCTYPE(dgo.Some(string(char)), dgo.None[string](), dgo.None[string](), false)
 	t.state = state_DOCTYPE_Name
+
 	return nil
 }
 
@@ -2329,6 +2333,10 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 
 	t.errors = append(t.errors, NewTokenizerError(ErrInvalidCharacterSequenceAfterDoctypeName, -1, -1))
 	t.state = state_BogusDOCTYPE
+	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
+		tag.forceQuirks = true
+	}
+
 	return t.reader.UnreadRune()
 }
 
@@ -2515,7 +2523,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.publicIdentifier.IsSome() {
-				*tag.publicIdentifier.Some += string(char)
+				*tag.publicIdentifier.Some += string(utf8.RuneError)
 			}
 		}
 		return nil
@@ -2869,7 +2877,6 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 	}
 
 	if IsWhitespace(char) {
-		t.state = state_BeforeDOCTYPE_SystemIdentifer
 		return nil
 	}
 
