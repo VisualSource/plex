@@ -115,6 +115,16 @@ const (
 	state_NumericCharacterReferenceEnd
 )
 
+var NONCHARACTER_CODEPOINTS = []int{
+	0xFFFE, 0xFFFF, 0x1FFFE, 0x1FFFF, 0x2FFFE,
+	0x2FFFF, 0x3FFFE, 0x3FFFF, 0x4FFFE, 0x4FFFF,
+	0x5FFFE, 0x5FFFF, 0x6FFFE, 0x6FFFF, 0x7FFFE,
+	0x7FFFF, 0x8FFFE, 0x8FFFF, 0x9FFFE, 0x9FFFF,
+	0xAFFFE, 0xAFFFF, 0xBFFFE, 0xBFFFF, 0xCFFFE,
+	0xCFFFF, 0xDFFFE, 0xDFFFF, 0xEFFFE, 0xEFFFF,
+	0xFFFFE, 0xFFFFF, 0x10FFFE, 0x10FFFF,
+}
+
 // https://html.spec.whatwg.org/#tokenization
 type Tokenizer struct {
 	reader                 *runeio.RuneReader
@@ -138,6 +148,11 @@ func NewTokenizer(stream io.Reader) *Tokenizer {
 		rstate:       state_Unset,
 		lastStartTag: dgo.None[string](),
 	}
+}
+
+func isNonCharacterCodepoint(v int) bool {
+	return v >= 0xFDD0 && v <= 0xFDEF || slices.Contains(NONCHARACTER_CODEPOINTS, v)
+
 }
 
 func IsWhitespace(r rune) bool {
@@ -390,6 +405,9 @@ func (t *Tokenizer) consume() (rune, error) {
 	if rune != '\r' {
 		if unicode.IsControl(rune) && !(IsWhitespace(rune) || rune == '\u0000') {
 			t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
+		}
+		if isNonCharacterCodepoint(int(rune)) {
+			t.errors = append(t.errors, NewTokenizerError(ErrNoncharacterInInputStream, -1, -1))
 		}
 
 		return rune, nil
@@ -1668,6 +1686,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
 			t.emitCurrentWithTokens(NewTokenEOF())
 		}
 		return err
@@ -1712,6 +1731,7 @@ func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 
 	if err != nil {
 		if err == io.EOF {
+			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
@@ -3188,16 +3208,6 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 	return t.reader.UnreadRune()
 }
 
-var NONCHARACTER_CODEPOINTS = []int{
-	0xFFFE, 0xFFFF, 0x1FFFE, 0x1FFFF, 0x2FFFE,
-	0x2FFFF, 0x3FFFE, 0x3FFFF, 0x4FFFE, 0x4FFFF,
-	0x5FFFE, 0x5FFFF, 0x6FFFE, 0x6FFFF, 0x7FFFE,
-	0x7FFFF, 0x8FFFE, 0x8FFFF, 0x9FFFE, 0x9FFFF,
-	0xAFFFE, 0xAFFFF, 0xBFFFE, 0xBFFFF, 0xCFFFE,
-	0xCFFFF, 0xDFFFE, 0xDFFFF, 0xEFFFE, 0xEFFFF,
-	0xFFFFE, 0xFFFFF, 0x10FFFE, 0x10FFFF,
-}
-
 // https://html.spec.whatwg.org/#numeric-character-reference-end-state
 func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
@@ -3217,8 +3227,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 		t.characterReferenceCode = 0xFFFD
 	}
 
-	if t.characterReferenceCode >= 0xFDD0 && t.characterReferenceCode <= 0xFDEF ||
-		slices.Contains(NONCHARACTER_CODEPOINTS, t.characterReferenceCode) {
+	if isNonCharacterCodepoint(t.characterReferenceCode) {
 		t.errors = append(t.errors, NewTokenizerError(ErrNoncharacterCharacterReference, -1, -1))
 	}
 
