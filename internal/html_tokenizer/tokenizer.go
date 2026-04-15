@@ -3153,7 +3153,7 @@ func (t *Tokenizer) state_DecimalCharacterReferenceStart() error {
 // https://html.spec.whatwg.org/#hexadecimal-character-reference-state
 func (t *Tokenizer) state_HexadecimalCharacterReference() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -3182,13 +3182,18 @@ func (t *Tokenizer) state_HexadecimalCharacterReference() error {
 
 	t.errors = append(t.errors, NewTokenizerError(ErrMissingSemicolonAfterCharacterReference, -1, -1))
 	t.state = state_NumericCharacterReferenceEnd
+
+	if err == io.EOF {
+		return nil
+	}
+
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#decimal-character-reference-state
 func (t *Tokenizer) state_DeciamalCharacterReference() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -3205,6 +3210,11 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 
 	t.errors = append(t.errors, NewTokenizerError(ErrMissingSemicolonAfterCharacterReference, -1, -1))
 	t.state = state_NumericCharacterReferenceEnd
+
+	if err == io.EOF {
+		return nil
+	}
+
 	return t.reader.UnreadRune()
 }
 
