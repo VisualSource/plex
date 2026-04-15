@@ -52,6 +52,7 @@ var (
 	ErrUnexpectedCharAfterDoctypeSystemIdentifier  TokenizerErrorReason = "unexpected-character-after-doctype-system-identifier"
 	ErrMissingWhitespaceAfterDoctypeSystemKeyword  TokenizerErrorReason = "missing-whitespace-after-doctype-system-keyword"
 	ErrControlCharacterInInputStream               TokenizerErrorReason = "control-character-in-input-stream"
+	ErrEndTagWithTrailingSolidus                   TokenizerErrorReason = "end-tag-with-trailing-solidus"
 )
 
 type TokenizerError struct {
