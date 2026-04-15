@@ -2,6 +2,7 @@ package html_tokenizer
 
 import (
 	"io"
+	"math"
 	"slices"
 	"strings"
 	"unicode"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/MadAppGang/dingo/pkg/dgo"
 	"github.com/VisualSource/plex/internal/runeio"
+	"github.com/VisualSource/plex/internal/utils"
 )
 
 type TokenizerState int
@@ -3150,6 +3152,26 @@ func (t *Tokenizer) state_DecimalCharacterReferenceStart() error {
 	return t.reader.UnreadRune()
 }
 
+// do to int overflowing we need to do check if we are going to
+// overflow so that in the character reference end state we hit the right
+// conditions. max character ref is 0x10FFFF so a int should be more
+// then enough for are needs
+func addNumericDigit(char int, power int, refCode int) int {
+	mr, ok := utils.Mul(refCode, power)
+	if !ok {
+		// if mul overflows then there is not need to try add opt
+		// make sure that we will hit invalid ref checks
+		return math.MaxInt
+	}
+
+	ar, ok := utils.Add(mr, char)
+	if !ok {
+		return math.MaxInt
+	}
+
+	return ar
+}
+
 // https://html.spec.whatwg.org/#hexadecimal-character-reference-state
 func (t *Tokenizer) state_HexadecimalCharacterReference() error {
 	char, err := t.consume()
@@ -3158,20 +3180,17 @@ func (t *Tokenizer) state_HexadecimalCharacterReference() error {
 	}
 
 	if unicode.IsDigit(char) {
-		t.characterReferenceCode *= 16
-		t.characterReferenceCode += int(char - '0')
+		t.characterReferenceCode = addNumericDigit(int(char-'0'), 16, t.characterReferenceCode)
 		return nil
 	}
 
 	if unicode.Is(unicode.ASCII_Hex_Digit, char) {
 		if unicode.IsUpper(char) {
-			t.characterReferenceCode *= 16
-			t.characterReferenceCode += int(char - '7')
+			t.characterReferenceCode = addNumericDigit(int(char-'7'), 16, t.characterReferenceCode)
 			return nil
 		}
 
-		t.characterReferenceCode *= 16
-		t.characterReferenceCode += int(char - 'W')
+		t.characterReferenceCode = addNumericDigit(int(char-'W'), 16, t.characterReferenceCode)
 		return nil
 	}
 
@@ -3198,8 +3217,7 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 	}
 
 	if unicode.IsDigit(char) {
-		t.characterReferenceCode *= 10
-		t.characterReferenceCode += int(char - '0')
+		t.characterReferenceCode = addNumericDigit(int(char-'0'), 10, t.characterReferenceCode)
 		return nil
 	}
 
@@ -3223,18 +3241,18 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
 	if t.characterReferenceCode == 0x00 {
 		t.errors = append(t.errors, NewTokenizerError(ErrNullCharacterReference, -1, -1))
-		t.characterReferenceCode = 0xFFFD
+		t.characterReferenceCode = utf8.RuneError
 	}
 
 	if t.characterReferenceCode > 0x10FFFF {
 		t.errors = append(t.errors, NewTokenizerError(ErrCharacterReferenceOutsideUnicodeRange, -1, -1))
-		t.characterReferenceCode = 0xFFFD
+		t.characterReferenceCode = utf8.RuneError
 	}
 
 	if (t.characterReferenceCode >= 0xD800 && t.characterReferenceCode <= 0xDBFF) ||
 		(t.characterReferenceCode >= 0xCD00 && t.characterReferenceCode <= 0xDFFF) {
 		t.errors = append(t.errors, NewTokenizerError(ErrSurrogateCharacterReference, -1, -1))
-		t.characterReferenceCode = 0xFFFD
+		t.characterReferenceCode = utf8.RuneError
 	}
 
 	if isNonCharacterCodepoint(t.characterReferenceCode) {
@@ -3245,59 +3263,59 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterReference, -1, -1))
 		switch t.characterReferenceCode {
 		case 0x80:
-			t.characterReferenceCode = 0x20AC
+			t.characterReferenceCode = 0x20AC //EURO SIGN
 		case 0x82:
-			t.characterReferenceCode = 0x201A
+			t.characterReferenceCode = 0x201A //SINGLE LOW-9 QUOTATION MARK
 		case 0x83:
-			t.characterReferenceCode = 0x0192
+			t.characterReferenceCode = 0x0192 //LATIN SMALL LETTER F WITH HOOK
 		case 0x84:
-			t.characterReferenceCode = 0x201E
+			t.characterReferenceCode = 0x201E //DOUBLE LOW-9 QUOTATION MARK
 		case 0x85:
-			t.characterReferenceCode = 0x2026
+			t.characterReferenceCode = 0x2026 //HORIZONTAL ELLIPSIS
 		case 0x86:
-			t.characterReferenceCode = 0x2020
+			t.characterReferenceCode = 0x2020 //DAGGER
 		case 0x87:
-			t.characterReferenceCode = 0x2021
+			t.characterReferenceCode = 0x2021 //DOUBLE DAGGER
 		case 0x88:
-			t.characterReferenceCode = 0x02C6
+			t.characterReferenceCode = 0x02C6 //MODIFIER LETTER CIRCUMFLEX ACCENT
 		case 0x89:
-			t.characterReferenceCode = 0x2030
+			t.characterReferenceCode = 0x2030 //PER MILLE SIGN
 		case 0x8A:
-			t.characterReferenceCode = 0x0160
+			t.characterReferenceCode = 0x0160 //LATIN CAPITAL LETTER S WITH CARON
 		case 0x8B:
-			t.characterReferenceCode = 0x2039
+			t.characterReferenceCode = 0x2039 //SINGLE LEFT-POINTING ANGLE QUOTATION MARK
 		case 0x8C:
-			t.characterReferenceCode = 0x0152
+			t.characterReferenceCode = 0x0152 //LATIN CAPITAL LIGATURE OE
 		case 0x8E:
-			t.characterReferenceCode = 0x017D
+			t.characterReferenceCode = 0x017D //LATIN CAPITAL LETTER Z WITH CARON
 		case 0x91:
-			t.characterReferenceCode = 0x2018
+			t.characterReferenceCode = 0x2018 //LEFT SINGLE QUOTATION MARK
 		case 0x92:
-			t.characterReferenceCode = 0x2019
+			t.characterReferenceCode = 0x2019 //RIGHT SINGLE QUOTATION MARK
 		case 0x93:
-			t.characterReferenceCode = 0x201C
+			t.characterReferenceCode = 0x201C //LEFT DOUBLE QUOTATION MARK
 		case 0x94:
-			t.characterReferenceCode = 0x201D
+			t.characterReferenceCode = 0x201D //RIGHT DOUBLE QUOTATION MARK
 		case 0x95:
-			t.characterReferenceCode = 0x2022
+			t.characterReferenceCode = 0x2022 //BULLET
 		case 0x96:
-			t.characterReferenceCode = 0x2013
+			t.characterReferenceCode = 0x2013 //EN DASH
 		case 0x97:
-			t.characterReferenceCode = 0x2014
+			t.characterReferenceCode = 0x2014 //EM DASH
 		case 0x98:
-			t.characterReferenceCode = 0x02DC
+			t.characterReferenceCode = 0x02DC //SMALL TILDE
 		case 0x99:
-			t.characterReferenceCode = 0x2122
+			t.characterReferenceCode = 0x2122 //TRADE MARK SIGN
 		case 0x9A:
-			t.characterReferenceCode = 0x0161
+			t.characterReferenceCode = 0x0161 //LATIN SMALL LETTER S WITH CARON
 		case 0x9B:
-			t.characterReferenceCode = 0x203A
+			t.characterReferenceCode = 0x203A //SINGLE RIGHT-POINTING ANGLE QUOTATION MARK
 		case 0x9C:
-			t.characterReferenceCode = 0x0153
+			t.characterReferenceCode = 0x0153 //LATIN SMALL LIGATURE OE
 		case 0x9E:
-			t.characterReferenceCode = 0x017E
+			t.characterReferenceCode = 0x017E //LATION SMALL LETTER Z WITH CARON
 		case 0x9F:
-			t.characterReferenceCode = 0x0178
+			t.characterReferenceCode = 0x0178 //LATIN CAPITAL LETTER Y WITH DIAERESIS
 		}
 	}
 
