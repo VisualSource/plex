@@ -21,28 +21,29 @@ type TokenCharacter struct{ Value rune }
 func (TokenCharacter) isToken()          {}
 func NewTokenCharacter(value rune) Token { return &TokenCharacter{Value: value} }
 
-type TokenStartTag struct {
+type TokenTagType uint8
+
+const (
+	TokenEndTag   TokenTagType = 0
+	TokenStartTag TokenTagType = 1
+)
+
+type TokenTag struct {
+	t           TokenTagType
 	name        string
 	attrs       AttributesMap
 	selfClosing dgo.Option[bool]
-	cavalue     string
-	caname      string
 }
 
-func (TokenStartTag) isToken() {}
-func NewTokenStartTag(name string, attrs AttributesMap, selfClosing dgo.Option[bool], cavalue string, caname string) Token {
-	return &TokenStartTag{name: name, attrs: attrs, selfClosing: selfClosing, cavalue: cavalue, caname: caname}
+func (TokenTag) isToken() {}
+func NewTokenTag(name string, tokenType TokenTagType, selfClosing dgo.Option[bool]) Token {
+	return &TokenTag{name: name, attrs: make(AttributesMap), t: tokenType, selfClosing: selfClosing}
 }
 
 type TokenComment struct{ Value string }
 
 func (TokenComment) isToken()            {}
 func NewTokenComment(value string) Token { return &TokenComment{Value: value} }
-
-type TokenEndTag struct{ name string }
-
-func (TokenEndTag) isToken()           {}
-func NewTokenEndTag(name string) Token { return &TokenEndTag{name: name} }
 
 type TokenDOCTYPE struct {
 	name             dgo.Option[string]
