@@ -126,6 +126,9 @@ type Tokenizer struct {
 	workingToken           Token
 	lastStartTag           dgo.Option[string]
 	errors                 []TokenizerError
+
+	workingAttrName  string
+	workingAttrValue string
 }
 
 func NewTokenizer(stream io.Reader) *Tokenizer {
@@ -367,10 +370,7 @@ func wasConsumedAsPartOfAttribute(state TokenizerState) bool {
 func (t *Tokenizer) flush() {
 	if wasConsumedAsPartOfAttribute(t.rstate) {
 
-		tag, ok := t.workingToken.(*TokenStartTag)
-		if ok {
-			tag.cavalue += t.tempbuffer
-		}
+		t.workingAttrValue += t.tempbuffer
 		return
 	}
 
@@ -414,31 +414,38 @@ func (t *Tokenizer) consume() (rune, error) {
 
 func (t *Tokenizer) finishAttr() {
 
-	if _, ok := t.workingToken.(*TokenEndTag); ok {
-		t.errors = append(t.errors, NewTokenizerError(ErrEndTagWithAttributes, -1, -1))
-	}
+	if tag, ok := t.workingToken.(*TokenTag); ok {
+		if tag.t == TokenEndTag {
+			t.errors = append(t.errors, NewTokenizerError(ErrEndTagWithAttributes, -1, -1))
+		}
 
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		if tag.caname != "" {
-			_, ok := tag.attrs[tag.caname]
-			if !ok {
-				tag.attrs[tag.caname] = tag.cavalue
-			} else {
-				t.errors = append(t.errors, NewTokenizerError(ErrDuplicateAttribute, -1, -1))
-			}
+		_, ok := tag.attrs[t.workingAttrName]
+		if !ok {
+			tag.attrs[t.workingAttrName] = t.workingAttrValue
+		} else {
+			t.errors = append(t.errors, NewTokenizerError(ErrDuplicateAttribute, -1, -1))
 		}
 	}
 }
 
 func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 	t.finishAttr()
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		t.lastStartTag = dgo.Some(tag.name)
+	if tag, ok := t.workingToken.(*TokenTag); ok {
+		switch tag.t {
+		case TokenEndTag:
+			if tag.selfClosing.SomeOr(false) {
+				t.errors = append(t.errors, NewTokenizerError(ErrEndTagWithTrailingSolidus, -1, -1))
+			}
+
+		case TokenStartTag:
+			t.lastStartTag = dgo.Some(tag.name)
+		}
 	}
 
 	if t.workingToken != nil {
 		t.tokens = append(t.tokens, t.workingToken)
 	}
+
 	t.tokens = append(t.tokens, tokens...)
 	t.workingToken = nil
 }
@@ -447,11 +454,9 @@ func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 // emitted from this tokenizer, if any. If no start tag has been emitted from this tokenizer,
 // then no end tag token is appropriate.
 func (t *Tokenizer) hasApproriateEndTagToken() bool {
-	tag, ok := t.workingToken.(*TokenEndTag)
-	if !ok {
-		return false
-	}
-	if t.lastStartTag.IsNone() {
+	tag, ok := t.workingToken.(*TokenTag)
+
+	if !ok || tag.t == TokenStartTag || t.lastStartTag.IsNone() {
 		return false
 	}
 
@@ -633,7 +638,7 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	if unicode.IsLetter(char) {
 		t.state = state_TagName
-		t.workingToken = NewTokenStartTag("", make(AttributesMap), dgo.None[bool](), "", "")
+		t.workingToken = NewTokenTag("", TokenStartTag, dgo.None[bool]())
 		return t.reader.UnreadRune()
 	}
 
@@ -664,7 +669,7 @@ func (t *Tokenizer) state_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenEndTag("")
+		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
 		t.state = state_TagName
 		return t.reader.UnreadRune()
 	}
@@ -711,30 +716,23 @@ func (t *Tokenizer) state_TagName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		switch tag := t.workingToken.(type) {
-		case *TokenStartTag:
-			tag.name += string(unicode.ToLower(char))
-		case *TokenEndTag:
+		if tag, ok := t.workingToken.(*TokenTag); ok {
 			tag.name += string(unicode.ToLower(char))
 		}
+
 		return nil
 	}
 
 	if char == '\u0000' {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
-		switch tag := t.workingToken.(type) {
-		case *TokenStartTag:
-			tag.name += string(utf8.RuneError)
-		case *TokenEndTag:
+		if tag, ok := t.workingToken.(*TokenTag); ok {
 			tag.name += string(utf8.RuneError)
 		}
+
 		return nil
 	}
 
-	switch tag := t.workingToken.(type) {
-	case *TokenStartTag:
-		tag.name += string(char)
-	case *TokenEndTag:
+	if tag, ok := t.workingToken.(*TokenTag); ok {
 		tag.name += string(char)
 	}
 
@@ -773,7 +771,7 @@ func (t *Tokenizer) state_RCData_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenEndTag("")
+		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
 
 		t.state = state_RCData_EndTagName
 		return t.reader.UnreadRune()
@@ -813,7 +811,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
 
-			if tag, ok := t.workingToken.(*TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 
@@ -821,7 +819,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(*TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -870,7 +868,7 @@ func (t *Tokenizer) state_RawText_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenEndTag("")
+		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
 		t.state = state_RawText_EndTagName
 
 		return t.reader.UnreadRune()
@@ -915,14 +913,14 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			if tag, ok := t.workingToken.(*TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 			return nil
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(*TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -972,7 +970,7 @@ func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenEndTag("")
+		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
 		t.state = state_ScriptData_EndTagName
 		return t.reader.UnreadRune()
 	}
@@ -1015,14 +1013,14 @@ func (t *Tokenizer) state_ScriptData_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			if tag, ok := t.workingToken.(*TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 			return nil
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(*TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -1198,7 +1196,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenEndTag("")
+		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
 		t.state = state_ScriptData_EscapedEndTagName
 		return t.reader.UnreadRune()
 	}
@@ -1241,14 +1239,14 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 	if unicode.IsLetter(char) {
 		if unicode.IsUpper(char) {
 			t.tempbuffer += string(char)
-			if tag, ok := t.workingToken.(*TokenEndTag); ok {
+			if tag, ok := t.workingToken.(*TokenTag); ok {
 				tag.name += string(unicode.ToLower(char))
 			}
 			return nil
 		}
 
 		t.tempbuffer += string(char)
-		if tag, ok := t.workingToken.(*TokenEndTag); ok {
+		if tag, ok := t.workingToken.(*TokenTag); ok {
 			tag.name += string(char)
 		}
 		return nil
@@ -1471,18 +1469,14 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 		t.state = state_AttributeName
 
 		t.finishAttr()
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
-			tag.caname = string(char)
-			tag.cavalue = ""
-		}
+		t.workingAttrName = string(char)
+		t.workingAttrValue = ""
 		return nil
 	}
 
 	t.finishAttr()
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		tag.caname = ""
-		tag.cavalue = ""
-	}
+	t.workingAttrName = ""
+	t.workingAttrValue = ""
 
 	t.state = state_AttributeName
 	return t.reader.UnreadRune()
@@ -1508,17 +1502,13 @@ func (t *Tokenizer) state_AttributeName() error {
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
-			tag.caname += string(unicode.ToLower(char))
-		}
+		t.workingAttrName += string(unicode.ToLower(char))
 		return nil
 	}
 
 	if char == '\u0000' {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
-			tag.caname += string(utf8.RuneError)
-		}
+		t.workingAttrName += string(utf8.RuneError)
 		return nil
 	}
 
@@ -1526,9 +1516,7 @@ func (t *Tokenizer) state_AttributeName() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedCharacterInAttributeName, -1, -1))
 	}
 
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		tag.caname += string(char)
-	}
+	t.workingAttrName += string(char)
 
 	return nil
 }
@@ -1566,10 +1554,8 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 	}
 
 	t.finishAttr()
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		tag.caname = ""
-		tag.cavalue = ""
-	}
+	t.workingAttrName = ""
+	t.workingAttrValue = ""
 
 	t.state = state_AttributeName
 	return t.reader.UnreadRune()
@@ -1632,15 +1618,13 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 
 	if char == '\u0000' {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
-			tag.cavalue += string(utf8.RuneError)
-		}
+
+		t.workingAttrValue += string(utf8.RuneError)
+
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		tag.cavalue += string(char)
-	}
+	t.workingAttrValue += string(char)
 	return nil
 }
 
@@ -1669,15 +1653,12 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 
 	if char == '\u0000' {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
-			tag.cavalue += string(utf8.RuneError)
-		}
+		t.workingAttrValue += string(utf8.RuneError)
+
 		return nil
 	}
 
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		tag.cavalue += string(char)
-	}
+	t.workingAttrValue += string(char)
 	return nil
 }
 
@@ -1711,9 +1692,8 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 
 	if char == '\u0000' {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
-			tag.cavalue += string(utf8.RuneError)
-		}
+		t.workingAttrValue += string(utf8.RuneError)
+
 		return nil
 	}
 
@@ -1721,9 +1701,8 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedCharacterInUnquotedAttributeValue, -1, -1))
 	}
 
-	if tag, ok := t.workingToken.(*TokenStartTag); ok {
-		tag.cavalue += string(char)
-	}
+	t.workingAttrValue += string(char)
+
 	return nil
 }
 
@@ -1775,7 +1754,7 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 	}
 
 	if char == '>' {
-		if tag, ok := t.workingToken.(*TokenStartTag); ok {
+		if tag, ok := t.workingToken.(*TokenTag); ok {
 			tag.selfClosing = dgo.Some(true)
 		}
 		t.state = State_Data
@@ -3065,11 +3044,7 @@ func (t *Tokenizer) state_AmbiguousAmpersand() error {
 
 	if unicode.IsLetter(char) || unicode.IsNumber(char) {
 		if wasConsumedAsPartOfAttribute(t.rstate) {
-
-			if tag, ok := t.workingToken.(TokenStartTag); ok {
-				tag.cavalue += string(char)
-			}
-
+			t.workingAttrValue += string(char)
 			return nil
 		}
 
@@ -3213,6 +3188,16 @@ func (t *Tokenizer) state_DeciamalCharacterReference() error {
 	return t.reader.UnreadRune()
 }
 
+var NONCHARACTER_CODEPOINTS = []int{
+	0xFFFE, 0xFFFF, 0x1FFFE, 0x1FFFF, 0x2FFFE,
+	0x2FFFF, 0x3FFFE, 0x3FFFF, 0x4FFFE, 0x4FFFF,
+	0x5FFFE, 0x5FFFF, 0x6FFFE, 0x6FFFF, 0x7FFFE,
+	0x7FFFF, 0x8FFFE, 0x8FFFF, 0x9FFFE, 0x9FFFF,
+	0xAFFFE, 0xAFFFF, 0xBFFFE, 0xBFFFF, 0xCFFFE,
+	0xCFFFF, 0xDFFFE, 0xDFFFF, 0xEFFFE, 0xEFFFF,
+	0xFFFFE, 0xFFFFF, 0x10FFFE, 0x10FFFF,
+}
+
 // https://html.spec.whatwg.org/#numeric-character-reference-end-state
 func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
@@ -3232,7 +3217,8 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 		t.characterReferenceCode = 0xFFFD
 	}
 
-	if t.characterReferenceCode >= 0xFDD0 && t.characterReferenceCode <= 0xFDEF {
+	if t.characterReferenceCode >= 0xFDD0 && t.characterReferenceCode <= 0xFDEF ||
+		slices.Contains(NONCHARACTER_CODEPOINTS, t.characterReferenceCode) {
 		t.errors = append(t.errors, NewTokenizerError(ErrNoncharacterCharacterReference, -1, -1))
 	}
 
