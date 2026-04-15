@@ -197,7 +197,7 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 			token := tok.tokens[i]
 			switch arg[0].(string) {
 			case "StartTag":
-				if tag, ok := token.(*TokenStartTag); ok {
+				if tag, ok := token.(*TokenTag); ok && tag.t == TokenStartTag {
 					if resolveEncoding(arg[1].(string), tt.DoubleEscaped) != tag.name {
 						t.Fatalf("was expecting a name of '%s' but was given '%s'", arg[1], tag.name)
 					}
@@ -220,7 +220,7 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 					t.Fatalf("was expecting an start tag but got '%#v'", token)
 				}
 			case "EndTag":
-				if tag, ok := token.(*TokenEndTag); ok {
+				if tag, ok := token.(*TokenTag); ok && tag.t == TokenEndTag {
 					if resolveEncoding(arg[1].(string), tt.DoubleEscaped) != tag.name {
 						t.Fatalf("was expecting end tag to have tag name of '%s' not '%s'", arg[1], tag.name)
 					}
