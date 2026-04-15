@@ -3250,7 +3250,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 	}
 
 	if (t.characterReferenceCode >= 0xD800 && t.characterReferenceCode <= 0xDBFF) ||
-		(t.characterReferenceCode >= 0xCD00 && t.characterReferenceCode <= 0xDFFF) {
+		(t.characterReferenceCode >= 0xDC00 && t.characterReferenceCode <= 0xDFFF) {
 		t.errors = append(t.errors, NewTokenizerError(ErrSurrogateCharacterReference, -1, -1))
 		t.characterReferenceCode = utf8.RuneError
 	}
