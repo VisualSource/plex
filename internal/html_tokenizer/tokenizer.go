@@ -154,7 +154,13 @@ func NewTokenizer(stream io.Reader) *Tokenizer {
 
 func isNonCharacterCodepoint(v int) bool {
 	return v >= 0xFDD0 && v <= 0xFDEF || slices.Contains(NONCHARACTER_CODEPOINTS, v)
+}
 
+func isSurrogate(v int) bool {
+	r := (v >= 0xD800 && v <= 0xDBFF) ||
+		(v >= 0xDC00 && v <= 0xDFFF)
+
+	return r
 }
 
 func IsWhitespace(r rune) bool {
@@ -410,6 +416,9 @@ func (t *Tokenizer) consume() (rune, error) {
 		}
 		if isNonCharacterCodepoint(int(rune)) {
 			t.errors = append(t.errors, NewTokenizerError(ErrNoncharacterInInputStream, -1, -1))
+		}
+		if isSurrogate(int(rune)) {
+			t.errors = append(t.errors, NewTokenizerError(ErrSurrogateInInputStream, -1, -1))
 		}
 
 		return rune, nil
@@ -731,6 +740,7 @@ func (t *Tokenizer) state_TagName() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -824,6 +834,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 	if char == '>' && t.hasApproriateEndTagToken() {
 		t.state = State_Data
 		t.emitCurrentWithTokens()
+		t.reader.Forget()
 		return nil
 	}
 
@@ -925,6 +936,7 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 	if char == '>' {
 		if t.hasApproriateEndTagToken() {
 			t.state = State_Data
+			t.reader.Forget()
 			t.emitCurrentWithTokens()
 			return nil
 		}
@@ -1026,6 +1038,7 @@ func (t *Tokenizer) state_ScriptData_EndTagName() error {
 		if t.hasApproriateEndTagToken() {
 			t.state = State_Data
 			t.emitCurrentWithTokens()
+			t.reader.Forget()
 			return nil
 		}
 	}
@@ -1423,6 +1436,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscaped_LessThanSign() error {
 		t.tempbuffer = ""
 		t.state = state_ScriptData_DoubleEscapeEnd
 		t.emitCurrentWithTokens(NewTokenCharacter('/'))
+		t.reader.Forget()
 		return nil
 	}
 
@@ -1445,6 +1459,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 		}
 
 		t.emitCurrentWithTokens(NewTokenCharacter(char))
+		t.reader.Forget()
 		return nil
 	}
 
@@ -1456,6 +1471,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 		}
 
 		t.emitCurrentWithTokens(NewTokenCharacter(char))
+		t.reader.Forget()
 		return nil
 	}
 
@@ -1513,6 +1529,11 @@ func (t *Tokenizer) state_AttributeName() error {
 
 	if isEOF || IsWhitespace(char) || char == '/' || char == '>' {
 		t.state = state_AfterAttributeName
+
+		if isEOF {
+			return nil
+		}
+
 		return t.reader.UnreadRune()
 	}
 
@@ -1569,6 +1590,7 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -1584,7 +1606,7 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 // https://html.spec.whatwg.org/#before-attribute-value-state
 func (t *Tokenizer) state_BeforeAttributeValue() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -1605,11 +1627,15 @@ func (t *Tokenizer) state_BeforeAttributeValue() error {
 	if char == '>' {
 		t.errors = append(t.errors, NewTokenizerError(ErrMissingAttributeValue, -1, -1))
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
 
 	t.state = state_AttributValue_Unquoted
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -1707,6 +1733,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -1751,6 +1778,7 @@ func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -1780,6 +1808,7 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 			tag.selfClosing = dgo.Some(true)
 		}
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -1861,6 +1890,7 @@ func (t *Tokenizer) state_BogusComment() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -1893,6 +1923,7 @@ func (t *Tokenizer) state_CommentStart() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.errors = append(t.errors, NewTokenizerError(ErrAbruptClosingOfEmptyComment, -1, -1))
 		t.emitCurrentWithTokens()
 		return nil
@@ -1923,6 +1954,7 @@ func (t *Tokenizer) state_Comment_StartDash() error {
 		return nil
 	case '>':
 		t.state = State_Data
+		t.reader.Forget()
 		t.errors = append(t.errors, NewTokenizerError(ErrAbruptClosingOfEmptyComment, -1, -1))
 		t.emitCurrentWithTokens()
 		return nil
@@ -2093,6 +2125,8 @@ func (t *Tokenizer) state_CommentEnd() error {
 
 	switch char {
 	case '>':
+		t.reader.Forget()
+
 		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
@@ -2135,6 +2169,7 @@ func (t *Tokenizer) state_Comment_EndBang() error {
 	case '>':
 		t.errors = append(t.errors, NewTokenizerError(ErrIncorrectlyClosedComment, -1, -1))
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	default:
@@ -2213,6 +2248,8 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 		t.workingToken = NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
 		t.state = State_Data
 
+		t.reader.Forget()
+
 		t.emitCurrentWithTokens()
 
 		return nil
@@ -2245,6 +2282,9 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 
 	if char == '>' {
 		t.state = State_Data
+
+		t.reader.Forget()
+
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2297,6 +2337,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2386,6 +2427,8 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 		}
 		t.state = State_Data
 
+		t.reader.Forget()
+
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2440,6 +2483,8 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
+
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2487,8 +2532,9 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			tag.forceQuirks = true
 		}
-		t.emitCurrentWithTokens()
 		t.state = State_Data
+		t.reader.Forget()
+		t.emitCurrentWithTokens()
 		return nil
 	}
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
@@ -2536,6 +2582,8 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
+		t.reader.Forget()
+
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2570,6 +2618,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2623,6 +2672,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2695,7 +2745,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
-
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2750,6 +2800,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2800,6 +2851,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2849,6 +2901,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 			tag.forceQuirks = true
 		}
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2883,6 +2936,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 
 	if char == '>' {
 		t.state = State_Data
+		t.reader.Forget()
 		t.emitCurrentWithTokens()
 		return nil
 	}
@@ -2905,6 +2959,8 @@ func (t *Tokenizer) state_Bogus_DOCTYPE() error {
 	}
 
 	if char == '>' {
+		t.reader.Forget()
+
 		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
@@ -2973,6 +3029,7 @@ func (t *Tokenizer) state_CDATA_SectionEnd() error {
 	}
 
 	if char == '>' {
+		t.reader.Forget()
 		t.state = State_Data
 		return nil
 	}
@@ -3042,6 +3099,7 @@ func (t *Tokenizer) state_NamedCharacterReference() error {
 	lastIdx := size - 1
 	if wasConsumedAsPartOfAttribute(t.rstate) && runes[lastIdx] != ';' && (runes[size] == '=' || unicode.IsDigit(runes[size]) || unicode.IsLetter(runes[size])) {
 		t.flush()
+		t.reader.Forget()
 		t.state = t.rstate
 		return nil
 	}
@@ -3052,6 +3110,7 @@ func (t *Tokenizer) state_NamedCharacterReference() error {
 
 	t.tempbuffer = string([]rune{rune(codepoint)})
 	t.flush()
+	t.reader.Forget()
 	t.state = t.rstate
 
 	return nil
@@ -3249,8 +3308,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 		t.characterReferenceCode = utf8.RuneError
 	}
 
-	if (t.characterReferenceCode >= 0xD800 && t.characterReferenceCode <= 0xDBFF) ||
-		(t.characterReferenceCode >= 0xDC00 && t.characterReferenceCode <= 0xDFFF) {
+	if isSurrogate(t.characterReferenceCode) {
 		t.errors = append(t.errors, NewTokenizerError(ErrSurrogateCharacterReference, -1, -1))
 		t.characterReferenceCode = utf8.RuneError
 	}
@@ -3322,6 +3380,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 	t.tempbuffer = string(rune(t.characterReferenceCode))
 
 	t.flush()
+	t.reader.Forget()
 	t.state = t.rstate
 	return nil
 }

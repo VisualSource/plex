@@ -54,6 +54,7 @@ var (
 	ErrControlCharacterInInputStream               TokenizerErrorReason = "control-character-in-input-stream"
 	ErrEndTagWithTrailingSolidus                   TokenizerErrorReason = "end-tag-with-trailing-solidus"
 	ErrNoncharacterInInputStream                   TokenizerErrorReason = "noncharacter-in-input-stream"
+	ErrSurrogateInInputStream                      TokenizerErrorReason = "surrogate-in-input-stream"
 )
 
 type TokenizerError struct {

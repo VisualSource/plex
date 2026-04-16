@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/text/unicode/norm"
-
 	"github.com/MadAppGang/dingo/pkg/dgo"
+	"github.com/kr/pretty"
+	"golang.org/x/text/unicode/norm"
 )
 
 type testCase struct {
@@ -136,11 +136,11 @@ func resolveStateStrToType(value string) TokenizerState {
 }
 
 func resolveEncoding(input string, isDoubleEscaped bool) string {
-	if isDoubleEscaped {
-		return norm.NFC.String(input)
+	if !isDoubleEscaped {
+		return input
 	}
 
-	return input
+	return norm.NFC.String(input)
 }
 
 func testOptStr(expected any, value dgo.Option[string], name string, isDoubleEscaped bool, t *testing.T) {
@@ -183,8 +183,9 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 	}
 
 	if len(tt.Output) != 0 {
+		// test case collapse character tokens so we can't check here if the output and tokens match
 		if len(tok.tokens) == 0 && len(tt.Output) != 0 {
-			t.Fatalf("missing tokens: was expecting %v", tt.Output)
+			t.Fatalf("tokens miss match: was expecting %v but got %+v", tt.Output, pretty.Sprint(tok.tokens))
 		}
 		i := 0
 		for _, arg := range tt.Output {
