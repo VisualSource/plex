@@ -7,12 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/MadAppGang/dingo/pkg/dgo"
 	"github.com/kr/pretty"
-	"golang.org/x/text/unicode/norm"
 )
 
 type testCase struct {
@@ -75,13 +75,15 @@ func loadTestCases(t *testing.T) map[string][]testCase {
 
 	values, isSet := os.LookupEnv("TEST_HTML_TOKENIZER_SUBSET")
 	allowed := strings.Split(values, ",")
-	useSubset := len(allowed) != 0
+	useSubset := values != "" && len(allowed) != 0
 
 	if isSet && !useSubset {
 		t.Fatalf("no subset of tests where set!")
 	}
 
-	t.Logf("using test subtest: %s", values)
+	if useSubset {
+		t.Logf("using test subtest: %s", values)
+	}
 
 	paths, err := filepath.Glob(filepath.Join("testdata", "*.test"))
 	if err != nil {
@@ -135,12 +137,37 @@ func resolveStateStrToType(value string) TokenizerState {
 	}
 }
 
+// UnescapeUnicode converts escaped unicode sequences (including double-escaped)
+// into their actual unicode characters.
+// e.g. "\\u00e9" -> "é", "\u00e9" -> "é"
+func UnescapeUnicode(s string) (string, error) {
+	// strconv.Unquote requires a quoted string, so wrap it.
+	// First, normalize double-escaped sequences: \\uXXXX -> \uXXXX
+	normalized := strings.ReplaceAll(s, `\\u`, `\u`)
+	normalized = strings.ReplaceAll(normalized, `\\U`, `\U`)
+	normalized = strings.ReplaceAll(normalized, `"`, `\"`)
+
+	// Wrap in quotes so strconv.Unquote can parse it
+	quoted := `"` + normalized + `"`
+	unquoted, err := strconv.Unquote(quoted)
+	if err != nil {
+		return "", fmt.Errorf("failed to unquote: %w", err)
+	}
+
+	return unquoted, nil
+}
+
 func resolveEncoding(input string, isDoubleEscaped bool) string {
 	if !isDoubleEscaped {
 		return input
 	}
 
-	return norm.NFC.String(input)
+	r, err := UnescapeUnicode(input)
+	if err != nil {
+		panic(err)
+	}
+
+	return r
 }
 
 func testOptStr(expected any, value dgo.Option[string], name string, isDoubleEscaped bool, t *testing.T) {
@@ -242,17 +269,21 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 						t.Fatalf("was expecting DOCTYPE forceQuirks flag to be 'true' but got '%#v'", tag.forceQuirks)
 					}
 				} else {
-					t.Fatalf("was expecting an doctype tag but got '%v'", token)
+					t.Fatalf("was expecting an doctype tag but got '%s'", pretty.Sprint(token))
 				}
 			case "Character":
 				for _, char := range resolveEncoding(arg[1].(string), tt.DoubleEscaped) {
+					if i >= len(tok.tokens) {
+						t.Fatalf("was expecting a character token but none are left. expected: %v given: %s", arg[1], pretty.Sprint(tok.tokens))
+					}
+
 					if tag, ok := tok.tokens[i].(*TokenCharacter); ok {
 
 						if char != tag.Value {
 							t.Fatalf("was expecting character token to have value of '%c' but got '%c'", char, tag.Value)
 						}
 					} else {
-						t.Fatalf("was expecting a character token but found '%#v'", tok.tokens[i])
+						t.Fatalf("was expecting a character token but found '%s'", pretty.Sprint(tok.tokens[i]))
 					}
 					i++
 				}
