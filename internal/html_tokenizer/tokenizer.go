@@ -776,7 +776,7 @@ func (t *Tokenizer) state_TagName() error {
 // https://html.spec.whatwg.org/#rcdata-less-than-sign-state
 func (t *Tokenizer) state_RCData_LessThen() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -789,14 +789,17 @@ func (t *Tokenizer) state_RCData_LessThen() error {
 	t.state = State_RCData
 	t.tokens = append(t.tokens, NewTokenCharacter('<'))
 
+	if err == io.EOF {
+		return nil
+	}
+
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#rcdata-end-tag-open-state
 func (t *Tokenizer) state_RCData_EndTagOpen() error {
 	char, err := t.consume()
-
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -810,6 +813,10 @@ func (t *Tokenizer) state_RCData_EndTagOpen() error {
 	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 	t.state = State_RCData
 
+	if err == io.EOF {
+		return nil
+	}
+
 	return t.reader.UnreadRune()
 }
 
@@ -817,7 +824,7 @@ func (t *Tokenizer) state_RCData_EndTagOpen() error {
 func (t *Tokenizer) state_RCData_EndTagName() error {
 	char, err := t.consume()
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -863,6 +870,11 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 	}
 
 	t.state = State_RCData
+
+	if err == io.EOF {
+		return nil
+	}
+
 	return t.reader.UnreadRune()
 }
 
@@ -874,7 +886,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 func (t *Tokenizer) state_RawText_LessThenSign() error {
 	char, err := t.consume()
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -887,6 +899,9 @@ func (t *Tokenizer) state_RawText_LessThenSign() error {
 	t.tokens = append(t.tokens, NewTokenCharacter('<'))
 	t.state = State_RawText
 
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -894,7 +909,7 @@ func (t *Tokenizer) state_RawText_LessThenSign() error {
 func (t *Tokenizer) state_RawText_EndTagOpen() error {
 	char, err := t.consume()
 
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -908,6 +923,9 @@ func (t *Tokenizer) state_RawText_EndTagOpen() error {
 	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 	t.state = State_RawText
 
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -915,31 +933,25 @@ func (t *Tokenizer) state_RawText_EndTagOpen() error {
 func (t *Tokenizer) state_RawText_EndTagName() error {
 	char, err := t.consume()
 
-	if err != nil {
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+		t.state = state_BeforeAttributeName
 		return nil
 	}
 
-	if IsWhitespace(char) {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_BeforeAttributeName
-			return nil
-		}
+	if char == '/' && t.hasApproriateEndTagToken() {
+		t.state = state_SelfClosingStartTag
+		return nil
 	}
 
-	if char == '/' {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_SelfClosingStartTag
-			return nil
-		}
-	}
-
-	if char == '>' {
-		if t.hasApproriateEndTagToken() {
-			t.state = State_Data
-			t.reader.Forget()
-			t.emitCurrentWithTokens()
-			return nil
-		}
+	if char == '>' && t.hasApproriateEndTagToken() {
+		t.state = State_Data
+		t.reader.Forget()
+		t.emitCurrentWithTokens()
+		return nil
 	}
 
 	if unicode.IsLetter(char) {
@@ -964,6 +976,9 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 	}
 
 	t.state = State_RawText
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -973,7 +988,7 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 // https://html.spec.whatwg.org/#script-data-less-than-sign-state
 func (t *Tokenizer) state_ScriptData_LessThanSign() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -989,6 +1004,9 @@ func (t *Tokenizer) state_ScriptData_LessThanSign() error {
 	default:
 		t.tokens = append(t.tokens, NewTokenCharacter('<'))
 		t.state = State_ScriptData
+		if err == io.EOF {
+			return nil
+		}
 		return t.reader.UnreadRune()
 	}
 
@@ -997,7 +1015,7 @@ func (t *Tokenizer) state_ScriptData_LessThanSign() error {
 // https://html.spec.whatwg.org/#script-data-end-tag-open-state
 func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err == io.EOF {
 		return nil
 	}
 
@@ -1010,37 +1028,35 @@ func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
 	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 	t.state = State_ScriptData
 
+	if err == io.EOF {
+		return nil
+	}
+
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-end-tag-name-state
 func (t *Tokenizer) state_ScriptData_EndTagName() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
-	if IsWhitespace(char) {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_BeforeAttributeName
-			return nil
-		}
+	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+		t.state = state_BeforeAttributeName
+		return nil
 	}
 
-	if char == '/' {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_SelfClosingStartTag
-			return nil
-		}
+	if char == '/' && t.hasApproriateEndTagToken() {
+		t.state = state_SelfClosingStartTag
+		return nil
 	}
 
-	if char == '>' {
-		if t.hasApproriateEndTagToken() {
-			t.state = State_Data
-			t.emitCurrentWithTokens()
-			t.reader.Forget()
-			return nil
-		}
+	if char == '>' && t.hasApproriateEndTagToken() {
+		t.state = State_Data
+		t.emitCurrentWithTokens()
+		t.reader.Forget()
+		return nil
 	}
 
 	if unicode.IsLetter(char) {
@@ -1065,13 +1081,16 @@ func (t *Tokenizer) state_ScriptData_EndTagName() error {
 	}
 
 	t.state = State_ScriptData
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-escape-start-state
 func (t *Tokenizer) state_ScriptData_Escape_Start() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
@@ -1082,13 +1101,16 @@ func (t *Tokenizer) state_ScriptData_Escape_Start() error {
 	}
 
 	t.state = State_ScriptData
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-escape-start-dash-state
 func (t *Tokenizer) state_ScriptData_Escape_StartDash() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
@@ -1099,6 +1121,9 @@ func (t *Tokenizer) state_ScriptData_Escape_StartDash() error {
 	}
 
 	t.state = State_ScriptData
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -1199,7 +1224,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_DashDash() error {
 // https://html.spec.whatwg.org/#script-data-escaped-less-than-sign-state
 func (t *Tokenizer) state_ScriptData_Escaped_LessThanSign() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -1218,13 +1243,16 @@ func (t *Tokenizer) state_ScriptData_Escaped_LessThanSign() error {
 
 	t.tokens = append(t.tokens, NewTokenCharacter('<'))
 	t.state = state_ScriptData_Escaped
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-end-tag-open-state
 func (t *Tokenizer) state_ScriptData_Escaped_EndTagOpen() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
@@ -1236,37 +1264,33 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagOpen() error {
 
 	t.tokens = append(t.tokens, NewTokenCharacter('<'), NewTokenCharacter('/'))
 	t.state = state_ScriptData_Escaped
-
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-escaped-end-tag-name-state
 func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
-	if IsWhitespace(char) {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_BeforeAttributeName
-			return nil
-		}
+	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+		t.state = state_BeforeAttributeName
+		return nil
 	}
 
-	if char == '/' {
-		if t.hasApproriateEndTagToken() {
-			t.state = state_SelfClosingStartTag
-			return nil
-		}
+	if char == '/' && t.hasApproriateEndTagToken() {
+		t.state = state_SelfClosingStartTag
+		return nil
 	}
 
-	if char == '>' {
-		if t.hasApproriateEndTagToken() {
-			t.state = State_Data
-			t.emitCurrentWithTokens()
-			return nil
-		}
+	if char == '>' && t.hasApproriateEndTagToken() {
+		t.state = State_Data
+		t.emitCurrentWithTokens()
+		return nil
 	}
 
 	if unicode.IsLetter(char) {
@@ -1292,13 +1316,16 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 	}
 
 	t.state = state_ScriptData_Escaped
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escape-start-state
 func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
@@ -1325,6 +1352,9 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 	}
 
 	t.state = state_ScriptData_Escaped
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -1428,7 +1458,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedDashDash() error {
 // https://html.spec.whatwg.org/#script-data-double-escaped-less-than-sign-state
 func (t *Tokenizer) state_ScriptData_DoubleEscaped_LessThanSign() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
@@ -1441,13 +1471,16 @@ func (t *Tokenizer) state_ScriptData_DoubleEscaped_LessThanSign() error {
 	}
 
 	t.state = state_ScriptData_DoubleEscaped
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#script-data-double-escape-end-state
 func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
@@ -1476,6 +1509,9 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 	}
 
 	t.state = state_ScriptData_DoubleEscaped
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -1493,6 +1529,9 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 
 	if isEOF || char == '/' || char == '>' {
 		t.state = state_AfterAttributeName
+		if isEOF {
+			return nil // can not unread eof
+		}
 		return t.reader.UnreadRune()
 	}
 
@@ -2034,7 +2073,7 @@ func (t *Tokenizer) state_Comment_LessThanSign() error {
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-state
 func (t *Tokenizer) state_Comment_LessThanSign_Bang() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -2044,13 +2083,17 @@ func (t *Tokenizer) state_Comment_LessThanSign_Bang() error {
 	}
 
 	t.state = state_Comment
+
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#comment-less-than-sign-bang-dash-state
 func (t *Tokenizer) state_Comment_LessThanSign_BangDash() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -2060,6 +2103,9 @@ func (t *Tokenizer) state_Comment_LessThanSign_BangDash() error {
 	}
 
 	t.state = state_CommentEndDash
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -3001,7 +3047,7 @@ func (t *Tokenizer) state_CDATA_Section() error {
 // https://html.spec.whatwg.org/#cdata-section-bracket-state
 func (t *Tokenizer) state_CDATA_SectionBracket() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -3012,14 +3058,16 @@ func (t *Tokenizer) state_CDATA_SectionBracket() error {
 
 	t.tokens = append(t.tokens, NewTokenCharacter(']'))
 	t.state = state_CDATA_Section
-
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
 // https://html.spec.whatwg.org/#cdata-section-end-state
 func (t *Tokenizer) state_CDATA_SectionEnd() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -3036,7 +3084,9 @@ func (t *Tokenizer) state_CDATA_SectionEnd() error {
 
 	t.tokens = append(t.tokens, NewTokenCharacter(']'), NewTokenCharacter(']'))
 	t.state = state_CDATA_Section
-
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
@@ -3119,7 +3169,7 @@ func (t *Tokenizer) state_NamedCharacterReference() error {
 // https://html.spec.whatwg.org/#ambiguous-ampersand-state
 func (t *Tokenizer) state_AmbiguousAmpersand() error {
 	char, err := t.consume()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -3138,6 +3188,9 @@ func (t *Tokenizer) state_AmbiguousAmpersand() error {
 	}
 
 	t.state = t.rstate
+	if err == io.EOF {
+		return nil
+	}
 	return t.reader.UnreadRune()
 }
 
