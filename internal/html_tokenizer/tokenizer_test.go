@@ -73,13 +73,9 @@ func TestTokenizer(t *testing.T) {
 func loadTestCases(t *testing.T) map[string][]testCase {
 	t.Helper()
 
-	values, isSet := os.LookupEnv("TEST_HTML_TOKENIZER_SUBSET")
+	values, _ := os.LookupEnv("TEST_HTML_TOKENIZER_SUBSET")
 	allowed := strings.Split(values, ",")
 	useSubset := values != "" && len(allowed) != 0
-
-	if isSet && !useSubset {
-		t.Fatalf("no subset of tests where set!")
-	}
 
 	if useSubset {
 		t.Logf("using test subtest: %s", values)
