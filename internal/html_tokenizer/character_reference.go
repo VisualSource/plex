@@ -10,14 +10,14 @@ import (
 
 type characterReferences struct {
 	K [][]rune
-	V []int
+	V [][]int
 }
 
 //go:embed character_reference.bin
 var characterReferencesRaw []byte
 var characterReferenceTrie = createCharacterReferenceTrie()
 
-func createCharacterReferenceTrie() trie.Tree[rune, int] {
+func createCharacterReferenceTrie() trie.Tree[rune, []int] {
 	dec := gob.NewDecoder(bytes.NewReader(characterReferencesRaw))
 
 	var data characterReferences
@@ -29,12 +29,12 @@ func createCharacterReferenceTrie() trie.Tree[rune, int] {
 }
 
 // use a trie and longest match to find an match
-// else return a -1 if no value was found
-func getCharacterReference(buffer *[]rune) (int, int) {
+// else returns nil if no value was found
+func getCharacterReference(buffer *[]rune) ([]int, int) {
 	trie := characterReferenceTrie
 
-	var matchedCodepoint int = -1
-	var size int = -1
+	var matchedCodepoint []int = nil
+	var size int = -1 // number of chars used to find ref
 	for idx, char := range *buffer {
 		if trie = trie.TraceOne(char); trie == nil {
 			break

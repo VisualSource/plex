@@ -37,12 +37,12 @@ func main() {
 
 	var output struct {
 		K [][]rune
-		V []int
+		V [][]int
 	}
 	for key, value := range references {
 		v, _ := strings.CutPrefix(key, "&")
 		output.K = append(output.K, []rune(v))
-		output.V = append(output.V, value.Codepoints[0])
+		output.V = append(output.V, value.Codepoints)
 	}
 
 	outputPath := filepath.Join(gp, "internal/html_tokenizer/character_reference.bin")
