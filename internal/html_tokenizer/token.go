@@ -4,6 +4,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/MadAppGang/dingo/pkg/dgo"
+	"github.com/VisualSource/plex/internal/utils"
 )
 
 type AttributesMap map[string]string
@@ -32,12 +33,21 @@ type TokenTag struct {
 	t           TokenTagType
 	name        string
 	attrs       AttributesMap
-	selfClosing dgo.Option[bool]
+	selfClosing utils.BoolOption
 }
 
 func (TokenTag) isToken() {}
-func NewTokenTag(name string, tokenType TokenTagType, selfClosing dgo.Option[bool]) Token {
-	return &TokenTag{name: name, attrs: make(AttributesMap), t: tokenType, selfClosing: selfClosing}
+func NewTokenTag(
+	name string,
+	tokenType TokenTagType,
+	selfClosing utils.BoolOption,
+) Token {
+	return &TokenTag{
+		name:        name,
+		attrs:       make(AttributesMap),
+		t:           tokenType,
+		selfClosing: selfClosing,
+	}
 }
 
 type TokenComment struct{ Value string }
@@ -53,8 +63,18 @@ type TokenDOCTYPE struct {
 }
 
 func (TokenDOCTYPE) isToken() {}
-func NewTokenDOCTYPE(name dgo.Option[string], publicIdentifier dgo.Option[string], systemIdentifier dgo.Option[string], forceQuirks bool) Token {
-	return &TokenDOCTYPE{name: name, publicIdentifier: publicIdentifier, systemIdentifier: systemIdentifier, forceQuirks: forceQuirks}
+func NewTokenDOCTYPE(
+	name dgo.Option[string],
+	publicIdentifier dgo.Option[string],
+	systemIdentifier dgo.Option[string],
+	forceQuirks bool,
+) Token {
+	return &TokenDOCTYPE{
+		name,
+		publicIdentifier,
+		systemIdentifier,
+		forceQuirks,
+	}
 }
 
 func NewReplacementToken() Token {

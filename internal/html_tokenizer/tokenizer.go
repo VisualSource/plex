@@ -136,7 +136,7 @@ type Tokenizer struct {
 	characterReferenceCode int
 	tempbuffer             strings.Builder
 	workingToken           Token
-	lastStartTag           dgo.Option[string]
+	lastStartTag           utils.StringOption
 	errors                 []TokenizerError
 
 	workingAttrName  strings.Builder
@@ -148,7 +148,7 @@ func NewTokenizer(stream io.Reader) *Tokenizer {
 		reader:       runeio.NewReader(stream),
 		state:        State_Data,
 		rstate:       state_Unset,
-		lastStartTag: dgo.None[string](),
+		lastStartTag: utils.None[string](),
 	}
 }
 
@@ -470,7 +470,7 @@ func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
 			}
 
 		case TokenStartTag:
-			t.lastStartTag = dgo.Some(tag.name)
+			t.lastStartTag.Set(tag.name)
 		}
 	}
 
@@ -492,7 +492,7 @@ func (t *Tokenizer) hasApproriateEndTagToken() bool {
 		return false
 	}
 
-	return t.lastStartTag.MustSome() == tag.name
+	return t.lastStartTag.Is(tag.name)
 }
 
 //#endregion
@@ -670,7 +670,7 @@ func (t *Tokenizer) state_TagOpen() error {
 
 	if unicode.IsLetter(char) {
 		t.state = state_TagName
-		t.workingToken = NewTokenTag("", TokenStartTag, dgo.None[bool]())
+		t.workingToken = NewTokenTag("", TokenStartTag, utils.None[bool]())
 		return t.reader.UnreadRune()
 	}
 
@@ -701,7 +701,7 @@ func (t *Tokenizer) state_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
+		t.workingToken = NewTokenTag("", TokenEndTag, utils.None[bool]())
 		t.state = state_TagName
 		return t.reader.UnreadRune()
 	}
@@ -807,7 +807,7 @@ func (t *Tokenizer) state_RCData_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
+		t.workingToken = NewTokenTag("", TokenEndTag, utils.None[bool]())
 
 		t.state = state_RCData_EndTagName
 		return t.reader.UnreadRune()
@@ -917,7 +917,7 @@ func (t *Tokenizer) state_RawText_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
+		t.workingToken = NewTokenTag("", TokenEndTag, utils.None[bool]())
 		t.state = state_RawText_EndTagName
 
 		return t.reader.UnreadRune()
@@ -1023,7 +1023,7 @@ func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
+		t.workingToken = NewTokenTag("", TokenEndTag, utils.None[bool]())
 		t.state = state_ScriptData_EndTagName
 		return t.reader.UnreadRune()
 	}
@@ -1260,7 +1260,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagOpen() error {
 	}
 
 	if unicode.IsLetter(char) {
-		t.workingToken = NewTokenTag("", TokenEndTag, dgo.None[bool]())
+		t.workingToken = NewTokenTag("", TokenEndTag, utils.None[bool]())
 		t.state = state_ScriptData_EscapedEndTagName
 		return t.reader.UnreadRune()
 	}
@@ -1848,7 +1848,7 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 
 	if char == '>' {
 		if tag, ok := t.workingToken.(*TokenTag); ok {
-			tag.selfClosing = dgo.Some(true)
+			tag.selfClosing.Set(true)
 		}
 		t.state = State_Data
 		t.reader.Forget()

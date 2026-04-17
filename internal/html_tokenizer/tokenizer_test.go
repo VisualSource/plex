@@ -45,7 +45,7 @@ func TestTokenizer(t *testing.T) {
 						tok.SetState(iState)
 
 						if tt.LastStartTag != "" {
-							tok.lastStartTag = dgo.Some(tt.LastStartTag)
+							tok.lastStartTag.Set(tt.LastStartTag)
 						}
 
 						validate(t, tok, &tt)
@@ -61,7 +61,7 @@ func TestTokenizer(t *testing.T) {
 				tok := NewTokenizer(input)
 
 				if tt.LastStartTag != "" {
-					tok.lastStartTag = dgo.Some(tt.LastStartTag)
+					tok.lastStartTag.Set(tt.LastStartTag)
 				}
 
 				validate(t, tok, &tt)
@@ -237,8 +237,8 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 						}
 					}
 
-					if len(arg) == 4 && arg[3].(bool) != *tag.selfClosing.Some {
-						t.Fatalf("was expecting self closing flag to be '%#v' but was given '%#v'", arg[3], tag.selfClosing.Some)
+					if len(arg) == 4 && !tag.selfClosing.Is(arg[3].(bool)) {
+						t.Fatalf("was expecting self closing flag to be '%#v' but was given '%#v'", arg[3], tag.selfClosing.Value)
 					}
 				} else {
 					t.Fatalf("was expecting an start tag but got '%#v'", token)
