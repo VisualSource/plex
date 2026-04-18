@@ -1,0 +1,96 @@
+package html_parser
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/VisualSource/plex/internal/dom"
+)
+
+type testCase struct {
+	data             string
+	errors           []any
+	newErrors        []any
+	documentFragment any
+	scriptOff        any
+	document         any
+}
+
+func TestHtmlParser(t *testing.T) {
+	files := loadTestCases(t)
+
+	for filename, tests := range files {
+
+		for idx, tt := range tests {
+			testname := fmt.Sprintf("[%s]: test %d", filename, idx)
+
+			input := strings.NewReader(tt.data)
+			t.Run(testname, func(t *testing.T) {
+				parser := NewHtmlParser(input)
+				document, err := parser.Parse()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				validateTest(t, document, parser, &tt)
+			})
+		}
+	}
+}
+
+func loadTestCases(t *testing.T) map[string][]testCase {
+	t.Helper()
+
+	testSubset, _ := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
+	wantTestSubset := strings.Split(testSubset, ",")
+	useSubset := testSubset != "" && len(wantTestSubset) != 0
+
+	paths, err := filepath.Glob(filepath.Join("testdata", "*.test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := make(map[string][]testCase)
+
+	for _, path := range paths {
+		_, filename := filepath.Split(path)
+		testname := filename[:len(filename)-len(filepath.Ext(path))]
+
+		if useSubset && !slices.Contains(wantTestSubset, testname) {
+			t.Logf("ignore test file '%s'", testname)
+			continue
+		}
+
+		t.Logf("using test file '%s'", testname)
+
+		file, err := os.Open(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer file.Close()
+
+		scanner := bufio.NewScanner(file)
+		scanner.Split(bufio.ScanLines)
+
+		testCases := make([]testCase, 0)
+
+		currentTestCase := testCase{}
+		for scanner.Scan() {
+			line := scanner.Text()
+
+		}
+
+		tests[testname] = testCases
+	}
+
+	return tests
+}
+
+func validateTest(t *testing.T, doc *dom.Document, parser *HtmlParser, test *testCase) {
+	t.Helper()
+}

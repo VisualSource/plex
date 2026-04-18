@@ -229,8 +229,12 @@ func (t *Tokenizer) ReconsumeToken(token Token) {
 	t.tokens = slices.Insert(t.tokens, 0, token)
 }
 
+func (t *Tokenizer) HasEmittedTokens() bool {
+	return len(t.tokens) != 0
+}
+
 func (t *Tokenizer) ConsumeToken() Token {
-	if len(t.tokens) == 0 {
+	if !t.HasEmittedTokens() {
 		return nil
 	}
 
