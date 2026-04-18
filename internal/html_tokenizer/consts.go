@@ -1,0 +1,105 @@
+package html_tokenizer
+
+type TokenizerState int
+
+const (
+	state_Unset TokenizerState = iota
+	State_Data
+	State_RCData
+	State_RawText
+	State_ScriptData
+	State_PlainText
+
+	state_TagOpen
+	state_EndTagOpen
+	state_TagName
+
+	state_RCData_LessThanSign
+	state_RCData_EndTagOpen
+	state_RCData_EndTagName
+
+	state_RawText_LessThanSign
+	state_RawText_EndTagOpen
+	state_RawText_EndTagName
+
+	state_ScriptData_LessThanSign
+	state_ScriptData_EndTagOpen
+	state_ScriptData_EndTagName
+	state_ScriptData_EscapeStart
+	state_ScriptData_EscapeStartDash
+
+	state_ScriptData_Escaped
+	state_ScriptData_EscapedDash
+	state_ScriptData_EscapedDashDash
+	state_ScriptData_EscapedLessThanSign
+	state_ScriptData_EscapedEndTagOpen
+	state_ScriptData_EscapedEndTagName
+
+	state_ScriptData_DoubleEscapedStart
+	state_ScriptData_DoubleEscaped
+	state_ScriptData_DoubleEscapedDash
+	state_ScriptData_DoubleEscapedDashDash
+	state_ScriptData_DoubleEscapedLessThanSign
+	state_ScriptData_DoubleEscapeEnd
+
+	state_BeforeAttributeName
+	state_AttributeName
+	state_AfterAttributeName
+
+	state_BeforeAttributeValue
+	state_AttributValue_DoubleQuoted
+	state_AttributValue_SingleQuoted
+	state_AttributValue_Unquoted
+	state_AfterAttributeValue_Quoted
+
+	state_SelfClosingStartTag
+	state_BogusComment
+	state_MarkupDeclarationOpen
+
+	state_CommentStart
+	state_CommentStartDash
+	state_Comment
+	state_CommentLessThanSign
+	state_CommentLessThanSignBang
+	state_CommentLessThanSignBangDash
+	state_CommentLessThanSignBangDashDash
+	state_CommentEndDash
+	state_CommentEnd
+	state_CommentEndBang
+
+	state_DOCTYPE
+	state_BeforeDOCTYPEName
+	state_DOCTYPE_Name
+	state_AfterDOCTYPE_Name
+
+	state_AfterDOCTYPE_PublicKeyword
+	state_BeforeDOCTYPE_PublicIdentifier
+	state_DOCTYPE_PublicIdentifier_DoubleQuoted
+	state_DOCTYPE_PublicIdentifier_SingleQuoted
+	state_AfterDOCTYPE_PublicIdentifier
+
+	state_BetweenDOCTYPE_PublicAndSystemIdentifiers
+
+	state_AfterDOCTYPE_SystemKeyword
+	state_BeforeDOCTYPE_SystemIdentifer
+	state_DOCTYPE_SystemIdentifier_DoubleQuoted
+	state_DOCTYPE_SystemIdentifier_SingleQuoted
+	state_AfterDOCTYPE_SystemIdentifier
+
+	state_BogusDOCTYPE
+
+	state_CDATA_Section
+	state_CDATA_SectionBracket
+	state_CDATA_SectionEnd
+
+	state_CharacterReference
+	state_NamedCharacterReference
+	state_AmbiguousAmpersand
+
+	state_NumericCharacterReference
+	state_HexadecimalCharacterReferenceStart
+	state_DecimalCharacterReferenceStart
+	state_HexadecimalCharacterReference
+	state_DecimalCharacterReference
+	state_NumericCharacterReferenceEnd
+)

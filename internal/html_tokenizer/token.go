@@ -3,7 +3,6 @@ package html_tokenizer
 import (
 	"unicode/utf8"
 
-	"github.com/MadAppGang/dingo/pkg/dgo"
 	"github.com/VisualSource/plex/internal/utils"
 )
 
@@ -56,17 +55,17 @@ func (TokenComment) isToken()            {}
 func NewTokenComment(value string) Token { return &TokenComment{Value: value} }
 
 type TokenDOCTYPE struct {
-	name             dgo.Option[string]
-	publicIdentifier dgo.Option[string]
-	systemIdentifier dgo.Option[string]
+	name             utils.StringOption
+	publicIdentifier utils.StringOption
+	systemIdentifier utils.StringOption
 	forceQuirks      bool
 }
 
 func (TokenDOCTYPE) isToken() {}
 func NewTokenDOCTYPE(
-	name dgo.Option[string],
-	publicIdentifier dgo.Option[string],
-	systemIdentifier dgo.Option[string],
+	name utils.StringOption,
+	publicIdentifier utils.StringOption,
+	systemIdentifier utils.StringOption,
 	forceQuirks bool,
 ) Token {
 	return &TokenDOCTYPE{

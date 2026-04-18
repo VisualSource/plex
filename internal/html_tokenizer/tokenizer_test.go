@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/MadAppGang/dingo/pkg/dgo"
+	"github.com/VisualSource/plex/internal/utils"
 	"github.com/kr/pretty"
 )
 
@@ -168,10 +168,10 @@ func resolveEncoding(input string, isDoubleEscaped bool) string {
 	return r
 }
 
-func testOptStr(expected any, value dgo.Option[string], name string, isDoubleEscaped bool, t *testing.T) {
+func testOptStr(expected any, value utils.Option[string], name string, isDoubleEscaped bool, t *testing.T) {
 	if expected == nil {
-		if value.Some != nil {
-			t.Fatalf("was expecting DOCTYPE prop %s to be nil but got: '%s'", name, *value.Some)
+		if value.IsSome() {
+			t.Fatalf("was expecting DOCTYPE prop %s to be nil but got: '%s'", name, *value.Value)
 		}
 		return
 	}
@@ -182,8 +182,8 @@ func testOptStr(expected any, value dgo.Option[string], name string, isDoubleEsc
 		t.Fatalf("DOCTYPE prop %s was expected to contain value '%s' but is nil", name, expected)
 	}
 
-	if resolveEncoding(exValue, isDoubleEscaped) != *value.Some {
-		t.Fatalf("was expecting prop %s to have value '%s' but got '%s'", name, exValue, *value.Some)
+	if resolveEncoding(exValue, isDoubleEscaped) != *value.Value {
+		t.Fatalf("was expecting prop %s to have value '%s' but got '%s'", name, exValue, *value.Value)
 	}
 }
 

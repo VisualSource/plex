@@ -8,124 +8,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/MadAppGang/dingo/pkg/dgo"
 	"github.com/VisualSource/plex/internal/runeio"
 	"github.com/VisualSource/plex/internal/utils"
 )
-
-type TokenizerState int
-
-const (
-	state_Unset TokenizerState = iota
-	State_Data
-	State_RCData
-	State_RawText
-	State_ScriptData
-	State_PlainText
-
-	state_TagOpen
-	state_EndTagOpen
-	state_TagName
-
-	state_RCData_LessThanSign
-	state_RCData_EndTagOpen
-	state_RCData_EndTagName
-
-	state_RawText_LessThanSign
-	state_RawText_EndTagOpen
-	state_RawText_EndTagName
-
-	state_ScriptData_LessThanSign
-	state_ScriptData_EndTagOpen
-	state_ScriptData_EndTagName
-	state_ScriptData_EscapeStart
-	state_ScriptData_EscapeStartDash
-
-	state_ScriptData_Escaped
-	state_ScriptData_EscapedDash
-	state_ScriptData_EscapedDashDash
-	state_ScriptData_EscapedLessThanSign
-	state_ScriptData_EscapedEndTagOpen
-	state_ScriptData_EscapedEndTagName
-
-	state_ScriptData_DoubleEscapedStart
-	state_ScriptData_DoubleEscaped
-	state_ScriptData_DoubleEscapedDash
-	state_ScriptData_DoubleEscapedDashDash
-	state_ScriptData_DoubleEscapedLessThanSign
-	state_ScriptData_DoubleEscapeEnd
-
-	state_BeforeAttributeName
-	state_AttributeName
-	state_AfterAttributeName
-
-	state_BeforeAttributeValue
-	state_AttributValue_DoubleQuoted
-	state_AttributValue_SingleQuoted
-	state_AttributValue_Unquoted
-	state_AfterAttributeValue_Quoted
-
-	state_SelfClosingStartTag
-	state_BogusComment
-	state_MarkupDeclarationOpen
-
-	state_CommentStart
-	state_CommentStartDash
-	state_Comment
-	state_CommentLessThanSign
-	state_CommentLessThanSignBang
-	state_CommentLessThanSignBangDash
-	state_CommentLessThanSignBangDashDash
-	state_CommentEndDash
-	state_CommentEnd
-	state_CommentEndBang
-
-	state_DOCTYPE
-	state_BeforeDOCTYPEName
-	state_DOCTYPE_Name
-	state_AfterDOCTYPE_Name
-
-	state_AfterDOCTYPE_PublicKeyword
-	state_BeforeDOCTYPE_PublicIdentifier
-	state_DOCTYPE_PublicIdentifier_DoubleQuoted
-	state_DOCTYPE_PublicIdentifier_SingleQuoted
-	state_AfterDOCTYPE_PublicIdentifier
-
-	state_BetweenDOCTYPE_PublicAndSystemIdentifiers
-
-	state_AfterDOCTYPE_SystemKeyword
-	state_BeforeDOCTYPE_SystemIdentifer
-	state_DOCTYPE_SystemIdentifier_DoubleQuoted
-	state_DOCTYPE_SystemIdentifier_SingleQuoted
-	state_AfterDOCTYPE_SystemIdentifier
-
-	state_BogusDOCTYPE
-
-	state_CDATA_Section
-	state_CDATA_SectionBracket
-	state_CDATA_SectionEnd
-
-	state_CharacterReference
-	state_NamedCharacterReference
-	state_AmbiguousAmpersand
-
-	state_NumericCharacterReference
-	state_HexadecimalCharacterReferenceStart
-	state_DecimalCharacterReferenceStart
-	state_HexadecimalCharacterReference
-	state_DecimalCharacterReference
-	state_NumericCharacterReferenceEnd
-)
-
-var NONCHARACTER_CODEPOINTS = []int{
-	0xFFFE, 0xFFFF, 0x1FFFE, 0x1FFFF, 0x2FFFE,
-	0x2FFFF, 0x3FFFE, 0x3FFFF, 0x4FFFE, 0x4FFFF,
-	0x5FFFE, 0x5FFFF, 0x6FFFE, 0x6FFFF, 0x7FFFE,
-	0x7FFFF, 0x8FFFE, 0x8FFFF, 0x9FFFE, 0x9FFFF,
-	0xAFFFE, 0xAFFFF, 0xBFFFE, 0xBFFFF, 0xCFFFE,
-	0xCFFFF, 0xDFFFE, 0xDFFFF, 0xEFFFE, 0xEFFFF,
-	0xFFFFE, 0xFFFFF, 0x10FFFE, 0x10FFFF,
-}
 
 // https://html.spec.whatwg.org/#tokenization
 type Tokenizer struct {
@@ -150,25 +35,6 @@ func NewTokenizer(stream io.Reader) *Tokenizer {
 		rstate:       state_Unset,
 		lastStartTag: utils.None[string](),
 	}
-}
-
-func isNonCharacterCodepoint(v int) bool {
-	return v >= 0xFDD0 && v <= 0xFDEF || slices.Contains(NONCHARACTER_CODEPOINTS, v)
-}
-
-func isSurrogate(v int) bool {
-	r := (v >= 0xD800 && v <= 0xDBFF) ||
-		(v >= 0xDC00 && v <= 0xDFFF)
-
-	return r
-}
-
-func IsWhitespace(r rune) bool {
-	switch r {
-	case '\t', '\n', '\f', ' ':
-		return true
-	}
-	return false
 }
 
 func (t *Tokenizer) Next() error {
@@ -412,7 +278,7 @@ func (t *Tokenizer) consume() (rune, error) {
 	}
 
 	if rune != '\r' {
-		if unicode.IsControl(rune) && !(IsWhitespace(rune) || rune == '\u0000') {
+		if unicode.IsControl(rune) && !(isWhitespace(rune) || rune == '\u0000') {
 			t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
 		}
 		if isNonCharacterCodepoint(int(rune)) {
@@ -731,7 +597,7 @@ func (t *Tokenizer) state_TagName() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -831,7 +697,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 		return err
 	}
 
-	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+	if isWhitespace(char) && t.hasApproriateEndTagToken() {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -940,7 +806,7 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 		return err
 	}
 
-	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+	if isWhitespace(char) && t.hasApproriateEndTagToken() {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -1045,7 +911,7 @@ func (t *Tokenizer) state_ScriptData_EndTagName() error {
 		return nil
 	}
 
-	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+	if isWhitespace(char) && t.hasApproriateEndTagToken() {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -1280,7 +1146,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 		return nil
 	}
 
-	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
+	if isWhitespace(char) && t.hasApproriateEndTagToken() {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -1332,7 +1198,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 		return nil
 	}
 
-	if IsWhitespace(char) || char == '/' || char == '>' {
+	if isWhitespace(char) || char == '/' || char == '>' {
 		if t.tempbuffer.String() == "script" {
 			t.state = state_ScriptData_DoubleEscaped
 		} else {
@@ -1487,7 +1353,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 		return nil
 	}
 
-	if IsWhitespace(char) || char == '/' || char == '>' {
+	if isWhitespace(char) || char == '/' || char == '>' {
 		if t.tempbuffer.String() == "script" {
 			t.state = state_ScriptData_Escaped
 		} else {
@@ -1538,7 +1404,7 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 		return t.reader.UnreadRune()
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
@@ -1570,7 +1436,7 @@ func (t *Tokenizer) state_AttributeName() error {
 		return err
 	}
 
-	if isEOF || IsWhitespace(char) || char == '/' || char == '>' {
+	if isEOF || isWhitespace(char) || char == '/' || char == '>' {
 		t.state = state_AfterAttributeName
 
 		if isEOF {
@@ -1617,7 +1483,7 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
@@ -1653,7 +1519,7 @@ func (t *Tokenizer) state_BeforeAttributeValue() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
@@ -1763,7 +1629,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -1809,7 +1675,7 @@ func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -2242,14 +2108,14 @@ func (t *Tokenizer) state_DOCTYPE() error {
 	if err != nil {
 		if err == io.EOF {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
-			tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
+			tag := NewTokenDOCTYPE(utils.None[string](), utils.None[string](), utils.None[string](), true)
 			t.emitCurrentWithTokens(tag, NewTokenEOF())
 			return err
 		}
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		t.state = state_BeforeDOCTYPEName
 		return nil
 	}
@@ -2270,32 +2136,32 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 	if err != nil {
 		if err == io.EOF {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInDoctype, -1, -1))
-			tag := NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
+			tag := NewTokenDOCTYPE(utils.None[string](), utils.None[string](), utils.None[string](), true)
 			t.emitCurrentWithTokens(tag, NewTokenEOF())
 		}
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
-		t.workingToken = NewTokenDOCTYPE(dgo.Some(string(unicode.ToLower(char))), dgo.None[string](), dgo.None[string](), false)
+		t.workingToken = NewTokenDOCTYPE(utils.Some(string(unicode.ToLower(char))), utils.None[string](), utils.None[string](), false)
 		t.state = state_DOCTYPE_Name
 		return nil
 	}
 
 	if char == '\u0000' {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
-		t.workingToken = NewTokenDOCTYPE(dgo.Some(string(utf8.RuneError)), dgo.None[string](), dgo.None[string](), false)
+		t.workingToken = NewTokenDOCTYPE(utils.Some(string(utf8.RuneError)), utils.None[string](), utils.None[string](), false)
 		t.state = state_DOCTYPE_Name
 		return nil
 	}
 
 	if char == '>' {
 		t.errors = append(t.errors, NewTokenizerError(ErrMissingDoctypeName, -1, -1))
-		t.workingToken = NewTokenDOCTYPE(dgo.None[string](), dgo.None[string](), dgo.None[string](), true)
+		t.workingToken = NewTokenDOCTYPE(utils.None[string](), utils.None[string](), utils.None[string](), true)
 		t.state = State_Data
 
 		t.reader.Forget()
@@ -2305,7 +2171,7 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 		return nil
 	}
 
-	t.workingToken = NewTokenDOCTYPE(dgo.Some(string(char)), dgo.None[string](), dgo.None[string](), false)
+	t.workingToken = NewTokenDOCTYPE(utils.Some(string(char)), utils.None[string](), utils.None[string](), false)
 	t.state = state_DOCTYPE_Name
 
 	return nil
@@ -2325,7 +2191,7 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		t.state = state_AfterDOCTYPE_Name
 		return nil
 	}
@@ -2342,7 +2208,7 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 	if unicode.IsLetter(char) && unicode.IsUpper(char) {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.name.IsSome() {
-				*tag.name.Some += string(unicode.ToLower(char))
+				*tag.name.Value += string(unicode.ToLower(char))
 			}
 		}
 		return nil
@@ -2352,14 +2218,14 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.name.IsSome() {
-				*tag.name.Some += string(utf8.RuneError)
+				*tag.name.Value += string(utf8.RuneError)
 			}
 		}
 		return nil
 	}
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.name.IsSome() {
-			*tag.name.Some += string(char)
+			*tag.name.Value += string(char)
 		}
 	}
 
@@ -2381,7 +2247,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
@@ -2447,7 +2313,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		t.state = state_BeforeDOCTYPE_PublicIdentifier
 		return nil
 	}
@@ -2456,7 +2322,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypePublicKeyword, -1, -1))
 		t.state = state_DOCTYPE_PublicIdentifier_DoubleQuoted
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.publicIdentifier = dgo.Some("")
+			tag.publicIdentifier = utils.Some("")
 		}
 		return nil
 	}
@@ -2465,7 +2331,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypePublicKeyword, -1, -1))
 		t.state = state_DOCTYPE_PublicIdentifier_SingleQuoted
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.publicIdentifier = dgo.Some("")
+			tag.publicIdentifier = utils.Some("")
 		}
 		return nil
 	}
@@ -2508,13 +2374,13 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
 	if char == '"' {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.publicIdentifier = dgo.Some("")
+			tag.publicIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_PublicIdentifier_DoubleQuoted
 		return nil
@@ -2522,7 +2388,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 
 	if char == '\'' {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.publicIdentifier = dgo.Some("")
+			tag.publicIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_PublicIdentifier_SingleQuoted
 		return nil
@@ -2571,7 +2437,7 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.publicIdentifier.IsSome() {
-				*tag.publicIdentifier.Some += string(utf8.RuneError)
+				*tag.publicIdentifier.Value += string(utf8.RuneError)
 			}
 		}
 		return nil
@@ -2589,7 +2455,7 @@ func (t *Tokenizer) state_DOCTYPE_PublicIdentifier_DoubleQuoted() error {
 	}
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.publicIdentifier.IsSome() {
-			*tag.publicIdentifier.Some += string(char)
+			*tag.publicIdentifier.Value += string(char)
 		}
 	}
 
@@ -2620,7 +2486,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.publicIdentifier.IsSome() {
-				*tag.publicIdentifier.Some += string(utf8.RuneError)
+				*tag.publicIdentifier.Value += string(utf8.RuneError)
 			}
 		}
 		return nil
@@ -2639,7 +2505,7 @@ func (t *Tokenizer) state_DOCKTYPE_PublicIdentifier_SingleQuoted() error {
 	}
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.publicIdentifier.IsSome() {
-			*tag.publicIdentifier.Some += string(char)
+			*tag.publicIdentifier.Value += string(char)
 		}
 	}
 
@@ -2661,7 +2527,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		t.state = state_BetweenDOCTYPE_PublicAndSystemIdentifiers
 		return nil
 	}
@@ -2676,7 +2542,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	if char == '"' {
 		t.errors = append(t.errors, NewTokenizerError(ErrNoWSBetweenDoctypePublicAndSystenIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
@@ -2685,7 +2551,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 	if char == '\'' {
 		t.errors = append(t.errors, NewTokenizerError(ErrNoWSBetweenDoctypePublicAndSystenIdentifier, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
@@ -2716,7 +2582,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
@@ -2729,7 +2595,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 
 	if char == '"' {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
@@ -2737,7 +2603,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 
 	if char == '\'' {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
@@ -2767,14 +2633,14 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
 	if char == '"' {
 		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypeSystemKeyword, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
@@ -2783,7 +2649,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 	if char == '\'' {
 		t.errors = append(t.errors, NewTokenizerError(ErrMissingWhitespaceAfterDoctypeSystemKeyword, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
@@ -2824,13 +2690,13 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
 	if char == '"' {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_DoubleQuoted
 		return nil
@@ -2838,7 +2704,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 
 	if char == '\'' {
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
-			tag.systemIdentifier = dgo.Some("")
+			tag.systemIdentifier = utils.Some("")
 		}
 		t.state = state_DOCTYPE_SystemIdentifier_SingleQuoted
 		return nil
@@ -2888,7 +2754,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.systemIdentifier.IsSome() {
-				*tag.systemIdentifier.Some += string(utf8.RuneError)
+				*tag.systemIdentifier.Value += string(utf8.RuneError)
 			}
 
 		}
@@ -2908,7 +2774,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_DoubleQuoted() error {
 
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.systemIdentifier.IsSome() {
-			*tag.systemIdentifier.Some += string(char)
+			*tag.systemIdentifier.Value += string(char)
 		}
 	}
 
@@ -2939,7 +2805,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrUnexpectedNullCharacter, -1, -1))
 		if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 			if tag.systemIdentifier.IsSome() {
-				*tag.systemIdentifier.Some += string(utf8.RuneError)
+				*tag.systemIdentifier.Value += string(utf8.RuneError)
 			}
 		}
 		return nil
@@ -2958,7 +2824,7 @@ func (t *Tokenizer) state_DOCTYPE_SystemIdentifier_SingleQuoted() error {
 
 	if tag, ok := t.workingToken.(*TokenDOCTYPE); ok {
 		if tag.systemIdentifier.IsSome() {
-			*tag.systemIdentifier.Some += string(char)
+			*tag.systemIdentifier.Value += string(char)
 		}
 	}
 
@@ -2980,7 +2846,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 		return err
 	}
 
-	if IsWhitespace(char) {
+	if isWhitespace(char) {
 		return nil
 	}
 
@@ -3388,7 +3254,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
 	if t.characterReferenceCode == 0x0D ||
 		(t.characterReferenceCode >= 0x0000 && t.characterReferenceCode <= 0x001F) ||
-		(t.characterReferenceCode >= 0x007F && t.characterReferenceCode <= 0x009F && !IsWhitespace(rune(t.characterReferenceCode))) {
+		(t.characterReferenceCode >= 0x007F && t.characterReferenceCode <= 0x009F && !isWhitespace(rune(t.characterReferenceCode))) {
 		t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterReference, -1, -1))
 		switch t.characterReferenceCode {
 		case 0x80:
