@@ -3386,7 +3386,9 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 		t.errors = append(t.errors, NewTokenizerError(ErrNoncharacterCharacterReference, -1, -1))
 	}
 
-	if t.characterReferenceCode == 0x0D || (t.characterReferenceCode >= 0x0000 && t.characterReferenceCode <= 0x001F) {
+	if t.characterReferenceCode == 0x0D ||
+		(t.characterReferenceCode >= 0x0000 && t.characterReferenceCode <= 0x001F) ||
+		(t.characterReferenceCode >= 0x007F && t.characterReferenceCode <= 0x009F && !IsWhitespace(rune(t.characterReferenceCode))) {
 		t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterReference, -1, -1))
 		switch t.characterReferenceCode {
 		case 0x80:

@@ -97,6 +97,8 @@ func loadTestCases(t *testing.T) map[string][]testCase {
 			continue
 		}
 
+		t.Logf("Using test file '%s'", testname)
+
 		source, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)
