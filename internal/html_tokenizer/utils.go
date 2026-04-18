@@ -1,6 +1,11 @@
 package html_tokenizer
 
-import "slices"
+import (
+	"math"
+	"slices"
+
+	"github.com/VisualSource/plex/internal/utils"
+)
 
 var NONCHARACTER_CODEPOINTS = []int{
 	0xFFFE, 0xFFFF, 0x1FFFE, 0x1FFFF, 0x2FFFE,
@@ -29,4 +34,33 @@ func isWhitespace(r rune) bool {
 		return true
 	}
 	return false
+}
+
+func wasConsumedAsPartOfAttribute(state TokenizerState) bool {
+	switch state {
+	case state_AttributValue_DoubleQuoted, state_AttributValue_SingleQuoted, state_AttributValue_Unquoted:
+		return true
+	default:
+		return false
+	}
+}
+
+// do to go's int (int32?) overflowing we need to do check if we are going to
+// overflow so that in the character reference end state we hit the right
+// conditions. max character ref is 0x10FFFF so a int should be more
+// then enough for are needs
+func addNumericDigit(char int, power int, refCode int) int {
+	mr, ok := utils.Mul(refCode, power)
+	if !ok {
+		// if mul overflows then there is not need to try add opt
+		// make sure that we will hit invalid ref checks
+		return math.MaxInt
+	}
+
+	ar, ok := utils.Add(mr, char)
+	if !ok {
+		return math.MaxInt
+	}
+
+	return ar
 }
