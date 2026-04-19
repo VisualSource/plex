@@ -14,18 +14,16 @@ import (
 
 type testCase struct {
 	data             string
-	errors           []any
-	newErrors        []any
-	documentFragment any
-	scriptOff        any
-	document         any
+	errors           []string
+	documentFragment string
+	scripting        bool
+	document         []string
 }
 
 func TestHtmlParser(t *testing.T) {
 	files := loadTestCases(t)
 
 	for filename, tests := range files {
-
 		for idx, tt := range tests {
 			testname := fmt.Sprintf("[%s]: test %d", filename, idx)
 
@@ -79,9 +77,55 @@ func loadTestCases(t *testing.T) map[string][]testCase {
 
 		testCases := make([]testCase, 0)
 
+		docLines := []string{}
+
 		currentTestCase := testCase{}
+		mode := 0
 		for scanner.Scan() {
 			line := scanner.Text()
+
+			switch line {
+			case "#data":
+				mode = 0
+				continue
+			case "#document":
+				mode = 1
+				continue
+			case "#errors", "#new-errors":
+				mode = 2
+				continue
+			case "#document-fragment":
+				mode = 3
+				continue
+			case "#script-off":
+				currentTestCase.scripting = false
+				continue
+			case "#script-on":
+				currentTestCase.scripting = true
+				continue
+			case "":
+				currentTestCase.document = docLines
+				testCases = append(testCases, currentTestCase)
+				currentTestCase = testCase{}
+				docLines = []string{}
+				mode = 0
+				continue
+			default:
+			}
+
+			switch mode {
+			case 0:
+				currentTestCase.data = line
+			case 1:
+				doc, found := strings.CutPrefix(line, "| ")
+				if found {
+					docLines = append(docLines, doc)
+				}
+			case 2:
+				currentTestCase.errors = append(currentTestCase.errors, line)
+			case 3:
+				currentTestCase.documentFragment = line
+			}
 
 		}
 

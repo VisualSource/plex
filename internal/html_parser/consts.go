@@ -40,3 +40,14 @@ const (
 	// ignoring async and defer attributes. This mode is used by createContextualFragment().
 	mode_Fragment
 )
+
+type Namespace string
+
+const (
+	NamespaceHTML   Namespace = "http://www.w3.org/1999/xhtml"
+	NamespaceMathML           = "http://www.w3.org/1998/Math/MathML"
+	NamespaceSVG              = "http://www.w3.org/2000/svg"
+	NamespaceXLink            = "http://www.w3.org/1999/xlink"
+	NamespaceXML              = "http://www.w3.org/XML/1998/namespace"
+	NamespaceXMLNS            = "http://www.w3.org/2000/xmlns/"
+)
