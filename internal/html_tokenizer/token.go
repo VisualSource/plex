@@ -49,6 +49,10 @@ func NewTokenTag(
 	}
 }
 
+func (p TokenTag) GetName() string {
+	return p.name
+}
+
 type TokenComment struct{ Value string }
 
 func (TokenComment) isToken()            {}

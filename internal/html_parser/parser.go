@@ -7,10 +7,12 @@ import (
 	"github.com/VisualSource/plex/internal/html_tokenizer"
 )
 
+// https://html.spec.whatwg.org/multipage/parsing.html#parse-state
 type HtmlParser struct {
 	tokenizer     *html_tokenizer.Tokenizer
+	// https://html.spec.whatwg.org/multipage/parsing.html#the-insertion-mode
 	insertionMode InsertionMode
-	// https://html.spec.whatwg.org/#the-stack-of-open-elements
+	// https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
 	openElementsStack []*dom.Node
 	// https://html.spec.whatwg.org/#the-list-of-active-formatting-elements
 	activeFormattingElements []*dom.Node
@@ -40,11 +42,38 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 			return nil, err
 		}
 
+	
+
 		for p.tokenizer.HasEmittedTokens() {
 			token := p.tokenizer.ConsumeToken()
 
-			isCheck := true
-			if isCheck {
+			aj := p.adjustedCurrentNode()
+			isStanderd := false;
+
+
+			if aj.namespace == NamespaceHTML || len(p.openElementsStack) == 0 {
+				isStanderd = true
+			} else {
+				switch tag := token.(type) {
+					case html_tokenizer.TokenTag:
+						name := tag.GetName()
+						isStanderd = (isMathMLIntegrationPoint(aj) && name != "mglyph" && name != "malignmark") ||  
+						isHTMLIntegrationPoint(aj) || 
+						aj.namespace == NamespaceMathML && aj.name == "annotation-xml" && name == "svg"
+					case html_tokenizer.TokenCharacter:
+						isStanderd = isMathMLIntergrationPoint(aj) || isHTMLIntegrationPoint(aj)
+					case html_tokenizer.TokenEOF:
+						isStanderd = true
+					}	
+			}
+
+			if !isStanderd {
+				if err := p.foreginContent(token); err != nil {
+					return nil, err
+				}
+				continue
+			}
+
 				var err error
 				switch p.insertionMode {
 				case mode_Initial:
@@ -94,17 +123,25 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 				if err != nil {
 					return nil, err
 				}
-			} else {
-				if err := p.foreginContent(token); err != nil {
-					return nil, err
-				}
-			}
+
 		}
 	}
 
 	p.parseEnd()
 
 	return nil, nil
+}
+// https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
+func (p *HtmlParser) adjustedCurrentNode() *dom.Node {
+
+	return p.currentNode()
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#current-node
+func (p *HtmlParser) currentNode() *dom.Node {
+	node := p.openElementsStack[len(p.openElementsStack)-1]
+
+	return node
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-end
