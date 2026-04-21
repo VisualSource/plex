@@ -35,6 +35,9 @@ type TokenTag struct {
 	selfClosing utils.BoolOption
 }
 
+func (t TokenTag) GetType() TokenTagType {
+	return t.t
+}
 func (TokenTag) isToken() {}
 func NewTokenTag(
 	name string,

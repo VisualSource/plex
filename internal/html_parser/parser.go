@@ -262,7 +262,7 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 	if !p.document.IsIframeSrcDoc() {
 		//TODO parser error
 	}
-	
+
 	if !p.document.ParserNoChangeMode {
 		p.document.QuirksMode = dom.QuirksMode_Quirks
 	}
@@ -274,7 +274,41 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-before-html-insertion-mode
-func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenDOCTYPE:
+		return nil
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			return nil
+		}
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+		tagType := tag.GetType()
+		if tagType == html_tokenizer.TokenStartTag && name == "html" {
+
+			node := p.createElement(token, NamespaceHTML, nil)
+			p.openElementsStack = append(p.openElementsStack, node)
+
+			p.insertionMode = mode_BeforeHead
+			return nil
+		} else if tagType == html_tokenizer.TokenEndTag && !slices.Contains([]string{"head", "body", "html", "br"}, name) {
+			return nil
+		}
+	}
+
+	node := p.createElement(nil, NamespaceHTML, nil)
+	p.openElementsStack = append(p.openElementsStack, node)
+
+	p.insertionMode = mode_BeforeHead
+	p.tokenizer.ReconsumeToken(token)
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-before-head-insertion-mode
 func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error { return nil }
