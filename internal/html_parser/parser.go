@@ -2,20 +2,22 @@ package html_parser
 
 import (
 	"io"
+	"strings"
 
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
+	"github.com/VisualSource/plex/internal/utils"
 )
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parse-state
 type HtmlParser struct {
-	tokenizer     *html_tokenizer.Tokenizer
+	tokenizer *html_tokenizer.Tokenizer
 	// https://html.spec.whatwg.org/multipage/parsing.html#the-insertion-mode
 	insertionMode InsertionMode
 	// https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
-	openElementsStack []*dom.Node
+	openElementsStack []dom.Node
 	// https://html.spec.whatwg.org/#the-list-of-active-formatting-elements
-	activeFormattingElements []*dom.Node
+	activeFormattingElements []dom.Node
 	// https://html.spec.whatwg.org/#other-parsing-state-flags
 	scriptingMode ScriptingMode
 
@@ -24,6 +26,8 @@ type HtmlParser struct {
 	fosterParenting bool
 
 	speculativeParser *SpeculativeHTMLParser
+
+	document *dom.Document
 }
 
 func NewHtmlParser(stream io.Reader) *HtmlParser {
@@ -42,29 +46,26 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 			return nil, err
 		}
 
-	
-
 		for p.tokenizer.HasEmittedTokens() {
 			token := p.tokenizer.ConsumeToken()
 
 			aj := p.adjustedCurrentNode()
-			isStanderd := false;
+			isStanderd := false
 
-
-			if aj.namespace == NamespaceHTML || len(p.openElementsStack) == 0 {
+			if aj.Namespace == NamespaceHTML || len(p.openElementsStack) == 0 {
 				isStanderd = true
 			} else {
 				switch tag := token.(type) {
-					case html_tokenizer.TokenTag:
-						name := tag.GetName()
-						isStanderd = (isMathMLIntegrationPoint(aj) && name != "mglyph" && name != "malignmark") ||  
-						isHTMLIntegrationPoint(aj) || 
-						aj.namespace == NamespaceMathML && aj.name == "annotation-xml" && name == "svg"
-					case html_tokenizer.TokenCharacter:
-						isStanderd = isMathMLIntergrationPoint(aj) || isHTMLIntegrationPoint(aj)
-					case html_tokenizer.TokenEOF:
-						isStanderd = true
-					}	
+				case html_tokenizer.TokenTag:
+					name := tag.GetName()
+					isStanderd = (isMathMLIntegrationPoint(aj) && name != "mglyph" && name != "malignmark") ||
+						isHTMLIntergrationPoint(aj) ||
+						aj.Namespace == NamespaceMathML && aj.Name == "annotation-xml" && name == "svg"
+				case html_tokenizer.TokenCharacter:
+					isStanderd = isMathMLIntegrationPoint(aj) || isHTMLIntergrationPoint(aj)
+				case html_tokenizer.TokenEOF:
+					isStanderd = true
+				}
 			}
 
 			if !isStanderd {
@@ -74,55 +75,55 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 				continue
 			}
 
-				var err error
-				switch p.insertionMode {
-				case mode_Initial:
-					err = p.state_Initial(token)
-				case mode_BeforeHtml:
-					err = p.state_BeforeHtml(token)
-				case mode_BeforeHead:
-					err = p.state_BeforeHead(token)
-				case mode_InHead:
-					err = p.state_InHead(token)
-				case mode_InHeadNoScript:
-					err = p.state_InHeadNoScript(token)
-				case mode_AfterHead:
-					err = p.state_AfterHead(token)
-				case mode_InBody:
-					err = p.state_InBody(token)
-				case mode_Text:
-					err = p.state_Text(token)
-				case mode_InTable:
-					err = p.state_InTable(token)
-				case mode_InTableText:
-					err = p.state_InTableText(token)
-				case mode_InCaption:
-					err = p.state_InCaption(token)
-				case mode_InColumnGroup:
-					err = p.state_InColumnGroup(token)
-				case mode_InTableBody:
-					err = p.state_InTableBody(token)
-				case mode_InRow:
-					err = p.state_InRow(token)
-				case mode_InCell:
-					err = p.state_InCell(token)
-				case mode_InTemplate:
-					err = p.state_InTemplate(token)
-				case mode_AfterBody:
-					err = p.state_AfterBody(token)
-				case mode_InFrameset:
-					err = p.state_InFrameset(token)
-				case mode_AfterFrameset:
-					err = p.state_AfterAfterFrameset(token)
-				case mode_AfterAfterBody:
-					err = p.state_AfterAfterBody(token)
-				case mode_AfterAfterFrameset:
-					err = p.state_AfterAfterFrameset(token)
-				}
+			var err error
+			switch p.insertionMode {
+			case mode_Initial:
+				err = p.state_Initial(token)
+			case mode_BeforeHtml:
+				err = p.state_BeforeHtml(token)
+			case mode_BeforeHead:
+				err = p.state_BeforeHead(token)
+			case mode_InHead:
+				err = p.state_InHead(token)
+			case mode_InHeadNoScript:
+				err = p.state_InHeadNoScript(token)
+			case mode_AfterHead:
+				err = p.state_AfterHead(token)
+			case mode_InBody:
+				err = p.state_InBody(token)
+			case mode_Text:
+				err = p.state_Text(token)
+			case mode_InTable:
+				err = p.state_InTable(token)
+			case mode_InTableText:
+				err = p.state_InTableText(token)
+			case mode_InCaption:
+				err = p.state_InCaption(token)
+			case mode_InColumnGroup:
+				err = p.state_InColumnGroup(token)
+			case mode_InTableBody:
+				err = p.state_InTableBody(token)
+			case mode_InRow:
+				err = p.state_InRow(token)
+			case mode_InCell:
+				err = p.state_InCell(token)
+			case mode_InTemplate:
+				err = p.state_InTemplate(token)
+			case mode_AfterBody:
+				err = p.state_AfterBody(token)
+			case mode_InFrameset:
+				err = p.state_InFrameset(token)
+			case mode_AfterFrameset:
+				err = p.state_AfterAfterFrameset(token)
+			case mode_AfterAfterBody:
+				err = p.state_AfterAfterBody(token)
+			case mode_AfterAfterFrameset:
+				err = p.state_AfterAfterFrameset(token)
+			}
 
-				if err != nil {
-					return nil, err
-				}
+			if err != nil {
+				return nil, err
+			}
 
 		}
 	}
@@ -131,6 +132,7 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 
 	return nil, nil
 }
+
 // https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
 func (p *HtmlParser) adjustedCurrentNode() *dom.Node {
 
@@ -198,12 +200,69 @@ func (p *HtmlParser) insertHtmlElement(token html_tokenizer.Token) *dom.Node {
 	return p.insertForeginElement(token, NamespaceHTML, false)
 }
 
+func (p *HtmlParser) insertComment(data string, position *dom.Node) {
+
+	if position == nil {
+		position = p.getInsertionPosition()
+	}
+}
+
 //#endregion
 
 //#region InsertionModes
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode
-func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		pubIdent := tag.GetPublicIdentifer()
+		sysIdent := tag.GetSystemIdentifer()
+		name := tag.GetName()
+
+		if !name.Is("html") || pubIdent.IsSome() || sysIdent.IsSome() && !sysIdent.Is("about:legacy-compat") {
+			// parse error!
+		}
+
+		node := dom.NewDocumentType(
+			utils.ValueOf(name.Value, ""),
+			utils.ValueOf(pubIdent.Value, ""),
+			utils.ValueOf(sysIdent.Value, ""),
+		)
+
+		p.document.AppendChild(node)
+
+		quirksMode := 0
+
+		// no iframe srcdoc && parserNoChange=false
+
+		if tag.GetForceQuirks() || !name.Is("html") {
+		}
+
+		if pubIdent.IsSome() {
+			if strings.EqualFold("-//W3O//DTD W3 HTML Strict 3.0//EN//", *pubIdent.Value) ||
+				strings.EqualFold("-/W3C/DTD HTML 4.0 Transitional/EN", *pubIdent.Value) ||
+				strings.EqualFold("HTML", *pubIdent.Value) {
+
+			}
+		}
+
+		p.insertionMode = mode_BeforeHtml
+		return nil
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			return nil
+		}
+	}
+
+	p.insertionMode = mode_BeforeHtml
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-before-html-insertion-mode
 func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error { return nil }

@@ -65,6 +65,19 @@ type TokenDOCTYPE struct {
 	forceQuirks      bool
 }
 
+func (d TokenDOCTYPE) GetName() utils.StringOption {
+	return d.name
+}
+func (d TokenDOCTYPE) GetPublicIdentifer() utils.StringOption {
+	return d.publicIdentifier
+}
+func (d TokenDOCTYPE) GetSystemIdentifer() utils.StringOption {
+	return d.systemIdentifier
+}
+func (d TokenDOCTYPE) GetForceQuirks() bool {
+	return d.forceQuirks
+}
+
 func (TokenDOCTYPE) isToken() {}
 func NewTokenDOCTYPE(
 	name utils.StringOption,
