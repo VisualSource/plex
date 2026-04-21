@@ -2,6 +2,7 @@ package html_parser
 
 import (
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/VisualSource/plex/internal/dom"
@@ -234,18 +235,18 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 
 		p.document.AppendChild(node)
 
-		quirksMode := 0
-
-		// no iframe srcdoc && parserNoChange=false
-
-		if tag.GetForceQuirks() || !name.Is("html") {
-		}
-
-		if pubIdent.IsSome() {
-			if strings.EqualFold("-//W3O//DTD W3 HTML Strict 3.0//EN//", *pubIdent.Value) ||
-				strings.EqualFold("-/W3C/DTD HTML 4.0 Transitional/EN", *pubIdent.Value) ||
-				strings.EqualFold("HTML", *pubIdent.Value) {
-
+		if !p.document.IsIframeSrcDoc() && !p.document.ParserNoChangeMode {
+			if tag.GetForceQuirks() || !name.Is("html") {
+				p.document.QuirksMode = dom.QuirksMode_Quirks
+			} else if pubIdent.IsSome() {
+				if (sysIdent.IsNone() || sysIdent.Is("")) && (strings.EqualFold("-//W3C//DTD HTML 4.01 Frameset//", *pubIdent.Value) ||
+					strings.EqualFold("-//W3C//DTD HTML 4.01 Transitional//", *pubIdent.Value)) {
+					p.document.QuirksMode = dom.QuirksMode_Limited
+				} else if slices.ContainsFunc(doctypeDtD, func(dtd string) bool { return strings.EqualFold(dtd, *pubIdent.Value) }) {
+					p.document.QuirksMode = dom.QuirksMode_Quirks
+				} else if strings.EqualFold("-//W3C//DTD XHTML 1.0 Frameset//", *pubIdent.Value) || strings.EqualFold("-//W3C//DTD XHTML 1.0 Transitional//", *pubIdent.Value) {
+					p.document.QuirksMode = dom.QuirksMode_Limited
+				}
 			}
 		}
 
@@ -258,7 +259,16 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 		}
 	}
 
+	if !p.document.IsIframeSrcDoc() {
+		//TODO parser error
+	}
+	
+	if !p.document.ParserNoChangeMode {
+		p.document.QuirksMode = dom.QuirksMode_Quirks
+	}
+
 	p.insertionMode = mode_BeforeHtml
+	p.tokenizer.ReconsumeToken(token)
 
 	return nil
 }
