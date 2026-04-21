@@ -39,6 +39,7 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 
 // https://html.spec.whatwg.org/#tree-construction
 func (p *HtmlParser) Parse() (*dom.Document, error) {
+	defer p.parseEnd()
 
 	for {
 		err := p.tokenizer.Next()
@@ -128,19 +129,17 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 		}
 	}
 
-	p.parseEnd()
-
 	return nil, nil
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
-func (p *HtmlParser) adjustedCurrentNode() *dom.Node {
+func (p *HtmlParser) adjustedCurrentNode() dom.Node {
 
 	return p.currentNode()
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#current-node
-func (p *HtmlParser) currentNode() *dom.Node {
+func (p *HtmlParser) currentNode() dom.Node {
 	node := p.openElementsStack[len(p.openElementsStack)-1]
 
 	return node
@@ -152,7 +151,7 @@ func (*HtmlParser) parseEnd() {}
 //#region Helpers
 
 // https://html.spec.whatwg.org/multipage/parsing.html#appropriate-place-for-inserting-a-node
-func (p *HtmlParser) getInsertionPosition() *dom.Node {
+func (p *HtmlParser) getInsertionPosition() dom.Node {
 
 	if p.fosterParenting {
 
@@ -164,7 +163,7 @@ func (p *HtmlParser) getInsertionPosition() *dom.Node {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#create-an-element-for-the-token
-func (p *HtmlParser) createElement(token html_tokenizer.Token, namespace Namespace, intendedParent *dom.Node) *dom.Node {
+func (p *HtmlParser) createElement(token html_tokenizer.Token, namespace Namespace, intendedParent dom.Node) dom.Node {
 	if p.speculativeParser != nil {
 
 		return nil
@@ -174,7 +173,7 @@ func (p *HtmlParser) createElement(token html_tokenizer.Token, namespace Namespa
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-an-element-at-the-adjusted-insertion-location
-func (p *HtmlParser) insertElement(element *dom.Node) {
+func (p *HtmlParser) insertElement(element dom.Node) {
 	adjInsertLocation := p.getInsertionPosition()
 
 	if adjInsertLocation == nil {
@@ -182,7 +181,7 @@ func (p *HtmlParser) insertElement(element *dom.Node) {
 	}
 }
 
-func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace Namespace, onlyAddToElementStack bool) *dom.Node {
+func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace Namespace, onlyAddToElementStack bool) dom.Node {
 	adjInsertLocation := p.getInsertionPosition()
 
 	el := p.createElement(token, namespace, adjInsertLocation)
@@ -196,11 +195,11 @@ func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace 
 	return el
 }
 
-func (p *HtmlParser) insertHtmlElement(token html_tokenizer.Token) *dom.Node {
+func (p *HtmlParser) insertHtmlElement(token html_tokenizer.Token) dom.Node {
 	return p.insertForeginElement(token, NamespaceHTML, false)
 }
 
-func (p *HtmlParser) insertComment(data string, position *dom.Node) {
+func (p *HtmlParser) insertComment(data string, position dom.Node) {
 
 	if position == nil {
 		position = p.getInsertionPosition()
