@@ -51,7 +51,9 @@ func NewTokenTag(
 		selfClosing: selfClosing,
 	}
 }
-
+func (p TokenTag) IsSelfClosingSet() bool {
+	return p.selfClosing.Is(true)
+}
 func (p TokenTag) GetName() string {
 	return p.name
 }

@@ -14,7 +14,8 @@ import (
 type HtmlParser struct {
 	tokenizer *html_tokenizer.Tokenizer
 	// https://html.spec.whatwg.org/multipage/parsing.html#the-insertion-mode
-	insertionMode InsertionMode
+	insertionMode         InsertionMode
+	originalInsertionMode InsertionMode
 	// https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
 	openElementsStack []dom.Node
 	// https://html.spec.whatwg.org/#the-list-of-active-formatting-elements
@@ -25,6 +26,8 @@ type HtmlParser struct {
 	framesetOk bool
 
 	fosterParenting bool
+
+	head dom.Node
 
 	speculativeParser *SpeculativeHTMLParser
 
@@ -207,6 +210,10 @@ func (p *HtmlParser) insertComment(data string, position dom.Node) {
 	}
 }
 
+// https://html.spec.whatwg.org/multipage/parsing.html#insert-a-character
+func (p *HtmlParser) insertCharacter(value rune)    {}
+func (p *HTMLParser) insertCharacters(value string) {}
+
 //#endregion
 
 //#region InsertionModes
@@ -311,10 +318,152 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-before-head-insertion-mode
-func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', ' ', '\r':
+			return nil
+		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parser error
+		return nil
+	case html_tokenizer.TokenTag:
+		{
+			name := tag.GetName()
+			if tag.GetType() == html_tokenizer.TokenStartTag {
+				switch name {
+				case "html":
+					return p.state_InBody(token)
+				case "head":
+					node := p.insertHtmlElement(token)
+
+					p.head = node
+					p.insertionMode = mode_InHead
+					return nil
+				}
+			} else if slices.Contains([]string{"head", "body", "html", "br"}, name) {
+				//TODO: parser error
+				return nil
+			}
+		}
+	}
+
+	node := p.insertHtmlElement(nil) // TODO: this is a head element
+	p.head = node
+	p.insertionMode = mode_InHead
+
+	p.tokenizer.ReconsumeToken(token)
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inhead
-func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			p.insertCharacter(tag.Value)
+			return nil
+		}
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parser error
+		return nil
+	case html_tokenizer.TokenTag:
+		tagType := tag.GetType()
+		name := tag.GetName()
+
+		if tagType == html_tokenizer.TokenStartTag {
+			switch name {
+			case "html":
+				return p.state_InBody(token)
+			case "base", "basefont", "bgsound", "link":
+				p.insertHtmlElement(token)
+
+				p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
+				if !tag.IsSelfClosingSet() {
+					//TODO: parse error
+				}
+				return nil
+			case "meta":
+				p.insertHtmlElement(token)
+				p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
+
+				if !tag.IsSelfClosingSet() {
+					//TODO: parse error
+				}
+
+				if p.speculativeParser == nil {
+					/*
+						TODO:
+						If the element has a charset attribute,
+						and getting an encoding from its value results in an encoding,
+						and the confidence is currently tentative,
+						then change the encoding to the resulting encoding.
+
+						ELSE
+
+						if the element has an http-equiv attribute
+						whose value is an ASCII case-insensitive match for "Content-Type",
+						and the element has a content attribute, and applying the algorithm
+						for extracting a character encoding from a meta element to that attribute's
+						value returns an encoding, and the confidence is currently tentative,
+						then change the encoding to the extracted encoding.
+
+					*/
+				}
+				return nil
+			case "title":
+				p.tokenizer.SetState(html_tokenizer.State_RCData)
+				return nil
+				// TODO
+			case "noscript":
+				if p.scriptingMode != mode_Disabled {
+					p.tokenizer.SetState(html_tokenizer.State_PlainText)
+				} else {
+					p.insertHtmlElement(token)
+					p.insertionMode = mode_InHeadNoScript
+				}
+				return nil
+			case "noframes", "style":
+				p.tokenizer.SetState(html_tokenizer.State_PlainText)
+				return nil
+			case "script":
+
+				p.originalInsertionMode = p.insertionMode
+				p.insertionMode = mode_Text
+				return nil
+			case "template":
+				return nil
+			case "head":
+				//TOOD : parse error
+				return nil
+			}
+		} else {
+			switch name {
+			case "head":
+				return nil
+			case "body", "html", "br":
+			case "template":
+				return nil
+			default:
+				//TODO: parse error
+				return nil
+			}
+		}
+	}
+
+	p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
+	p.insertionMode = mode_AfterHead
+	p.tokenizer.ReconsumeToken(token)
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inheadnoscript
 func (p *HtmlParser) state_InHeadNoScript(token html_tokenizer.Token) error { return nil }

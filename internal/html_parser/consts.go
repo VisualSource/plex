@@ -24,6 +24,8 @@ const (
 	mode_AfterFrameset
 	mode_AfterAfterBody
 	mode_AfterAfterFrameset
+
+	mode_Unset
 )
 
 type ScriptingMode uint
