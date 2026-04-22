@@ -860,7 +860,22 @@ func (p *HtmlParser) state_Text(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error { return nil }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intabletext
-func (p *HtmlParser) state_InTableText(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InTableText(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\u0000':
+			//TODO: parse error
+		default:
+		}
+	default:
+		p.insertionMode = p.originalInsertionMode
+		p.tokenizer.ReconsumeToken(token)
+	}
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-incaption
 func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error { return nil }
