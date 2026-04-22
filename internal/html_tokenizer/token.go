@@ -57,6 +57,9 @@ func (p TokenTag) IsSelfClosingSet() bool {
 func (p TokenTag) GetName() string {
 	return p.name
 }
+func (p *TokenTag) SetName(value string) {
+	p.name = value
+}
 
 type TokenComment struct{ Value string }
 

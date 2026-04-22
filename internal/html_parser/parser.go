@@ -136,6 +136,10 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 	return nil, nil
 }
 
+func (p *HtmlParser) openStackPop() {
+	p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
+}
+
 // https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
 func (p *HtmlParser) adjustedCurrentNode() dom.Node {
 
@@ -212,7 +216,20 @@ func (p *HtmlParser) insertComment(data string, position dom.Node) {
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-a-character
 func (p *HtmlParser) insertCharacter(value rune)    {}
-func (p *HTMLParser) insertCharacters(value string) {}
+func (p *HtmlParser) insertCharacters(value string) {}
+
+func (p *HtmlParser) genericElementParse(token html_tokenizer.Token, alg string) {
+	p.insertHtmlElement(token)
+
+	if alg == "text" {
+		p.tokenizer.SetState(html_tokenizer.State_PlainText)
+	} else {
+		p.tokenizer.SetState(html_tokenizer.State_RCData)
+	}
+
+	p.originalInsertionMode = p.insertionMode
+	p.insertionMode = mode_Text
+}
 
 //#endregion
 
@@ -308,7 +325,8 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 		}
 	}
 
-	node := p.createElement(nil, NamespaceHTML, nil)
+	//TODO: fix this
+	node := p.createElement(html_tokenizer.NewTokenTag("html", html_tokenizer.TokenStartTag, utils.None[bool]()), NamespaceHTML, nil)
 	p.openElementsStack = append(p.openElementsStack, node)
 
 	p.insertionMode = mode_BeforeHead
@@ -353,7 +371,7 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 		}
 	}
 
-	node := p.insertHtmlElement(nil) // TODO: this is a head element
+	node := p.insertHtmlElement(html_tokenizer.NewTokenTag("head", html_tokenizer.TokenStartTag, utils.None[bool]()))
 	p.head = node
 	p.insertionMode = mode_InHead
 
@@ -419,19 +437,19 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				}
 				return nil
 			case "title":
-				p.tokenizer.SetState(html_tokenizer.State_RCData)
+				p.genericElementParse(token, "rcdata")
 				return nil
 				// TODO
 			case "noscript":
 				if p.scriptingMode != mode_Disabled {
-					p.tokenizer.SetState(html_tokenizer.State_PlainText)
+					p.genericElementParse(token, "text")
 				} else {
 					p.insertHtmlElement(token)
 					p.insertionMode = mode_InHeadNoScript
 				}
 				return nil
 			case "noframes", "style":
-				p.tokenizer.SetState(html_tokenizer.State_PlainText)
+				p.genericElementParse(token, "text")
 				return nil
 			case "script":
 
@@ -458,7 +476,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 		}
 	}
 
-	p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
+	p.openStackPop()
 	p.insertionMode = mode_AfterHead
 	p.tokenizer.ReconsumeToken(token)
 
@@ -466,16 +484,377 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inheadnoscript
-func (p *HtmlParser) state_InHeadNoScript(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InHeadNoScript(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "html":
+				return p.state_InBody(token)
+			case "basefont", "bssound", "link", "meta", "noframes", "style":
+				return p.state_InHead(token)
+			case "head", "noscript":
+				// TODO: parse error
+				return nil
+			}
+		} else {
+			switch name {
+			case "noscript":
+				p.openStackPop()
+				p.insertionMode = mode_InHead
+				return nil
+			default:
+				if name != "br" {
+					return nil
+				}
+
+				//TODO: parse error
+			}
+		}
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\f', '\n', '\r', ' ':
+			return p.state_InHead(token)
+		}
+	case html_tokenizer.TokenComment:
+		return p.state_InHead(token)
+	}
+
+	//TODO: parse error
+
+	p.openStackPop()
+	p.insertionMode = mode_InHead
+	p.tokenizer.ReconsumeToken(token)
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-after-head-insertion-mode
-func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			p.insertCharacter(tag.Value)
+			return nil
+		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "html":
+				return p.state_InBody(token)
+			case "body":
+				p.insertHtmlElement(token)
+
+				p.framesetOk = true
+				p.insertionMode = mode_InBody
+				return nil
+			case "frameset":
+				p.insertHtmlElement(token)
+				p.insertionMode = mode_InFrameset
+				return nil
+			case "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title":
+				//TODO: parse error
+				p.openElementsStack = append(p.openElementsStack, p.head)
+
+				err := p.state_InHead(token)
+				if err != nil {
+					return err
+				}
+
+				//TODO: remove p.head from open element Stack
+				return nil
+			case "head":
+				//TODO: parse error
+				return nil
+			}
+
+		} else {
+			switch name {
+			case "body", "html", "br":
+			default:
+				//TODO: parse error
+				return nil
+			}
+		}
+	}
+
+	p.insertHtmlElement(html_tokenizer.NewTokenTag("body", html_tokenizer.TokenStartTag, utils.None[bool]()))
+
+	p.insertionMode = mode_InBody
+	p.tokenizer.ReconsumeToken(token)
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
-func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\u0000':
+			//TODO: parse error
+			return nil
+		case '\t', '\n', '\f', '\r', ' ':
+			//TODO: reconstruct action formatting els
+			p.insertCharacter(tag.Value)
+			return nil
+		default:
+			//TODO :reconstruct
+			p.insertCharacter(tag.Value)
+
+			p.framesetOk = false
+			return nil
+		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "html":
+				//TODO: parse error
+
+				//TODO finsih
+				return nil
+			case "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title":
+				return p.state_InHead(token)
+			case "body":
+				//TODO: parse error
+				return nil
+			case "frameset":
+
+				if !p.framesetOk {
+					return nil
+				}
+
+				p.insertionMode = mode_InFrameset
+				return nil
+			case "address", "article", "aside", "blockquote", "center", "details",
+				"dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer",
+				"header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul":
+
+				p.insertHtmlElement(token)
+				return nil
+			case "h1", "h2", "h3", "h4", "h5", "h6":
+				//TODO
+
+				p.insertHtmlElement(token)
+				return nil
+			case "pre", "listing":
+
+				//TODO
+
+				p.insertHtmlElement(token)
+				p.framesetOk = false
+
+				return nil
+			case "form":
+				//TODO
+				return nil
+			case "li":
+				p.framesetOk = false
+
+				//TODO
+
+				return nil
+			case "dd", "dt":
+				p.framesetOk = false
+
+				//TODO
+
+				return nil
+			case "plaintext":
+				//TODO
+
+				p.insertHtmlElement(token)
+				p.tokenizer.SetState(html_tokenizer.State_PlainText)
+				return nil
+			case "button":
+
+				//TODO
+
+				p.insertHtmlElement(token)
+				p.framesetOk = false
+				return nil
+			case "a":
+
+				p.insertHtmlElement(token)
+				return nil
+			case "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u":
+				p.insertHtmlElement(token)
+				return nil
+			case "nobr":
+				p.insertHtmlElement(token)
+				return nil
+			case "applet", "marquee", "object":
+				p.insertHtmlElement(token)
+				return nil
+			case "table":
+				p.insertHtmlElement(token)
+				p.framesetOk = false
+				p.insertionMode = mode_InTable
+				return nil
+			case "area", "br", "embed", "img", "keygen", "wbr":
+				p.insertHtmlElement(token)
+				p.framesetOk = false
+				return nil
+			case "input":
+
+				return nil
+			case "param", "source", "track":
+				p.insertHtmlElement(token)
+				p.openStackPop()
+				return nil
+			case "hr":
+				p.insertHtmlElement(token)
+				p.framesetOk = false
+				return nil
+			case "image":
+
+				// tag name to "img" and reporecess it. (Don't ask)
+				tag.SetName("img")
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			case "textarea":
+				p.insertHtmlElement(token)
+
+				p.tokenizer.SetState(html_tokenizer.State_RCData)
+				p.originalInsertionMode = p.insertionMode
+				p.framesetOk = false
+				p.insertionMode = mode_Text
+				return nil
+			case "xmp":
+
+				p.framesetOk = false
+				p.genericElementParse(token, "text")
+				return nil
+			case "iframe":
+				p.framesetOk = false
+				p.genericElementParse(token, "text")
+				return nil
+			case "noembed":
+				p.genericElementParse(token, "text")
+				return nil
+			case "noscript":
+				if p.scriptingMode != mode_Disabled {
+					p.genericElementParse(token, "text")
+				}
+				return nil
+			case "select":
+				p.insertHtmlElement(token)
+				p.framesetOk = false
+				return nil
+			case "option":
+				p.insertHtmlElement(token)
+				return nil
+			case "optgroup":
+				p.insertHtmlElement(token)
+				return nil
+			case "rb", "rtc":
+				p.insertHtmlElement(token)
+				return nil
+			case "rp", "rt":
+				p.insertHtmlElement(token)
+				return nil
+			case "math":
+				return nil
+			case "svg":
+				return nil
+			case "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr":
+				return nil
+			default:
+				p.insertHtmlElement(token)
+				return nil
+			}
+		} else {
+			switch name {
+			case "template":
+				return p.state_InHead(token)
+			case "body":
+
+				p.insertionMode = mode_AfterBody
+				return nil
+			case "html":
+
+				p.insertionMode = mode_AfterBody
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			case "address", "article", "aside", "blockquote", "button", "center", "details", "dialong", "dir", "div", "dl", "fieldset",
+				"figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search",
+				"section", "select", "summary", "ul":
+				return nil
+			case "form":
+				return nil
+			case "p":
+				return nil
+			case "li":
+				return nil
+			case "dd", "dt":
+				return nil
+			case "h1", "h2", "h3", "h4", "h5", "h6":
+				return nil
+			case "sarcasm":
+				return nil
+			case "a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u":
+				return nil
+			case "applet", "marquee", "object":
+				return nil
+			case "br":
+				return nil
+			default:
+
+				return nil
+
+			}
+		}
+	case html_tokenizer.TokenEOF:
+		//TODO:
+		return io.EOF
+	}
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-incdata
-func (p *HtmlParser) state_Text(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_Text(token html_tokenizer.Token) error {
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		p.insertCharacter(tag.Value)
+	case html_tokenizer.TokenEOF:
+		p.openStackPop()
+		p.insertionMode = p.originalInsertionMode
+		p.tokenizer.ReconsumeToken(token)
+		return nil
+	case html_tokenizer.TokenTag:
+		if tag.GetType() != html_tokenizer.TokenEndTag {
+			return nil
+		}
+		if tag.GetName() == "script" {
+			return nil
+		}
+
+		p.insertionMode = p.originalInsertionMode
+	}
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intable
 func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error { return nil }
