@@ -941,8 +941,8 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 	p.fosterParenting = true
 	if err := p.state_InBody(token); err != nil {
 		return err
-	} 
-	p.fosterParenting = false;
+	}
+	p.fosterParenting = false
 
 	return nil
 }
@@ -966,7 +966,35 @@ func (p *HtmlParser) state_InTableText(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-incaption
-func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "caption", "col", "colgroup", "tbody", "td", "tfoot", "th", "thead", "tr":
+				//TODO
+
+				p.insertionMode = mode_InTable
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			}
+		} else {
+			switch name {
+			case "caption":
+				//TODO
+				p.insertionMode = mode_InTable
+				return nil
+			case "body", "col", "colgroup", "html", "tbody", "td", "tfoot", "th", "thead", "tr":
+				//TODO: parser error
+				return nil
+			}
+		}
+	}
+
+	return p.state_InBody(token)
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-incolgroup
 func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error { return nil }
