@@ -1167,7 +1167,62 @@ func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intemplate
-func (p *HtmlParser) state_InTemplate(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InTemplate(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter,
+		html_tokenizer.TokenComment,
+		html_tokenizer.TokenDOCTYPE:
+		return p.state_InBody(token)
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title":
+				return p.state_InHead(token)
+			case "caption", "colgroup", "tbody", "tfoot", "thead":
+				//TODO
+
+				p.insertionMode = mode_InTable
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			case "col":
+				//TODO
+				p.insertionMode = mode_InColumnGroup
+				return nil
+			case "tr":
+				//TODO
+				p.insertionMode = mode_InTableBody
+				return nil
+			case "td", "th":
+				//TODO
+				p.insertionMode = mode_InRow
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			default:
+				//TODO
+				p.insertionMode = mode_InBody
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			}
+		} else {
+			switch name {
+			case "template":
+				return p.state_InHead(token)
+			default:
+				//TODO: parse error
+				return nil
+			}
+		}
+	case html_tokenizer.TokenEOF:
+		//TODO
+		p.tokenizer.ReconsumeToken(token)
+		return nil
+	}
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-afterbody
 func (p *HtmlParser) state_AfterBody(token html_tokenizer.Token) error { return nil }
