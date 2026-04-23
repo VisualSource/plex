@@ -57,6 +57,10 @@ func (p TokenTag) IsSelfClosingSet() bool {
 func (p TokenTag) GetName() string {
 	return p.name
 }
+func (p TokenTag) GetAttr(key string) (string, bool) {
+	value, ok := p.attrs[key]
+	return value,ok
+}
 func (p *TokenTag) SetName(value string) {
 	p.name = value
 }

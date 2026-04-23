@@ -857,7 +857,95 @@ func (p *HtmlParser) state_Text(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intable
-func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		node := p.currentNode()
+		if slices.Contains([]string{"table", "tbody", "template", "tfoot", "tr"}, node.Name) {
+			p.originalInsertionMode = p.insertionMode
+			p.insertionMode = mode_InTableText
+			return nil
+		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "caption":
+				//TODO
+				p.insertHtmlElement(token)
+				p.insertionMode = mode_InCaption
+				return nil
+			case "colgroup":
+				//TODO
+				p.insertHtmlElement(token)
+				p.insertionMode = mode_InColumnGroup
+				return nil
+			case "col":
+				//TODO
+				p.insertHtmlElement(html_tokenizer.NewTokenTag("colgroup", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertionMode = mode_InColumnGroup
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			case "tbody", "tfoot", "thead":
+				//TODO
+				p.insertHtmlElement(html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertionMode = mode_InTableBody
+				return nil
+			case "td", "th", "tr":
+				//TODO
+				p.insertHtmlElement(html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertionMode = mode_InTableBody
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			case "table":
+				//TODO: parser error
+				//TODO
+				return nil
+			case "style", "script", "template":
+				return p.state_InHead(token)
+			case "input":
+				value, exists := tag.GetAttr("type")
+				if !(!exists || !strings.EqualFold(value, "hidden")) {
+					//TODO
+					p.insertHtmlElement(token)
+					return nil
+				}
+			case "form":
+				//TODO
+				return nil
+			}
+		} else {
+			switch name {
+			case "table":
+				//TODO
+				return nil
+			case "body", "caption", "col", "colgroup", "html", "tbody", "td", "tfoot", "th", "thead", "tr":
+				//TODO: parse error
+				return nil
+			case "template":
+				return p.state_InHead(token)
+			}
+		}
+	case html_tokenizer.TokenEOF:
+		return p.state_InBody(token)
+	}
+
+	//TODO: parse error
+	p.fosterParenting = true
+	if err := p.state_InBody(token); err != nil {
+		return err
+	} 
+	p.fosterParenting = false;
+
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intabletext
 func (p *HtmlParser) state_InTableText(token html_tokenizer.Token) error {
