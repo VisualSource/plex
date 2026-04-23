@@ -997,7 +997,56 @@ func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-incolgroup
-func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			p.insertCharacter(tag.Value)
+			return nil
+		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "html":
+				return p.state_InBody(token)
+			case "col":
+				p.insertHtmlElement(token)
+				p.openStackPop()
+				//TODO
+				return nil
+			case "template":
+				return p.state_InHead(token)
+			}
+		} else {
+			switch name {
+			case "colgroup":
+				//TODO
+				return nil
+			case "col":
+				//TODO: parse error
+				return nil
+			case "template":
+				return p.state_InHead(token)
+			}
+		}
+	case html_tokenizer.TokenEOF:
+		return p.state_InBody(token)
+	}
+
+	//TODO
+	p.insertionMode = mode_InTable
+	p.tokenizer.ReconsumeToken(token)
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intbody
 func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error { return nil }
