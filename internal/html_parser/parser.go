@@ -1070,7 +1070,30 @@ func (p *HtmlParser) state_InFrameset(token html_tokenizer.Token) error { return
 func (p *HtmlParser) state_AfterFrameset(token html_tokenizer.Token) error { return nil }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-after-after-body-insertion-mode
-func (p *HtmlParser) state_AfterAfterBody(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_AfterAfterBody(token html_tokenizer.Token) error {
+	switch tag := token.(type) {
+	case html_tokenizer.TokenComment:
+		//TODO
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		return p.state_InBody(token)
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			return p.state_InBody(token)
+		}
+	case html_tokenizer.TokenTag:
+		if tag.GetName() == "html" && tag.GetType() == html_tokenizer.TokenStartTag {
+			return p.state_InBody(token)
+		}
+	case html_tokenizer.TokenEOF:
+		return io.EOF
+	}
+
+	//TODO: parse error
+	return p.state_InBody(token)
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-after-after-frameset-insertion-mode
 func (p *HtmlParser) state_AfterAfterFrameset(token html_tokenizer.Token) error { return nil }
