@@ -1097,16 +1097,16 @@ func (p *HtmlParser) state_AfterAfterBody(token html_tokenizer.Token) error {
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-after-after-frameset-insertion-mode
 func (p *HtmlParser) state_AfterAfterFrameset(token html_tokenizer.Token) error {
-	
+
 	switch tag := token.(type) {
 	case html_tokenizer.TokenComment:
 		//TODO
-		p.insertComment(tag.Value,nil)
-		return nil 
+		p.insertComment(tag.Value, nil)
+		return nil
 	case html_tokenizer.TokenDOCTYPE:
 		return p.state_InBody(token)
 	case html_tokenizer.TokenTag:
-		if (tag.GetType() == html_tokenizer.TokenStartTag){
+		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch tag.GetName() {
 			case "html":
 				return p.state_InBody(token)
@@ -1119,10 +1119,77 @@ func (p *HtmlParser) state_AfterAfterFrameset(token html_tokenizer.Token) error 
 	}
 
 	//TODO: parse error
-	return nil 
+	return nil
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inforeign
-func (p *HtmlParser) foreginContent(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) foreginContent(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			p.insertCharacter(tag.Value)
+			return nil
+		default:
+			p.insertCharacter(tag.Value)
+			p.framesetOk = false
+			return nil
+		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "font":
+				_, hasColor := tag.GetAttr("color")
+				_, hasFace := tag.GetAttr("face")
+				_, hasSize := tag.GetAttr("size")
+				if !(hasColor || hasFace || hasSize) {
+					break
+				}
+				fallthrough
+			case "b", "big", "blockquote", "body", "br", "center", "code", "dd", "div",
+				"dl", "dt", "em", "embed", "h1", "h2", "h3", "h4", "h5", "h6", "head", "hr", "i", "img", "li",
+				"listing", "menu", "meta", "nobr", "ol", "p", "pre", "ruby", "s", "small", "span", "strong", "strike",
+				"sub", "sup", "table", "tt", "u", "ul", "var":
+				//TODO parse error
+
+				//TODO
+				return nil
+			default:
+				//TODO
+
+				if tag.IsSelfClosingSet() {
+					if name == "script" && p.currentNode().Namespace == NamespaceSVG {
+
+					} else {
+						p.openStackPop()
+					}
+				}
+			}
+		} else {
+			switch name {
+			case "script":
+				if p.currentNode().Namespace == NamespaceSVG {
+					
+					return nil
+				}
+				fallthrough
+			default:
+				//TODO
+			}
+		}
+
+	}
+
+	return nil
+}
 
 //#endregion
