@@ -1316,7 +1316,42 @@ func (p *HtmlParser) state_InFrameset(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-afterframeset
-func (p *HtmlParser) state_AfterFrameset(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_AfterFrameset(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			p.insertCharacter(tag.Value)
+			return nil
+		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		name := tag.GetName()
+
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "html":
+				return p.state_InBody(token)
+			case "noframes":
+				p.insertionMode = mode_AfterAfterFrameset
+				return nil
+			}
+		} else if name == "html" {
+			return p.state_AfterAfterFrameset(token)
+		}
+	case html_tokenizer.TokenEOF:
+		return io.EOF
+	}
+
+	//TODO: parse erro
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-after-after-body-insertion-mode
 func (p *HtmlParser) state_AfterAfterBody(token html_tokenizer.Token) error {
