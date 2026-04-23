@@ -1225,7 +1225,42 @@ func (p *HtmlParser) state_InTemplate(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-afterbody
-func (p *HtmlParser) state_AfterBody(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_AfterBody(token html_tokenizer.Token) error {
+
+	switch tag := token.(type) {
+	case html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			return p.state_InBody(token)
+		}
+	case html_tokenizer.TokenComment:
+		node := p.openElementsStack[0]
+
+		p.insertComment(tag.Value, node)
+
+		return nil
+	case html_tokenizer.TokenDOCTYPE:
+		//TODO: parse error
+		return nil
+	case html_tokenizer.TokenTag:
+		if tag.GetName() == "html" {
+			if tag.GetType() == html_tokenizer.TokenStartTag {
+				return p.state_InBody(token)
+			}
+
+			//TODO
+			p.insertionMode = mode_AfterAfterBody
+			return nil
+		}
+	case html_tokenizer.TokenEOF:
+		return io.EOF
+	}
+
+	//TODO: parse error
+	p.insertionMode = mode_InBody
+	p.tokenizer.ReconsumeToken(token)
+	return nil
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inframeset
 func (p *HtmlParser) state_InFrameset(token html_tokenizer.Token) error { return nil }
