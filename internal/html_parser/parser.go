@@ -43,8 +43,7 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 
 // https://html.spec.whatwg.org/#tree-construction
 func (p *HtmlParser) Parse() (*dom.Document, error) {
-	defer p.parseEnd()
-
+parseLoop:
 	for {
 		err := p.tokenizer.Next()
 		if err != nil && err != io.EOF {
@@ -57,7 +56,7 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 			aj := p.adjustedCurrentNode()
 			isStanderd := false
 
-			if aj.Namespace == NamespaceHTML || len(p.openElementsStack) == 0 {
+			if aj.Namespace() == dom.NamespaceHTML || len(p.openElementsStack) == 0 {
 				isStanderd = true
 			} else {
 				switch tag := token.(type) {
@@ -65,7 +64,7 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 					name := tag.GetName()
 					isStanderd = (isMathMLIntegrationPoint(aj) && name != "mglyph" && name != "malignmark") ||
 						isHTMLIntergrationPoint(aj) ||
-						aj.Namespace == NamespaceMathML && aj.Name == "annotation-xml" && name == "svg"
+						aj.Namespace() == dom.NamespaceMathML && aj.Tag() == "annotation-xml" && name == "svg"
 				case html_tokenizer.TokenCharacter:
 					isStanderd = isMathMLIntegrationPoint(aj) || isHTMLIntergrationPoint(aj)
 				case html_tokenizer.TokenEOF:
@@ -127,11 +126,15 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 			}
 
 			if err != nil {
+				if err == io.EOF {
+					break parseLoop
+				}
 				return nil, err
 			}
-
 		}
 	}
+
+	p.parseEnd()
 
 	return nil, nil
 }
@@ -171,7 +174,7 @@ func (p *HtmlParser) getInsertionPosition() dom.Node {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#create-an-element-for-the-token
-func (p *HtmlParser) createElement(token html_tokenizer.Token, namespace Namespace, intendedParent dom.Node) dom.Node {
+func (p *HtmlParser) createElement(token html_tokenizer.Token, namespace dom.Namespace, intendedParent dom.Node) dom.Node {
 	if p.speculativeParser != nil {
 
 		return nil
@@ -189,7 +192,7 @@ func (p *HtmlParser) insertElement(element dom.Node) {
 	}
 }
 
-func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace Namespace, onlyAddToElementStack bool) dom.Node {
+func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
 	adjInsertLocation := p.getInsertionPosition()
 
 	el := p.createElement(token, namespace, adjInsertLocation)
@@ -204,7 +207,7 @@ func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace 
 }
 
 func (p *HtmlParser) insertHtmlElement(token html_tokenizer.Token) dom.Node {
-	return p.insertForeginElement(token, NamespaceHTML, false)
+	return p.insertForeginElement(token, dom.NamespaceHTML, false)
 }
 
 func (p *HtmlParser) insertComment(data string, position dom.Node) {
@@ -315,7 +318,7 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 		tagType := tag.GetType()
 		if tagType == html_tokenizer.TokenStartTag && name == "html" {
 
-			node := p.createElement(token, NamespaceHTML, nil)
+			node := p.createElement(token, dom.NamespaceHTML, nil)
 			p.openElementsStack = append(p.openElementsStack, node)
 
 			p.insertionMode = mode_BeforeHead
@@ -326,7 +329,7 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 	}
 
 	//TODO: fix this
-	node := p.createElement(html_tokenizer.NewTokenTag("html", html_tokenizer.TokenStartTag, utils.None[bool]()), NamespaceHTML, nil)
+	node := p.createElement(html_tokenizer.NewTokenTag("html", html_tokenizer.TokenStartTag, utils.None[bool]()), dom.NamespaceHTML, nil)
 	p.openElementsStack = append(p.openElementsStack, node)
 
 	p.insertionMode = mode_BeforeHead
@@ -862,7 +865,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 	switch tag := token.(type) {
 	case html_tokenizer.TokenCharacter:
 		node := p.currentNode()
-		if slices.Contains([]string{"table", "tbody", "template", "tfoot", "tr"}, node.Name) {
+		if slices.Contains([]string{"table", "tbody", "template", "tfoot", "tr"}, node.Tag()) {
 			p.originalInsertionMode = p.insertionMode
 			p.insertionMode = mode_InTableText
 			return nil
@@ -1451,7 +1454,7 @@ func (p *HtmlParser) foreginContent(token html_tokenizer.Token) error {
 				//TODO
 
 				if tag.IsSelfClosingSet() {
-					if name == "script" && p.currentNode().Namespace == NamespaceSVG {
+					if name == "script" && p.currentNode().Namespace() == dom.NamespaceSVG {
 
 					} else {
 						p.openStackPop()
@@ -1461,7 +1464,7 @@ func (p *HtmlParser) foreginContent(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "script":
-				if p.currentNode().Namespace == NamespaceSVG {
+				if p.currentNode().Namespace() == dom.NamespaceSVG {
 
 					return nil
 				}

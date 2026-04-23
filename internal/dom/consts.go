@@ -1,0 +1,12 @@
+package dom
+
+type Namespace string
+
+const (
+	NamespaceHTML   Namespace = "http://www.w3.org/1999/xhtml"
+	NamespaceMathML Namespace = "http://www.w3.org/1998/Math/MathML"
+	NamespaceSVG    Namespace = "http://www.w3.org/2000/svg"
+	NamespaceXLink  Namespace = "http://www.w3.org/1999/xlink"
+	NamespaceXML    Namespace = "http://www.w3.org/XML/1998/namespace"
+	NamespaceXMLNS  Namespace = "http://www.w3.org/2000/xmlns/"
+)
