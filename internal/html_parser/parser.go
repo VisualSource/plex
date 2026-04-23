@@ -1091,7 +1091,41 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intr
-func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error {
+	if tag, ok := token.(*html_tokenizer.TokenTag); ok {
+		name := tag.GetName()
+
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "th", "td":
+				//TODO
+				p.insertHtmlElement(token)
+				p.insertionMode = mode_InCell
+				return nil
+			case "caption", "col", "colgroup", "tbody", "tfoot", "thead", "tr":
+				//TODO
+				return nil
+			}
+		} else {
+			switch name {
+			case "tr":
+				//TODO
+				return nil
+			case "table":
+				//TODO
+				return nil
+			case "tbody", "tfoot", "thead":
+				//TODO
+				return nil
+			case "body", "caption", "col", "colgroup", "html", "td", "th":
+				//TODO: parse error
+				return nil
+			}
+		}
+	}
+
+	return p.state_InTable(token)
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intd
 func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error { return nil }
