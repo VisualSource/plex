@@ -1049,7 +1049,46 @@ func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intbody
-func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error { return nil }
+func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
+	if tag, ok := token.(*html_tokenizer.TokenTag); ok {
+		name := tag.GetName()
+
+		if tag.GetType() == html_tokenizer.TokenStartTag {
+			switch name {
+			case "tr":
+				//TODO
+				p.insertHtmlElement(token)
+				p.insertionMode = mode_InRow
+				return nil
+			case "th", "td":
+				//TODO
+				p.insertHtmlElement(html_tokenizer.NewTokenTag("tr", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertionMode = mode_InRow
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			case "caption", "col", "colgroup", "tbody", "tfoot":
+
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			}
+		} else {
+			switch name {
+			case "tbody", "tfoot", "thead":
+
+				return nil
+			case "table":
+
+				p.tokenizer.ReconsumeToken(token)
+				return nil
+			case "body", "caption", "col", "colgroup", "html", "td", "th", "tr":
+				//TODO: parse error
+				return nil
+			}
+		}
+	}
+
+	return p.state_InTable(token)
+}
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intr
 func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error { return nil }
@@ -1178,7 +1217,7 @@ func (p *HtmlParser) foreginContent(token html_tokenizer.Token) error {
 			switch name {
 			case "script":
 				if p.currentNode().Namespace == NamespaceSVG {
-					
+
 					return nil
 				}
 				fallthrough
