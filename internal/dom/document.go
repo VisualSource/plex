@@ -9,15 +9,24 @@ const (
 )
 
 type Document struct {
-	children       []Node
-	QuirksMode     QuirksMode
+	children           []Node
+	QuirksMode         QuirksMode
 	ParserNoChangeMode bool
+}
+
+func (d Document) IsNode() uint {
+	return 0
+}
+func (d Document) Tag() string {
+	return "#document"
+}
+func (d Document) Namespace() Namespace {
+	return NamespaceHTML
 }
 
 func (d *Document) AppendChild(node Node) {
 	d.children = append(d.children, node)
 }
-
 
 func (d Document) IsIframeSrcDoc() bool {
 	return false
