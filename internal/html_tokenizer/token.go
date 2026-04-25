@@ -43,7 +43,7 @@ func NewTokenTag(
 	name string,
 	tokenType TokenTagType,
 	selfClosing utils.BoolOption,
-) Token {
+) *TokenTag {
 	return &TokenTag{
 		name:        name,
 		attrs:       make(AttributesMap),
@@ -59,7 +59,7 @@ func (p TokenTag) GetName() string {
 }
 func (p TokenTag) GetAttr(key string) (string, bool) {
 	value, ok := p.attrs[key]
-	return value,ok
+	return value, ok
 }
 func (p *TokenTag) SetName(value string) {
 	p.name = value

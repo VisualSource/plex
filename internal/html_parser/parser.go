@@ -151,6 +151,9 @@ func (p *HtmlParser) adjustedCurrentNode() dom.Node {
 
 // https://html.spec.whatwg.org/multipage/parsing.html#current-node
 func (p *HtmlParser) currentNode() dom.Node {
+	if len(p.openElementsStack) == 0 {
+		return nil
+	}
 	node := p.openElementsStack[len(p.openElementsStack)-1]
 
 	return node
@@ -161,39 +164,90 @@ func (*HtmlParser) parseEnd() {}
 
 //#region Helpers
 
+func (p *HtmlParser) lastElementOfType(nodeType string) (dom.Node, int) {
+	for i := len(p.openElementsStack) - 1; i >= 0; i-- {
+		if p.openElementsStack[i].Tag() == nodeType {
+			return p.openElementsStack[i], i
+		}
+	}
+	return nil, -1
+}
+
+type InsertionPosition uint
+
+const (
+	Insert_Before InsertionPosition = iota
+	Insert_After
+)
+
 // https://html.spec.whatwg.org/multipage/parsing.html#appropriate-place-for-inserting-a-node
-func (p *HtmlParser) getInsertionPosition() dom.Node {
-
-	if p.fosterParenting {
-
+func (p *HtmlParser) getInsertionPosition(overrideTarget dom.Node) (dom.Node, InsertionPosition) {
+	var target dom.Node
+	if overrideTarget != nil {
+		target = overrideTarget
 	} else {
-
+		target = p.currentNode()
 	}
 
-	return nil
+	var adjusted dom.Node = target
+	if p.fosterParenting && slices.Contains([]string{"table", "tbody", "tfoot", "thead", "tr"}, target.Tag()) {
+		lastTemplate, tempIdx := p.lastElementOfType("template")
+		lastTable, tableIdx := p.lastElementOfType("table")
+
+		if lastTemplate != nil && (tableIdx != -1 && tempIdx > tableIdx) {
+			return lastTemplate, Insert_After
+		} else if tableIdx == -1 {
+			return p.openElementsStack[0], Insert_After
+		} else if lastTable != nil && lastTable.Parent() != nil {
+			return lastTable.Parent(), Insert_Before
+		}
+
+		prev := p.openElementsStack[tableIdx-1]
+		return prev, Insert_After
+	}
+
+	parent := adjusted.Parent()
+	switch parent.(type) {
+	case *dom.TemplateElement:
+		return parent, Insert_After
+	default:
+		return adjusted, Insert_After
+	}
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#create-an-element-for-the-token
-func (p *HtmlParser) createElement(token html_tokenizer.Token, namespace dom.Namespace, intendedParent dom.Node) dom.Node {
+func (p *HtmlParser) createElement(token html_tokenizer.TokenTag, namespace dom.Namespace, intendedParent dom.Node) dom.Node {
 	if p.speculativeParser != nil {
-
 		return nil
 	}
 
-	return nil
+	el := dom.NewElement(token.GetName(), namespace)
+	if is, ok := token.GetAttr("is"); ok {
+		el.Is = &is
+	}
+
+	return el
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-an-element-at-the-adjusted-insertion-location
 func (p *HtmlParser) insertElement(element dom.Node) {
-	adjInsertLocation := p.getInsertionPosition()
+	adjInsertLocation, insertPosition := p.getInsertionPosition(nil)
 
 	if adjInsertLocation == nil {
 		return
 	}
+
+	switch insertPosition {
+	case Insert_Before:
+		adjInsertLocation.PrependChild(element)
+	case Insert_After:
+		adjInsertLocation.AppendChild(element)
+	}
+
 }
 
-func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
-	adjInsertLocation := p.getInsertionPosition()
+func (p *HtmlParser) insertForeginElement(token html_tokenizer.TokenTag, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
+	adjInsertLocation, _ := p.getInsertionPosition(nil)
 
 	el := p.createElement(token, namespace, adjInsertLocation)
 
@@ -206,14 +260,14 @@ func (p *HtmlParser) insertForeginElement(token html_tokenizer.Token, namespace 
 	return el
 }
 
-func (p *HtmlParser) insertHtmlElement(token html_tokenizer.Token) dom.Node {
+func (p *HtmlParser) insertHtmlElement(token html_tokenizer.TokenTag) dom.Node {
 	return p.insertForeginElement(token, dom.NamespaceHTML, false)
 }
 
 func (p *HtmlParser) insertComment(data string, position dom.Node) {
 
 	if position == nil {
-		position = p.getInsertionPosition()
+		position, _ = p.getInsertionPosition(nil)
 	}
 }
 
@@ -221,7 +275,7 @@ func (p *HtmlParser) insertComment(data string, position dom.Node) {
 func (p *HtmlParser) insertCharacter(value rune)    {}
 func (p *HtmlParser) insertCharacters(value string) {}
 
-func (p *HtmlParser) genericElementParse(token html_tokenizer.Token, alg string) {
+func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg string) {
 	p.insertHtmlElement(token)
 
 	if alg == "text" {
@@ -318,7 +372,7 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 		tagType := tag.GetType()
 		if tagType == html_tokenizer.TokenStartTag && name == "html" {
 
-			node := p.createElement(token, dom.NamespaceHTML, nil)
+			node := p.createElement(tag, dom.NamespaceHTML, nil)
 			p.openElementsStack = append(p.openElementsStack, node)
 
 			p.insertionMode = mode_BeforeHead
@@ -329,7 +383,8 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 	}
 
 	//TODO: fix this
-	node := p.createElement(html_tokenizer.NewTokenTag("html", html_tokenizer.TokenStartTag, utils.None[bool]()), dom.NamespaceHTML, nil)
+	html := html_tokenizer.NewTokenTag("html", html_tokenizer.TokenStartTag, utils.None[bool]())
+	node := p.createElement(*html, dom.NamespaceHTML, nil)
 	p.openElementsStack = append(p.openElementsStack, node)
 
 	p.insertionMode = mode_BeforeHead
@@ -361,7 +416,7 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 				case "html":
 					return p.state_InBody(token)
 				case "head":
-					node := p.insertHtmlElement(token)
+					node := p.insertHtmlElement(tag)
 
 					p.head = node
 					p.insertionMode = mode_InHead
@@ -373,8 +428,8 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 			}
 		}
 	}
-
-	node := p.insertHtmlElement(html_tokenizer.NewTokenTag("head", html_tokenizer.TokenStartTag, utils.None[bool]()))
+	head := html_tokenizer.NewTokenTag("head", html_tokenizer.TokenStartTag, utils.None[bool]())
+	node := p.insertHtmlElement(*head)
 	p.head = node
 	p.insertionMode = mode_InHead
 
@@ -404,7 +459,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 			case "html":
 				return p.state_InBody(token)
 			case "base", "basefont", "bgsound", "link":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 
 				p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
 				if !tag.IsSelfClosingSet() {
@@ -412,7 +467,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				}
 				return nil
 			case "meta":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
 
 				if !tag.IsSelfClosingSet() {
@@ -440,19 +495,19 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				}
 				return nil
 			case "title":
-				p.genericElementParse(token, "rcdata")
+				p.genericElementParse(tag, "rcdata")
 				return nil
 				// TODO
 			case "noscript":
 				if p.scriptingMode != mode_Disabled {
-					p.genericElementParse(token, "text")
+					p.genericElementParse(tag, "text")
 				} else {
-					p.insertHtmlElement(token)
+					p.insertHtmlElement(tag)
 					p.insertionMode = mode_InHeadNoScript
 				}
 				return nil
 			case "noframes", "style":
-				p.genericElementParse(token, "text")
+				p.genericElementParse(tag, "text")
 				return nil
 			case "script":
 
@@ -560,13 +615,13 @@ func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 			case "html":
 				return p.state_InBody(token)
 			case "body":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 
 				p.framesetOk = true
 				p.insertionMode = mode_InBody
 				return nil
 			case "frameset":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.insertionMode = mode_InFrameset
 				return nil
 			case "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title":
@@ -594,8 +649,8 @@ func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 			}
 		}
 	}
-
-	p.insertHtmlElement(html_tokenizer.NewTokenTag("body", html_tokenizer.TokenStartTag, utils.None[bool]()))
+	body := html_tokenizer.NewTokenTag("body", html_tokenizer.TokenStartTag, utils.None[bool]())
+	p.insertHtmlElement(*body)
 
 	p.insertionMode = mode_InBody
 	p.tokenizer.ReconsumeToken(token)
@@ -654,18 +709,18 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 				"dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer",
 				"header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul":
 
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "h1", "h2", "h3", "h4", "h5", "h6":
 				//TODO
 
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "pre", "listing":
 
 				//TODO
 
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.framesetOk = false
 
 				return nil
@@ -687,47 +742,47 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 			case "plaintext":
 				//TODO
 
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.tokenizer.SetState(html_tokenizer.State_PlainText)
 				return nil
 			case "button":
 
 				//TODO
 
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.framesetOk = false
 				return nil
 			case "a":
 
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "nobr":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "applet", "marquee", "object":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "table":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.framesetOk = false
 				p.insertionMode = mode_InTable
 				return nil
 			case "area", "br", "embed", "img", "keygen", "wbr":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.framesetOk = false
 				return nil
 			case "input":
 
 				return nil
 			case "param", "source", "track":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.openStackPop()
 				return nil
 			case "hr":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.framesetOk = false
 				return nil
 			case "image":
@@ -737,7 +792,7 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "textarea":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 
 				p.tokenizer.SetState(html_tokenizer.State_RCData)
 				p.originalInsertionMode = p.insertionMode
@@ -747,35 +802,35 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 			case "xmp":
 
 				p.framesetOk = false
-				p.genericElementParse(token, "text")
+				p.genericElementParse(tag, "text")
 				return nil
 			case "iframe":
 				p.framesetOk = false
-				p.genericElementParse(token, "text")
+				p.genericElementParse(tag, "text")
 				return nil
 			case "noembed":
-				p.genericElementParse(token, "text")
+				p.genericElementParse(tag, "text")
 				return nil
 			case "noscript":
 				if p.scriptingMode != mode_Disabled {
-					p.genericElementParse(token, "text")
+					p.genericElementParse(tag, "text")
 				}
 				return nil
 			case "select":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.framesetOk = false
 				return nil
 			case "option":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "optgroup":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "rb", "rtc":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "rp", "rt":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "math":
 				return nil
@@ -784,7 +839,7 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 			case "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr":
 				return nil
 			default:
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			}
 		} else {
@@ -882,28 +937,29 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 			switch name {
 			case "caption":
 				//TODO
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.insertionMode = mode_InCaption
 				return nil
 			case "colgroup":
 				//TODO
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.insertionMode = mode_InColumnGroup
 				return nil
 			case "col":
 				//TODO
-				p.insertHtmlElement(html_tokenizer.NewTokenTag("colgroup", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				colgroup := html_tokenizer.NewTokenTag("colgroup", html_tokenizer.TokenStartTag, utils.None[bool]())
+				p.insertHtmlElement(*colgroup)
 				p.insertionMode = mode_InColumnGroup
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "tbody", "tfoot", "thead":
 				//TODO
-				p.insertHtmlElement(html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
 				p.insertionMode = mode_InTableBody
 				return nil
 			case "td", "th", "tr":
 				//TODO
-				p.insertHtmlElement(html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
 				p.insertionMode = mode_InTableBody
 				p.tokenizer.ReconsumeToken(token)
 				return nil
@@ -917,7 +973,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				value, exists := tag.GetAttr("type")
 				if !(!exists || !strings.EqualFold(value, "hidden")) {
 					//TODO
-					p.insertHtmlElement(token)
+					p.insertHtmlElement(tag)
 					return nil
 				}
 			case "form":
@@ -1022,7 +1078,7 @@ func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error {
 			case "html":
 				return p.state_InBody(token)
 			case "col":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.openStackPop()
 				//TODO
 				return nil
@@ -1060,12 +1116,12 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 			switch name {
 			case "tr":
 				//TODO
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InRow
 				return nil
 			case "th", "td":
 				//TODO
-				p.insertHtmlElement(html_tokenizer.NewTokenTag("tr", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tr", html_tokenizer.TokenStartTag, utils.None[bool]()))
 				p.insertionMode = mode_InRow
 				p.tokenizer.ReconsumeToken(token)
 				return nil
@@ -1102,7 +1158,7 @@ func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error {
 			switch name {
 			case "th", "td":
 				//TODO
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InCell
 				return nil
 			case "caption", "col", "colgroup", "tbody", "tfoot", "thead", "tr":
@@ -1289,10 +1345,10 @@ func (p *HtmlParser) state_InFrameset(token html_tokenizer.Token) error {
 			case "html":
 				return p.state_InBody(token)
 			case "frameset":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				return nil
 			case "frame":
-				p.insertHtmlElement(token)
+				p.insertHtmlElement(tag)
 				p.openStackPop()
 				//TODO
 				return nil

@@ -5,6 +5,7 @@ type Node interface {
 	Tag() string
 	Namespace() Namespace
 	AppendChild(node Node)
+	Parent() Node
 }
 
 type DocumentType struct {
@@ -13,6 +14,9 @@ type DocumentType struct {
 	SystemId string
 }
 
+func (d DocumentType) Parent() Node {
+	return nil
+}
 func (d DocumentType) IsNode() uint {
 	return 1
 }
@@ -33,6 +37,9 @@ type Text struct {
 	Data string
 }
 
+func (t Text) Parent() Node {
+	return nil
+}
 func (t Text) IsNode() uint {
 	return 2
 }
@@ -52,6 +59,10 @@ func NewTextNode(data string) *Text {
 
 type Comment struct {
 	Data string
+}
+
+func (c Comment) Parent() Node {
+	return nil
 }
 
 func (c Comment) IsNode() uint {
@@ -74,8 +85,12 @@ type Element struct {
 	children  []Node
 	localName string
 	namespace Namespace
+	Is        *string
 }
 
+func (e Element) Parent() Node {
+	return nil
+}
 func (e Element) IsNode() uint {
 	return 4
 }
@@ -88,9 +103,34 @@ func (e Element) Namespace() Namespace {
 func (e *Element) AppendChild(node Node) {
 	e.children = append(e.children, node)
 }
-func NewElement(tagName string, namespace Namespace) *Element {
+func NewElement(localName string, namespace Namespace) *Element {
 	return &Element{
-		localName: tagName,
+		localName: localName,
 		namespace: namespace,
 	}
+}
+
+type TemplateElement struct {
+	templateContents []Node
+}
+
+func (e TemplateElement) Parent() Node {
+	return nil
+}
+func (e TemplateElement) IsNode() uint {
+	return 4
+}
+func (e TemplateElement) Tag() string {
+	return "template"
+}
+func (e TemplateElement) Namespace() Namespace {
+	return NamespaceHTML
+}
+
+func (e *TemplateElement) AppendChild(node Node) {
+	e.templateContents = append(e.templateContents, node)
+}
+
+func NewTemplateElement() *TemplateElement {
+	return &TemplateElement{}
 }
