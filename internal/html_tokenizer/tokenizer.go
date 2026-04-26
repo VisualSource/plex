@@ -311,9 +311,9 @@ func (t *Tokenizer) finishAttr() {
 
 		attrName := t.workingAttrName.String()
 
-		_, ok := tag.attrs[attrName]
+		_, ok := tag.Attributes[attrName]
 		if !ok {
-			tag.attrs[attrName] = t.workingAttrValue.String()
+			tag.Attributes[attrName] = t.workingAttrValue.String()
 		} else {
 			t.errors = append(t.errors, NewTokenizerError(ErrDuplicateAttribute, -1, -1))
 		}

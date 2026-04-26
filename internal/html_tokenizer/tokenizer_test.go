@@ -229,7 +229,7 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 					}
 
 					for name, value := range arg[2].(map[string]any) {
-						tag, hasTag := tag.attrs[resolveEncoding(name, tt.DoubleEscaped)]
+						tag, hasTag := tag.Attributes[resolveEncoding(name, tt.DoubleEscaped)]
 						if !hasTag {
 							t.Fatalf("was expecting to have attribute with a name of '%s' but not was found", name)
 						}

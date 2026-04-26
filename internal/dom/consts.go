@@ -10,3 +10,11 @@ const (
 	NamespaceXML    Namespace = "http://www.w3.org/XML/1998/namespace"
 	NamespaceXMLNS  Namespace = "http://www.w3.org/2000/xmlns/"
 )
+
+type QuirksMode string
+
+const (
+	QuirksMode_Limited  QuirksMode = "limited-quirks"
+	QuirksMode_Quirks   QuirksMode = "quirks"
+	QuirksMode_NoQuirks QuirksMode = "no-quirks"
+)

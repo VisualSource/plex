@@ -1,12 +1,6 @@
 package dom
 
-type QuirksMode string
-
-const (
-	QuirksMode_Limited  QuirksMode = "limited-quirks"
-	QuirksMode_Quirks   QuirksMode = "quirks"
-	QuirksMode_NoQuirks QuirksMode = "no-quirks"
-)
+import "slices"
 
 type Document struct {
 	children           []Node
@@ -27,7 +21,14 @@ func (d Document) Namespace() Namespace {
 func (d *Document) AppendChild(node Node) {
 	d.children = append(d.children, node)
 }
+func (d *Document) PrependChild(node Node) {
+	d.children = slices.Insert(d.children, 0, node)
+}
 
 func (d Document) IsIframeSrcDoc() bool {
 	return false
+}
+
+func (d Document) Document() *Document {
+	return &d
 }

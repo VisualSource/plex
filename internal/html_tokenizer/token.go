@@ -8,6 +8,14 @@ import (
 
 type AttributesMap map[string]string
 
+func (p AttributesMap) Get(key string) utils.StringOption {
+	value, ok := p[key]
+	if ok {
+		return utils.Some(value)
+	}
+	return utils.None[string]()
+}
+
 // https://html.spec.whatwg.org/#tokenization
 type Token interface{ isToken() }
 
@@ -31,7 +39,7 @@ const (
 type TokenTag struct {
 	t           TokenTagType
 	name        string
-	attrs       AttributesMap
+	Attributes  AttributesMap
 	selfClosing utils.BoolOption
 }
 
@@ -46,7 +54,7 @@ func NewTokenTag(
 ) *TokenTag {
 	return &TokenTag{
 		name:        name,
-		attrs:       make(AttributesMap),
+		Attributes:  make(AttributesMap),
 		t:           tokenType,
 		selfClosing: selfClosing,
 	}
@@ -56,10 +64,6 @@ func (p TokenTag) IsSelfClosingSet() bool {
 }
 func (p TokenTag) GetName() string {
 	return p.name
-}
-func (p TokenTag) GetAttr(key string) (string, bool) {
-	value, ok := p.attrs[key]
-	return value, ok
 }
 func (p *TokenTag) SetName(value string) {
 	p.name = value

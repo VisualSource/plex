@@ -32,6 +32,8 @@ type HtmlParser struct {
 	speculativeParser *SpeculativeHTMLParser
 
 	document *dom.Document
+
+	isFragmentParsing bool
 }
 
 func NewHtmlParser(stream io.Reader) *HtmlParser {
@@ -218,15 +220,58 @@ func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (
 // https://html.spec.whatwg.org/multipage/parsing.html#create-an-element-for-the-token
 func (p *HtmlParser) createElement(token html_tokenizer.TokenTag, namespace dom.Namespace, intendedParent dom.Node) dom.Node {
 	if p.speculativeParser != nil {
-		return nil
+		return nil //TODO: create mock element
+	}
+	//TODO: create speculative mock element
+
+	document := intendedParent.Document()
+	is := token.Attributes.Get("is")
+
+	//TODO: custom element registery lookup
+	//TODO: custom element Definition lookup
+	registry := utils.None[string]()
+	definition := utils.None[string]()
+
+	willExecuteScript := definition.IsNone() && !p.isFragmentParsing
+
+	if willExecuteScript {
+		//TODO: document write/open re-entrancy
 	}
 
-	el := dom.NewElement(token.GetName(), namespace)
-	if is, ok := token.GetAttr("is"); ok {
-		el.Is = &is
+	element := dom.NewElement(
+		document,
+		token.GetName(),
+		utils.Some(namespace),
+		utils.None[string](),
+		is,
+		willExecuteScript,
+		registry,
+	)
+
+	for key, value := range token.Attributes {
+		element.SetAttribute(key, value)
 	}
 
-	return el
+	if willExecuteScript {
+		//TODO: custom element flush reactions and tear down guard
+	}
+
+	if xmlnsAttr := element.GetAttributeNS(dom.NamespaceXMLNS, "xmlns"); xmlnsAttr != nil {
+		if xmlnsAttr.Value != string(element.Namespace()) {
+			//TODO: parse error
+		}
+	}
+
+	if xLinkAttr := element.GetAttributeNS(dom.NamespaceXMLNS, "xlink"); xLinkAttr != nil {
+		if xLinkAttr.Value != string(dom.NamespaceXLink) {
+			//TODO: parse error
+		}
+	}
+
+	// TODO: step 14
+	// TODO: step 15
+
+	return element
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-an-element-at-the-adjusted-insertion-location
@@ -970,8 +1015,8 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 			case "style", "script", "template":
 				return p.state_InHead(token)
 			case "input":
-				value, exists := tag.GetAttr("type")
-				if !(!exists || !strings.EqualFold(value, "hidden")) {
+				value := tag.Attributes.Get("type")
+				if !(value.IsNone() || !strings.EqualFold(*value.Value, "hidden")) {
 					//TODO
 					p.insertHtmlElement(tag)
 					return nil
@@ -1491,9 +1536,9 @@ func (p *HtmlParser) foreginContent(token html_tokenizer.Token) error {
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
 			case "font":
-				_, hasColor := tag.GetAttr("color")
-				_, hasFace := tag.GetAttr("face")
-				_, hasSize := tag.GetAttr("size")
+				hasColor := tag.Attributes.Get("color").IsSome()
+				hasFace := tag.Attributes.Get("face").IsSome()
+				hasSize := tag.Attributes.Get("size").IsSome()
 				if !(hasColor || hasFace || hasSize) {
 					break
 				}
