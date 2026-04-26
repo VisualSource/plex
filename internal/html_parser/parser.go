@@ -231,7 +231,7 @@ func (p *HtmlParser) createElement(token html_tokenizer.TokenTag, namespace dom.
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-an-element-at-the-adjusted-insertion-location
 func (p *HtmlParser) insertElement(element dom.Node) {
-	adjInsertLocation, insertPosition := p.getInsertionPosition(nil)
+	adjInsertLocation, insertPosition := p.appropriatePlaceForInsertingNode(nil)
 
 	if adjInsertLocation == nil {
 		return
@@ -247,7 +247,7 @@ func (p *HtmlParser) insertElement(element dom.Node) {
 }
 
 func (p *HtmlParser) insertForeginElement(token html_tokenizer.TokenTag, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
-	adjInsertLocation, _ := p.getInsertionPosition(nil)
+	adjInsertLocation, _ := p.appropriatePlaceForInsertingNode(nil)
 
 	el := p.createElement(token, namespace, adjInsertLocation)
 
@@ -267,7 +267,7 @@ func (p *HtmlParser) insertHtmlElement(token html_tokenizer.TokenTag) dom.Node {
 func (p *HtmlParser) insertComment(data string, position dom.Node) {
 
 	if position == nil {
-		position, _ = p.getInsertionPosition(nil)
+		position, _ = p.appropriatePlaceForInsertingNode(nil)
 	}
 }
 
