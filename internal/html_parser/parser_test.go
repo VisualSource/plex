@@ -3,6 +3,7 @@ package html_parser
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/VisualSource/plex/internal/dom"
+	"github.com/VisualSource/plex/internal/html_tokenizer"
 )
 
 type testCase struct {
@@ -20,7 +22,120 @@ type testCase struct {
 	document         []string
 }
 
-func TestHtmlParser(t *testing.T) {
+func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		stream io.Reader
+		// Named input parameters for target function.
+		overrideTarget dom.Node
+		want           dom.Node
+		want2          InsertionPosition
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewHtmlParser(tt.stream)
+			got, got2 := p.appropriatePlaceForInsertingNode(tt.overrideTarget)
+			// TODO: update the condition below to compare got with tt.want.
+			if true {
+				t.Errorf("appropriatePlaceForInsertingNode() = %v, want %v", got, tt.want)
+			}
+			if true {
+				t.Errorf("appropriatePlaceForInsertingNode() = %v, want %v", got2, tt.want2)
+			}
+		})
+	}
+}
+
+func TestHtmlParser_createElement(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		stream io.Reader
+		// Named input parameters for target function.
+		token          html_tokenizer.TokenTag
+		namespace      dom.Namespace
+		intendedParent dom.Node
+		want           dom.Node
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewHtmlParser(tt.stream)
+			got := p.createElement(tt.token, tt.namespace, tt.intendedParent)
+			// TODO: update the condition below to compare got with tt.want.
+			if true {
+				t.Errorf("createElement() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHtmlParser_insertElement(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		stream io.Reader
+		// Named input parameters for target function.
+		element dom.Node
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewHtmlParser(tt.stream)
+			p.insertElement(tt.element)
+		})
+	}
+}
+
+func TestHtmlParser_insertForeginElement(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		stream io.Reader
+		// Named input parameters for target function.
+		token                 html_tokenizer.TokenTag
+		namespace             dom.Namespace
+		onlyAddToElementStack bool
+		want                  dom.Node
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewHtmlParser(tt.stream)
+			got := p.insertForeginElement(tt.token, tt.namespace, tt.onlyAddToElementStack)
+			// TODO: update the condition below to compare got with tt.want.
+			if true {
+				t.Errorf("insertForeginElement() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHtmlParser_insertCharacter(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		stream io.Reader
+		// Named input parameters for target function.
+		value rune
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := NewHtmlParser(tt.stream)
+			p.insertCharacter(tt.value)
+		})
+	}
+}
+
+func TestHtmlParser_Parse(t *testing.T) {
 	files := loadTestCases(t)
 
 	for filename, tests := range files {
