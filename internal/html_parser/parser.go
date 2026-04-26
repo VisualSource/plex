@@ -181,7 +181,7 @@ const (
 )
 
 // https://html.spec.whatwg.org/multipage/parsing.html#appropriate-place-for-inserting-a-node
-func (p *HtmlParser) getInsertionPosition(overrideTarget dom.Node) (dom.Node, InsertionPosition) {
+func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (dom.Node, InsertionPosition) {
 	var target dom.Node
 	if overrideTarget != nil {
 		target = overrideTarget
