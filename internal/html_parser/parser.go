@@ -175,13 +175,6 @@ func (p *HtmlParser) lastElementOfType(nodeType string) (dom.Node, int) {
 	return nil, -1
 }
 
-type InsertionPosition uint
-
-const (
-	Insert_Before InsertionPosition = iota
-	Insert_After
-)
-
 // https://html.spec.whatwg.org/multipage/parsing.html#appropriate-place-for-inserting-a-node
 func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (dom.Node, InsertionPosition) {
 	var target dom.Node
@@ -246,6 +239,7 @@ func (p *HtmlParser) createElement(token html_tokenizer.TokenTag, namespace dom.
 		is,
 		willExecuteScript,
 		registry,
+		intendedParent,
 	)
 
 	for key, value := range token.Attributes {
@@ -291,6 +285,7 @@ func (p *HtmlParser) insertElement(element dom.Node) {
 
 }
 
+// https://html.spec.whatwg.org/multipage/parsing.html#insert-a-foreign-element
 func (p *HtmlParser) insertForeginElement(token html_tokenizer.TokenTag, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
 	adjInsertLocation, _ := p.appropriatePlaceForInsertingNode(nil)
 
@@ -305,6 +300,7 @@ func (p *HtmlParser) insertForeginElement(token html_tokenizer.TokenTag, namespa
 	return el
 }
 
+// https://html.spec.whatwg.org/multipage/parsing.html#insert-an-html-element
 func (p *HtmlParser) insertHtmlElement(token html_tokenizer.TokenTag) dom.Node {
 	return p.insertForeginElement(token, dom.NamespaceHTML, false)
 }
@@ -317,7 +313,32 @@ func (p *HtmlParser) insertComment(data string, position dom.Node) {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-a-character
-func (p *HtmlParser) insertCharacter(value rune)    {}
+func (p *HtmlParser) insertCharacter(value rune) {
+
+	aj, pos := p.appropriatePlaceForInsertingNode(nil)
+
+	if aj.IsNode() == 0 {
+		return
+	}
+
+	prev := aj.PreviousSibling()
+	if textNode, ok := prev.(*dom.Text); ok {
+		textNode.Data += string(value)
+		return
+	}
+
+	//TODO: get position
+
+	document := aj.Document()
+	text := dom.NewTextNode(document, string(value), aj)
+
+	switch pos {
+	case Insert_After:
+		aj.AppendChild(text)
+	case Insert_Before:
+		aj.PrependChild(text)
+	}
+}
 func (p *HtmlParser) insertCharacters(value string) {}
 
 func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg string) {

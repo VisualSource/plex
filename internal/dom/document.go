@@ -24,6 +24,9 @@ func (d *Document) AppendChild(node Node) {
 func (d *Document) PrependChild(node Node) {
 	d.children = slices.Insert(d.children, 0, node)
 }
+func (d Document) Children() []Node {
+	return d.children
+}
 
 func (d Document) IsIframeSrcDoc() bool {
 	return false
