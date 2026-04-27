@@ -286,7 +286,7 @@ func (p *HtmlParser) insertElement(element dom.Node) {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-a-foreign-element
-func (p *HtmlParser) insertForeginElement(token html_tokenizer.TokenTag, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
+func (p *HtmlParser) insertForeignElement(token html_tokenizer.TokenTag, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
 	adjInsertLocation, _ := p.appropriatePlaceForInsertingNode(nil)
 
 	el := p.createElement(token, namespace, adjInsertLocation)
@@ -302,7 +302,7 @@ func (p *HtmlParser) insertForeginElement(token html_tokenizer.TokenTag, namespa
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-an-html-element
 func (p *HtmlParser) insertHtmlElement(token html_tokenizer.TokenTag) dom.Node {
-	return p.insertForeginElement(token, dom.NamespaceHTML, false)
+	return p.insertForeignElement(token, dom.NamespaceHTML, false)
 }
 
 func (p *HtmlParser) insertComment(data string, position dom.Node) {
