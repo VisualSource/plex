@@ -56,26 +56,26 @@ parseLoop:
 			token := p.tokenizer.ConsumeToken()
 
 			aj := p.adjustedCurrentNode()
-			isStanderd := false
+			isStandard := false
 
 			if aj.Namespace() == dom.NamespaceHTML || len(p.openElementsStack) == 0 {
-				isStanderd = true
+				isStandard = true
 			} else {
 				switch tag := token.(type) {
 				case html_tokenizer.TokenTag:
 					name := tag.GetName()
-					isStanderd = (isMathMLIntegrationPoint(aj) && name != "mglyph" && name != "malignmark") ||
-						isHTMLIntergrationPoint(aj) ||
+					isStandard = (isMathMLIntegrationPoint(aj) && name != "mglyph" && name != "malignmark") ||
+						isHTMLIntegrationPoint(aj) ||
 						aj.Namespace() == dom.NamespaceMathML && aj.Tag() == "annotation-xml" && name == "svg"
 				case html_tokenizer.TokenCharacter:
-					isStanderd = isMathMLIntegrationPoint(aj) || isHTMLIntergrationPoint(aj)
+					isStandard = isMathMLIntegrationPoint(aj) || isHTMLIntegrationPoint(aj)
 				case html_tokenizer.TokenEOF:
-					isStanderd = true
+					isStandard = true
 				}
 			}
 
-			if !isStanderd {
-				if err := p.foreginContent(token); err != nil {
+			if !isStandard {
+				if err := p.foreignContent(token); err != nil {
 					return nil, err
 				}
 				continue
@@ -328,7 +328,6 @@ func (p *HtmlParser) insertComment(data string, position dom.Node) {
 func (p *HtmlParser) insertCharacter(value rune) {
 
 	aj, pos := p.appropriatePlaceForInsertingNode(nil)
-
 	if aj.IsNode() == 0 {
 		return
 	}
@@ -338,8 +337,6 @@ func (p *HtmlParser) insertCharacter(value rune) {
 		textNode.Data += string(value)
 		return
 	}
-
-	//TODO: get position
 
 	document := aj.Document()
 	text := dom.NewTextNode(document, string(value), aj)
@@ -351,7 +348,6 @@ func (p *HtmlParser) insertCharacter(value rune) {
 		aj.PrependChild(text)
 	}
 }
-func (p *HtmlParser) insertCharacters(value string) {}
 
 func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg string) {
 	p.insertHtmlElement(token)
@@ -1544,7 +1540,7 @@ func (p *HtmlParser) state_AfterAfterFrameset(token html_tokenizer.Token) error 
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inforeign
-func (p *HtmlParser) foreginContent(token html_tokenizer.Token) error {
+func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 
 	switch tag := token.(type) {
 	case html_tokenizer.TokenCharacter:

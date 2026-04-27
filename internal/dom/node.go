@@ -133,8 +133,8 @@ func (c Comment) PreviousSibling() Node {
 func (c Comment) Children() []Node {
 	return nil
 }
-func NewComment(data string) *Comment {
-	return &Comment{Data: data}
+func NewComment(document *Document, parent Node, data string) *Comment {
+	return &Comment{Data: data, document: document, parent: parent}
 }
 
 type Attribute struct {
