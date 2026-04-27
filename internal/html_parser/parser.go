@@ -379,7 +379,7 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 		name := tag.GetName()
 
 		if !name.Is("html") || pubIdent.IsSome() || sysIdent.IsSome() && !sysIdent.Is("about:legacy-compat") {
-			// parse error!
+			//TODO: parse error
 		}
 
 		node := dom.NewDocumentType(
@@ -394,12 +394,12 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 			if tag.GetForceQuirks() || !name.Is("html") {
 				p.document.QuirksMode = dom.QuirksMode_Quirks
 			} else if pubIdent.IsSome() {
-				if (sysIdent.IsNone() || sysIdent.Is("")) && (strings.EqualFold("-//W3C//DTD HTML 4.01 Frameset//", *pubIdent.Value) ||
-					strings.EqualFold("-//W3C//DTD HTML 4.01 Transitional//", *pubIdent.Value)) {
+				if (sysIdent.IsNone() || sysIdent.Is("")) && (strings.HasPrefix(strings.ToUpper(*pubIdent.Value), "-//W3C//DTD HTML 4.01 Frameset//") ||
+					strings.HasPrefix(strings.ToUpper(*pubIdent.Value), "-//W3C//DTD HTML 4.01 Transitional//")) {
 					p.document.QuirksMode = dom.QuirksMode_Limited
-				} else if slices.ContainsFunc(doctypeDtD, func(dtd string) bool { return strings.EqualFold(dtd, *pubIdent.Value) }) {
+				} else if slices.ContainsFunc(doctypeDtD, func(dtd string) bool { return strings.HasPrefix(strings.ToUpper(*pubIdent.Value), dtd) }) {
 					p.document.QuirksMode = dom.QuirksMode_Quirks
-				} else if strings.EqualFold("-//W3C//DTD XHTML 1.0 Frameset//", *pubIdent.Value) || strings.EqualFold("-//W3C//DTD XHTML 1.0 Transitional//", *pubIdent.Value) {
+				} else if strings.HasPrefix(strings.ToUpper(*pubIdent.Value), "-//W3C//DTD XHTML 1.0 Frameset//") || strings.HasPrefix(strings.ToUpper(*pubIdent.Value), "-//W3C//DTD XHTML 1.0 Transitional//") {
 					p.document.QuirksMode = dom.QuirksMode_Limited
 				}
 			}
@@ -446,7 +446,7 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 		tagType := tag.GetType()
 		if tagType == html_tokenizer.TokenStartTag && name == "html" {
 
-			node := p.createElement(tag, dom.NamespaceHTML, nil)
+			node := p.createElement(tag, dom.NamespaceHTML, p.document)
 			p.openElementsStack = append(p.openElementsStack, node)
 
 			p.insertionMode = mode_BeforeHead
@@ -456,9 +456,8 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 		}
 	}
 
-	//TODO: fix this
 	html := html_tokenizer.NewTokenTag("html", html_tokenizer.TokenStartTag, utils.None[bool]())
-	node := p.createElement(*html, dom.NamespaceHTML, nil)
+	node := p.createElement(*html, dom.NamespaceHTML, p.document)
 	p.openElementsStack = append(p.openElementsStack, node)
 
 	p.insertionMode = mode_BeforeHead
@@ -496,7 +495,7 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 					p.insertionMode = mode_InHead
 					return nil
 				}
-			} else if slices.Contains([]string{"head", "body", "html", "br"}, name) {
+			} else if !slices.Contains([]string{"head", "body", "html", "br"}, name) {
 				//TODO: parser error
 				return nil
 			}
@@ -521,6 +520,9 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 			p.insertCharacter(tag.Value)
 			return nil
 		}
+	case html_tokenizer.TokenComment:
+		p.insertComment(tag.Value, nil)
+		return nil
 	case html_tokenizer.TokenDOCTYPE:
 		//TODO: parser error
 		return nil
@@ -534,15 +536,15 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				return p.state_InBody(token)
 			case "base", "basefont", "bgsound", "link":
 				p.insertHtmlElement(tag)
+				p.openStackPop()
 
-				p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
 				if !tag.IsSelfClosingSet() {
 					//TODO: parse error
 				}
 				return nil
 			case "meta":
 				p.insertHtmlElement(tag)
-				p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
+				p.openStackPop()
 
 				if !tag.IsSelfClosingSet() {
 					//TODO: parse error
@@ -571,7 +573,6 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 			case "title":
 				p.genericElementParse(tag, "rcdata")
 				return nil
-				// TODO
 			case "noscript":
 				if p.scriptingMode != mode_Disabled {
 					p.genericElementParse(tag, "text")
@@ -600,6 +601,11 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				return nil
 			case "body", "html", "br":
 			case "template":
+
+				p.framesetOk = false
+				p.insertionMode = mode_InTemplate
+
+				//TODO
 				return nil
 			default:
 				//TODO: parse error

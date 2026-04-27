@@ -8,6 +8,10 @@ type Document struct {
 	ParserNoChangeMode bool
 }
 
+func (d Document) Parent() Node {
+	return nil
+}
+
 func (d Document) IsNode() uint {
 	return 0
 }
@@ -16,6 +20,9 @@ func (d Document) Tag() string {
 }
 func (d Document) Namespace() Namespace {
 	return NamespaceHTML
+}
+func (d Document) PreviousSibling() Node {
+	return nil
 }
 
 func (d *Document) AppendChild(node Node) {
