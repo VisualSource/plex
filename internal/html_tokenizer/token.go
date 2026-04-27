@@ -84,10 +84,10 @@ type TokenDOCTYPE struct {
 func (d TokenDOCTYPE) GetName() utils.StringOption {
 	return d.name
 }
-func (d TokenDOCTYPE) GetPublicIdentifer() utils.StringOption {
+func (d TokenDOCTYPE) GetPublicIdentifier() utils.StringOption {
 	return d.publicIdentifier
 }
-func (d TokenDOCTYPE) GetSystemIdentifer() utils.StringOption {
+func (d TokenDOCTYPE) GetSystemIdentifier() utils.StringOption {
 	return d.systemIdentifier
 }
 func (d TokenDOCTYPE) GetForceQuirks() bool {

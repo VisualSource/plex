@@ -374,8 +374,8 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 		p.insertComment(tag.Value, nil)
 		return nil
 	case html_tokenizer.TokenDOCTYPE:
-		pubIdent := tag.GetPublicIdentifer()
-		sysIdent := tag.GetSystemIdentifer()
+		pubIdent := tag.GetPublicIdentifier()
+		sysIdent := tag.GetSystemIdentifier()
 		name := tag.GetName()
 
 		if !name.Is("html") || pubIdent.IsSome() || sysIdent.IsSome() && !sysIdent.Is("about:legacy-compat") {

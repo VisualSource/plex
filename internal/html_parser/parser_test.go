@@ -108,7 +108,7 @@ func TestHtmlParser_insertForeginElement(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p := NewHtmlParser(tt.stream)
-			got := p.insertForeginElement(tt.token, tt.namespace, tt.onlyAddToElementStack)
+			got := p.insertForeignElement(tt.token, tt.namespace, tt.onlyAddToElementStack)
 			// TODO: update the condition below to compare got with tt.want.
 			if true {
 				t.Errorf("insertForeginElement() = %v, want %v", got, tt.want)
