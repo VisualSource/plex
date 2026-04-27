@@ -22,31 +22,169 @@ type testCase struct {
 	document         []string
 }
 
+type mockNode struct {
+	tag       string
+	parent    dom.Node
+	namespace dom.Namespace
+}
+
+func (m *mockNode) IsNode() uint              { return 4 }
+func (m *mockNode) Tag() string               { return m.tag }
+func (m *mockNode) Namespace() dom.Namespace  { return m.namespace }
+func (m *mockNode) AppendChild(dom.Node)      {}
+func (m *mockNode) PrependChild(dom.Node)     {}
+func (m *mockNode) Parent() dom.Node          { return m.parent }
+func (m *mockNode) Document() *dom.Document   { return nil }
+func (m *mockNode) PreviousSibling() dom.Node { return nil }
+func (m *mockNode) Children() []dom.Node      { return nil }
+
+func newMock(tag string, parent dom.Node) *mockNode {
+	return &mockNode{tag: tag, parent: parent, namespace: dom.NamespaceHTML}
+}
+
 func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
-	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for receiver constructor.
-		stream io.Reader
-		// Named input parameters for target function.
-		overrideTarget dom.Node
-		want           dom.Node
-		want2          InsertionPosition
-	}{
-		// TODO: Add test cases.
+	newParser := func() *HtmlParser { return NewHtmlParser(strings.NewReader("")) }
+	check := func(t *testing.T, got dom.Node, gotPos InsertionPosition, want dom.Node, wantPos InsertionPosition) {
+		t.Helper()
+		if got != want {
+			t.Errorf("node = %v, want %v", got, want)
+		}
+		if gotPos != wantPos {
+			t.Errorf("position = %v, want %v", gotPos, wantPos)
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := NewHtmlParser(tt.stream)
-			got, got2 := p.appropriatePlaceForInsertingNode(tt.overrideTarget)
-			// TODO: update the condition below to compare got with tt.want.
-			if true {
-				t.Errorf("appropriatePlaceForInsertingNode() = %v, want %v", got, tt.want)
-			}
-			if true {
-				t.Errorf("appropriatePlaceForInsertingNode() = %v, want %v", got2, tt.want2)
-			}
-		})
-	}
+
+	t.Run("returns current node when no override and parent is nil", func(t *testing.T) {
+		div := newMock("div", nil)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div}
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(nil)
+		check(t, got, gotPos, div, Insert_After)
+	})
+
+	t.Run("returns current node when parent is a regular element", func(t *testing.T) {
+		body := newMock("body", nil)
+		div := newMock("div", body)
+		p := newParser()
+		p.openElementsStack = []dom.Node{body, div}
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(nil)
+		check(t, got, gotPos, div, Insert_After)
+	})
+
+	t.Run("returns adjusted when it is itself a TemplateElement", func(t *testing.T) {
+		// spec step 3: if adjusted IS a template element, insert into its template contents;
+		// TemplateElement.AppendChild already routes to templateContents, so returning adjusted is correct
+		templateEl := &dom.TemplateElement{}
+		p := newParser()
+		p.openElementsStack = []dom.Node{templateEl}
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(nil)
+		check(t, got, gotPos, templateEl, Insert_After)
+	})
+
+	t.Run("returns adjusted even when its parent is a TemplateElement", func(t *testing.T) {
+		// spec step 3 checks if adjusted itself is a template element, not its parent
+		templateEl := &dom.TemplateElement{}
+		div := newMock("div", templateEl)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div}
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(nil)
+		check(t, got, gotPos, div, Insert_After)
+	})
+
+	t.Run("uses override target instead of current node", func(t *testing.T) {
+		div := newMock("div", nil)
+		span := newMock("span", nil)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div}
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(span)
+		check(t, got, gotPos, span, Insert_After)
+	})
+
+	t.Run("returns override target even when its parent is a TemplateElement", func(t *testing.T) {
+		// spec step 3 checks if adjusted itself is a template element, not its parent
+		templateEl := &dom.TemplateElement{}
+		div := newMock("div", nil)
+		span := newMock("span", templateEl)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div}
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(span)
+		check(t, got, gotPos, span, Insert_After)
+	})
+
+	t.Run("foster parenting skipped when target tag is not a table-related element", func(t *testing.T) {
+		div := newMock("div", nil)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div}
+		p.fosterParenting = true
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(nil)
+		check(t, got, gotPos, div, Insert_After)
+	})
+
+	t.Run("foster parenting: template after table wins, returns template", func(t *testing.T) {
+		div := newMock("div", nil)
+		table := newMock("table", nil)
+		tmpl := newMock("template", nil)
+		p := newParser()
+		// tempIdx(2) > tableIdx(1) → template wins
+		p.openElementsStack = []dom.Node{div, table, tmpl}
+		p.fosterParenting = true
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(newMock("table", nil))
+		check(t, got, gotPos, tmpl, Insert_After)
+	})
+
+	t.Run("foster parenting: template in stack with no table returns template", func(t *testing.T) {
+		// spec: lastTemplate != nil && (no table OR template more recently added) → return template
+		// condition should be (tableIdx == -1 || tempIdx > tableIdx), not (tableIdx != -1 && tempIdx > tableIdx)
+		div := newMock("div", nil)
+		tmpl := newMock("template", nil)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div, tmpl}
+		p.fosterParenting = true
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(newMock("tbody", nil))
+		check(t, got, gotPos, tmpl, Insert_After)
+	})
+
+	t.Run("foster parenting: no table and no template returns first open element", func(t *testing.T) {
+		div := newMock("div", nil)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div}
+		p.fosterParenting = true
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(newMock("tbody", nil))
+		check(t, got, gotPos, div, Insert_After)
+	})
+
+	t.Run("foster parenting: table with parent returns table's parent with Insert_Before", func(t *testing.T) {
+		tableParent := newMock("body", nil)
+		div := newMock("div", nil)
+		table := newMock("table", tableParent)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div, table}
+		p.fosterParenting = true
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(newMock("tr", nil))
+		check(t, got, gotPos, tableParent, Insert_Before)
+	})
+
+	t.Run("foster parenting: table without parent returns element before table in stack", func(t *testing.T) {
+		div := newMock("div", nil)
+		table := newMock("table", nil)
+		p := newParser()
+		p.openElementsStack = []dom.Node{div, table}
+		p.fosterParenting = true
+
+		got, gotPos := p.appropriatePlaceForInsertingNode(newMock("tr", nil))
+		check(t, got, gotPos, div, Insert_After)
+	})
 }
 
 func TestHtmlParser_createElement(t *testing.T) {

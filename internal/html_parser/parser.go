@@ -189,7 +189,7 @@ func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (
 		lastTemplate, tempIdx := p.lastElementOfType("template")
 		lastTable, tableIdx := p.lastElementOfType("table")
 
-		if lastTemplate != nil && (tableIdx != -1 && tempIdx > tableIdx) {
+		if lastTemplate != nil && (tableIdx != -1 || tempIdx > tableIdx) {
 			return lastTemplate, Insert_After
 		} else if tableIdx == -1 {
 			return p.openElementsStack[0], Insert_After
@@ -201,13 +201,7 @@ func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (
 		return prev, Insert_After
 	}
 
-	parent := adjusted.Parent()
-	switch parent.(type) {
-	case *dom.TemplateElement:
-		return parent, Insert_After
-	default:
-		return adjusted, Insert_After
-	}
+	return adjusted, Insert_After
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#create-an-element-for-the-token
