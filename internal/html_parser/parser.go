@@ -307,8 +307,20 @@ func (p *HtmlParser) insertHtmlElement(token html_tokenizer.TokenTag) dom.Node {
 
 func (p *HtmlParser) insertComment(data string, position dom.Node) {
 
+	var aj dom.Node = position
+	var insertPos InsertionPosition = Insert_After
 	if position == nil {
-		position, _ = p.appropriatePlaceForInsertingNode(nil)
+		aj, insertPos = p.appropriatePlaceForInsertingNode(nil)
+	}
+
+	document := aj.Document()
+	comment := dom.NewComment(document, aj, data)
+
+	switch insertPos {
+	case Insert_After:
+		aj.AppendChild(comment)
+	case Insert_Before:
+		aj.PrependChild(comment)
 	}
 }
 
