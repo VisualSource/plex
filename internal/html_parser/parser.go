@@ -163,7 +163,9 @@ func (p *HtmlParser) currentNode() dom.Node {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-end
-func (*HtmlParser) parseEnd() {}
+func (*HtmlParser) parseEnd() {
+
+}
 
 //#region Helpers
 
@@ -456,6 +458,7 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 
 	html := html_tokenizer.NewTokenTag("html", html_tokenizer.TokenStartTag, utils.None[bool]())
 	node := p.createElement(*html, dom.NamespaceHTML, p.document)
+	p.document.AppendChild(node)
 	p.openElementsStack = append(p.openElementsStack, node)
 
 	p.insertionMode = mode_BeforeHead
