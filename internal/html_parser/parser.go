@@ -40,6 +40,7 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 	return &HtmlParser{
 		insertionMode: mode_Initial,
 		tokenizer:     html_tokenizer.NewTokenizer(stream),
+		document:      dom.NewDocument(),
 	}
 }
 
@@ -58,7 +59,7 @@ parseLoop:
 			aj := p.adjustedCurrentNode()
 			isStandard := false
 
-			if aj.Namespace() == dom.NamespaceHTML || len(p.openElementsStack) == 0 {
+			if aj != nil && aj.Namespace() == dom.NamespaceHTML || len(p.openElementsStack) == 0 {
 				isStandard = true
 			} else {
 				switch tag := token.(type) {
@@ -138,7 +139,7 @@ parseLoop:
 
 	p.parseEnd()
 
-	return nil, nil
+	return p.document, nil
 }
 
 func (p *HtmlParser) openStackPop() {
@@ -343,6 +344,9 @@ func (p *HtmlParser) insertCharacter(value rune) {
 	}
 }
 
+// https://html.spec.whatwg.org/multipage/parsing.html#reconstruct-the-active-formatting-elements
+func (p *HtmlParser) reconstructActiveFormattingElements() {}
+
 func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg string) {
 	p.insertHtmlElement(token)
 
@@ -364,10 +368,10 @@ func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg stri
 func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 
 	switch tag := token.(type) {
-	case html_tokenizer.TokenComment:
+	case *html_tokenizer.TokenComment:
 		p.insertComment(tag.Value, nil)
 		return nil
-	case html_tokenizer.TokenDOCTYPE:
+	case *html_tokenizer.TokenDOCTYPE:
 		pubIdent := tag.GetPublicIdentifier()
 		sysIdent := tag.GetSystemIdentifier()
 		name := tag.GetName()
@@ -401,7 +405,7 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 
 		p.insertionMode = mode_BeforeHtml
 		return nil
-	case html_tokenizer.TokenCharacter:
+	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
 		case '\t', '\n', '\f', '\r', ' ':
 			return nil
@@ -426,21 +430,21 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 
 	switch tag := token.(type) {
-	case html_tokenizer.TokenDOCTYPE:
+	case *html_tokenizer.TokenDOCTYPE:
 		return nil
-	case html_tokenizer.TokenComment:
+	case *html_tokenizer.TokenComment:
 		p.insertComment(tag.Value, nil)
-	case html_tokenizer.TokenCharacter:
+	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
 		case '\t', '\n', '\f', '\r', ' ':
 			return nil
 		}
-	case html_tokenizer.TokenTag:
+	case *html_tokenizer.TokenTag:
 		name := tag.GetName()
 		tagType := tag.GetType()
 		if tagType == html_tokenizer.TokenStartTag && name == "html" {
 
-			node := p.createElement(tag, dom.NamespaceHTML, p.document)
+			node := p.createElement(*tag, dom.NamespaceHTML, p.document)
 			p.openElementsStack = append(p.openElementsStack, node)
 
 			p.insertionMode = mode_BeforeHead
@@ -464,18 +468,18 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 
 	switch tag := token.(type) {
-	case html_tokenizer.TokenCharacter:
+	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
 		case '\t', '\n', '\f', ' ', '\r':
 			return nil
 		}
-	case html_tokenizer.TokenComment:
+	case *html_tokenizer.TokenComment:
 		p.insertComment(tag.Value, nil)
 		return nil
-	case html_tokenizer.TokenDOCTYPE:
+	case *html_tokenizer.TokenDOCTYPE:
 		//TODO: parser error
 		return nil
-	case html_tokenizer.TokenTag:
+	case *html_tokenizer.TokenTag:
 		{
 			name := tag.GetName()
 			if tag.GetType() == html_tokenizer.TokenStartTag {
@@ -483,7 +487,7 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 				case "html":
 					return p.state_InBody(token)
 				case "head":
-					node := p.insertHtmlElement(tag)
+					node := p.insertHtmlElement(*tag)
 
 					p.head = node
 					p.insertionMode = mode_InHead
@@ -508,19 +512,19 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 
 	switch tag := token.(type) {
-	case html_tokenizer.TokenCharacter:
+	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
 		case '\t', '\n', '\f', '\r', ' ':
 			p.insertCharacter(tag.Value)
 			return nil
 		}
-	case html_tokenizer.TokenComment:
+	case *html_tokenizer.TokenComment:
 		p.insertComment(tag.Value, nil)
 		return nil
-	case html_tokenizer.TokenDOCTYPE:
+	case *html_tokenizer.TokenDOCTYPE:
 		//TODO: parser error
 		return nil
-	case html_tokenizer.TokenTag:
+	case *html_tokenizer.TokenTag:
 		tagType := tag.GetType()
 		name := tag.GetName()
 
@@ -529,7 +533,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 			case "html":
 				return p.state_InBody(token)
 			case "base", "basefont", "bgsound", "link":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.openStackPop()
 
 				if !tag.IsSelfClosingSet() {
@@ -537,7 +541,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				}
 				return nil
 			case "meta":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.openStackPop()
 
 				if !tag.IsSelfClosingSet() {
@@ -565,18 +569,18 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				}
 				return nil
 			case "title":
-				p.genericElementParse(tag, "rcdata")
+				p.genericElementParse(*tag, "rcdata")
 				return nil
 			case "noscript":
 				if p.scriptingMode != mode_Disabled {
-					p.genericElementParse(tag, "text")
+					p.genericElementParse(*tag, "text")
 				} else {
-					p.insertHtmlElement(tag)
+					p.insertHtmlElement(*tag)
 					p.insertionMode = mode_InHeadNoScript
 				}
 				return nil
 			case "noframes", "style":
-				p.genericElementParse(tag, "text")
+				p.genericElementParse(*tag, "text")
 				return nil
 			case "script":
 
@@ -669,19 +673,19 @@ func (p *HtmlParser) state_InHeadNoScript(token html_tokenizer.Token) error {
 // https://html.spec.whatwg.org/multipage/parsing.html#the-after-head-insertion-mode
 func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 	switch tag := token.(type) {
-	case html_tokenizer.TokenCharacter:
+	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
 		case '\t', '\n', '\f', '\r', ' ':
 			p.insertCharacter(tag.Value)
 			return nil
 		}
-	case html_tokenizer.TokenComment:
+	case *html_tokenizer.TokenComment:
 		p.insertComment(tag.Value, nil)
 		return nil
-	case html_tokenizer.TokenDOCTYPE:
+	case *html_tokenizer.TokenDOCTYPE:
 		//TODO: parse error
 		return nil
-	case html_tokenizer.TokenTag:
+	case *html_tokenizer.TokenTag:
 		name := tag.GetName()
 
 		if tag.GetType() == html_tokenizer.TokenStartTag {
@@ -689,13 +693,13 @@ func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 			case "html":
 				return p.state_InBody(token)
 			case "body":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 
 				p.framesetOk = true
 				p.insertionMode = mode_InBody
 				return nil
 			case "frameset":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InFrameset
 				return nil
 			case "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title":
@@ -735,36 +739,48 @@ func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 
 	switch tag := token.(type) {
-	case html_tokenizer.TokenCharacter:
+	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
 		case '\u0000':
 			//TODO: parse error
 			return nil
 		case '\t', '\n', '\f', '\r', ' ':
-			//TODO: reconstruct action formatting els
+			p.reconstructActiveFormattingElements()
 			p.insertCharacter(tag.Value)
 			return nil
 		default:
-			//TODO :reconstruct
+			p.reconstructActiveFormattingElements()
 			p.insertCharacter(tag.Value)
 
 			p.framesetOk = false
 			return nil
 		}
-	case html_tokenizer.TokenComment:
+	case *html_tokenizer.TokenComment:
 		p.insertComment(tag.Value, nil)
 		return nil
-	case html_tokenizer.TokenDOCTYPE:
+	case *html_tokenizer.TokenDOCTYPE:
 		//TODO: parse error
 		return nil
-	case html_tokenizer.TokenTag:
+	case *html_tokenizer.TokenTag:
 		name := tag.GetName()
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
 			case "html":
 				//TODO: parse error
 
-				//TODO finsih
+				node, _ := p.lastElementOfType("template")
+				if node != nil {
+					return nil
+				}
+
+				if el, ok := p.openElementsStack[0].(*dom.Element); ok {
+					for attrName, attrValue := range tag.Attributes {
+						if !el.HasAttribute(attrName) {
+							el.SetAttribute(attrName, attrValue)
+						}
+					}
+				}
+
 				return nil
 			case "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title":
 				return p.state_InHead(token)
@@ -783,18 +799,18 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 				"dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer",
 				"header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul":
 
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "h1", "h2", "h3", "h4", "h5", "h6":
 				//TODO
 
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "pre", "listing":
 
 				//TODO
 
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.framesetOk = false
 
 				return nil
@@ -816,47 +832,47 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 			case "plaintext":
 				//TODO
 
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.tokenizer.SetState(html_tokenizer.State_PlainText)
 				return nil
 			case "button":
 
 				//TODO
 
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.framesetOk = false
 				return nil
 			case "a":
 
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "nobr":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "applet", "marquee", "object":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "table":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.framesetOk = false
 				p.insertionMode = mode_InTable
 				return nil
 			case "area", "br", "embed", "img", "keygen", "wbr":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.framesetOk = false
 				return nil
 			case "input":
 
 				return nil
 			case "param", "source", "track":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.openStackPop()
 				return nil
 			case "hr":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.framesetOk = false
 				return nil
 			case "image":
@@ -866,7 +882,7 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "textarea":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 
 				p.tokenizer.SetState(html_tokenizer.State_RCData)
 				p.originalInsertionMode = p.insertionMode
@@ -876,35 +892,35 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 			case "xmp":
 
 				p.framesetOk = false
-				p.genericElementParse(tag, "text")
+				p.genericElementParse(*tag, "text")
 				return nil
 			case "iframe":
 				p.framesetOk = false
-				p.genericElementParse(tag, "text")
+				p.genericElementParse(*tag, "text")
 				return nil
 			case "noembed":
-				p.genericElementParse(tag, "text")
+				p.genericElementParse(*tag, "text")
 				return nil
 			case "noscript":
 				if p.scriptingMode != mode_Disabled {
-					p.genericElementParse(tag, "text")
+					p.genericElementParse(*tag, "text")
 				}
 				return nil
 			case "select":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				p.framesetOk = false
 				return nil
 			case "option":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "optgroup":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "rb", "rtc":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "rp", "rt":
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			case "math":
 				return nil
@@ -913,7 +929,7 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 			case "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr":
 				return nil
 			default:
-				p.insertHtmlElement(tag)
+				p.insertHtmlElement(*tag)
 				return nil
 			}
 		} else {
@@ -957,7 +973,7 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 
 			}
 		}
-	case html_tokenizer.TokenEOF:
+	case *html_tokenizer.TokenEOF:
 		//TODO:
 		return io.EOF
 	}

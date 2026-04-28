@@ -11,7 +11,6 @@ type Document struct {
 func (d Document) Parent() Node {
 	return nil
 }
-
 func (d Document) IsNode() uint {
 	return 0
 }
@@ -24,7 +23,6 @@ func (d Document) Namespace() Namespace {
 func (d Document) PreviousSibling() Node {
 	return nil
 }
-
 func (d *Document) AppendChild(node Node) {
 	d.children = append(d.children, node)
 }
@@ -34,11 +32,17 @@ func (d *Document) PrependChild(node Node) {
 func (d Document) Children() []Node {
 	return d.children
 }
-
 func (d Document) IsIframeSrcDoc() bool {
 	return false
 }
-
 func (d Document) Document() *Document {
 	return &d
+}
+
+func NewDocument() *Document {
+	return &Document{
+		ParserNoChangeMode: false,
+		QuirksMode:         QuirksMode_NoQuirks,
+		children:           make([]Node, 0),
+	}
 }
