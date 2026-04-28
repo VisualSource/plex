@@ -29,6 +29,14 @@ func (d *Document) AppendChild(node Node) {
 func (d *Document) PrependChild(node Node) {
 	d.children = slices.Insert(d.children, 0, node)
 }
+func (d *Document) InsertBefore(node Node, ref Node) {
+	idx := slices.Index(d.children, ref)
+	if idx == -1 {
+		d.children = append(d.children, node)
+	} else {
+		d.children = slices.Insert(d.children, idx, node)
+	}
+}
 func (d Document) Children() []Node {
 	return d.children
 }

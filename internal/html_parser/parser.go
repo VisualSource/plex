@@ -178,8 +178,19 @@ func (p *HtmlParser) lastElementOfType(nodeType string) (dom.Node, int) {
 	return nil, -1
 }
 
+// InsertionLocation carries the parent node and, for foster-parenting, the
+// sibling to insert before (nil means append as the last child).
+
+func insertNode(node dom.Node, parent dom.Node, before dom.Node) {
+	if before == nil {
+		parent.AppendChild(node)
+	} else {
+		parent.InsertBefore(node, before)
+	}
+}
+
 // https://html.spec.whatwg.org/multipage/parsing.html#appropriate-place-for-inserting-a-node
-func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (dom.Node, InsertionPosition) {
+func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (parent dom.Node, before dom.Node) {
 	var target dom.Node
 	if overrideTarget != nil {
 		target = overrideTarget
@@ -187,24 +198,23 @@ func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (
 		target = p.currentNode()
 	}
 
-	var adjusted dom.Node = target
+	adjusted := target
 	if p.fosterParenting && slices.Contains([]string{"table", "tbody", "tfoot", "thead", "tr"}, target.Tag()) {
 		lastTemplate, tempIdx := p.lastElementOfType("template")
 		lastTable, tableIdx := p.lastElementOfType("table")
 
 		if lastTemplate != nil && (tableIdx != -1 || tempIdx > tableIdx) {
-			return lastTemplate, Insert_After
+			return lastTemplate, nil
 		} else if tableIdx == -1 {
-			return p.openElementsStack[0], Insert_After
+			return p.openElementsStack[0], nil
 		} else if lastTable != nil && lastTable.Parent() != nil {
-			return lastTable.Parent(), Insert_Before
+			return lastTable.Parent(), lastTable
 		}
 
-		prev := p.openElementsStack[tableIdx-1]
-		return prev, Insert_After
+		return p.openElementsStack[tableIdx-1], nil
 	}
 
-	return adjusted, Insert_After
+	return adjusted, nil
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#create-an-element-for-the-token
@@ -267,26 +277,19 @@ func (p *HtmlParser) createElement(token html_tokenizer.TokenTag, namespace dom.
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-an-element-at-the-adjusted-insertion-location
 func (p *HtmlParser) insertElement(element dom.Node) {
-	adjInsertLocation, insertPosition := p.appropriatePlaceForInsertingNode(nil)
-
-	if adjInsertLocation == nil {
+	parent, before := p.appropriatePlaceForInsertingNode(nil)
+	if parent == nil {
 		return
 	}
 
-	switch insertPosition {
-	case Insert_Before:
-		adjInsertLocation.PrependChild(element)
-	case Insert_After:
-		adjInsertLocation.AppendChild(element)
-	}
-
+	insertNode(element, parent, before)
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-a-foreign-element
 func (p *HtmlParser) insertForeignElement(token html_tokenizer.TokenTag, namespace dom.Namespace, onlyAddToElementStack bool) dom.Node {
-	adjInsertLocation, _ := p.appropriatePlaceForInsertingNode(nil)
+	parent, _ := p.appropriatePlaceForInsertingNode(nil)
 
-	el := p.createElement(token, namespace, adjInsertLocation)
+	el := p.createElement(token, namespace, parent)
 
 	if !onlyAddToElementStack {
 		p.insertElement(el)
@@ -303,73 +306,49 @@ func (p *HtmlParser) insertHtmlElement(token html_tokenizer.TokenTag) dom.Node {
 }
 
 func (p *HtmlParser) insertComment(data string, position dom.Node) {
-
-	var aj dom.Node = position
-	var insertPos InsertionPosition = Insert_After
+	var loc dom.Node
+	var before dom.Node = nil
 	if position == nil {
-		aj, insertPos = p.appropriatePlaceForInsertingNode(nil)
+		loc, before = p.appropriatePlaceForInsertingNode(nil)
+	} else {
+		loc = position
 	}
 
-	document := aj.Document()
-	comment := dom.NewComment(document, aj, data)
-
-	switch insertPos {
-	case Insert_After:
-		aj.AppendChild(comment)
-	case Insert_Before:
-		aj.PrependChild(comment)
-	}
+	comment := dom.NewComment(loc.Document(), loc, data)
+	insertNode(comment, loc, before)
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-a-character
-/*
-Bug: wrong "immediately before" lookup
-The spec's "Text node immediately before the adjusted insertion location" means the node that sits just before the position where the new text would be inserted — i.e., a sibling-to-be of the new text node, inside aj. For the normal Insert_After (append-as-last-child) case that's aj's last child.
-
-The code is doing aj.PreviousSibling() (parser.go:332), which is the previous sibling of aj itself in aj's parent's children list — an entirely different node.
-
-Practical consequence: parsing <p>hello calls insertCharacter five times with aj = <p>. Each call checks <p>'s previous sibling, finds something other than a Text, and creates a brand-new Text node. You'd end up with five sibling Text children of <p> instead of one merged "hello". The "merge with prior Text" branch is essentially never taken in normal flow.
-
-It should look up the last existing child of aj (for Insert_After) — and for the foster-parented Insert_Before case, the child sitting immediately before the table inside the foster parent.
-
-There's no method on Node for "last child" yet — Children() exists, so children := aj.Children(); if len(children) > 0 { prev := children[len(children)-1]; ... } works, or add a LastChild() helper to mirror PreviousSibling().
-
-Style: opaque Document check
-aj.IsNode() == 0 (parser.go:328) works because only Document returns 0 from IsNode() — but it reads as a "is this a node at all?" check. Spec step 3 is specifically "is the adjusted insertion location in a Document node". A typed check (if _, ok := aj.(*dom.Document); ok) or a named constant would make intent obvious, and would be robust if IsNode()'s numbering ever shifts.
-
-Adjacent issue (not this function's fault)
-For foster parenting, parser.go:199-200 returns lastTable.Parent(), Insert_Before meaning "insert into the foster parent, before the table." But every caller (including insertCharacter at line 344, and insertElement at parser.go:278) treats Insert_Before as PrependChild — first child of the target. So foster-parented characters/elements end up at the start of the foster parent rather than directly before the table. This is a parser-wide representation problem — InsertionPosition carries a parent and a direction but no reference node — but worth flagging since it's the second branch of this function.
-
-TL;DR
-The Document check is fine semantically (just stylistically magic-numbery).
-The "merge into prior Text" check is wrong — it walks the wrong axis (sibling-of-parent instead of last-child-of-parent), so consecutive characters never coalesce.
-A separate Insert_Before-vs-PrependChild mismatch in foster parenting affects this function but originates elsewhere.
-Want me to fix insertCharacter (and ideally add a TestHtmlParser_insertCharacter case proving consecutive chars merge into one Text node)?
-
-
-*/
 func (p *HtmlParser) insertCharacter(value rune) {
-
-	aj, pos := p.appropriatePlaceForInsertingNode(nil)
-	if aj.IsNode() == 0 {
+	parent, before := p.appropriatePlaceForInsertingNode(nil)
+	if _, ok := parent.(*dom.Document); ok {
 		return
 	}
 
-	prev := aj.PreviousSibling()
-	if textNode, ok := prev.(*dom.Text); ok {
-		textNode.Data += string(value)
-		return
+	// Find the node immediately before the insertion point and coalesce into
+	// it if it is already a Text node, avoiding redundant sibling Text nodes.
+	children := parent.Children()
+	if before == nil {
+		// Normal append: check the current last child.
+		if len(children) > 0 {
+			if textNode, ok := children[len(children)-1].(*dom.Text); ok {
+				textNode.Data += string(value)
+				return
+			}
+		}
+	} else {
+		// Foster-parented insert-before: check the child just before loc.Before.
+		idx := slices.Index(children, before)
+		if idx > 0 {
+			if textNode, ok := children[idx-1].(*dom.Text); ok {
+				textNode.Data += string(value)
+				return
+			}
+		}
 	}
 
-	document := aj.Document()
-	text := dom.NewTextNode(document, string(value), aj)
-
-	switch pos {
-	case Insert_After:
-		aj.AppendChild(text)
-	case Insert_Before:
-		aj.PrependChild(text)
-	}
+	text := dom.NewTextNode(parent.Document(), string(value), parent)
+	insertNode(text, parent, before)
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#reconstruct-the-active-formatting-elements

@@ -28,12 +28,6 @@ const (
 	mode_Unset
 )
 
-type InsertionPosition uint
-
-const (
-	Insert_Before InsertionPosition = iota
-	Insert_After
-)
 
 type ScriptingMode uint
 

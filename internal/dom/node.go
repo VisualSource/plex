@@ -13,6 +13,7 @@ type Node interface {
 	Namespace() Namespace
 	AppendChild(node Node)
 	PrependChild(node Node)
+	InsertBefore(node Node, ref Node)
 	Parent() Node
 	Document() *Document
 	PreviousSibling() Node
@@ -43,6 +44,9 @@ func (d *DocumentType) AppendChild(node Node) {
 	panic("DocumentType node does not support this method")
 }
 func (d *DocumentType) PrependChild(node Node) {
+	panic("DocumentType node does not support this method")
+}
+func (d *DocumentType) InsertBefore(node Node, ref Node) {
 	panic("DocumentType node does not support this method")
 }
 func (d DocumentType) Document() *Document {
@@ -84,6 +88,9 @@ func (t *Text) AppendChild(node Node) {
 func (t *Text) PrependChild(node Node) {
 	panic("Text node does not support this method")
 }
+func (t *Text) InsertBefore(node Node, ref Node) {
+	panic("Text node does not support this method")
+}
 func (t Text) Document() *Document {
 	return t.document
 }
@@ -122,6 +129,9 @@ func (c *Comment) AppendChild(node Node) {
 	panic("Comment node does not support this method")
 }
 func (c *Comment) PrependChild(node Node) {
+	panic("Comment node does not support this method")
+}
+func (c *Comment) InsertBefore(node Node, ref Node) {
 	panic("Comment node does not support this method")
 }
 func (c Comment) Document() *Document {
@@ -189,6 +199,14 @@ func (e *Element) AppendChild(node Node) {
 }
 func (e *Element) PrependChild(node Node) {
 	e.children = slices.Insert(e.children, 0, node)
+}
+func (e *Element) InsertBefore(node Node, ref Node) {
+	idx := slices.Index(e.children, ref)
+	if idx == -1 {
+		e.children = append(e.children, node)
+	} else {
+		e.children = slices.Insert(e.children, idx, node)
+	}
 }
 func (e Element) Document() *Document {
 	return e.document
@@ -328,6 +346,14 @@ func (e *TemplateElement) AppendChild(node Node) {
 }
 func (e *TemplateElement) PrependChild(node Node) {
 	e.templateContents = slices.Insert(e.templateContents, 0, node)
+}
+func (e *TemplateElement) InsertBefore(node Node, ref Node) {
+	idx := slices.Index(e.templateContents, ref)
+	if idx == -1 {
+		e.templateContents = append(e.templateContents, node)
+	} else {
+		e.templateContents = slices.Insert(e.templateContents, idx, node)
+	}
 }
 
 func (e TemplateElement) PreviousSibling() Node {
