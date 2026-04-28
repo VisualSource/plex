@@ -322,6 +322,32 @@ func (p *HtmlParser) insertComment(data string, position dom.Node) {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#insert-a-character
+/*
+Bug: wrong "immediately before" lookup
+The spec's "Text node immediately before the adjusted insertion location" means the node that sits just before the position where the new text would be inserted — i.e., a sibling-to-be of the new text node, inside aj. For the normal Insert_After (append-as-last-child) case that's aj's last child.
+
+The code is doing aj.PreviousSibling() (parser.go:332), which is the previous sibling of aj itself in aj's parent's children list — an entirely different node.
+
+Practical consequence: parsing <p>hello calls insertCharacter five times with aj = <p>. Each call checks <p>'s previous sibling, finds something other than a Text, and creates a brand-new Text node. You'd end up with five sibling Text children of <p> instead of one merged "hello". The "merge with prior Text" branch is essentially never taken in normal flow.
+
+It should look up the last existing child of aj (for Insert_After) — and for the foster-parented Insert_Before case, the child sitting immediately before the table inside the foster parent.
+
+There's no method on Node for "last child" yet — Children() exists, so children := aj.Children(); if len(children) > 0 { prev := children[len(children)-1]; ... } works, or add a LastChild() helper to mirror PreviousSibling().
+
+Style: opaque Document check
+aj.IsNode() == 0 (parser.go:328) works because only Document returns 0 from IsNode() — but it reads as a "is this a node at all?" check. Spec step 3 is specifically "is the adjusted insertion location in a Document node". A typed check (if _, ok := aj.(*dom.Document); ok) or a named constant would make intent obvious, and would be robust if IsNode()'s numbering ever shifts.
+
+Adjacent issue (not this function's fault)
+For foster parenting, parser.go:199-200 returns lastTable.Parent(), Insert_Before meaning "insert into the foster parent, before the table." But every caller (including insertCharacter at line 344, and insertElement at parser.go:278) treats Insert_Before as PrependChild — first child of the target. So foster-parented characters/elements end up at the start of the foster parent rather than directly before the table. This is a parser-wide representation problem — InsertionPosition carries a parent and a direction but no reference node — but worth flagging since it's the second branch of this function.
+
+TL;DR
+The Document check is fine semantically (just stylistically magic-numbery).
+The "merge into prior Text" check is wrong — it walks the wrong axis (sibling-of-parent instead of last-child-of-parent), so consecutive characters never coalesce.
+A separate Insert_Before-vs-PrependChild mismatch in foster parenting affects this function but originates elsewhere.
+Want me to fix insertCharacter (and ideally add a TestHtmlParser_insertCharacter case proving consecutive chars merge into one Text node)?
+
+
+*/
 func (p *HtmlParser) insertCharacter(value rune) {
 
 	aj, pos := p.appropriatePlaceForInsertingNode(nil)
