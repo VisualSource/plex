@@ -23,11 +23,14 @@ type HtmlParser struct {
 	// https://html.spec.whatwg.org/#other-parsing-state-flags
 	scriptingMode ScriptingMode
 
+	templateInsertionModesStack []InsertionMode
+
 	framesetOk bool
 
 	fosterParenting bool
 
 	head dom.Node
+	form dom.Node
 
 	speculativeParser *SpeculativeHTMLParser
 
@@ -150,6 +153,14 @@ func (p *HtmlParser) openStackPop() {
 func (p *HtmlParser) adjustedCurrentNode() dom.Node {
 
 	return p.currentNode()
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#current-template-insertion-mode
+func (p *HtmlParser) currentTemplateInsertionMode() InsertionMode {
+	if len(p.templateInsertionModesStack) == 0 {
+		return mode_Unset
+	}
+	return p.templateInsertionModesStack[len(p.templateInsertionModesStack)-1]
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#current-node
@@ -365,6 +376,103 @@ func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg stri
 
 	p.originalInsertionMode = p.insertionMode
 	p.insertionMode = mode_Text
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-context
+func (p *HtmlParser) clearStackBackToTableContext() {
+	x := p.currentNode()
+	for !slices.Contains([]string{"html", "table", "template"}, x.Tag()) {
+		p.openStackPop()
+		x = p.currentNode()
+	}
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#reset-the-insertion-mode-appropriately
+func (p *HtmlParser) resetInsertionModeAppropriately() {
+	last := false
+
+	idx := len(p.openElementsStack) - 1
+	node := p.openElementsStack[idx]
+
+	for {
+		if node == p.openElementsStack[0] {
+			last = true
+
+			if p.isFragmentParsing {
+				//TODO: set node to context element
+			}
+		}
+
+		tag := node.Tag()
+
+		switch tag {
+		case "td", "th":
+			if !last {
+				p.insertionMode = mode_InCell
+				return
+			}
+		case "tr":
+			p.insertionMode = mode_InRow
+			return
+		case "tbody", "thead", "tfoot":
+			p.insertionMode = mode_InTableBody
+			return
+		case "caption":
+			p.insertionMode = mode_InCaption
+			return
+		case "colgroup":
+			p.insertionMode = mode_InColumnGroup
+			return
+		case "table":
+			p.insertionMode = mode_InTable
+			return
+		case "template":
+			p.insertionMode = p.currentTemplateInsertionMode()
+			return
+		case "head":
+			if !last {
+				p.insertionMode = mode_InHead
+			}
+		case "body":
+			p.insertionMode = mode_InBody
+			return
+		case "frameset":
+			p.insertionMode = mode_InFrameset
+			return
+		case "html":
+			if p.head == nil {
+				p.insertionMode = mode_BeforeHead
+				return
+			}
+			p.insertionMode = mode_AfterHead
+			return
+		}
+
+		if last {
+			p.insertionMode = mode_InBody
+			return
+		}
+
+		idx--
+		node = p.openElementsStack[idx]
+	}
+}
+
+func (p *HtmlParser) clearStackBackToTableBodyContext() {
+	x := p.currentNode()
+	for !slices.Contains([]string{"tbody", "tfoot", "thead", "template", "html"}, x.Tag()) {
+		p.openStackPop()
+		x = p.currentNode()
+	}
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-row-context
+func (p *HtmlParser) clearStackBackToRowContext() {
+	x := p.currentNode()
+	for !slices.Contains([]string{"tr", "template", "html"}, x.Tag()) {
+		p.openStackPop()
+		x = p.currentNode()
+	}
 }
 
 //#endregion
@@ -1034,36 +1142,46 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
 			case "caption":
-				//TODO
+				p.clearStackBackToTableContext()
 				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InCaption
 				return nil
 			case "colgroup":
-				//TODO
+				p.clearStackBackToTableContext()
 				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InColumnGroup
 				return nil
 			case "col":
-				//TODO
+				p.clearStackBackToTableContext()
 				colgroup := html_tokenizer.NewTokenTag("colgroup", html_tokenizer.TokenStartTag, utils.None[bool]())
 				p.insertHtmlElement(*colgroup)
 				p.insertionMode = mode_InColumnGroup
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "tbody", "tfoot", "thead":
-				//TODO
+				p.clearStackBackToTableContext()
 				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
 				p.insertionMode = mode_InTableBody
 				return nil
 			case "td", "th", "tr":
-				//TODO
+				p.clearStackBackToTableContext()
+
 				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
 				p.insertionMode = mode_InTableBody
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "table":
-				//TODO: parser error
-				//TODO
+				//TODO: parse error
+				//TODO: check if no table element in table scope -> ignore
+
+				x := p.currentNode()
+				for {
+					if x == nil || x.Tag() == "table" {
+						break
+					}
+				}
+				p.resetInsertionModeAppropriately()
+				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "style", "script", "template":
 				return p.state_InHead(token)
@@ -1072,6 +1190,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				if !(value.IsNone() || !strings.EqualFold(*value.Value, "hidden")) {
 					//TODO
 					p.insertHtmlElement(*tag)
+					p.openStackPop()
 					return nil
 				}
 			case "form":
@@ -1081,7 +1200,17 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "table":
-				//TODO
+				//TODO: parse error
+				//TODO: check if no table element in table scope -> ignore
+
+				x := p.currentNode()
+				for {
+					if x == nil || x.Tag() == "table" {
+						break
+					}
+				}
+
+				p.resetInsertionModeAppropriately()
 				return nil
 			case "body", "caption", "col", "colgroup", "html", "tbody", "td", "tfoot", "th", "thead", "tr":
 				//TODO: parse error
@@ -1213,28 +1342,36 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
 			case "tr":
-				//TODO
+				p.clearStackBackToTableBodyContext()
 				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InRow
 				return nil
 			case "th", "td":
-				//TODO
+				p.clearStackBackToTableBodyContext()
 				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tr", html_tokenizer.TokenStartTag, utils.None[bool]()))
 				p.insertionMode = mode_InRow
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "caption", "col", "colgroup", "tbody", "tfoot":
-
+				p.clearStackBackToTableBodyContext()
+				p.openStackPop()
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			}
 		} else {
 			switch name {
 			case "tbody", "tfoot", "thead":
+				//TODO: if open element no table scope -> pare error -> ignore
 
+				p.clearStackBackToTableBodyContext()
+				p.openStackPop()
+				p.insertionMode = mode_InTable
 				return nil
 			case "table":
 
+				//TODO: if open element has tbody,thead,tfoot in table scope -> parse error -> ignore
+				p.clearStackBackToTableBodyContext()
+				p.openStackPop()
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "body", "caption", "col", "colgroup", "html", "td", "th", "tr":
@@ -1255,24 +1392,38 @@ func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error {
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
 			case "th", "td":
-				//TODO
+				p.clearStackBackToRowContext()
 				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InCell
+
+				//TODO: insert marker
 				return nil
 			case "caption", "col", "colgroup", "tbody", "tfoot", "thead", "tr":
-				//TODO
+				//TODO: no tr element table scope -> parser eerror -> ignore
+				p.clearStackBackToRowContext()
+				p.openStackPop()
+				p.insertionMode = mode_InTableBody
 				return nil
 			}
 		} else {
 			switch name {
 			case "tr":
-				//TODO
+				//TODO: no tr element in table scope -> parser error -> ignore
+
+				p.clearStackBackToRowContext()
+				p.openStackPop()
+				p.insertionMode = mode_InTableBody
 				return nil
 			case "table":
 				//TODO
 				return nil
 			case "tbody", "tfoot", "thead":
-				//TODO
+				//TODO: no HTML element in table scope with same tag -> parser error -> ignore
+				//TODO: no tr element in table scope --> ignore
+
+				p.clearStackBackToRowContext()
+				p.openStackPop()
+				p.insertionMode = mode_InTableBody
 				return nil
 			case "body", "caption", "col", "colgroup", "html", "td", "th":
 				//TODO: parse error
