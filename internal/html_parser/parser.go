@@ -475,6 +475,23 @@ func (p *HtmlParser) clearStackBackToRowContext() {
 	}
 }
 
+// https://html.spec.whatwg.org/multipage/parsing.html#generate-implied-end-tags
+func (p *HtmlParser) generateImpliedEndTags(ignore ...string) {
+	current := p.currentNode()
+	for {
+		switch current.Tag() {
+		case "dd", "dt", "li", "optgroup", "option", "p", "rb", "rt", "rtc":
+			if slices.Contains(ignore, current.Tag()) {
+				return
+			}
+			p.openStackPop()
+			current = p.currentNode()
+		default:
+			return
+		}
+	}
+}
+
 //#endregion
 
 //#region InsertionModes
@@ -963,6 +980,7 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 				p.insertHtmlElement(*tag)
 				return nil
 			case "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u":
+				p.reconstructActiveFormattingElements()
 				p.insertHtmlElement(*tag)
 				return nil
 			case "nobr":
@@ -972,6 +990,7 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 				p.insertHtmlElement(*tag)
 				return nil
 			case "table":
+				//TODO: handle non quriks mode
 				p.insertHtmlElement(*tag)
 				p.framesetOk = false
 				p.insertionMode = mode_InTable
@@ -1203,9 +1222,12 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				//TODO: parse error
 				//TODO: check if no table element in table scope -> ignore
 
-				x := p.currentNode()
 				for {
-					if x == nil || x.Tag() == "table" {
+					current := p.currentNode()
+					isEnd := current == nil || current.Tag() == "table"
+
+					p.openStackPop()
+					if isEnd {
 						break
 					}
 				}
@@ -1372,6 +1394,7 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 				//TODO: if open element has tbody,thead,tfoot in table scope -> parse error -> ignore
 				p.clearStackBackToTableBodyContext()
 				p.openStackPop()
+				p.insertionMode = mode_InTable
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "body", "caption", "col", "colgroup", "html", "td", "th", "tr":
@@ -1415,7 +1438,12 @@ func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error {
 				p.insertionMode = mode_InTableBody
 				return nil
 			case "table":
-				//TODO
+				//TODO: no tr in table scope -> parse error -> ignore
+
+				p.clearStackBackToRowContext()
+				p.openStackPop()
+				p.insertionMode = mode_InTableBody
+				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "tbody", "tfoot", "thead":
 				//TODO: no HTML element in table scope with same tag -> parser error -> ignore
@@ -1452,9 +1480,20 @@ func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 				//TODO: parse error
 				return nil
 			case "table", "tbody", "tfoot", "thead", "tr":
+				//TODO: stack no have element in table scope is html element with same tag -> parse error -> ignore
+				p.generateImpliedEndTags()
 
-				//TODO
+				current := p.currentNode()
+				if !(current.Tag() == "td" || current.Tag() == "th") {
+					//TODO: parse error
+				}
+				for !(current.Tag() == "td" || current.Tag() == "th") {
+					p.openStackPop()
+					current = p.currentNode()
+				}
 
+				//TODO: clear active formatting elements to last marker
+				p.insertionMode = mode_InRow
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			}
