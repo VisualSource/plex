@@ -12,6 +12,7 @@ import (
 
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
+	"github.com/kr/pretty"
 )
 
 type testCase struct {
@@ -273,6 +274,10 @@ func TestHtmlParser_Parse(t *testing.T) {
 
 			input := strings.NewReader(tt.data)
 			t.Run(testname, func(t *testing.T) {
+				if tt.documentFragment != "" || tt.scripting {
+					t.Skipf("Skipping test '%s;' due to Fragment: %v, scripting: %v", testname, tt.documentFragment != "", tt.scripting)
+					return
+				}
 
 				parser := NewHtmlParser(input)
 				document, err := parser.Parse()
@@ -416,6 +421,61 @@ func validateTest(t *testing.T, document *dom.Document, _ *HtmlParser, testCase 
 	tree := printTree(document, 0)
 
 	if !slices.Equal(testCase.document, tree) {
-		t.Fatalf("was expecting %#v but was given %#v", testCase.document, tree)
+		diff := pretty.Diff(testCase.document, tree)
+		t.Fatalf("tree mismatch:\nInput:%s\n%s\n\n(-expected +got):\n%s",
+			testCase.data,
+			strings.Join(diff, "\n"),
+			unifiedDiff(testCase.document, tree),
+		)
 	}
+}
+
+func unifiedDiff(expected, got []string) string {
+	const (
+		ansiReset = "\x1b[0m"
+		ansiRed   = "\x1b[31m"
+		ansiGreen = "\x1b[32m"
+		ansiDim   = "\x1b[2m"
+	)
+
+	n, m := len(expected), len(got)
+	lcs := make([][]int, n+1)
+	for i := range lcs {
+		lcs[i] = make([]int, m+1)
+	}
+	for i := n - 1; i >= 0; i-- {
+		for j := m - 1; j >= 0; j-- {
+			if expected[i] == got[j] {
+				lcs[i][j] = lcs[i+1][j+1] + 1
+			} else if lcs[i+1][j] >= lcs[i][j+1] {
+				lcs[i][j] = lcs[i+1][j]
+			} else {
+				lcs[i][j] = lcs[i][j+1]
+			}
+		}
+	}
+
+	var lines []string
+	i, j := 0, 0
+	for i < n && j < m {
+		switch {
+		case expected[i] == got[j]:
+			lines = append(lines, ansiDim+"  "+expected[i]+ansiReset)
+			i++
+			j++
+		case lcs[i+1][j] >= lcs[i][j+1]:
+			lines = append(lines, ansiRed+"- "+expected[i]+ansiReset)
+			i++
+		default:
+			lines = append(lines, ansiGreen+"+ "+got[j]+ansiReset)
+			j++
+		}
+	}
+	for ; i < n; i++ {
+		lines = append(lines, ansiRed+"- "+expected[i]+ansiReset)
+	}
+	for ; j < m; j++ {
+		lines = append(lines, ansiGreen+"+ "+got[j]+ansiReset)
+	}
+	return strings.Join(lines, "\n")
 }

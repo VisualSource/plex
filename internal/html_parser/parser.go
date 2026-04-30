@@ -10,6 +10,11 @@ import (
 	"github.com/VisualSource/plex/internal/utils"
 )
 
+type activeFormattingItem struct {
+	IsMarker bool
+	Element  dom.Node
+}
+
 // https://html.spec.whatwg.org/multipage/parsing.html#parse-state
 type HtmlParser struct {
 	tokenizer *html_tokenizer.Tokenizer
@@ -19,7 +24,7 @@ type HtmlParser struct {
 	// https://html.spec.whatwg.org/multipage/parsing.html#the-stack-of-open-elements
 	openElementsStack []dom.Node
 	// https://html.spec.whatwg.org/#the-list-of-active-formatting-elements
-	activeFormattingElements []dom.Node
+	activeFormattingElements []activeFormattingItem
 	// https://html.spec.whatwg.org/#other-parsing-state-flags
 	scriptingMode ScriptingMode
 
@@ -363,7 +368,23 @@ func (p *HtmlParser) insertCharacter(value rune) {
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#reconstruct-the-active-formatting-elements
-func (p *HtmlParser) reconstructActiveFormattingElements() {}
+func (p *HtmlParser) reconstructActiveFormattingElements() {
+	if len(p.activeFormattingElements) == 0 {
+		return
+	}
+
+	entry := p.activeFormattingElements[len(p.activeFormattingElements)-1]
+	if entry.IsMarker || slices.Index(p.openElementsStack, entry.Element) != -1 {
+		return
+	}
+
+	if len(p.activeFormattingElements)-2 >= 0 {
+		for {
+
+		}
+	}
+
+}
 
 func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg string) {
 	p.insertHtmlElement(token)
@@ -488,6 +509,21 @@ func (p *HtmlParser) generateImpliedEndTags(ignore ...string) {
 			current = p.currentNode()
 		default:
 			return
+		}
+	}
+}
+
+func (p *HtmlParser) haveAnElementTargetNode(target string, list ...string) int {
+	idx := len(p.openElementsStack) - 1
+	node := p.openElementsStack[idx]
+	for {
+		if node.Tag() == target {
+			return 1
+		} else if slices.Contains(list, node.Tag()) {
+			return -1
+		} else {
+			idx--
+			node = p.openElementsStack[idx]
 		}
 	}
 }
@@ -931,6 +967,8 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 			case "address", "article", "aside", "blockquote", "center", "details",
 				"dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer",
 				"header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul":
+
+				//TODO:
 
 				p.insertHtmlElement(*tag)
 				return nil
