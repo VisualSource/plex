@@ -39,10 +39,41 @@ func (m *mockNode) Parent() dom.Node                         { return m.parent }
 func (m *mockNode) Document() *dom.Document                  { return nil }
 func (m *mockNode) PreviousSibling() dom.Node                { return nil }
 func (m *mockNode) Children() []dom.Node                     { return nil }
+func (m *mockNode) Remove()                                  {}
+func (m *mockNode) RemoveChild(dom.Node) dom.Node            { return nil }
 
 func newMock(tag string, parent dom.Node) *mockNode {
 	return &mockNode{tag: tag, parent: parent, namespace: dom.NamespaceHTML}
 }
+
+type mockElementNode struct {
+	mockNode
+	attrs []dom.Attribute
+}
+
+func newMockElement(tag string) *mockElementNode {
+	return &mockElementNode{mockNode: mockNode{tag: tag, namespace: dom.NamespaceHTML}}
+}
+
+func (m *mockElementNode) SetAttribute(key, value string) {}
+func (m *mockElementNode) GetAttribute(key string) *dom.Attribute {
+	for i := range m.attrs {
+		if m.attrs[i].LocalName == key {
+			return &m.attrs[i]
+		}
+	}
+	return nil
+}
+func (m *mockElementNode) GetAttributeNS(ns dom.Namespace, localName string) *dom.Attribute {
+	for i := range m.attrs {
+		if m.attrs[i].NamespaceUri == ns && m.attrs[i].LocalName == localName {
+			return &m.attrs[i]
+		}
+	}
+	return nil
+}
+func (m *mockElementNode) HasAttribute(key string) bool { return m.GetAttribute(key) != nil }
+func (m *mockElementNode) Attributes() []dom.Attribute  { return m.attrs }
 
 func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 	newParser := func() *HtmlParser { return NewHtmlParser(strings.NewReader("")) }
@@ -464,18 +495,192 @@ func unifiedDiff(expected, got []string) string {
 			i++
 			j++
 		case lcs[i+1][j] >= lcs[i][j+1]:
-			lines = append(lines, ansiRed+"- "+expected[i]+ansiReset)
+			lines = append(lines, ansiGreen+"- "+expected[i]+ansiReset)
 			i++
 		default:
-			lines = append(lines, ansiGreen+"+ "+got[j]+ansiReset)
+			lines = append(lines, ansiRed+"+ "+got[j]+ansiReset)
 			j++
 		}
 	}
 	for ; i < n; i++ {
-		lines = append(lines, ansiRed+"- "+expected[i]+ansiReset)
+		lines = append(lines, ansiGreen+"- "+expected[i]+ansiReset)
 	}
 	for ; j < m; j++ {
-		lines = append(lines, ansiGreen+"+ "+got[j]+ansiReset)
+		lines = append(lines, ansiRed+"+ "+got[j]+ansiReset)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func TestHtmlParser_reconstructActiveFormattingElements(t *testing.T) {
+	newParser := func() *HtmlParser { return NewHtmlParser(strings.NewReader("")) }
+
+	t.Run("no-op when list is empty", func(t *testing.T) {
+		p := newParser()
+		p.reconstructActiveFormattingElements()
+		if len(p.activeFormattingElements) != 0 {
+			t.Errorf("expected empty list, got %d entries", len(p.activeFormattingElements))
+		}
+	})
+
+	t.Run("no-op when last entry is a marker", func(t *testing.T) {
+		p := newParser()
+		el := newMock("b", nil)
+		p.activeFormattingElements = []activeFormattingItem{
+			{Element: el},
+			{IsMarker: true},
+		}
+		p.reconstructActiveFormattingElements()
+		if len(p.openElementsStack) != 0 {
+			t.Errorf("expected open stack unchanged, got %d entries", len(p.openElementsStack))
+		}
+		if p.activeFormattingElements[0].Element != el {
+			t.Error("AFE entries should be unchanged")
+		}
+	})
+
+	t.Run("no-op when last entry is already in open stack", func(t *testing.T) {
+		p := newParser()
+		el := newMock("b", nil)
+		p.openElementsStack = []dom.Node{el}
+		p.activeFormattingElements = []activeFormattingItem{{Element: el}}
+		p.reconstructActiveFormattingElements()
+		if len(p.openElementsStack) != 1 {
+			t.Errorf("expected open stack unchanged, got %d entries", len(p.openElementsStack))
+		}
+		if p.activeFormattingElements[0].Element != el {
+			t.Error("AFE entry should be unchanged")
+		}
+	})
+
+	t.Run("single element is reconstructed", func(t *testing.T) {
+		p := newParser()
+		p.openElementsStack = []dom.Node{newMock("body", nil)}
+		orig := newMockElement("b")
+		p.activeFormattingElements = []activeFormattingItem{{Element: orig}}
+
+		p.reconstructActiveFormattingElements()
+
+		newEl := p.activeFormattingElements[0].Element
+		if newEl == orig {
+			t.Error("AFE entry should be replaced with a new element")
+		}
+		if newEl.Tag() != "b" {
+			t.Errorf("expected tag %q, got %q", "b", newEl.Tag())
+		}
+		if !slices.Contains(p.openElementsStack, newEl) {
+			t.Error("new element should be in open elements stack")
+		}
+	})
+
+	t.Run("multiple consecutive elements all reconstructed", func(t *testing.T) {
+		p := newParser()
+		p.openElementsStack = []dom.Node{newMock("body", nil)}
+		origB := newMockElement("b")
+		origI := newMockElement("i")
+		origU := newMockElement("u")
+		p.activeFormattingElements = []activeFormattingItem{
+			{Element: origB},
+			{Element: origI},
+			{Element: origU},
+		}
+
+		p.reconstructActiveFormattingElements()
+
+		for idx, orig := range []*mockElementNode{origB, origI, origU} {
+			newEl := p.activeFormattingElements[idx].Element
+			if newEl == orig {
+				t.Errorf("entry %d: should be replaced with a new element", idx)
+			}
+			if newEl.Tag() != orig.tag {
+				t.Errorf("entry %d: expected tag %q, got %q", idx, orig.tag, newEl.Tag())
+			}
+			if !slices.Contains(p.openElementsStack, newEl) {
+				t.Errorf("entry %d: new element not in open elements stack", idx)
+			}
+		}
+	})
+
+	t.Run("reconstruction stops at marker boundary", func(t *testing.T) {
+		p := newParser()
+		p.openElementsStack = []dom.Node{newMock("body", nil)}
+		before := newMockElement("span")
+		after := newMockElement("b")
+		p.activeFormattingElements = []activeFormattingItem{
+			{Element: before},
+			{IsMarker: true},
+			{Element: after},
+		}
+
+		p.reconstructActiveFormattingElements()
+
+		if p.activeFormattingElements[0].Element != before {
+			t.Error("element before marker should not be replaced")
+		}
+		newEl := p.activeFormattingElements[2].Element
+		if newEl == after {
+			t.Error("element after marker should be replaced")
+		}
+		if newEl.Tag() != "b" {
+			t.Errorf("expected tag %q, got %q", "b", newEl.Tag())
+		}
+		if !slices.Contains(p.openElementsStack, newEl) {
+			t.Error("new element should be in open elements stack")
+		}
+	})
+
+	t.Run("reconstruction stops at open-stack element boundary", func(t *testing.T) {
+		p := newParser()
+		boundary := newMockElement("i")
+		p.openElementsStack = []dom.Node{newMock("body", nil), boundary}
+		before := newMockElement("span")
+		after := newMockElement("b")
+		p.activeFormattingElements = []activeFormattingItem{
+			{Element: before},
+			{Element: boundary},
+			{Element: after},
+		}
+
+		p.reconstructActiveFormattingElements()
+
+		if p.activeFormattingElements[0].Element != before {
+			t.Error("element before boundary should not be replaced")
+		}
+		if p.activeFormattingElements[1].Element != boundary {
+			t.Error("boundary element in open stack should not be replaced")
+		}
+		newEl := p.activeFormattingElements[2].Element
+		if newEl == after {
+			t.Error("element after boundary should be replaced")
+		}
+		if newEl.Tag() != "b" {
+			t.Errorf("expected tag %q, got %q", "b", newEl.Tag())
+		}
+		if !slices.Contains(p.openElementsStack, newEl) {
+			t.Error("new element should be in open elements stack")
+		}
+	})
+
+	t.Run("attributes are preserved on reconstructed element", func(t *testing.T) {
+		p := newParser()
+		p.openElementsStack = []dom.Node{newMock("body", nil)}
+		el := newMockElement("a")
+		el.attrs = []dom.Attribute{
+			{LocalName: "href", Value: "https://example.com"},
+			{LocalName: "class", Value: "link"},
+		}
+		p.activeFormattingElements = []activeFormattingItem{{Element: el}}
+
+		p.reconstructActiveFormattingElements()
+
+		newEl, ok := p.activeFormattingElements[0].Element.(dom.ElementNode)
+		if !ok {
+			t.Fatal("new element does not implement ElementNode")
+		}
+		if attr := newEl.GetAttribute("href"); attr == nil || attr.Value != "https://example.com" {
+			t.Errorf("href attribute not preserved: %v", attr)
+		}
+		if attr := newEl.GetAttribute("class"); attr == nil || attr.Value != "link" {
+			t.Errorf("class attribute not preserved: %v", attr)
+		}
+	})
 }

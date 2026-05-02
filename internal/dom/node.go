@@ -15,6 +15,10 @@ type Node interface {
 	PrependChild(node Node)
 	InsertBefore(node Node, ref Node)
 	Parent() Node
+	// removes the element from its parent node. If it has no parent node, calling remove() does nothing.
+	Remove()
+	// removes a child node from the DOM and returns the removed node.
+	RemoveChild(node Node) Node
 	Document() *Document
 	PreviousSibling() Node
 	Children() []Node
@@ -60,6 +64,11 @@ func (d DocumentType) Children() []Node {
 	return nil
 }
 
+func (d DocumentType) Remove() {}
+func (d DocumentType) RemoveChild(Node) Node {
+	return nil
+}
+
 func NewDocumentType(name string, publicId string, systemId string) *DocumentType {
 	return &DocumentType{Name: name, PublicId: publicId, SystemId: systemId}
 }
@@ -93,6 +102,16 @@ func (t *Text) InsertBefore(node Node, ref Node) {
 }
 func (t Text) Document() *Document {
 	return t.document
+}
+
+func (t *Text) Remove() {
+	if t.parent != nil {
+		t.parent.RemoveChild(t)
+	}
+}
+
+func (t *Text) RemoveChild(Node) Node {
+	return nil
 }
 
 func (t Text) PreviousSibling() Node {
@@ -143,6 +162,14 @@ func (c Comment) PreviousSibling() Node {
 func (c Comment) Children() []Node {
 	return nil
 }
+func (c Comment) RemoveChild(Node) Node {
+	return nil
+}
+func (c *Comment) Remove() {
+	if c.parent != nil {
+		c.parent.RemoveChild(c)
+	}
+}
 func NewComment(document *Document, parent Node, data string) *Comment {
 	return &Comment{Data: data, document: document, parent: parent}
 }
@@ -169,6 +196,7 @@ type ElementNode interface {
 	GetAttribute(key string) *Attribute
 	GetAttributeNS(namespace Namespace, localName string) *Attribute
 	HasAttribute(key string) bool
+	Attributes() []Attribute
 }
 
 type Element struct {
@@ -288,6 +316,26 @@ func (e Element) GetAttributeNS(namespace Namespace, localname string) *Attribut
 func (e Element) HasAttribute(key string) bool {
 	attr := e.GetAttribute(key)
 	return attr != nil
+}
+
+func (e Element) Attributes() []Attribute {
+	return e.attributes
+}
+
+func (e *Element) Remove() {
+	if e.parent != nil {
+		e.parent.RemoveChild(e)
+	}
+}
+func (e *Element) RemoveChild(node Node) Node {
+	idx := slices.Index(e.children, node)
+	if idx == -1 {
+		return nil
+	}
+
+	item := slices.Delete(e.children, idx, idx)
+
+	return item[0]
 }
 
 // https://dom.spec.whatwg.org/#concept-create-element
@@ -434,4 +482,24 @@ func (e TemplateElement) GetAttributeNS(namespace Namespace, localname string) *
 func (e TemplateElement) HasAttribute(key string) bool {
 	attr := e.GetAttribute(key)
 	return attr != nil
+}
+
+func (e TemplateElement) Attributes() []Attribute {
+	return e.attributes
+}
+
+func (e *TemplateElement) Remove() {
+	if e.parent != nil {
+		e.parent.RemoveChild(e)
+	}
+}
+func (e *TemplateElement) RemoveChild(node Node) Node {
+	idx := slices.Index(e.templateContents, node)
+	if idx != -1 {
+		return nil
+	}
+
+	item := slices.Delete(e.templateContents, idx, idx+1)
+
+	return item[0]
 }

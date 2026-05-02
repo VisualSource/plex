@@ -28,7 +28,6 @@ const (
 	mode_Unset
 )
 
-
 type ScriptingMode uint
 
 const (

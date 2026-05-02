@@ -37,6 +37,18 @@ func (d *Document) InsertBefore(node Node, ref Node) {
 		d.children = slices.Insert(d.children, idx, node)
 	}
 }
+func (d Document) Remove() {}
+func (d *Document) RemoveChild(node Node) Node {
+	idx := slices.Index(d.children, node)
+	if idx == -1 {
+		return nil
+	}
+
+	item := slices.Delete(d.children, idx, idx)
+
+	return item[0]
+}
+
 func (d Document) Children() []Node {
 	return d.children
 }

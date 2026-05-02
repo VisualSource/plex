@@ -1,6 +1,9 @@
 package dom
 
+import "github.com/VisualSource/plex/internal/utils"
+
 type Namespace string
+type NamespaceOption = utils.Option[Namespace]
 
 const (
 	NamespaceHTML   Namespace = "http://www.w3.org/1999/xhtml"
