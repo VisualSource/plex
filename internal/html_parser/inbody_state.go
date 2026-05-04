@@ -15,8 +15,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		case "html":
 			//TODO: parse error
 
-			node, _ := p.lastElementOfType("template")
-			if node != nil {
+			if node, _ := p.lastElementOfType("template"); node != nil {
 				return nil
 			}
 
@@ -56,7 +55,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 
 			p.openElementsStack[1].Remove()
 
-			for i := len(p.openElementsStack); i > 1; i-- {
+			for i := len(p.openElementsStack); i >= 1; i-- {
 				p.openStackPop()
 			}
 
@@ -272,20 +271,12 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				inBody_ClosePTag(p)
 			}
 			p.reconstructActiveFormattingElements()
-			p.framesetOk = false
-			p.genericElementParse(*tag, "text")
-			return nil
+			fallthrough
 		case "iframe":
 			p.framesetOk = false
-			p.genericElementParse(*tag, "text")
-			return nil
+			fallthrough
 		case "noembed":
 			p.genericElementParse(*tag, "text")
-			return nil
-		case "noscript":
-			if p.scriptingMode != mode_Disabled {
-				p.genericElementParse(*tag, "text")
-			}
 			return nil
 		case "select":
 			//TODO:
@@ -340,6 +331,11 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			return nil
 		case "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr":
 			return nil
+		case "noscript":
+			if p.scriptingMode != mode_Disabled {
+				p.genericElementParse(*tag, "text")
+			}
+			fallthrough
 		default:
 			p.reconstructActiveFormattingElements()
 			p.insertHtmlElement(*tag)

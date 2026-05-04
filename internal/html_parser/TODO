@@ -1,0 +1,61 @@
+
+Finished states:
+    InBody:
+        ✔ character token that is U+0000 NULL @done(26-05-04 13:10)
+        ✔ A character token that is \t \n \f \r ' ' @done(26-05-04 13:10)
+        ✔ Any other character token @done(26-05-04 13:10)
+        ✔ A comment token @done(26-05-04 13:10)
+        ✔ A DOCTYPE token @done(26-05-04 13:10)
+        ✔ A start tag whose tag name is "html" @done(26-05-04 13:12)
+        ✔ A start tag whose tag name is one of: "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title" @done(26-05-04 13:13)
+        ✔ An end tag whose tag name is "template" @done(26-05-04 13:14)
+        ✔ A start tag whose tag name is "body" @done(26-05-04 13:13)
+        ✔ A start tag whose tag name is "frameset" @done(26-05-04 13:16)
+        ✔ An end-of-file token @done(26-05-04 13:12)
+        [] An end tag whose tag name is "body"
+        [] An end tag whose tag name is "html"
+        ✔ A start tag whose tag name is one of: "address", "article", "aside", "blockquote", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul" @done(26-05-04 13:16)
+        ✔ A start tag whose tag name is one of: "h1", "h2", "h3", "h4", "h5", "h6" @done(26-05-04 13:17)
+        [] A start tag whose tag name is one of: "pre", "listing"
+        [] A start tag whose tag name is "form"
+        [] A start tag whose tag name is "li"
+        [] A start tag whose tag name is one of: "dd", "dt"
+        ✔ A start tag whose tag name is "plaintext" @done(26-05-04 13:19)
+        [] A start tag whose tag name is "button"
+        [] An end tag whose tag name is one of: "address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search", "section", "select", "summary", "ul"
+        [] An end tag whose tag name is "form
+        ✔ An end tag whose tag name is "p" @done(26-05-04 13:20)
+        [] An end tag whose tag name is "li"
+        [] An end tag whose tag name is one of: "dd", "dt"
+        [] An end tag whose tag name is one of: "h1", "h2", "h3", "h4", "h5", "h6"
+        ✔ An end tag whose tag name is "sarcasm" @done(26-05-04 13:20)
+        ✔ A start tag whose tag name is "a" @done(26-05-04 13:20)
+        ✔ A start tag whose tag name is one of: "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u" @done(26-05-04 13:20)
+        ✔ A start tag whose tag name is "nobr" @done(26-05-04 13:21)
+        ✔ An end tag whose tag name is one of: "a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u" @done(26-05-04 13:21)
+        [] A start tag whose tag name is one of: "applet", "marquee", "object"
+        [] An end tag token whose tag name is one of: "applet", "marquee", "object"
+        [] A start tag whose tag name is "table"
+        [] An end tag whose tag name is "br"
+        [] A start tag whose tag name is one of: "area", "br", "embed", "img", "keygen", "wbr"
+        [] A start tag whose tag name is "input"
+        [] A start tag whose tag name is one of: "param", "source", "track"
+        [] A start tag whose tag name is "hr"
+        ✔ A start tag whose tag name is "image" @done(26-05-04 13:23)
+        [] A start tag whose tag name is "textarea"
+        ✔ A start tag whose tag name is "xmp" @done(26-05-04 13:24)
+        ✔ A start tag whose tag name is "iframe" @done(26-05-04 13:25)
+        ✔ A start tag whose tag name is "noembed" @done(26-05-04 13:25)
+        ✔ A start tag whose tag name is "noscript", if scripting mode is not Disabled @done(26-05-04 13:25)
+        [] A start tag whose tag name is "select"
+        [] A start tag whose tag name is "option"
+        [] A start tag whose tag name is "optgroup"
+        [] A start tag whose tag name is one of: "rb", "rtc"
+        [] A start tag whose tag name is one of: "rp", "rt"
+        [] A start tag whose tag name is "math"
+        [] A start tag whose tag name is "svg"
+        ✔ A start tag whose tag name is one of: "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr" @done(26-05-04 13:26)
+        ✔ Any other start tag @done(26-05-04 13:27)
+        ✔ Any other end tag @done(26-05-04 13:27)
+
+
