@@ -347,10 +347,20 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 	case "template":
 		return p.state_InHead(tag)
 	case "body":
+		if body, _ := p.lastElementOfType("body"); body == nil {
+			return nil
+		}
+
+		//TODO: if no dd,dt,li,optgroup,option,p,rb,rp,rt,rtc,tbody,td,tfoot,th,thead,tr,body,html -> parse error
 
 		p.insertionMode = mode_AfterBody
 		return nil
 	case "html":
+		if html, _ := p.lastElementOfType("html"); html == nil {
+			return nil
+		}
+
+		//TODO: no dd,dt,li,optgroup,option,p,rb,rp,rt,rtc,tbody,td,tfoot,th,thead,tr,body,html -> parse error
 
 		p.insertionMode = mode_AfterBody
 		p.tokenizer.ReconsumeToken(tag)
@@ -381,6 +391,11 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 
 		return nil
 	case "form":
+		if template, _ := p.lastElementOfType("template"); template != nil {
+
+			return nil
+		}
+
 		return nil
 	case "p":
 		if !p.isInButtonScope("p") {

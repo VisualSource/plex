@@ -12,8 +12,8 @@ Finished states:
         ✔ A start tag whose tag name is "body" @done(26-05-04 13:13)
         ✔ A start tag whose tag name is "frameset" @done(26-05-04 13:16)
         ✔ An end-of-file token @done(26-05-04 13:12)
-        [] An end tag whose tag name is "body"
-        [] An end tag whose tag name is "html"
+        ✔ An end tag whose tag name is "body" @done(26-05-04 20:00)
+        ✔ An end tag whose tag name is "html" @done(26-05-04 20:00)
         ✔ A start tag whose tag name is one of: "address", "article", "aside", "blockquote", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul" @done(26-05-04 13:16)
         ✔ A start tag whose tag name is one of: "h1", "h2", "h3", "h4", "h5", "h6" @done(26-05-04 13:17)
         [] A start tag whose tag name is one of: "pre", "listing"
