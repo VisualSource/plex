@@ -150,8 +150,16 @@ parseLoop:
 	return p.document, nil
 }
 
-func (p *HtmlParser) openStackPop() {
-	p.openElementsStack = p.openElementsStack[:len(p.openElementsStack)-1]
+func (p *HtmlParser) openStackPop() dom.Node {
+	l := len(p.openElementsStack) - 1
+	if l <= 0 {
+		return nil
+	}
+
+	removed := p.openElementsStack[l]
+	p.openElementsStack = slices.Delete(p.openElementsStack, l, l+1)
+
+	return removed
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
@@ -584,7 +592,7 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 
 	switch tag := token.(type) {
 	case *html_tokenizer.TokenComment:
-		p.insertComment(tag.Value, nil)
+		p.insertComment(tag.Value, p.document)
 		return nil
 	case *html_tokenizer.TokenDOCTYPE:
 		pubIdent := tag.GetPublicIdentifier()

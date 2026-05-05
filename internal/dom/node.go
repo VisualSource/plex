@@ -322,9 +322,10 @@ func (e *Element) RemoveChild(node Node) Node {
 		return nil
 	}
 
-	item := slices.Delete(e.children, idx, idx)
+	removed := e.children[idx]
+	e.children = slices.Delete(e.children, idx, idx+1)
 
-	return item[0]
+	return removed
 }
 
 type TemplateElement struct {
@@ -453,9 +454,10 @@ func (e *TemplateElement) RemoveChild(node Node) Node {
 		return nil
 	}
 
-	item := slices.Delete(e.templateContents, idx, idx+1)
+	removed := e.templateContents[idx]
+	e.templateContents = slices.Delete(e.templateContents, idx, idx+1)
 
-	return item[0]
+	return removed
 }
 
 // https://dom.spec.whatwg.org/#concept-create-element

@@ -154,9 +154,20 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.tokenizer.SetState(html_tokenizer.State_PlainText)
 			return nil
 		case "button":
+			if p.haveAnElementTargetNode("button", func(tag string, namespace dom.Namespace) bool {
+				return hasParticularElementInScope(tag, namespace)
+			}) {
+				//TODO: parse error
+				p.generateImpliedEndTags()
+				for {
+					node := p.openStackPop()
+					if node == nil || node.Tag() == "button" {
+						break
+					}
+				}
+			}
 
-			//TODO
-
+			p.reconstructActiveFormattingElements()
 			p.insertHtmlElement(*tag)
 			p.framesetOk = false
 			return nil
@@ -564,6 +575,9 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 				nodeStackIdx = currentIdx
 			}
 			nodeStackIdx--
+			if nodeStackIdx < 0 { //TODO: see if need, could be affects of invalid/unimplemented step
+				break
+			}
 			node = p.openElementsStack[nodeStackIdx]
 
 			if node == formattingElement {

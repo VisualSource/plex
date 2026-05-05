@@ -422,6 +422,10 @@ func printTree(root dom.Node, ident int) []string {
 	for _, node := range root.Children() {
 
 		switch tag := node.(type) {
+		case *dom.DocumentType:
+			output = append(output,
+				fmt.Sprintf("%s<!DOCTYPE %s>", strings.Repeat(" ", ident), tag.Name),
+			)
 		case *dom.Text:
 			output = append(output, fmt.Sprintf("%s\"%s\"", strings.Repeat(" ", ident), tag.Data))
 		case *dom.Comment:

@@ -44,9 +44,9 @@ func (d *Document) RemoveChild(node Node) Node {
 		return nil
 	}
 
-	item := slices.Delete(d.children, idx, idx)
-
-	return item[0]
+	removed := d.children[idx]
+	d.children = slices.Delete(d.children, idx, idx+1)
+	return removed
 }
 
 func (d Document) Children() []Node {

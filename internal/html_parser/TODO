@@ -21,7 +21,7 @@ Finished states:
         [] A start tag whose tag name is "li"
         [] A start tag whose tag name is one of: "dd", "dt"
         ✔ A start tag whose tag name is "plaintext" @done(26-05-04 13:19)
-        [] A start tag whose tag name is "button"
+        ✔ A start tag whose tag name is "button" @done(26-05-05 12:35)
         [] An end tag whose tag name is one of: "address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search", "section", "select", "summary", "ul"
         [] An end tag whose tag name is "form
         ✔ An end tag whose tag name is "p" @done(26-05-04 13:20)
