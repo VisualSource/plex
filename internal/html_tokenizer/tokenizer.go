@@ -311,6 +311,10 @@ func (t *Tokenizer) finishAttr() {
 
 		attrName := t.workingAttrName.String()
 
+		if attrName == "" {
+			return
+		}
+
 		_, ok := tag.Attributes[attrName]
 		if !ok {
 			tag.Attributes[attrName] = t.workingAttrValue.String()
@@ -318,6 +322,9 @@ func (t *Tokenizer) finishAttr() {
 			t.errors = append(t.errors, NewTokenizerError(ErrDuplicateAttribute, -1, -1))
 		}
 	}
+
+	t.workingAttrName.Reset()
+	t.workingAttrValue.Reset()
 }
 
 func (t *Tokenizer) emitCurrentWithTokens(tokens ...Token) {
@@ -1346,15 +1353,11 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 		t.state = state_AttributeName
 
 		t.finishAttr()
-		t.workingAttrName.Reset()
 		t.workingAttrName.WriteRune(char)
-		t.workingAttrValue.Reset()
 		return nil
 	}
 
 	t.finishAttr()
-	t.workingAttrName.Reset()
-	t.workingAttrValue.Reset()
 
 	t.state = state_AttributeName
 	return t.reader.UnreadRune()
@@ -1434,8 +1437,6 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 		return nil
 	default:
 		t.finishAttr()
-		t.workingAttrName.Reset()
-		t.workingAttrValue.Reset()
 
 		t.state = state_AttributeName
 		return t.reader.UnreadRune()
