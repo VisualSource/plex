@@ -15,6 +15,10 @@ type activeFormattingItem struct {
 	Element  dom.Node
 }
 
+func newActiveFormatingMarker() activeFormattingItem {
+	return activeFormattingItem{IsMarker: true}
+}
+
 // https://html.spec.whatwg.org/multipage/parsing.html#parse-state
 type HtmlParser struct {
 	tokenizer *html_tokenizer.Tokenizer
@@ -160,6 +164,11 @@ func (p *HtmlParser) openStackPop() dom.Node {
 	p.openElementsStack = slices.Delete(p.openElementsStack, l, l+1)
 
 	return removed
+}
+
+func (p *HtmlParser) popTemplateInsertionMode() {
+	idx := len(p.templateInsertionModesStack) - 1
+	p.templateInsertionModesStack = slices.Delete(p.templateInsertionModesStack, idx, idx+1)
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
@@ -1076,9 +1085,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				return nil
 			case "table":
 				//TODO: parse error
-				if !p.haveAnElementTargetNode("table", func(tag string, namespace dom.Namespace) bool {
-					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
-				}) {
+				if !p.isInTableScope("table") {
 					return nil
 				}
 
@@ -1116,9 +1123,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 			switch name {
 			case "table":
 				//TODO: parse error
-				if !p.haveAnElementTargetNode("table", func(tag string, namespace dom.Namespace) bool {
-					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
-				}) {
+				if !p.isInTableScope("table") {
 					return nil
 				}
 
@@ -1194,9 +1199,7 @@ func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
 			case "caption", "col", "colgroup", "tbody", "td", "tfoot", "th", "thead", "tr":
-				if !p.haveAnElementTargetNode("caption", func(tag string, namespace dom.Namespace) bool {
-					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
-				}) {
+				if !p.isInTableScope("caption") {
 					return nil
 				}
 
@@ -1219,9 +1222,7 @@ func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "caption":
-				if !p.haveAnElementTargetNode("caption", func(tag string, namespace dom.Namespace) bool {
-					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
-				}) {
+				if !p.isInTableScope("caption") {
 					return nil
 				}
 				p.generateImpliedEndTags()
@@ -1237,9 +1238,7 @@ func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
 				p.insertionMode = mode_InTable
 				return nil
 			case "table":
-				if !p.haveAnElementTargetNode("caption", func(tag string, namespace dom.Namespace) bool {
-					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
-				}) {
+				if !p.isInTableScope("caption") {
 					return nil
 				}
 
@@ -1293,7 +1292,7 @@ func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error {
 			case "col":
 				p.insertHtmlElement(*tag)
 				p.openStackPop()
-				//TODO
+				//TODO: ack self closing
 				return nil
 			case "template":
 				return p.state_InHead(token)
@@ -1301,7 +1300,13 @@ func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "colgroup":
-				//TODO
+				if node := p.currentNode(); node.Tag() != "colgroup" {
+					//TODO: parse error
+					return nil
+				}
+
+				p.openStackPop()
+				p.insertionMode = mode_InTable
 				return nil
 			case "col":
 				//TODO: parse error
@@ -1314,7 +1319,12 @@ func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error {
 		return p.state_InBody(token)
 	}
 
-	//TODO
+	if node := p.currentNode(); node == nil || node.Tag() != "colgroup" {
+		//TODO: parse error
+		return nil
+	}
+
+	p.openStackPop()
 	p.insertionMode = mode_InTable
 	p.tokenizer.ReconsumeToken(token)
 	return nil
@@ -1333,12 +1343,18 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 				p.insertionMode = mode_InRow
 				return nil
 			case "th", "td":
+				//TODO: parse error
 				p.clearStackBackToTableBodyContext()
 				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tr", html_tokenizer.TokenStartTag, utils.None[bool]()))
 				p.insertionMode = mode_InRow
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "caption", "col", "colgroup", "tbody", "tfoot":
+				if !(p.isInTableScope("tbody") || p.isInTableScope("thead") || p.isInTableScope("tfoot")) {
+					//TODO: parse error
+					return nil
+				}
+
 				p.clearStackBackToTableBodyContext()
 				p.openStackPop()
 				p.tokenizer.ReconsumeToken(token)
@@ -1347,15 +1363,23 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "tbody", "tfoot", "thead":
-				//TODO: if open element no table scope -> pare error -> ignore
+				if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
+					return namespace == dom.NamespaceHTML && (tag == "table" || tag == "html" || tag == "template")
+				}) {
+					//TODO: parse error
+					return nil
+				}
 
 				p.clearStackBackToTableBodyContext()
 				p.openStackPop()
 				p.insertionMode = mode_InTable
 				return nil
 			case "table":
+				if !(p.isInTableScope("tbody") || p.isInTableScope("thead") || p.isInTableScope("tfoot")) {
+					//TODO: parse error
+					return nil
+				}
 
-				//TODO: if open element has tbody,thead,tfoot in table scope -> parse error -> ignore
 				p.clearStackBackToTableBodyContext()
 				p.openStackPop()
 				p.insertionMode = mode_InTable
@@ -1383,26 +1407,36 @@ func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error {
 				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InCell
 
-				//TODO: insert marker
+				p.activeFormattingElements = append(p.activeFormattingElements, newActiveFormatingMarker())
 				return nil
 			case "caption", "col", "colgroup", "tbody", "tfoot", "thead", "tr":
-				//TODO: no tr element table scope -> parser eerror -> ignore
+				if !p.isInTableScope("tr") {
+					//TODO: parse error
+					return nil
+				}
 				p.clearStackBackToRowContext()
 				p.openStackPop()
 				p.insertionMode = mode_InTableBody
+				p.tokenizer.ReconsumeToken(token)
 				return nil
 			}
 		} else {
 			switch name {
 			case "tr":
-				//TODO: no tr element in table scope -> parser error -> ignore
+				if !p.isInTableScope("tr") {
+					//TODO: parse error
+					return nil
+				}
 
 				p.clearStackBackToRowContext()
 				p.openStackPop()
 				p.insertionMode = mode_InTableBody
 				return nil
 			case "table":
-				//TODO: no tr in table scope -> parse error -> ignore
+				if !p.isInTableScope("tr") {
+					//TODO: parse error
+					return nil
+				}
 
 				p.clearStackBackToRowContext()
 				p.openStackPop()
@@ -1410,12 +1444,18 @@ func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error {
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "tbody", "tfoot", "thead":
-				//TODO: no HTML element in table scope with same tag -> parser error -> ignore
-				//TODO: no tr element in table scope --> ignore
+				if !p.isInTableScope(name) {
+					//TODO: parse error
+					return nil
+				}
+				if !p.isInTableScope("tr") {
+					return nil
+				}
 
 				p.clearStackBackToRowContext()
 				p.openStackPop()
 				p.insertionMode = mode_InTableBody
+				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "body", "caption", "col", "colgroup", "html", "td", "th":
 				//TODO: parse error
@@ -1427,6 +1467,24 @@ func (p *HtmlParser) state_InRow(token html_tokenizer.Token) error {
 	return p.state_InTable(token)
 }
 
+func closeCell(p *HtmlParser) {
+	p.generateImpliedEndTags()
+
+	if node := p.currentNode(); node.Tag() != "td" || node.Tag() != "th" {
+		//TODO: parse error
+	}
+
+	for {
+		node := p.openStackPop()
+		if node == nil || node.Tag() == "td" || node.Tag() == "th" {
+			break
+		}
+	}
+
+	clearFormattingElsTolastMarker(p)
+	p.insertionMode = mode_InRow
+}
+
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-intd
 func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 	if tag, ok := token.(*html_tokenizer.TokenTag); ok {
@@ -1435,42 +1493,49 @@ func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 		if tag.GetType() == html_tokenizer.TokenEndTag {
 			switch name {
 			case "td", "th":
+				if !p.isInTableScope(name) {
+					//TODO: parse error
+					return nil
+				}
 
-				//TODO
+				p.generateImpliedEndTags()
+				if node := p.currentNode(); !(node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+					//TODO: parse error
+				}
 
+				for {
+					node := p.openStackPop()
+					if node == nil || node.Tag() == name {
+						break
+					}
+				}
+
+				clearFormattingElsTolastMarker(p)
 				p.insertionMode = mode_InRow
 				return nil
 			case "body", "caption", "col", "colgroup", "html":
 				//TODO: parse error
 				return nil
 			case "table", "tbody", "tfoot", "thead", "tr":
-				//TODO: stack no have element in table scope is html element with same tag -> parse error -> ignore
-				p.generateImpliedEndTags()
-
-				current := p.currentNode()
-				if !(current.Tag() == "td" || current.Tag() == "th") {
+				if !p.isInTableScope(name) {
 					//TODO: parse error
-				}
-				for !(current.Tag() == "td" || current.Tag() == "th") {
-					p.openStackPop()
-					current = p.currentNode()
+					return nil
 				}
 
-				//TODO: clear active formatting elements to last marker
-				p.insertionMode = mode_InRow
+				closeCell(p)
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			}
-		} else {
-			switch name {
-			case "caption", "col", "colgroup", "tbody", "td", "tfoot", "thead", "tr":
+		}
 
-				//TODO
-
-				p.tokenizer.ReconsumeToken(token)
-				return nil
+		switch name {
+		case "caption", "col", "colgroup", "tbody", "td", "tfoot", "thead", "tr":
+			if !(p.isInTableScope("td") || p.isInTableScope("th")) {
+				panic("Should not have td or th element")
 			}
-
+			closeCell(p)
+			p.tokenizer.ReconsumeToken(token)
+			return nil
 		}
 	}
 
@@ -1493,26 +1558,32 @@ func (p *HtmlParser) state_InTemplate(token html_tokenizer.Token) error {
 			case "base", "basefont", "bgsound", "link", "meta", "noframes", "script", "style", "template", "title":
 				return p.state_InHead(token)
 			case "caption", "colgroup", "tbody", "tfoot", "thead":
-				//TODO
-
+				p.popTemplateInsertionMode()
+				p.templateInsertionModesStack = append(p.templateInsertionModesStack, mode_InTable)
 				p.insertionMode = mode_InTable
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "col":
-				//TODO
+				p.popTemplateInsertionMode()
+				p.templateInsertionModesStack = append(p.templateInsertionModesStack, mode_InColumnGroup)
 				p.insertionMode = mode_InColumnGroup
+				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "tr":
-				//TODO
+				p.popTemplateInsertionMode()
+				p.templateInsertionModesStack = append(p.templateInsertionModesStack, mode_InTableBody)
 				p.insertionMode = mode_InTableBody
+				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "td", "th":
-				//TODO
+				p.popTemplateInsertionMode()
+				p.templateInsertionModesStack = append(p.templateInsertionModesStack, mode_InRow)
 				p.insertionMode = mode_InRow
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			default:
-				//TODO
+				p.popTemplateInsertionMode()
+				p.templateInsertionModesStack = append(p.templateInsertionModesStack, mode_InBody)
 				p.insertionMode = mode_InBody
 				p.tokenizer.ReconsumeToken(token)
 				return nil
@@ -1527,7 +1598,21 @@ func (p *HtmlParser) state_InTemplate(token html_tokenizer.Token) error {
 			}
 		}
 	case *html_tokenizer.TokenEOF:
-		//TODO
+		if last, _ := p.lastElementOfType("template"); last == nil {
+			return io.EOF
+		}
+		//TODO: parse error
+
+		for {
+			node := p.openStackPop()
+			if node == nil || node.Tag() == "template" {
+				break
+			}
+		}
+
+		clearFormattingElsTolastMarker(p)
+		p.popTemplateInsertionMode()
+		p.resetInsertionModeAppropriately()
 		p.tokenizer.ReconsumeToken(token)
 		return nil
 	}
@@ -1559,7 +1644,11 @@ func (p *HtmlParser) state_AfterBody(token html_tokenizer.Token) error {
 				return p.state_InBody(token)
 			}
 
-			//TODO
+			if p.isFragmentParsing {
+				//TODO: parse error
+				return nil
+			}
+
 			p.insertionMode = mode_AfterAfterBody
 			return nil
 		}
@@ -1602,7 +1691,7 @@ func (p *HtmlParser) state_InFrameset(token html_tokenizer.Token) error {
 			case "frame":
 				p.insertHtmlElement(*tag)
 				p.openStackPop()
-				//TODO
+				//TODO: ack self closing
 				return nil
 			case "noframes":
 				return p.state_InHead(token)
@@ -1610,15 +1699,24 @@ func (p *HtmlParser) state_InFrameset(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "frameset":
-				//TODO
+				if node := p.currentNode(); node.Tag() == "html" {
+					//TODO: parse error
+					return nil
+				}
 
-				p.insertionMode = mode_AfterFrameset
+				p.openStackPop()
+
+				if !p.isFragmentParsing && p.currentNode().Tag() != "frameset" {
+					p.insertionMode = mode_AfterFrameset
+				}
 				return nil
 			}
 		}
 
 	case html_tokenizer.TokenEOF:
-		//TODO
+		if node := p.currentNode(); node == nil || node.Tag() != "html" {
+			//TODO: parse eror
+		}
 		return io.EOF
 	}
 
@@ -1650,17 +1748,17 @@ func (p *HtmlParser) state_AfterFrameset(token html_tokenizer.Token) error {
 			case "html":
 				return p.state_InBody(token)
 			case "noframes":
-				p.insertionMode = mode_AfterAfterFrameset
-				return nil
+				return p.state_InHead(token)
 			}
 		} else if name == "html" {
-			return p.state_AfterAfterFrameset(token)
+			p.insertionMode = mode_AfterAfterFrameset
+			return nil
 		}
 	case *html_tokenizer.TokenEOF:
 		return io.EOF
 	}
 
-	//TODO: parse erro
+	//TODO: parse error
 	return nil
 }
 
@@ -1668,8 +1766,7 @@ func (p *HtmlParser) state_AfterFrameset(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_AfterAfterBody(token html_tokenizer.Token) error {
 	switch tag := token.(type) {
 	case *html_tokenizer.TokenComment:
-		//TODO
-		p.insertComment(tag.Value, nil)
+		p.insertComment(tag.Value, p.document)
 		return nil
 	case *html_tokenizer.TokenDOCTYPE:
 		return p.state_InBody(token)
@@ -1687,7 +1784,9 @@ func (p *HtmlParser) state_AfterAfterBody(token html_tokenizer.Token) error {
 	}
 
 	//TODO: parse error
-	return p.state_InBody(token)
+	p.insertionMode = mode_InBody
+	p.tokenizer.ReconsumeToken(token)
+	return nil
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#the-after-after-frameset-insertion-mode
@@ -1696,7 +1795,7 @@ func (p *HtmlParser) state_AfterAfterFrameset(token html_tokenizer.Token) error 
 	switch tag := token.(type) {
 	case *html_tokenizer.TokenComment:
 		//TODO
-		p.insertComment(tag.Value, nil)
+		p.insertComment(tag.Value, p.document)
 		return nil
 	case *html_tokenizer.TokenDOCTYPE:
 		return p.state_InBody(token)
@@ -1754,18 +1853,35 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 				"dl", "dt", "em", "embed", "h1", "h2", "h3", "h4", "h5", "h6", "head", "hr", "i", "img", "li",
 				"listing", "menu", "meta", "nobr", "ol", "p", "pre", "ruby", "s", "small", "span", "strong", "strike",
 				"sub", "sup", "table", "tt", "u", "ul", "var":
-				//TODO parse error
+				//TODO: parse error
 
-				//TODO
+				node := p.currentNode()
+				for !isMathMLIntegrationPoint(node) && !isHTMLIntegrationPoint(node) || node.Namespace() != dom.NamespaceHTML {
+					p.openStackPop()
+				}
+
+				p.tokenizer.ReconsumeToken(token)
 				return nil
 			default:
-				//TODO
+				aj := p.adjustedCurrentNode()
+				if aj.Namespace() == dom.NamespaceMathML {
+					adjustMathMLAttributes(tag)
+				} else if aj.Namespace() == dom.NamespaceSVG {
+					//TODO: fix scg tag name
+
+					adjustSvgAttributes(tag)
+				}
+
+				//TODO: adjust foreigin attributes
+
+				p.insertForeignElement(*tag, aj.Namespace(), false)
 
 				if tag.IsSelfClosingSet() {
 					if name == "script" && p.currentNode().Namespace() == dom.NamespaceSVG {
-
+						//TODO: ack self closing
 					} else {
 						p.openStackPop()
+						//TODO: ack self closing
 					}
 				}
 			}
@@ -1773,6 +1889,9 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 			switch name {
 			case "script":
 				if p.currentNode().Namespace() == dom.NamespaceSVG {
+					p.openStackPop()
+
+					//TODO:
 
 					return nil
 				}
