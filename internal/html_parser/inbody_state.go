@@ -379,23 +379,20 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 	case "address", "article", "aside", "blockquote", "button", "center", "details", "dialong", "dir", "div", "dl", "fieldset",
 		"figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search",
 		"section", "select", "summary", "ul":
+		if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
+			return hasParticularElementInScope(tag, namespace)
+		}) {
+			//TODO: parse error
+			return nil
+		}
 
 		p.generateImpliedEndTags()
-
-		node := p.currentNode()
-		if node.Namespace() != dom.NamespaceHTML || node.Tag() != tag.GetName() {
+		if node := p.currentNode(); node.Namespace() != dom.NamespaceHTML || node.Tag() != tag.GetName() {
 			//TODO: parse error
 		}
 
 		for {
-			node = p.currentNode()
-			if node == nil {
-				break
-			}
-			isElement := node.Tag() == tag.GetName()
-			p.openStackPop()
-
-			if isElement {
+			if node := p.openStackPop(); node == nil || node.Tag() == name && node.Namespace() == dom.NamespaceHTML {
 				break
 			}
 		}
@@ -403,10 +400,48 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		return nil
 	case "form":
 		if template, _ := p.lastElementOfType("template"); template != nil {
+			if !p.haveAnElementTargetNode("form", func(tag string, namespace dom.Namespace) bool {
+				return hasParticularElementInScope(tag, namespace)
+			}) {
+				//TODO: parse error
+				return nil
+			}
+
+			p.generateImpliedEndTags()
+
+			if node := p.currentNode(); node == nil || node.Tag() != "form" {
+				//TODO: parse error
+			}
+
+			for {
+				if node := p.openStackPop(); node == nil || node.Tag() == name && node.Namespace() == dom.NamespaceHTML {
+					break
+				}
+			}
 
 			return nil
 		}
 
+		node := p.form
+		p.form = nil
+
+		if node == nil || !p.haveAnElementTargetNode(node.Tag(), func(tag string, namespace dom.Namespace) bool { return hasParticularElementInScope(tag, namespace) }) {
+			//TODO: parse error
+			return nil
+		}
+
+		p.generateImpliedEndTags()
+
+		if node != p.currentNode() {
+			//TODO: parse error
+		}
+
+		idx := slices.Index(p.openElementsStack, node)
+		if idx == -1 {
+			return nil
+		}
+
+		p.openElementsStack = slices.Delete(p.openElementsStack, idx, idx+1)
 		return nil
 	case "p":
 		if !p.isInButtonScope("p") {
@@ -417,17 +452,89 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		inBody_ClosePTag(p)
 		return nil
 	case "li":
+		if !p.isInListScope("li") {
+			//TODO: parse error
+			return nil
+		}
+
+		p.generateImpliedEndTags("li")
+		if node := p.currentNode(); node == nil || node.Tag() != "li" {
+			//TODO: parse error
+		}
+
+		for {
+			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+				break
+			}
+		}
 		return nil
 	case "dd", "dt":
+		if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
+			return hasParticularElementInScope(tag, namespace)
+		}) {
+			//TODO: parse error
+			return nil
+		}
+
+		p.generateImpliedEndTags(name)
+
+		if node := p.currentNode(); node == nil || node.Tag() != name {
+			//TODO: parse error
+		}
+
+		for {
+			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+				break
+			}
+		}
 		return nil
 	case "h1", "h2", "h3", "h4", "h5", "h6":
+		if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
+			return hasParticularElementInScope(tag, namespace)
+		}) {
+			//TODO: parse error
+			return nil
+		}
+
+		p.generateImpliedEndTags()
+
+		if node := p.currentNode(); node == nil || node.Tag() != name {
+			//TODO: parse error
+		}
+
+		for {
+			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+				break
+			}
+		}
 		return nil
 	case "a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u":
 		inBody_adoptionAgency(p, tag)
 		return nil
 	case "applet", "marquee", "object":
+		if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
+			return hasParticularElementInScope(tag, namespace)
+		}) {
+			//TODO: parse error
+			return nil
+		}
+
+		p.generateImpliedEndTags()
+		if node := p.currentNode(); node == nil || node.Tag() != name {
+			//TODO: parse error
+		}
+
+		for {
+			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+				break
+			}
+		}
+
+		clearFormattingElsTolastMarker(p)
 		return nil
 	case "br":
+		clear(tag.Attributes)
+
 		p.reconstructActiveFormattingElements()
 		p.insertHtmlElement(*tag)
 		p.openStackPop()

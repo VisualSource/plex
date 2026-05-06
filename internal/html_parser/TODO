@@ -22,21 +22,21 @@ Finished states:
         [] A start tag whose tag name is one of: "dd", "dt"
         ✔ A start tag whose tag name is "plaintext" @done(26-05-04 13:19)
         ✔ A start tag whose tag name is "button" @done(26-05-05 12:35)
-        [] An end tag whose tag name is one of: "address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search", "section", "select", "summary", "ul"
-        [] An end tag whose tag name is "form
+        ✔ An end tag whose tag name is one of: "address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search", "section", "select", "summary", "ul" @done(26-05-06 13:53)
+        ✔ An end tag whose tag name is "form @done(26-05-06 13:52)
         ✔ An end tag whose tag name is "p" @done(26-05-04 13:20)
-        [] An end tag whose tag name is "li"
-        [] An end tag whose tag name is one of: "dd", "dt"
-        [] An end tag whose tag name is one of: "h1", "h2", "h3", "h4", "h5", "h6"
+        ✔ An end tag whose tag name is "li" @done(26-05-06 13:42)
+        ✔ An end tag whose tag name is one of: "dd", "dt" @done(26-05-06 13:42)
+        ✔ An end tag whose tag name is one of: "h1", "h2", "h3", "h4", "h5", "h6" @done(26-05-06 13:43)
         ✔ An end tag whose tag name is "sarcasm" @done(26-05-04 13:20)
         ✔ A start tag whose tag name is "a" @done(26-05-04 13:20)
         ✔ A start tag whose tag name is one of: "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u" @done(26-05-04 13:20)
         ✔ A start tag whose tag name is "nobr" @done(26-05-04 13:21)
         ✔ An end tag whose tag name is one of: "a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u" @done(26-05-04 13:21)
         [] A start tag whose tag name is one of: "applet", "marquee", "object"
-        [] An end tag token whose tag name is one of: "applet", "marquee", "object"
+        ✔ An end tag token whose tag name is one of: "applet", "marquee", "object" @done(26-05-06 13:44)
         [] A start tag whose tag name is "table"
-        [] An end tag whose tag name is "br"
+        ✔ An end tag whose tag name is "br" @done(26-05-06 13:45)
         [] A start tag whose tag name is one of: "area", "br", "embed", "img", "keygen", "wbr"
         [] A start tag whose tag name is "input"
         [] A start tag whose tag name is one of: "param", "source", "track"

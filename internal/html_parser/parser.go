@@ -38,6 +38,8 @@ type HtmlParser struct {
 
 	fosterParenting bool
 
+	context dom.Node
+
 	head dom.Node
 	form dom.Node
 
@@ -173,6 +175,9 @@ func (p *HtmlParser) popTemplateInsertionMode() {
 
 // https://html.spec.whatwg.org/multipage/parsing.html#adjusted-current-node
 func (p *HtmlParser) adjustedCurrentNode() dom.Node {
+	if p.isFragmentParsing && len(p.openElementsStack) == 1 {
+		return p.context
+	}
 
 	return p.currentNode()
 }
@@ -435,7 +440,7 @@ func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg stri
 	p.insertHtmlElement(token)
 
 	if alg == "text" {
-		p.tokenizer.SetState(html_tokenizer.State_PlainText)
+		p.tokenizer.SetState(html_tokenizer.State_RawText)
 	} else {
 		p.tokenizer.SetState(html_tokenizer.State_RCData)
 	}
@@ -1014,6 +1019,9 @@ func (p *HtmlParser) state_Text(token html_tokenizer.Token) error {
 	case *html_tokenizer.TokenCharacter:
 		p.insertCharacter(tag.Value)
 	case *html_tokenizer.TokenEOF:
+		if node := p.currentNode(); node.Tag() == "script" {
+			//TODO: set started flag
+		}
 		p.openStackPop()
 		p.insertionMode = p.originalInsertionMode
 		p.tokenizer.ReconsumeToken(token)
@@ -1023,9 +1031,16 @@ func (p *HtmlParser) state_Text(token html_tokenizer.Token) error {
 			return nil
 		}
 		if tag.GetName() == "script" {
+
+			p.openStackPop()
+			p.insertionMode = p.originalInsertionMode
+
+			//TODO: finish
+
 			return nil
 		}
 
+		p.openStackPop()
 		p.insertionMode = p.originalInsertionMode
 	}
 	return nil
