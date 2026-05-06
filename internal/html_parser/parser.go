@@ -1159,14 +1159,30 @@ func (p *HtmlParser) state_InTableText(token html_tokenizer.Token) error {
 		switch tag.Value {
 		case '\u0000':
 			//TODO: parse error
+			return nil
 		default:
+			//TODO: append char to pending
 		}
 	default:
+		//TODO: handle pending table chars tokens
+
 		p.insertionMode = p.originalInsertionMode
 		p.tokenizer.ReconsumeToken(token)
 	}
 
 	return nil
+}
+
+func clearFormattingElsTolastMarker(p *HtmlParser) {
+	for {
+		lastIdx := len(p.activeFormattingElements) - 1
+		item := p.activeFormattingElements[lastIdx]
+		p.activeFormattingElements = slices.Delete(p.activeFormattingElements, lastIdx, lastIdx+1)
+
+		if item.IsMarker {
+			break
+		}
+	}
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-incaption
@@ -1178,7 +1194,23 @@ func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
 			case "caption", "col", "colgroup", "tbody", "td", "tfoot", "th", "thead", "tr":
-				//TODO
+				if !p.haveAnElementTargetNode("caption", func(tag string, namespace dom.Namespace) bool {
+					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
+				}) {
+					return nil
+				}
+
+				p.generateImpliedEndTags()
+				if node := p.currentNode(); node.Tag() != "caption" {
+					//TODO: parse error
+				}
+				for {
+					if node := p.openStackPop(); node == nil || node.Tag() == "caption" {
+						break
+					}
+				}
+
+				clearFormattingElsTolastMarker(p)
 
 				p.insertionMode = mode_InTable
 				p.tokenizer.ReconsumeToken(token)
@@ -1187,9 +1219,49 @@ func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "caption":
-				//TODO
+				if !p.haveAnElementTargetNode("caption", func(tag string, namespace dom.Namespace) bool {
+					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
+				}) {
+					return nil
+				}
+				p.generateImpliedEndTags()
+
+				if node := p.currentNode(); node.Tag() != "caption" {
+					//TODO: parse error
+				}
+
+				for {
+					if node := p.openStackPop(); node == nil || node.Tag() == "caption" {
+						break
+					}
+				}
+
+				clearFormattingElsTolastMarker(p)
+
 				p.insertionMode = mode_InTable
 				return nil
+			case "table":
+				if !p.haveAnElementTargetNode("caption", func(tag string, namespace dom.Namespace) bool {
+					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
+				}) {
+					return nil
+				}
+
+				p.generateImpliedEndTags()
+				if node := p.currentNode(); node.Tag() != "caption" {
+					//TODO: parse error
+				}
+				for {
+					if node := p.openStackPop(); node == nil || node.Tag() == "caption" {
+						break
+					}
+				}
+
+				clearFormattingElsTolastMarker(p)
+
+				p.insertionMode = mode_InTable
+				p.tokenizer.ReconsumeToken(token)
+
 			case "body", "col", "colgroup", "html", "tbody", "td", "tfoot", "th", "thead", "tr":
 				//TODO: parser error
 				return nil
