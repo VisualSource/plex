@@ -1225,19 +1225,15 @@ func (p *HtmlParser) state_InCaption(token html_tokenizer.Token) error {
 					return nil
 				}
 				p.generateImpliedEndTags()
-
 				if node := p.currentNode(); node.Tag() != "caption" {
 					//TODO: parse error
 				}
-
 				for {
 					if node := p.openStackPop(); node == nil || node.Tag() == "caption" {
 						break
 					}
 				}
-
 				clearFormattingElsTolastMarker(p)
-
 				p.insertionMode = mode_InTable
 				return nil
 			case "table":
