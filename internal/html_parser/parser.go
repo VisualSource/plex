@@ -1029,6 +1029,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 	case *html_tokenizer.TokenCharacter:
 		node := p.currentNode()
 		if slices.Contains([]string{"table", "tbody", "template", "tfoot", "tr"}, node.Tag()) {
+			//TODO
 			p.originalInsertionMode = p.insertionMode
 			p.insertionMode = mode_InTableText
 			return nil
@@ -1046,6 +1047,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 			case "caption":
 				p.clearStackBackToTableContext()
 				p.insertHtmlElement(*tag)
+				p.activeFormattingElements = append(p.activeFormattingElements, activeFormattingItem{IsMarker: true})
 				p.insertionMode = mode_InCaption
 				return nil
 			case "colgroup":
@@ -1062,7 +1064,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				return nil
 			case "tbody", "tfoot", "thead":
 				p.clearStackBackToTableContext()
-				p.insertHtmlElement(*html_tokenizer.NewTokenTag("tbody", html_tokenizer.TokenStartTag, utils.None[bool]()))
+				p.insertHtmlElement(*tag)
 				p.insertionMode = mode_InTableBody
 				return nil
 			case "td", "th", "tr":
@@ -1074,11 +1076,14 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				return nil
 			case "table":
 				//TODO: parse error
-				//TODO: check if no table element in table scope -> ignore
+				if !p.haveAnElementTargetNode("table", func(tag string, namespace dom.Namespace) bool {
+					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
+				}) {
+					return nil
+				}
 
-				x := p.currentNode()
 				for {
-					if x == nil || x.Tag() == "table" {
+					if node := p.openStackPop(); node == nil || node.Tag() == "table" {
 						break
 					}
 				}
@@ -1089,28 +1094,36 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				return p.state_InHead(token)
 			case "input":
 				value := tag.Attributes.Get("type")
-				if !(value.IsNone() || !strings.EqualFold(*value.Value, "hidden")) {
-					//TODO
+				if value.IsNone() || !strings.EqualFold(*value.Value, "hidden") {
+					//TODO: parse error
 					p.insertHtmlElement(*tag)
 					p.openStackPop()
+					//TODO: ack self closing
 					return nil
 				}
 			case "form":
-				//TODO
+				temp, _ := p.lastElementOfType("template")
+				if temp != nil || p.form != nil {
+					return nil
+				}
+
+				node := p.insertHtmlElement(*tag)
+				p.form = node
+				p.openStackPop()
 				return nil
 			}
 		} else {
 			switch name {
 			case "table":
 				//TODO: parse error
-				//TODO: check if no table element in table scope -> ignore
+				if !p.haveAnElementTargetNode("table", func(tag string, namespace dom.Namespace) bool {
+					return namespace == dom.NamespaceHTML && (tag == "html" || tag == "table" || tag == "template")
+				}) {
+					return nil
+				}
 
 				for {
-					current := p.currentNode()
-					isEnd := current == nil || current.Tag() == "table"
-
-					p.openStackPop()
-					if isEnd {
+					if node := p.openStackPop(); node == nil || node.Tag() == "table" {
 						break
 					}
 				}
