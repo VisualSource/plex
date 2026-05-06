@@ -472,17 +472,19 @@ func NewElement(
 
 	if utils.ValueOf(namespace.Value, NamespaceHTML) == NamespaceHTML && localName == "template" {
 		return &TemplateElement{
-			document: document,
-			parent:   parent,
+			document:   document,
+			parent:     parent,
+			attributes: make([]Attribute, 0),
 		}
 	}
 
 	return &Element{
-		document:  document,
-		localName: localName,
-		namespace: utils.ValueOf(namespace.Value, NamespaceHTML),
-		prefix:    prefix,
-		Is:        is,
-		parent:    parent,
+		document:   document,
+		localName:  localName,
+		namespace:  utils.ValueOf(namespace.Value, NamespaceHTML),
+		prefix:     prefix,
+		Is:         is,
+		parent:     parent,
+		attributes: make([]Attribute, 0),
 	}
 }
