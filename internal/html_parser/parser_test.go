@@ -325,7 +325,7 @@ func TestHtmlParser_Parse(t *testing.T) {
 func loadTestCases(t *testing.T) map[string][]testCase {
 	t.Helper()
 
-	testSubset := "tests1" //os.LookupEnv("TEST_HTML_PARSER_SUBSET")
+	testSubset, _ := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
 	wantTestSubset := strings.Split(testSubset, ",")
 	useSubset := testSubset != "" && len(wantTestSubset) != 0
 
@@ -447,8 +447,13 @@ func printTree(root dom.Node, ident int) []string {
 
 		switch tag := node.(type) {
 		case *dom.DocumentType:
+			ids := ""
+			if tag.PublicId != "" || tag.SystemId != "" {
+				ids = fmt.Sprintf(" \"%s\" \"%s\"", tag.PublicId, tag.SystemId)
+			}
+
 			output = append(output,
-				fmt.Sprintf("%s<!DOCTYPE %s>", strings.Repeat(" ", ident), tag.Name),
+				fmt.Sprintf("%s<!DOCTYPE %s%s>", strings.Repeat(" ", ident), tag.Name, ids),
 			)
 		case *dom.Text:
 			output = append(output, fmt.Sprintf("%s\"%s\"", strings.Repeat(" ", ident), tag.Data))

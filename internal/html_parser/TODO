@@ -57,5 +57,66 @@ Finished states:
         ✔ A start tag whose tag name is one of: "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr" @done(26-05-04 13:26)
         ✔ Any other start tag @done(26-05-04 13:27)
         ✔ Any other end tag @done(26-05-04 13:27)
+Passing Tests:
+    [] adoption01
+    [] adoption02
+    [] blocks
+    ✔ comments01 @done(26-05-07 13:20)
+    [] doctype01
+    [] domjs-unsafe
+    ✔ entities01 @done(26-05-07 13:21)
+    ✔ entities02 @done(26-05-07 13:21)
+    [] foreign-fragment
+    [] html5test-com
+    [] inbody01
+    [] isindex
+    [] main-element
+    [] math
+    [] menuitem-element
+    [] namespace-sensitivity
+    [] noscript01
+    [] pending-spec-changes-plain-text-unsafe
+    [] pending-spec-changes
+    [] plain-text-unsafe
+    [] quirks01
+    [] ruby
+    [] scriptdata01
+    [] search-element
+    [] svg
+    [] tables01
+    [] template
+    [] tests_innerHTML_1
+    [] test1
+    [] test2
+    [] test3
+    ✔ test4 @done(26-05-07 13:15)
+    [] test5
+    [] test6
+    [] test7
+    [] test8
+    [] test9
+    [] test10
+    [] test11
+    [] test12
+    ✔ test13 @done(26-05-07 13:16)
+    ✔ test14 @done(26-05-07 13:16)
+    [] test15
+    [] test16
+    ✔ test17 @done(26-05-07 13:16)
+    [] test18
+    [] test19
+    [] test20
+    [] test21
+    [] test22
+    [] test23
+    ✔ test24 @done(26-05-07 13:17)
+    ✔ test25 @done(26-05-07 13:17)
+    [] test26
+    [] tricky01
+    [] webkit01
+    [] webkit02
 
 
+  
+  
+ 
