@@ -433,13 +433,31 @@ func printTree(root dom.Node, ident int) []string {
 		case *dom.Element:
 			output = append(output, fmt.Sprintf("%s<%s>", strings.Repeat(" ", ident), tag.Tag()))
 
+			for _, attr := range tag.Attributes() {
+				var localName string
+				if attr.Prefix.IsSome() {
+					localName = *attr.Prefix.Value + ":" + attr.LocalName
+				} else {
+					localName = attr.LocalName
+				}
+				output = append(output, fmt.Sprintf("%s%s=\"%s\"", strings.Repeat(" ", ident+2), localName, attr.Value))
+			}
+
 			if children := node.Children(); children != nil {
 				tree := printTree(node, ident+2)
 				output = append(output, tree...)
 			}
 		case *dom.TemplateElement:
 			output = append(output, fmt.Sprintf("%s<%s>", strings.Repeat(" ", ident), tag.Tag()))
-
+			for _, attr := range tag.Attributes() {
+				var localName string
+				if attr.Prefix.IsNone() {
+					localName = *attr.Prefix.Value + ":" + attr.LocalName
+				} else {
+					localName = attr.LocalName
+				}
+				output = append(output, fmt.Sprintf("%s%s=\"%s\"", strings.Repeat(" ", ident+2), localName, attr.Value))
+			}
 			if children := node.Children(); children != nil {
 				tree := printTree(node, ident+2)
 				output = append(output, tree...)

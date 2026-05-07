@@ -597,6 +597,12 @@ func (p *HtmlParser) isInButtonScope(tag string) bool {
 	})
 }
 
+func (p *HtmlParser) hasElementInScope(name string) bool {
+	return p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
+		return hasParticularElementInScope(tag, namespace)
+	})
+}
+
 //#endregion
 
 //#region InsertionModes
@@ -822,11 +828,44 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				p.genericElementParse(*tag, "text")
 				return nil
 			case "script":
+				parent, before := p.appropriatePlaceForInsertingNode(nil)
 
+				el := p.createElement(*tag, dom.NamespaceHTML, parent)
+
+				if p.scriptingMode != mode_Fragment {
+					//TODO: set parse as document
+				}
+
+				//TODO: set force async fase
+
+				if p.scriptingMode == mode_Inert {
+					//TODO: set already started = true
+				}
+
+				insertNode(el, parent, before)
+
+				p.openElementsStack = append(p.openElementsStack, el)
+
+				p.tokenizer.SetState(html_tokenizer.State_ScriptData)
 				p.originalInsertionMode = p.insertionMode
 				p.insertionMode = mode_Text
 				return nil
 			case "template":
+
+				p.activeFormattingElements = append(p.activeFormattingElements, newActiveFormatingMarker())
+				p.framesetOk = false
+				p.insertionMode = mode_InTemplate
+				p.templateInsertionModesStack = append(p.templateInsertionModesStack, mode_InTemplate)
+
+				parent, _ := p.appropriatePlaceForInsertingNode(nil)
+				//document := parent.Document()
+
+				//TODO: other two cheks
+				if slices.Index(p.openElementsStack, parent) != 0 {
+					p.insertHtmlElement(*tag)
+				} else {
+
+				}
 				return nil
 			case "head":
 				//TOOD : parse error
@@ -835,14 +874,31 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 		} else {
 			switch name {
 			case "head":
+				p.openStackPop()
+				p.insertionMode = mode_AfterHead
 				return nil
 			case "body", "html", "br":
 			case "template":
+				if temp, _ := p.lastElementOfType("template"); temp == nil {
+					//TODO: parse error
+					return nil
+				}
 
-				p.framesetOk = false
-				p.insertionMode = mode_InTemplate
+				//TODO: genearte all implied end tags thoroughly
 
-				//TODO
+				if node := p.currentNode(); node == nil || node.Tag() != "template" {
+					//TODO: parse error
+				}
+
+				for {
+					if el := p.openStackPop(); el == nil || el.Tag() == "template" {
+						break
+					}
+				}
+
+				clearFormattingElsTolastMarker(p)
+				p.popTemplateInsertionMode()
+				p.resetInsertionModeAppropriately()
 				return nil
 			default:
 				//TODO: parse error

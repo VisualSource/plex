@@ -17,9 +17,9 @@ Finished states:
         ✔ A start tag whose tag name is one of: "address", "article", "aside", "blockquote", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul" @done(26-05-04 13:16)
         ✔ A start tag whose tag name is one of: "h1", "h2", "h3", "h4", "h5", "h6" @done(26-05-04 13:17)
         [] A start tag whose tag name is one of: "pre", "listing"
-        [] A start tag whose tag name is "form"
-        [] A start tag whose tag name is "li"
-        [] A start tag whose tag name is one of: "dd", "dt"
+        ✔ A start tag whose tag name is "form" @done(26-05-06 18:48)
+        ✔ A start tag whose tag name is "li" @done(26-05-06 19:00)
+        ✔ A start tag whose tag name is one of: "dd", "dt" @done(26-05-06 19:08)
         ✔ A start tag whose tag name is "plaintext" @done(26-05-04 13:19)
         ✔ A start tag whose tag name is "button" @done(26-05-05 12:35)
         ✔ An end tag whose tag name is one of: "address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search", "section", "select", "summary", "ul" @done(26-05-06 13:53)
@@ -33,25 +33,25 @@ Finished states:
         ✔ A start tag whose tag name is one of: "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u" @done(26-05-04 13:20)
         ✔ A start tag whose tag name is "nobr" @done(26-05-04 13:21)
         ✔ An end tag whose tag name is one of: "a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u" @done(26-05-04 13:21)
-        [] A start tag whose tag name is one of: "applet", "marquee", "object"
+        ✔ A start tag whose tag name is one of: "applet", "marquee", "object" @done(26-05-06 18:45)
         ✔ An end tag token whose tag name is one of: "applet", "marquee", "object" @done(26-05-06 13:44)
-        [] A start tag whose tag name is "table"
+        ✔ A start tag whose tag name is "table" @done(26-05-06 19:10)
         ✔ An end tag whose tag name is "br" @done(26-05-06 13:45)
-        [] A start tag whose tag name is one of: "area", "br", "embed", "img", "keygen", "wbr"
-        [] A start tag whose tag name is "input"
-        [] A start tag whose tag name is one of: "param", "source", "track"
-        [] A start tag whose tag name is "hr"
+        ✔ A start tag whose tag name is one of: "area", "br", "embed", "img", "keygen", "wbr" @done(26-05-06 19:19)
+        ✔ A start tag whose tag name is "input" @done(26-05-06 19:19)
+        ✔ A start tag whose tag name is one of: "param", "source", "track" @done(26-05-06 19:20)
+        ✔ A start tag whose tag name is "hr" @done(26-05-06 19:22)
         ✔ A start tag whose tag name is "image" @done(26-05-04 13:23)
         [] A start tag whose tag name is "textarea"
         ✔ A start tag whose tag name is "xmp" @done(26-05-04 13:24)
         ✔ A start tag whose tag name is "iframe" @done(26-05-04 13:25)
         ✔ A start tag whose tag name is "noembed" @done(26-05-04 13:25)
         ✔ A start tag whose tag name is "noscript", if scripting mode is not Disabled @done(26-05-04 13:25)
-        [] A start tag whose tag name is "select"
-        [] A start tag whose tag name is "option"
-        [] A start tag whose tag name is "optgroup"
-        [] A start tag whose tag name is one of: "rb", "rtc"
-        [] A start tag whose tag name is one of: "rp", "rt"
+        ✔ A start tag whose tag name is "select" @done(26-05-06 19:27)
+        ✔ A start tag whose tag name is "option" @done(26-05-06 19:30)
+        ✔ A start tag whose tag name is "optgroup" @done(26-05-06 19:35)
+        ✔ A start tag whose tag name is one of: "rb", "rtc" @done(26-05-06 19:36)
+        ✔ A start tag whose tag name is one of: "rp", "rt" @done(26-05-06 19:38)
         [] A start tag whose tag name is "math"
         [] A start tag whose tag name is "svg"
         ✔ A start tag whose tag name is one of: "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr" @done(26-05-04 13:26)
