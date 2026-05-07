@@ -354,60 +354,84 @@ func loadTestCases(t *testing.T) map[string][]testCase {
 		defer file.Close()
 
 		scanner := bufio.NewScanner(file)
+		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 		scanner.Split(bufio.ScanLines)
 
-		testCases := make([]testCase, 0)
-
-		docLines := []string{}
-
-		currentTestCase := testCase{}
-		mode := 0
+		var lines []string
 		for scanner.Scan() {
-			line := scanner.Text()
+			lines = append(lines, scanner.Text())
+		}
+		if err := scanner.Err(); err != nil {
+			t.Fatal(err)
+		}
 
-			switch line {
-			case "#data":
-				mode = 0
-				continue
-			case "#document":
-				mode = 1
-				continue
-			case "#errors", "#new-errors":
-				mode = 2
-				continue
-			case "#document-fragment":
-				mode = 3
-				continue
-			case "#script-off":
-				currentTestCase.scripting = false
-				continue
-			case "#script-on":
-				currentTestCase.scripting = true
-				continue
-			case "":
-				currentTestCase.document = docLines
-				testCases = append(testCases, currentTestCase)
-				currentTestCase = testCase{}
-				docLines = []string{}
-				mode = 0
-				continue
-			default:
-			}
-
-			switch mode {
-			case 0:
-				currentTestCase.data = line
-			case 1:
-				doc, found := strings.CutPrefix(line, "| ")
-				if found {
-					docLines = append(docLines, doc)
+		// Split lines into per-test blocks. A blank line is a test separator
+		// only when it is followed by "#data" (the next test's start) or EOF;
+		// blank lines embedded in #data content or inside multi-line text
+		// nodes in #document are part of the test, not separators.
+		var blocks [][]string
+		var current []string
+		for i, line := range lines {
+			isSeparator := line == "" && (i+1 == len(lines) || lines[i+1] == "#data")
+			if isSeparator {
+				if len(current) > 0 {
+					blocks = append(blocks, current)
+					current = nil
 				}
-			case 2:
-				currentTestCase.errors = append(currentTestCase.errors, line)
-			case 3:
-				currentTestCase.documentFragment = line
+				continue
 			}
+			current = append(current, line)
+		}
+		if len(current) > 0 {
+			blocks = append(blocks, current)
+		}
 
+		testCases := make([]testCase, 0, len(blocks))
+		for _, block := range blocks {
+			var tc testCase
+			var dataLines, docLines []string
+			section := ""
+			for _, line := range block {
+				switch line {
+				case "#data":
+					section = "data"
+					continue
+				case "#errors", "#new-errors":
+					section = "errors"
+					continue
+				case "#document":
+					section = "document"
+					continue
+				case "#document-fragment":
+					section = "document-fragment"
+					continue
+				case "#script-off":
+					tc.scripting = false
+					continue
+				case "#script-on":
+					tc.scripting = true
+					continue
+				}
+
+				switch section {
+				case "data":
+					dataLines = append(dataLines, line)
+				case "errors":
+					tc.errors = append(tc.errors, line)
+				case "document":
+					if doc, ok := strings.CutPrefix(line, "| "); ok {
+						docLines = append(docLines, doc)
+					} else if len(docLines) > 0 {
+						// Continuation of a text node that contains a newline.
+						docLines[len(docLines)-1] += "\n" + line
+					}
+				case "document-fragment":
+					tc.documentFragment = line
+				}
+			}
+			tc.data = strings.Join(dataLines, "\n")
+			tc.document = docLines
+			testCases = append(testCases, tc)
 		}
 
 		tests[testname] = testCases
