@@ -48,6 +48,8 @@ type HtmlParser struct {
 	document *dom.Document
 
 	isFragmentParsing bool
+
+	pendingTableCharacters []html_tokenizer.TokenCharacter
 }
 
 func NewHtmlParser(stream io.Reader) *HtmlParser {
@@ -60,6 +62,7 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 
 // https://html.spec.whatwg.org/#tree-construction
 func (p *HtmlParser) Parse() (*dom.Document, error) {
+
 parseLoop:
 	for {
 		err := p.tokenizer.Next()
@@ -1001,12 +1004,13 @@ func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 				//TODO: parse error
 				p.openElementsStack = append(p.openElementsStack, p.head)
 
-				err := p.state_InHead(token)
-				if err != nil {
+				if err := p.state_InHead(token); err != nil {
 					return err
 				}
 
-				//TODO: remove p.head from open element Stack
+				if idx := slices.Index(p.openElementsStack, p.head); idx != -1 {
+					p.openElementsStack = slices.Delete(p.openElementsStack, idx, idx+1)
+				}
 				return nil
 			case "head":
 				//TODO: parse error
@@ -1109,9 +1113,12 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 	case *html_tokenizer.TokenCharacter:
 		node := p.currentNode()
 		if slices.Contains([]string{"table", "tbody", "template", "tfoot", "tr"}, node.Tag()) {
-			//TODO
+			p.pendingTableCharacters = nil
+			p.pendingTableCharacters = make([]html_tokenizer.TokenCharacter, 0)
+
 			p.originalInsertionMode = p.insertionMode
 			p.insertionMode = mode_InTableText
+			p.tokenizer.ReconsumeToken(token)
 			return nil
 		}
 	case *html_tokenizer.TokenComment:
@@ -1237,10 +1244,27 @@ func (p *HtmlParser) state_InTableText(token html_tokenizer.Token) error {
 			//TODO: parse error
 			return nil
 		default:
-			//TODO: append char to pending
+			p.pendingTableCharacters = append(p.pendingTableCharacters, *tag)
 		}
 	default:
-		//TODO: handle pending table chars tokens
+		if slices.ContainsFunc(p.pendingTableCharacters, func(value html_tokenizer.TokenCharacter) bool {
+			return !html_tokenizer.IsWhitespace(value.Value)
+		}) {
+			//TODO: parse error
+
+			for _, el := range p.pendingTableCharacters {
+				//TODO: parse error
+				p.fosterParenting = true
+				if err := p.state_InBody(&el); err != nil {
+					return err
+				}
+				p.fosterParenting = false
+			}
+		} else {
+			for _, el := range p.pendingTableCharacters {
+				p.insertCharacter(el.Value)
+			}
+		}
 
 		p.insertionMode = p.originalInsertionMode
 		p.tokenizer.ReconsumeToken(token)
@@ -1784,9 +1808,9 @@ func (p *HtmlParser) state_InFrameset(token html_tokenizer.Token) error {
 			}
 		}
 
-	case html_tokenizer.TokenEOF:
+	case *html_tokenizer.TokenEOF:
 		if node := p.currentNode(); node == nil || node.Tag() != "html" {
-			//TODO: parse eror
+			//TODO: parse error
 		}
 		return io.EOF
 	}

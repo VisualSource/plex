@@ -28,7 +28,7 @@ func isSurrogate(v int) bool {
 	return r
 }
 
-func isWhitespace(r rune) bool {
+func IsWhitespace(r rune) bool {
 	switch r {
 	case '\t', '\n', '\f', ' ':
 		return true

@@ -272,7 +272,7 @@ func (t *Tokenizer) consume() (rune, error) {
 	}
 
 	if rune != '\r' {
-		if unicode.IsControl(rune) && !(isWhitespace(rune) || rune == '\u0000') {
+		if unicode.IsControl(rune) && !(IsWhitespace(rune) || rune == '\u0000') {
 			t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterInInputStream, -1, -1))
 		}
 		if isNonCharacterCodepoint(int(rune)) {
@@ -597,7 +597,7 @@ func (t *Tokenizer) state_TagName() error {
 			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
-	case isWhitespace(char):
+	case IsWhitespace(char):
 		t.state = state_BeforeAttributeName
 	case char == '/':
 		t.state = state_SelfClosingStartTag
@@ -681,7 +681,7 @@ func (t *Tokenizer) state_RCData_EndTagName() error {
 	switch {
 	case err != nil && err != io.EOF:
 		return err
-	case isWhitespace(char) && t.hasApproriateEndTagToken():
+	case IsWhitespace(char) && t.hasApproriateEndTagToken():
 		t.state = state_BeforeAttributeName
 	case char == '/' && t.hasApproriateEndTagToken():
 		t.state = state_SelfClosingStartTag
@@ -772,7 +772,7 @@ func (t *Tokenizer) state_RawText_EndTagName() error {
 	switch {
 	case err != nil && err != io.EOF:
 		return err
-	case isWhitespace(char) && t.hasApproriateEndTagToken():
+	case IsWhitespace(char) && t.hasApproriateEndTagToken():
 		t.state = state_BeforeAttributeName
 	case char == '/' && t.hasApproriateEndTagToken():
 		t.state = state_SelfClosingStartTag
@@ -865,7 +865,7 @@ func (t *Tokenizer) state_ScriptData_EndTagName() error {
 	}
 
 	switch {
-	case isWhitespace(char) && t.hasApproriateEndTagToken():
+	case IsWhitespace(char) && t.hasApproriateEndTagToken():
 		t.state = state_BeforeAttributeName
 		return nil
 	case char == '/' && t.hasApproriateEndTagToken():
@@ -1090,7 +1090,7 @@ func (t *Tokenizer) state_ScriptData_Escaped_EndTagName() error {
 		return nil
 	}
 
-	if isWhitespace(char) && t.hasApproriateEndTagToken() {
+	if IsWhitespace(char) && t.hasApproriateEndTagToken() {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -1138,7 +1138,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedStart() error {
 		return nil
 	}
 
-	if isWhitespace(char) || char == '/' || char == '>' {
+	if IsWhitespace(char) || char == '/' || char == '>' {
 		if t.tempbuffer.String() == "script" {
 			t.state = state_ScriptData_DoubleEscaped
 		} else {
@@ -1293,7 +1293,7 @@ func (t *Tokenizer) state_ScriptData_DoubleEscapedEnd() error {
 		return nil
 	}
 
-	if isWhitespace(char) || char == '/' || char == '>' {
+	if IsWhitespace(char) || char == '/' || char == '>' {
 		if t.tempbuffer.String() == "script" {
 			t.state = state_ScriptData_Escaped
 		} else {
@@ -1344,7 +1344,7 @@ func (t *Tokenizer) state_BeforeAttributeName() error {
 		return t.reader.UnreadRune()
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -1372,7 +1372,7 @@ func (t *Tokenizer) state_AttributeName() error {
 		return err
 	}
 
-	if isEOF || isWhitespace(char) || char == '/' || char == '>' {
+	if isEOF || IsWhitespace(char) || char == '/' || char == '>' {
 		t.state = state_AfterAttributeName
 
 		if isEOF {
@@ -1419,7 +1419,7 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -1450,7 +1450,7 @@ func (t *Tokenizer) state_BeforeAttributeValue() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -1547,7 +1547,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -1587,7 +1587,7 @@ func (t *Tokenizer) state_AfterAttributeValue_Quoted() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		t.state = state_BeforeAttributeName
 		return nil
 	}
@@ -2027,7 +2027,7 @@ func (t *Tokenizer) state_DOCTYPE() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		t.state = state_BeforeDOCTYPEName
 		return nil
 	}
@@ -2054,7 +2054,7 @@ func (t *Tokenizer) state_BeforeDOCTYPEName() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2103,7 +2103,7 @@ func (t *Tokenizer) state_DOCTYPE_Name() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		t.state = state_AfterDOCTYPE_Name
 		return nil
 	}
@@ -2153,7 +2153,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_Name() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2219,7 +2219,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicKeyword() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		t.state = state_BeforeDOCTYPE_PublicIdentifier
 		return nil
 	}
@@ -2280,7 +2280,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2425,7 +2425,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_PublicIdentifier() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		t.state = state_BetweenDOCTYPE_PublicAndSystemIdentifiers
 		return nil
 	}
@@ -2480,7 +2480,7 @@ func (t *Tokenizer) state_BetweenDOCTYPE_PublicAndSystemIdent() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2531,7 +2531,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemKeyword() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2588,7 +2588,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_SystemIdentifier() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -2735,7 +2735,7 @@ func (t *Tokenizer) state_AfterDOCTYPE_SystemIdentifer() error {
 		return err
 	}
 
-	if isWhitespace(char) {
+	if IsWhitespace(char) {
 		return nil
 	}
 
@@ -3123,7 +3123,7 @@ func (t *Tokenizer) state_NumericCharacterReferenceEnd() error {
 
 	if t.characterReferenceCode == 0x0D ||
 		(t.characterReferenceCode >= 0x0000 && t.characterReferenceCode <= 0x001F) ||
-		(t.characterReferenceCode >= 0x007F && t.characterReferenceCode <= 0x009F && !isWhitespace(rune(t.characterReferenceCode))) {
+		(t.characterReferenceCode >= 0x007F && t.characterReferenceCode <= 0x009F && !IsWhitespace(rune(t.characterReferenceCode))) {
 		t.errors = append(t.errors, NewTokenizerError(ErrControlCharacterReference, -1, -1))
 		switch t.characterReferenceCode {
 		case 0x80:

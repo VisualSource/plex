@@ -486,7 +486,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 	case "template":
 		return p.state_InHead(tag)
 	case "body":
-		if body, _ := p.lastElementOfType("body"); body == nil {
+		if !p.hasElementInScope("body") {
 			return nil
 		}
 
@@ -495,7 +495,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		p.insertionMode = mode_AfterBody
 		return nil
 	case "html":
-		if html, _ := p.lastElementOfType("html"); html == nil {
+		if !p.hasElementInScope("html") {
 			return nil
 		}
 
