@@ -5,7 +5,7 @@ PWD = $(shell pwd)
 DOCKER_REPO = plex
 DOCKER_TAG = latest
 
-all: git-hooks  tidy ## Initializes all tools
+all: git-hooks gen-char-ref-bin tidy ## Initializes all tools
 
 out:
 	@mkdir -p out
@@ -29,6 +29,9 @@ test-build: ## Tests whether the code compiles
 	@go build -o /dev/null ./...
 
 build: out/bin ## Builds all binaries
+
+gen-char-ref-bin: ## Genearte the character reference binrary from json file
+	@go run ./scripts/character_ref_to_bin.go
 
 GO_BUILD = mkdir -pv "$(@)" && go build -ldflags="-w -s" -o "$(@)" ./...
 .PHONY: out/bin
