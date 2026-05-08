@@ -452,15 +452,6 @@ func (p *HtmlParser) genericElementParse(token html_tokenizer.TokenTag, alg stri
 	p.insertionMode = mode_Text
 }
 
-// https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-context
-func (p *HtmlParser) clearStackBackToTableContext() {
-	x := p.currentNode()
-	for !slices.Contains([]string{"html", "table", "template"}, x.Tag()) {
-		p.openStackPop()
-		x = p.currentNode()
-	}
-}
-
 // https://html.spec.whatwg.org/multipage/parsing.html#reset-the-insertion-mode-appropriately
 func (p *HtmlParser) resetInsertionModeAppropriately() {
 	last := false
@@ -532,6 +523,16 @@ func (p *HtmlParser) resetInsertionModeAppropriately() {
 	}
 }
 
+// https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-context
+func (p *HtmlParser) clearStackBackToTableContext() {
+	node := p.currentNode()
+	for !slices.Contains([]string{"table", "template", "html"}, node.Tag()) {
+		p.openStackPop()
+		node = p.currentNode()
+	}
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-body-context
 func (p *HtmlParser) clearStackBackToTableBodyContext() {
 	x := p.currentNode()
 	for !slices.Contains([]string{"tbody", "tfoot", "thead", "template", "html"}, x.Tag()) {
@@ -1445,7 +1446,7 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "caption", "col", "colgroup", "tbody", "tfoot":
-				if !p.isInTableScope("tbody") || !p.isInTableScope("thead") || !p.isInTableScope("tfoot") {
+				if !(p.isInTableScope("tbody") || p.isInTableScope("thead") || p.isInTableScope("tfoot")) {
 					//TODO: parse error
 					return nil
 				}
@@ -1469,7 +1470,7 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 				p.insertionMode = mode_InTable
 				return nil
 			case "table":
-				if !p.isInTableScope("tbody") || !p.isInTableScope("thead") || !p.isInTableScope("tfoot") {
+				if !(p.isInTableScope("tbody") || p.isInTableScope("thead") || p.isInTableScope("tfoot")) {
 					//TODO: parse error
 					return nil
 				}
@@ -1622,7 +1623,7 @@ func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 		}
 
 		switch name {
-		case "caption", "col", "colgroup", "tbody", "td", "tfoot", "thead", "tr":
+		case "caption", "col", "colgroup", "tbody", "td", "tfoot", "th", "thead", "tr":
 			if !(p.isInTableScope("td") || p.isInTableScope("th")) {
 				panic("Should have a td or th table element!")
 			}
