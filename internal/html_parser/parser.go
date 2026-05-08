@@ -1133,8 +1133,8 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 			switch name {
 			case "caption":
 				p.clearStackBackToTableContext()
+				p.activeFormattingElements = append(p.activeFormattingElements, newActiveFormatingMarker())
 				p.insertHtmlElement(*tag)
-				p.activeFormattingElements = append(p.activeFormattingElements, activeFormattingItem{IsMarker: true})
 				p.insertionMode = mode_InCaption
 				return nil
 			case "colgroup":
@@ -1179,7 +1179,7 @@ func (p *HtmlParser) state_InTable(token html_tokenizer.Token) error {
 				return p.state_InHead(token)
 			case "input":
 				value := tag.Attributes.Get("type")
-				if value.IsNone() || !strings.EqualFold(*value.Value, "hidden") {
+				if value.IsSome() && strings.EqualFold(*value.Value, "hidden") {
 					//TODO: parse error
 					p.insertHtmlElement(*tag)
 					p.openStackPop()
@@ -1445,22 +1445,21 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			case "caption", "col", "colgroup", "tbody", "tfoot":
-				if !(p.isInTableScope("tbody") || p.isInTableScope("thead") || p.isInTableScope("tfoot")) {
+				if !p.isInTableScope("tbody") || !p.isInTableScope("thead") || !p.isInTableScope("tfoot") {
 					//TODO: parse error
 					return nil
 				}
 
 				p.clearStackBackToTableBodyContext()
 				p.openStackPop()
+				p.insertionMode = mode_InTable
 				p.tokenizer.ReconsumeToken(token)
 				return nil
 			}
 		} else {
 			switch name {
 			case "tbody", "tfoot", "thead":
-				if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
-					return namespace == dom.NamespaceHTML && (tag == "table" || tag == "html" || tag == "template")
-				}) {
+				if !p.isInTableScope(name) {
 					//TODO: parse error
 					return nil
 				}
@@ -1470,7 +1469,7 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 				p.insertionMode = mode_InTable
 				return nil
 			case "table":
-				if !(p.isInTableScope("tbody") || p.isInTableScope("thead") || p.isInTableScope("tfoot")) {
+				if !p.isInTableScope("tbody") || !p.isInTableScope("thead") || !p.isInTableScope("tfoot") {
 					//TODO: parse error
 					return nil
 				}
@@ -1599,8 +1598,7 @@ func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 				}
 
 				for {
-					node := p.openStackPop()
-					if node == nil || node.Tag() == name {
+					if node := p.openStackPop(); node == nil || node.Tag() == name {
 						break
 					}
 				}
@@ -1626,7 +1624,7 @@ func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 		switch name {
 		case "caption", "col", "colgroup", "tbody", "td", "tfoot", "thead", "tr":
 			if !(p.isInTableScope("td") || p.isInTableScope("th")) {
-				panic("Should not have td or th element")
+				panic("Should have a td or th table element!")
 			}
 			closeCell(p)
 			p.tokenizer.ReconsumeToken(token)
