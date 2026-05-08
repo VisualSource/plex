@@ -66,7 +66,6 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		case "address", "article", "aside", "blockquote", "center", "details",
 			"dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer",
 			"header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul":
-
 			if p.isInButtonScope("p") {
 				inBody_ClosePTag(p)
 			}
@@ -120,11 +119,8 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.framesetOk = false
 
 			idx := len(p.openElementsStack) - 1
-			for {
+			for idx >= 0 {
 				node := p.openElementsStack[idx]
-				if node == nil {
-					break
-				}
 				if node.Tag() == "li" {
 					p.generateImpliedEndTags("li")
 					if p.currentNode().Tag() != "li" {
@@ -132,8 +128,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 					}
 
 					for {
-						node := p.openStackPop()
-						if node == nil || node.Tag() == "li" {
+						if popped := p.openStackPop(); popped == nil || popped.Tag() == "li" {
 							break
 						}
 					}
@@ -144,9 +139,6 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				}
 
 				idx--
-				if idx < len(p.openElementsStack) {
-					break
-				}
 			}
 
 			if p.isInButtonScope("p") {
@@ -159,20 +151,12 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.framesetOk = false
 
 			idx := len(p.openElementsStack) - 1
-		loop:
-			for {
-				if idx < len(p.openElementsStack) {
-					break
-				}
+			for idx >= 0 {
 				node := p.openElementsStack[idx]
-				if node == nil {
-					break
-				}
-
 				name := node.Tag()
 				if name == "dt" || name == "dd" {
 					p.generateImpliedEndTags(name)
-					if node := p.currentNode(); node == nil || node.Tag() != name {
+					if p.currentNode().Tag() != name {
 						//TODO: parse error
 					}
 					for {
@@ -180,9 +164,9 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 							break
 						}
 					}
-					break loop
+					break
 				} else if isSpecialElement(name, utils.Some(node.Namespace())) && !slices.Contains([]string{"address", "div", "p"}, name) {
-					break loop
+					break
 				}
 
 				idx--
@@ -507,9 +491,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 	case "address", "article", "aside", "blockquote", "button", "center", "details", "dialong", "dir", "div", "dl", "fieldset",
 		"figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search",
 		"section", "select", "summary", "ul":
-		if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
-			return hasParticularElementInScope(tag, namespace)
-		}) {
+		if !p.hasElementInScope(name) {
 			//TODO: parse error
 			return nil
 		}

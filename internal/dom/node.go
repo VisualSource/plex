@@ -33,6 +33,37 @@ type ElementNode interface {
 	Attributes() []Attribute
 }
 
+// setParent updates a node's parent pointer. Used by AppendChild/PrependChild/
+// InsertBefore to keep parent backrefs consistent when nodes are moved.
+func setParent(node Node, parent Node) {
+	switch n := node.(type) {
+	case *Element:
+		n.parent = parent
+	case *TemplateElement:
+		n.parent = parent
+	case *Text:
+		n.parent = parent
+	case *Comment:
+		n.parent = parent
+	case *DocumentType:
+		n.parent = parent
+	}
+}
+
+// adoptNode detaches node from its current parent (if it has one that isn't
+// newParent) so it can be re-parented under newParent. The old parent's
+// children list is updated; the node's parent pointer is left for the caller
+// to update via setParent.
+func adoptNode(node Node, newParent Node) {
+	if node == nil {
+		return
+	}
+	current := node.Parent()
+	if current != nil && current != newParent {
+		current.RemoveChild(node)
+	}
+}
+
 type DocumentType struct {
 	Name     string
 	PublicId string
@@ -217,12 +248,18 @@ func (e Element) Namespace() Namespace {
 	return e.namespace
 }
 func (e *Element) AppendChild(node Node) {
+	adoptNode(node, e)
+	setParent(node, e)
 	e.children = append(e.children, node)
 }
 func (e *Element) PrependChild(node Node) {
+	adoptNode(node, e)
+	setParent(node, e)
 	e.children = slices.Insert(e.children, 0, node)
 }
 func (e *Element) InsertBefore(node Node, ref Node) {
+	adoptNode(node, e)
+	setParent(node, e)
 	idx := slices.Index(e.children, ref)
 	if idx == -1 {
 		e.children = append(e.children, node)
@@ -352,12 +389,18 @@ func (e TemplateElement) Namespace() Namespace {
 	return NamespaceHTML
 }
 func (e *TemplateElement) AppendChild(node Node) {
+	adoptNode(node, e)
+	setParent(node, e)
 	e.templateContents = append(e.templateContents, node)
 }
 func (e *TemplateElement) PrependChild(node Node) {
+	adoptNode(node, e)
+	setParent(node, e)
 	e.templateContents = slices.Insert(e.templateContents, 0, node)
 }
 func (e *TemplateElement) InsertBefore(node Node, ref Node) {
+	adoptNode(node, e)
+	setParent(node, e)
 	idx := slices.Index(e.templateContents, ref)
 	if idx == -1 {
 		e.templateContents = append(e.templateContents, node)
