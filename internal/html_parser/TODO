@@ -1,5 +1,24 @@
 
 Finished states:
+    InHead:
+        ✔ A character token that is one of U+0009 CHARACTER TABULATION, U+000A LINE FEED (LF), U+000C FORM FEED (FF), U+000D CARRIAGE RETURN (CR), or U+0020 SPACE @done(26-05-06 19:53)
+        ✔ A comment token @done(26-05-06 19:53)
+        ✔ A DOCTYPE token @done(26-05-06 19:54)
+        ✔ A start tag whose tag name is "html" @done(26-05-06 19:54)
+        ✔ A start tag whose tag name is one of: "base", "basefont", "bgsound", "link" @done(26-05-06 19:54)
+        ✔ A start tag whose tag name is "meta" @done(26-05-06 19:55)
+        ✔ A start tag whose tag name is "title" @done(26-05-06 19:55)
+        ✔ A start tag whose tag name is "noscript", if scripting mode is not Disabled @done(26-05-06 19:55)
+        ✔ A start tag whose tag name is one of: "noframes", "style" @done(26-05-06 19:56)
+        ✔ A start tag whose tag name is "noscript", if scripting mode is Disabled @done(26-05-06 19:56)
+        [] A start tag whose tag name is "script"
+        ✔ An end tag whose tag name is "head" @done(26-05-06 20:03)
+        ✔ An end tag whose tag name is one of: "body", "html", "br" @done(26-05-06 20:12)
+        [] A start tag whose tag name is "template"
+        [] An end tag whose tag name is "template"
+        ✔ A start tag whose tag name is "head" @done(26-05-06 20:11)
+        ✔ Any other end tag @done(26-05-06 20:12)
+        ✔ Anything else @done(26-05-06 20:12)
     InBody:
         ✔ character token that is U+0000 NULL @done(26-05-04 13:10)
         ✔ A character token that is \t \n \f \r ' ' @done(26-05-04 13:10)
