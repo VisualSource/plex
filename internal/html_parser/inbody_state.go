@@ -251,7 +251,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		case "nobr":
 			p.reconstructActiveFormattingElements()
 
-			if hasParticularElementInScope("nobr", dom.NamespaceHTML) {
+			if p.hasElementInScope("nobr") {
 				//TODO: parse error
 				inBody_adoptionAgency(p, tag)
 				p.reconstructActiveFormattingElements()

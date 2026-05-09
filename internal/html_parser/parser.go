@@ -680,7 +680,8 @@ func (p *HtmlParser) state_BeforeHtml(token html_tokenizer.Token) error {
 	case *html_tokenizer.TokenDOCTYPE:
 		return nil
 	case *html_tokenizer.TokenComment:
-		p.insertComment(tag.Value, nil)
+		p.insertComment(tag.Value, p.document)
+		return nil
 	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
 		case '\t', '\n', '\f', '\r', ' ':

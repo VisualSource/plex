@@ -105,8 +105,8 @@ Passing Tests:
     [] tables01
     [] template
     [] tests_innerHTML_1
-    [] test1
-    [] test2
+    ✔ test1 @done(26-05-08 19:57)
+    ✔ test2 @done(26-05-08 20:08)
     [] test3
     ✔ test4 @done(26-05-07 13:15)
     [] test5
