@@ -36,6 +36,8 @@ type HtmlParser struct {
 
 	framesetOk bool
 
+	skipNextLineFeed bool
+
 	fosterParenting bool
 
 	context dom.Node
@@ -1040,6 +1042,12 @@ func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 	switch tag := token.(type) {
 	case *html_tokenizer.TokenCharacter:
+		if p.skipNextLineFeed { // handle pre,listing newlines
+			p.skipNextLineFeed = false
+			if tag.Value == '\n' {
+				return nil
+			}
+		}
 		switch tag.Value {
 		case '\u0000':
 			//TODO: parse error
@@ -1079,6 +1087,13 @@ func (p *HtmlParser) state_InBody(token html_tokenizer.Token) error {
 func (p *HtmlParser) state_Text(token html_tokenizer.Token) error {
 	switch tag := token.(type) {
 	case *html_tokenizer.TokenCharacter:
+		if p.skipNextLineFeed { // handle textarea newlines
+			p.skipNextLineFeed = false
+			if tag.Value == '\n' {
+				return nil
+			}
+		}
+
 		p.insertCharacter(tag.Value)
 	case *html_tokenizer.TokenEOF:
 		if node := p.currentNode(); node.Tag() == "script" {

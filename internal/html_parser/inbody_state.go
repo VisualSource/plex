@@ -94,7 +94,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 
 			p.insertHtmlElement(*tag)
 
-			//TODO: ignore \n
+			p.skipNextLineFeed = true
 
 			p.framesetOk = false
 
@@ -341,7 +341,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		case "textarea":
 			p.insertHtmlElement(*tag)
 
-			//TODO: handle newLines
+			p.skipNextLineFeed = true
 
 			p.tokenizer.SetState(html_tokenizer.State_RCData)
 			p.originalInsertionMode = p.insertionMode
