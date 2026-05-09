@@ -19,7 +19,7 @@ type testCase struct {
 	data             string
 	errors           []string
 	documentFragment string
-	scripting        bool
+	scripting        string
 	document         []string
 }
 
@@ -305,13 +305,13 @@ func TestHtmlParser_Parse(t *testing.T) {
 
 			input := strings.NewReader(tt.data)
 			t.Run(testname, func(t *testing.T) {
-				if tt.documentFragment != "" || tt.scripting {
-					t.Skipf("Skipping test '%s;' due to Fragment: %v, scripting: %v", testname, tt.documentFragment != "", tt.scripting)
+				if tt.documentFragment != "" {
+					t.Skipf("Skipping test '%s;' due to Fragment: %v", testname, tt.documentFragment != "")
 					return
 				}
 
 				parser := NewHtmlParser(input)
-				if !tt.scripting {
+				if tt.scripting == "off" {
 					parser.scriptingMode = mode_Disabled
 				}
 
@@ -329,7 +329,7 @@ func TestHtmlParser_Parse(t *testing.T) {
 func loadTestCases(t *testing.T) map[string][]testCase {
 	t.Helper()
 
-	testSubset := "tests6" //, _ := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
+	testSubset, _ := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
 	wantTestSubset := strings.Split(testSubset, ",")
 	useSubset := testSubset != "" && len(wantTestSubset) != 0
 
@@ -410,10 +410,10 @@ func loadTestCases(t *testing.T) map[string][]testCase {
 					section = "document-fragment"
 					continue
 				case "#script-off":
-					tc.scripting = false
+					tc.scripting = "off"
 					continue
 				case "#script-on":
-					tc.scripting = true
+					tc.scripting = "on"
 					continue
 				}
 

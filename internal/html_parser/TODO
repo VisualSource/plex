@@ -106,12 +106,12 @@ Passing Tests:
     [] template
     [] tests_innerHTML_1
     ✔ test1 @done(26-05-08 19:57)
-    ✔ test2 @done(26-05-08 20:08)
+    ✔ test2 @done(26-05-08 20:51)
     ✔ test3 @done(26-05-08 20:28)
     ✔ test4 @done(26-05-07 13:15)
     ✔ test5 @done(26-05-08 20:36)
     [] test6
-    [] test7
+    ✔ test7 @done(26-05-08 20:38)
     [] test8
     [] test9
     [] test10
