@@ -567,7 +567,7 @@ func (p *HtmlParser) generateImpliedEndTags(ignore ...string) {
 	current := p.currentNode()
 	for {
 		switch current.Tag() {
-		case "dd", "dt", "li", "optgroup", "option", "p", "rb", "rt", "rtc":
+		case "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc":
 			if slices.Contains(ignore, current.Tag()) {
 				return
 			}
