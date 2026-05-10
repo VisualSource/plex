@@ -234,8 +234,8 @@ func validate(t *testing.T, tok *Tokenizer, tt *testCase) {
 							t.Fatalf("was expecting to have attribute with a name of '%s' but not was found", name)
 						}
 
-						if resolveEncoding(value.(string), tt.DoubleEscaped) != tag {
-							t.Fatalf("was expecting attribute '%s' to have value of '%s' but got '%s'", name, value, tag)
+						if resolveEncoding(value.(string), tt.DoubleEscaped) != tag.Value {
+							t.Fatalf("was expecting attribute '%s' to have value of '%s' but got '%s'", name, value, tag.Value)
 						}
 					}
 

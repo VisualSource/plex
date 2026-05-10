@@ -4,6 +4,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
@@ -33,7 +34,7 @@ type HtmlParser struct {
 	scriptingMode ScriptingMode
 
 	templateInsertionModesStack []InsertionMode
-
+	//https://html.spec.whatwg.org/multipage/parsing.html#frameset-ok-flag
 	framesetOk bool
 
 	skipNextLineFeed bool
@@ -59,6 +60,7 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 		insertionMode: mode_Initial,
 		tokenizer:     html_tokenizer.NewTokenizer(stream),
 		document:      dom.NewDocument(),
+		framesetOk:    true,
 	}
 }
 
@@ -76,25 +78,31 @@ parseLoop:
 			token := p.tokenizer.ConsumeToken()
 
 			aj := p.adjustedCurrentNode()
-			isStandard := false
+			isHtmlContext := false
 
-			if aj != nil && aj.Namespace() == dom.NamespaceHTML || len(p.openElementsStack) == 0 {
-				isStandard = true
-			} else {
+			switch {
+			case len(p.openElementsStack) == 0:
+				fallthrough
+			case aj != nil && aj.Namespace() == dom.NamespaceHTML:
+				isHtmlContext = true
+			default:
 				switch tag := token.(type) {
-				case html_tokenizer.TokenTag:
+				case *html_tokenizer.TokenCharacter:
+					isHtmlContext = isHTMLIntegrationPoint(aj) || isMathMLIntegrationPoint(aj)
+				case *html_tokenizer.TokenTag:
 					name := tag.GetName()
-					isStandard = (isMathMLIntegrationPoint(aj) && name != "mglyph" && name != "malignmark") ||
-						isHTMLIntegrationPoint(aj) ||
-						aj.Namespace() == dom.NamespaceMathML && aj.Tag() == "annotation-xml" && name == "svg"
-				case html_tokenizer.TokenCharacter:
-					isStandard = isMathMLIntegrationPoint(aj) || isHTMLIntegrationPoint(aj)
-				case html_tokenizer.TokenEOF:
-					isStandard = true
+					if tag.GetType() != html_tokenizer.TokenStartTag {
+						break
+					}
+					isHtmlContext = isHTMLIntegrationPoint(aj) ||
+						(isMathMLIntegrationPoint(aj) && !(name == "mglyph" || name == "malignmark")) ||
+						(aj.Namespace() == dom.NamespaceMathML && aj.Tag() == "annotation-xml" && name == "svg")
+				case *html_tokenizer.TokenEOF:
+					isHtmlContext = true
 				}
 			}
 
-			if !isStandard {
+			if !isHtmlContext {
 				if err := p.foreignContent(token); err != nil {
 					return nil, err
 				}
@@ -292,8 +300,8 @@ func (p *HtmlParser) createElement(token html_tokenizer.TokenTag, namespace dom.
 		intendedParent,
 	)
 
-	for key, value := range token.Attributes {
-		element.SetAttribute(key, value)
+	for _, value := range token.Attributes {
+		element.SetAttributeNode(value)
 	}
 
 	if willExecuteScript {
@@ -425,11 +433,8 @@ func (p *HtmlParser) reconstructActiveFormattingElements() {
 		el := entry.Element.(dom.ElementNode)
 		tok := html_tokenizer.NewTokenTag(el.Tag(), html_tokenizer.TokenStartTag, utils.None[bool]())
 		for _, attr := range el.Attributes() {
-			key := attr.LocalName
-			if attr.Prefix.IsSome() {
-				key = *attr.Prefix.Value + ":" + attr.LocalName
-			}
-			tok.Attributes[key] = attr.Value
+			name := attr.GetName()
+			tok.Attributes[name] = attr
 		}
 		newElement := p.insertHtmlElement(*tok)
 		p.activeFormattingElements[idx] = activeFormattingItem{Element: newElement}
@@ -1907,6 +1912,11 @@ func (p *HtmlParser) state_AfterAfterFrameset(token html_tokenizer.Token) error 
 		//TODO
 		p.insertComment(tag.Value, p.document)
 		return nil
+	case *html_tokenizer.TokenCharacter:
+		switch tag.Value {
+		case '\t', '\n', '\f', '\r', ' ':
+			return p.state_InBody(token)
+		}
 	case *html_tokenizer.TokenDOCTYPE:
 		return p.state_InBody(token)
 	case *html_tokenizer.TokenTag:
@@ -1932,6 +1942,8 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 	switch tag := token.(type) {
 	case *html_tokenizer.TokenCharacter:
 		switch tag.Value {
+		case '\u0000':
+			p.insertCharacter(utf8.RuneError)
 		case '\t', '\n', '\f', '\r', ' ':
 			p.insertCharacter(tag.Value)
 			return nil
@@ -1960,17 +1972,61 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 				}
 				fallthrough
 			case "b", "big", "blockquote", "body", "br", "center", "code", "dd", "div",
-				"dl", "dt", "em", "embed", "h1", "h2", "h3", "h4", "h5", "h6", "head", "hr", "i", "img", "li",
-				"listing", "menu", "meta", "nobr", "ol", "p", "pre", "ruby", "s", "small", "span", "strong", "strike",
-				"sub", "sup", "table", "tt", "u", "ul", "var":
+				"dl", "dt", "em", "embed", "h1", "h2", "h3", "h4", "h5", "h6", "head", "hr",
+				"i", "img", "li", "listing", "menu", "meta", "nobr", "ol", "p", "pre", "ruby",
+				"s", "small", "span", "strong", "strike", "sub", "sup", "table", "tt", "u", "ul", "var":
 				//TODO: parse error
 
 				node := p.currentNode()
-				for !isMathMLIntegrationPoint(node) && !isHTMLIntegrationPoint(node) || node.Namespace() != dom.NamespaceHTML {
+				for !(isMathMLIntegrationPoint(node) || isHTMLIntegrationPoint(node) || node.Namespace() == dom.NamespaceHTML) {
 					p.openStackPop()
+					node = p.currentNode()
 				}
 
-				p.tokenizer.ReconsumeToken(token)
+				switch p.insertionMode {
+				case mode_Initial:
+					return p.state_Initial(token)
+				case mode_BeforeHtml:
+					return p.state_BeforeHtml(token)
+				case mode_BeforeHead:
+					return p.state_BeforeHead(token)
+				case mode_InHead:
+					return p.state_InHead(token)
+				case mode_InHeadNoScript:
+					return p.state_InHeadNoScript(token)
+				case mode_AfterHead:
+					return p.state_AfterHead(token)
+				case mode_InBody:
+					return p.state_InBody(token)
+				case mode_Text:
+					return p.state_Text(token)
+				case mode_InTable:
+					return p.state_InTable(token)
+				case mode_InTableText:
+					return p.state_InTableText(token)
+				case mode_InCaption:
+					return p.state_InCaption(token)
+				case mode_InColumnGroup:
+					return p.state_InColumnGroup(token)
+				case mode_InTableBody:
+					return p.state_InTableBody(token)
+				case mode_InRow:
+					return p.state_InRow(token)
+				case mode_InCell:
+					return p.state_InCell(token)
+				case mode_InTemplate:
+					return p.state_InTemplate(token)
+				case mode_AfterBody:
+					return p.state_AfterBody(token)
+				case mode_InFrameset:
+					return p.state_InFrameset(token)
+				case mode_AfterFrameset:
+					return p.state_AfterFrameset(token)
+				case mode_AfterAfterBody:
+					return p.state_AfterAfterBody(token)
+				case mode_AfterAfterFrameset:
+					return p.state_AfterAfterFrameset(token)
+				}
 				return nil
 			default:
 				aj := p.adjustedCurrentNode()
@@ -1981,13 +2037,14 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 
 					adjustSvgAttributes(tag)
 				}
-
-				//TODO: adjust foreigin attributes
+				adjustForeignAttributes(tag)
 
 				p.insertForeignElement(*tag, aj.Namespace(), false)
 
 				if tag.IsSelfClosingSet() {
 					if name == "script" && p.currentNode().Namespace() == dom.NamespaceSVG {
+						p.openStackPop()
+
 						//TODO: ack self closing
 					} else {
 						p.openStackPop()
@@ -1997,6 +2054,60 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 			}
 		} else {
 			switch name {
+
+			case "br", "p":
+				//TOOD: parse error
+				node := p.currentNode()
+				for !(isMathMLIntegrationPoint(node) || isHTMLIntegrationPoint(node) || node.Namespace() == dom.NamespaceHTML) {
+					p.openStackPop()
+					node = p.currentNode()
+				}
+
+				switch p.insertionMode {
+				case mode_Initial:
+					return p.state_Initial(token)
+				case mode_BeforeHtml:
+					return p.state_BeforeHtml(token)
+				case mode_BeforeHead:
+					return p.state_BeforeHead(token)
+				case mode_InHead:
+					return p.state_InHead(token)
+				case mode_InHeadNoScript:
+					return p.state_InHeadNoScript(token)
+				case mode_AfterHead:
+					return p.state_AfterHead(token)
+				case mode_InBody:
+					return p.state_InBody(token)
+				case mode_Text:
+					return p.state_Text(token)
+				case mode_InTable:
+					return p.state_InTable(token)
+				case mode_InTableText:
+					return p.state_InTableText(token)
+				case mode_InCaption:
+					return p.state_InCaption(token)
+				case mode_InColumnGroup:
+					return p.state_InColumnGroup(token)
+				case mode_InTableBody:
+					return p.state_InTableBody(token)
+				case mode_InRow:
+					return p.state_InRow(token)
+				case mode_InCell:
+					return p.state_InCell(token)
+				case mode_InTemplate:
+					return p.state_InTemplate(token)
+				case mode_AfterBody:
+					return p.state_AfterBody(token)
+				case mode_InFrameset:
+					return p.state_InFrameset(token)
+				case mode_AfterFrameset:
+					return p.state_AfterFrameset(token)
+				case mode_AfterAfterBody:
+					return p.state_AfterAfterBody(token)
+				case mode_AfterAfterFrameset:
+					return p.state_AfterAfterFrameset(token)
+				}
+				return nil
 			case "script":
 				if p.currentNode().Namespace() == dom.NamespaceSVG {
 					p.openStackPop()
@@ -2007,7 +2118,79 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 				}
 				fallthrough
 			default:
-				//TODO
+				node := p.currentNode()
+				nodeIdx := len(p.openElementsStack) - 1
+
+				if strings.ToLower(node.Tag()) != name {
+					// parse error
+				}
+
+				for {
+					if nodeIdx == 0 {
+						return nil
+					}
+
+					if strings.ToLower(node.Tag()) == name {
+						for p.currentNode() != node {
+							p.openStackPop()
+						}
+						p.openStackPop()
+						return nil
+					}
+
+					nodeIdx--
+					node = p.openElementsStack[nodeIdx]
+
+					if node.Namespace() != dom.NamespaceHTML {
+						continue
+					}
+
+					switch p.insertionMode {
+					case mode_Initial:
+						return p.state_Initial(token)
+					case mode_BeforeHtml:
+						return p.state_BeforeHtml(token)
+					case mode_BeforeHead:
+						return p.state_BeforeHead(token)
+					case mode_InHead:
+						return p.state_InHead(token)
+					case mode_InHeadNoScript:
+						return p.state_InHeadNoScript(token)
+					case mode_AfterHead:
+						return p.state_AfterHead(token)
+					case mode_InBody:
+						return p.state_InBody(token)
+					case mode_Text:
+						return p.state_Text(token)
+					case mode_InTable:
+						return p.state_InTable(token)
+					case mode_InTableText:
+						return p.state_InTableText(token)
+					case mode_InCaption:
+						return p.state_InCaption(token)
+					case mode_InColumnGroup:
+						return p.state_InColumnGroup(token)
+					case mode_InTableBody:
+						return p.state_InTableBody(token)
+					case mode_InRow:
+						return p.state_InRow(token)
+					case mode_InCell:
+						return p.state_InCell(token)
+					case mode_InTemplate:
+						return p.state_InTemplate(token)
+					case mode_AfterBody:
+						return p.state_AfterBody(token)
+					case mode_InFrameset:
+						return p.state_InFrameset(token)
+					case mode_AfterFrameset:
+						return p.state_AfterFrameset(token)
+					case mode_AfterAfterBody:
+						return p.state_AfterAfterBody(token)
+					case mode_AfterAfterFrameset:
+						return p.state_AfterAfterFrameset(token)
+					}
+					return nil
+				}
 			}
 		}
 

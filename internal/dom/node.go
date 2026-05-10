@@ -27,8 +27,10 @@ type Node interface {
 type ElementNode interface {
 	Node
 	SetAttribute(key string, value string)
+	SetAttributeNS(namespace Namespace, key string, value string)
 	GetAttribute(key string) *Attribute
 	GetAttributeNS(namespace Namespace, localName string) *Attribute
+	SetAttributeNode(node Attribute)
 	HasAttribute(key string) bool
 	Attributes() []Attribute
 }
@@ -215,7 +217,23 @@ type Attribute struct {
 	Value        string
 }
 
-func NewAttribute(namespace Namespace, prefix utils.StringOption, name string, value string) Attribute {
+func (attr Attribute) GetName() string {
+	key := attr.LocalName
+	if attr.Prefix.IsSome() {
+		key = *attr.Prefix.Value + ":" + attr.LocalName
+	}
+	return key
+}
+
+func NewAttribute(namespace Namespace, name string, value string) Attribute {
+	prefix := utils.None[string]()
+
+	if strings.Contains(name, ":") {
+		items := strings.Split(name, ":")
+		prefix.Set(items[0])
+		name = items[1]
+	}
+
 	return Attribute{
 		NamespaceUri: namespace,
 		Prefix:       prefix,
@@ -295,26 +313,14 @@ func (e Element) PreviousSibling() Node {
 func (e Element) Children() []Node {
 	return e.children
 }
+func (e *Element) SetAttributeNode(node Attribute) {
+	e.attributes = append(e.attributes, node)
+}
 func (e *Element) SetAttribute(key string, value string) {
-	prefix := utils.None[string]()
-	name := key
-	namespace := NamespaceHTML
-
-	if strings.Contains(key, ":") {
-		items := strings.Split(key, ":")
-
-		prefix.Set(items[0])
-		name = items[1]
-
-		switch *prefix.Value {
-		case "xmlns":
-			namespace = NamespaceXMLNS
-		case "xlink":
-			namespace = NamespaceXLink
-		}
-	}
-
-	e.attributes = append(e.attributes, NewAttribute(namespace, prefix, name, value))
+	e.attributes = append(e.attributes, NewAttribute(NamespaceHTML, key, value))
+}
+func (e *Element) SetAttributeNS(namespace Namespace, key string, value string) {
+	e.attributes = append(e.attributes, NewAttribute(namespace, key, value))
 }
 func (e Element) GetAttribute(key string) *Attribute {
 	name := strings.ToLower(key)
@@ -433,26 +439,14 @@ func (e TemplateElement) PreviousSibling() Node {
 func (e TemplateElement) Children() []Node {
 	return e.templateContents
 }
+func (e *TemplateElement) SetAttributeNode(node Attribute) {
+	e.attributes = append(e.attributes, node)
+}
 func (e *TemplateElement) SetAttribute(key string, value string) {
-	prefix := utils.None[string]()
-	name := key
-	namespace := NamespaceHTML
-
-	if strings.Contains(key, ":") {
-		items := strings.Split(key, ":")
-
-		prefix.Set(items[0])
-		name = items[1]
-
-		switch *prefix.Value {
-		case "xmlns":
-			namespace = NamespaceXMLNS
-		case "xlink":
-			namespace = NamespaceXLink
-		}
-	}
-
-	e.attributes = append(e.attributes, NewAttribute(namespace, prefix, name, value))
+	e.attributes = append(e.attributes, NewAttribute(NamespaceHTML, key, value))
+}
+func (e *TemplateElement) SetAttributeNS(namespace Namespace, key string, value string) {
+	e.attributes = append(e.attributes, NewAttribute(namespace, key, value))
 }
 func (e TemplateElement) GetAttribute(key string) *Attribute {
 	name := strings.ToLower(key)

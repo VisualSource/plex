@@ -7,6 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/runeio"
 	"github.com/VisualSource/plex/internal/utils"
 )
@@ -317,7 +318,7 @@ func (t *Tokenizer) finishAttr() {
 
 		_, ok := tag.Attributes[attrName]
 		if !ok {
-			tag.Attributes[attrName] = t.workingAttrValue.String()
+			tag.Attributes[attrName] = dom.NewAttribute(dom.NamespaceHTML, attrName, t.workingAttrValue.String())
 		} else {
 			t.errors = append(t.errors, NewTokenizerError(ErrDuplicateAttribute, -1, -1))
 		}

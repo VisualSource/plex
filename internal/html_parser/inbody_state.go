@@ -23,7 +23,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			if el, ok := p.openElementsStack[0].(*dom.Element); ok {
 				for attrName, attrValue := range tag.Attributes {
 					if !el.HasAttribute(attrName) {
-						el.SetAttribute(attrName, attrValue)
+						el.SetAttributeNode(attrValue)
 					}
 				}
 			}
@@ -43,20 +43,25 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			if el, ok := p.openElementsStack[1].(*dom.Element); ok {
 				for attrName, attrValue := range tag.Attributes {
 					if !el.HasAttribute(attrName) {
-						el.SetAttribute(attrName, attrValue)
+						el.SetAttributeNode(attrValue)
 					}
 				}
 			}
 
 			return nil
 		case "frameset":
-			if len(p.openElementsStack) == 1 || p.openElementsStack[1].Tag() != "body" || !p.framesetOk {
+			//TODO: parse error
+			if len(p.openElementsStack) == 1 || p.openElementsStack[1].Tag() != "body" {
+				return nil
+			}
+
+			if !p.framesetOk {
 				return nil
 			}
 
 			p.openElementsStack[1].Remove()
 
-			for i := len(p.openElementsStack); i >= 1; i-- {
+			for len(p.openElementsStack) > 1 {
 				p.openStackPop()
 			}
 
@@ -432,7 +437,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.reconstructActiveFormattingElements()
 
 			adjustMathMLAttributes(tag)
-			//adjustForeginAttributes(tag)
+			adjustForeignAttributes(tag)
 			p.insertForeignElement(*tag, dom.NamespaceMathML, false)
 
 			if tag.IsSelfClosingSet() {
@@ -444,7 +449,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		case "svg":
 			p.reconstructActiveFormattingElements()
 			adjustSvgAttributes(tag)
-			//adjustForeginAttributes(tag)
+			adjustForeignAttributes(tag)
 			p.insertForeignElement(*tag, dom.NamespaceSVG, false)
 
 			if tag.IsSelfClosingSet() {
@@ -823,7 +828,7 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 					if removeIdx <= stackIdx {
 						stackIdx--
 					}
-					if removeIdx <= nodeStackIdx {
+					if removeIdx < nodeStackIdx {
 						nodeStackIdx--
 					}
 				}
@@ -834,11 +839,8 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 			nodeEl := node.(dom.ElementNode)
 			tok := html_tokenizer.NewTokenTag(nodeEl.Tag(), html_tokenizer.TokenStartTag, utils.None[bool]())
 			for _, attr := range nodeEl.Attributes() {
-				key := attr.LocalName
-				if attr.Prefix.IsSome() {
-					key = *attr.Prefix.Value + ":" + attr.LocalName
-				}
-				tok.Attributes[key] = attr.Value
+				name := attr.GetName()
+				tok.Attributes[name] = attr
 			}
 			newElement := p.createElement(*tok, dom.NamespaceHTML, commonAncestor)
 
@@ -874,11 +876,8 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 		formattingEl := formattingElement.(dom.ElementNode)
 		newTok := html_tokenizer.NewTokenTag(formattingEl.Tag(), html_tokenizer.TokenStartTag, utils.None[bool]())
 		for _, attr := range formattingEl.Attributes() {
-			key := attr.LocalName
-			if attr.Prefix.IsSome() {
-				key = *attr.Prefix.Value + ":" + attr.LocalName
-			}
-			newTok.Attributes[key] = attr.Value
+			name := attr.GetName()
+			newTok.Attributes[name] = attr
 		}
 		newFormattingElement := p.createElement(*newTok, dom.NamespaceHTML, furthestBlock)
 
@@ -951,4 +950,19 @@ func adjustSvgAttributes(tag *html_tokenizer.TokenTag) {
 		delete(tag.Attributes, key)
 	}
 
+}
+
+func adjustForeignAttributes(tag *html_tokenizer.TokenTag) {
+	for key, attr := range tag.Attributes {
+		switch key {
+		case "xlink:actuate", "xlink:arcrole":
+			attr.NamespaceUri = dom.NamespaceXLink
+		case "xlink:href", "xlink:role", "xlink:show", "xlink:title", "xlink:type":
+			attr.NamespaceUri = dom.NamespaceXLink
+		case "xml:lang", "xml:space":
+			attr.NamespaceUri = dom.NamespaceXML
+		case "xmlns", "xmlns:xlink":
+			attr.NamespaceUri = dom.NamespaceXMLNS
+		}
+	}
 }

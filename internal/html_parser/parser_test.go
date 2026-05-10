@@ -72,8 +72,10 @@ func (m *mockElementNode) GetAttributeNS(ns dom.Namespace, localName string) *do
 	}
 	return nil
 }
-func (m *mockElementNode) HasAttribute(key string) bool { return m.GetAttribute(key) != nil }
-func (m *mockElementNode) Attributes() []dom.Attribute  { return m.attrs }
+func (e *mockElementNode) SetAttributeNode(node dom.Attribute)                             {}
+func (e *mockElementNode) SetAttributeNS(ns dom.Namespace, localName string, value string) {}
+func (m *mockElementNode) HasAttribute(key string) bool                                    { return m.GetAttribute(key) != nil }
+func (m *mockElementNode) Attributes() []dom.Attribute                                     { return m.attrs }
 
 func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 	newParser := func() *HtmlParser { return NewHtmlParser(strings.NewReader("")) }
@@ -464,12 +466,31 @@ func printTree(root dom.Node, ident int) []string {
 		case *dom.Comment:
 			output = append(output, fmt.Sprintf("%s<!-- %s -->", strings.Repeat(" ", ident), tag.Data))
 		case *dom.Element:
-			output = append(output, fmt.Sprintf("%s<%s>", strings.Repeat(" ", ident), tag.Tag()))
+			namespace := ""
+			switch tag.Namespace() {
+			case dom.NamespaceMathML:
+				namespace = "math "
+			case dom.NamespaceSVG:
+				namespace = "svg "
+			case dom.NamespaceXLink:
+			case dom.NamespaceXMLNS:
+			case dom.NamespaceXML:
+			}
 
-			for _, attr := range tag.Attributes() {
+			output = append(output, fmt.Sprintf("%s<%s%s>", strings.Repeat(" ", ident), namespace, tag.Tag()))
+
+			sortedAttrs := slices.SortedFunc(slices.Values(tag.Attributes()), func(a, b dom.Attribute) int {
+				return strings.Compare(a.LocalName, b.LocalName)
+			})
+			for _, attr := range sortedAttrs {
 				var localName string
+
 				if attr.Prefix.IsSome() {
-					localName = *attr.Prefix.Value + ":" + attr.LocalName
+					if tag.Namespace() != dom.NamespaceHTML {
+						localName = *attr.Prefix.Value + " " + attr.LocalName
+					} else {
+						localName = *attr.Prefix.Value + ":" + attr.LocalName
+					}
 				} else {
 					localName = attr.LocalName
 				}
@@ -482,10 +503,17 @@ func printTree(root dom.Node, ident int) []string {
 			}
 		case *dom.TemplateElement:
 			output = append(output, fmt.Sprintf("%s<%s>", strings.Repeat(" ", ident), tag.Tag()))
-			for _, attr := range tag.Attributes() {
+			sortedTemplateAttrs := slices.SortedFunc(slices.Values(tag.Attributes()), func(a, b dom.Attribute) int {
+				return strings.Compare(a.LocalName, b.LocalName)
+			})
+			for _, attr := range sortedTemplateAttrs {
 				var localName string
-				if attr.Prefix.IsNone() {
-					localName = *attr.Prefix.Value + ":" + attr.LocalName
+				if attr.Prefix.IsSome() {
+					if tag.Namespace() != dom.NamespaceHTML {
+						localName = *attr.Prefix.Value + " " + attr.LocalName
+					} else {
+						localName = *attr.Prefix.Value + ":" + attr.LocalName
+					}
 				} else {
 					localName = attr.LocalName
 				}

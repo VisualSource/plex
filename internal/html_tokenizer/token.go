@@ -3,15 +3,16 @@ package html_tokenizer
 import (
 	"unicode/utf8"
 
+	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/utils"
 )
 
-type AttributesMap map[string]string
+type AttributesMap map[string]dom.Attribute
 
 func (p AttributesMap) Get(key string) utils.StringOption {
-	value, ok := p[key]
+	attr, ok := p[key]
 	if ok {
-		return utils.Some(value)
+		return utils.Some(attr.Value)
 	}
 	return utils.None[string]()
 }
