@@ -2045,7 +2045,7 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 					case "femergenode":
 						tag.SetName("feMergeNode")
 					case "femorphology":
-						tag.SetName("feMorphology")
+						tag.SetName("feMorphlogy")
 					case "feoffset":
 						tag.SetName("feOffset")
 					case "fepointlight":

@@ -462,6 +462,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		case "noscript":
 			if p.scriptingMode != mode_Disabled {
 				p.genericElementParse(*tag, "text")
+				return nil
 			}
 			fallthrough
 		default:

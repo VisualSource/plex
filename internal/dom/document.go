@@ -3,9 +3,10 @@ package dom
 import "slices"
 
 type Document struct {
-	children           []Node
-	QuirksMode         QuirksMode
-	ParserNoChangeMode bool
+	children                    []Node
+	QuirksMode                  QuirksMode
+	ParserNoChangeMode          bool
+	AllowDeclarativeShadowRoots bool
 }
 
 func (d Document) Parent() Node {
@@ -61,8 +62,9 @@ func (d Document) Document() *Document {
 
 func NewDocument() *Document {
 	return &Document{
-		ParserNoChangeMode: false,
-		QuirksMode:         QuirksMode_NoQuirks,
-		children:           make([]Node, 0),
+		ParserNoChangeMode:          false,
+		AllowDeclarativeShadowRoots: true,
+		QuirksMode:                  QuirksMode_NoQuirks,
+		children:                    make([]Node, 0),
 	}
 }
