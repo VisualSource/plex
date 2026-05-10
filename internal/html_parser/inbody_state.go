@@ -763,13 +763,14 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 			//TODO: parse error
 		}
 
-		// Find furthestBlock: last special element in the stack above formattingElement
+		// Find furthestBlock: first (topmost) special element in the stack above formattingElement
 		var furthestBlock dom.Node
 		furthestBlockIdx := -1
 		for i := stackIdx + 1; i < len(p.openElementsStack); i++ {
 			if isSpecialElement(p.openElementsStack[i].Tag(), utils.Some(p.openElementsStack[i].Namespace())) {
 				furthestBlock = p.openElementsStack[i]
 				furthestBlockIdx = i
+				break
 			}
 		}
 

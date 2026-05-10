@@ -112,10 +112,10 @@ Passing Tests:
     ✔ test5 @done(26-05-08 20:36)
     ✔ test6 @done(26-05-08 22:59)
     ✔ test7 @done(26-05-08 23:01)
-    ☐ test8
+    ✔ test8 @done(26-05-10 19:29)
     ✔ test9 @done(26-05-09 20:46)
     ✔ test10 @done(26-05-10 15:50)
-    ✔ test11 - attr rename on svg @done(26-05-10 15:43)
+    ✔ test11 @done(26-05-10 15:43)
     ✔ test12 @done(26-05-10 15:43)
     ✔ test13 @done(26-05-09 20:48)
     ✔ test14 @done(26-05-09 20:48)
@@ -123,11 +123,11 @@ Passing Tests:
     ✔ test16 @done(26-05-10 16:48)
     ✔ test17 @done(26-05-09 20:48)
     ✔ test18 @done(26-05-10 18:45)
-    [] test19
+    ☐ test19
     ✔ test20 @done(26-05-10 18:47)
-    [] test21
-    [] test22
-    [] test23
+    ☐ test21
+    ✔ test22 @done(26-05-10 19:30)
+    ☐ test23
     ✔ test24 @done(26-05-09 20:49)
     ✔ test25 @done(26-05-09 20:49)
     ✔ test26 @done(26-05-10 15:47)
