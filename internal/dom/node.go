@@ -30,9 +30,9 @@ type ElementNode interface {
 	SetAttributeNS(namespace Namespace, key string, value string)
 	GetAttribute(key string) *Attribute
 	GetAttributeNS(namespace Namespace, localName string) *Attribute
-	SetAttributeNode(node Attribute)
+	SetAttributeNode(node *Attribute)
 	HasAttribute(key string) bool
-	Attributes() []Attribute
+	Attributes() []*Attribute
 }
 
 // setParent updates a node's parent pointer. Used by AppendChild/PrependChild/
@@ -225,7 +225,7 @@ func (attr Attribute) GetName() string {
 	return key
 }
 
-func NewAttribute(namespace Namespace, name string, value string) Attribute {
+func NewAttribute(namespace Namespace, name string, value string) *Attribute {
 	prefix := utils.None[string]()
 
 	if strings.Contains(name, ":") {
@@ -234,7 +234,7 @@ func NewAttribute(namespace Namespace, name string, value string) Attribute {
 		name = items[1]
 	}
 
-	return Attribute{
+	return &Attribute{
 		NamespaceUri: namespace,
 		Prefix:       prefix,
 		LocalName:    name,
@@ -248,7 +248,7 @@ type Element struct {
 	namespace  Namespace
 	Is         utils.StringOption
 	document   *Document
-	attributes []Attribute
+	attributes []*Attribute
 	prefix     utils.StringOption
 	parent     Node
 }
@@ -313,7 +313,7 @@ func (e Element) PreviousSibling() Node {
 func (e Element) Children() []Node {
 	return e.children
 }
-func (e *Element) SetAttributeNode(node Attribute) {
+func (e *Element) SetAttributeNode(node *Attribute) {
 	e.attributes = append(e.attributes, node)
 }
 func (e *Element) SetAttribute(key string, value string) {
@@ -332,7 +332,7 @@ func (e Element) GetAttribute(key string) *Attribute {
 		}
 
 		if qualName == name {
-			return &attr
+			return attr
 		}
 	}
 
@@ -341,7 +341,7 @@ func (e Element) GetAttribute(key string) *Attribute {
 func (e Element) GetAttributeNS(namespace Namespace, localname string) *Attribute {
 	for _, attr := range e.attributes {
 		if attr.NamespaceUri == namespace && attr.LocalName == localname {
-			return &attr
+			return attr
 		}
 	}
 
@@ -351,7 +351,7 @@ func (e Element) HasAttribute(key string) bool {
 	attr := e.GetAttribute(key)
 	return attr != nil
 }
-func (e Element) Attributes() []Attribute {
+func (e Element) Attributes() []*Attribute {
 	return e.attributes
 }
 func (e *Element) Remove() {
@@ -375,7 +375,7 @@ type TemplateElement struct {
 	templateContents []Node
 	document         *Document
 	parent           Node
-	attributes       []Attribute
+	attributes       []*Attribute
 }
 
 func (e TemplateElement) Document() *Document {
@@ -439,7 +439,7 @@ func (e TemplateElement) PreviousSibling() Node {
 func (e TemplateElement) Children() []Node {
 	return e.templateContents
 }
-func (e *TemplateElement) SetAttributeNode(node Attribute) {
+func (e *TemplateElement) SetAttributeNode(node *Attribute) {
 	e.attributes = append(e.attributes, node)
 }
 func (e *TemplateElement) SetAttribute(key string, value string) {
@@ -458,7 +458,7 @@ func (e TemplateElement) GetAttribute(key string) *Attribute {
 		}
 
 		if qualName == name {
-			return &attr
+			return attr
 		}
 	}
 
@@ -467,7 +467,7 @@ func (e TemplateElement) GetAttribute(key string) *Attribute {
 func (e TemplateElement) GetAttributeNS(namespace Namespace, localname string) *Attribute {
 	for _, attr := range e.attributes {
 		if attr.NamespaceUri == namespace && attr.LocalName == localname {
-			return &attr
+			return attr
 		}
 	}
 
@@ -477,7 +477,7 @@ func (e TemplateElement) HasAttribute(key string) bool {
 	attr := e.GetAttribute(key)
 	return attr != nil
 }
-func (e TemplateElement) Attributes() []Attribute {
+func (e TemplateElement) Attributes() []*Attribute {
 	return e.attributes
 }
 func (e *TemplateElement) Remove() {
@@ -511,7 +511,7 @@ func NewElement(
 		return &TemplateElement{
 			document:   document,
 			parent:     parent,
-			attributes: make([]Attribute, 0),
+			attributes: make([]*Attribute, 0),
 		}
 	}
 
@@ -522,6 +522,6 @@ func NewElement(
 		prefix:     prefix,
 		Is:         is,
 		parent:     parent,
-		attributes: make([]Attribute, 0),
+		attributes: make([]*Attribute, 0),
 	}
 }

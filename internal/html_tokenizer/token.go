@@ -7,7 +7,7 @@ import (
 	"github.com/VisualSource/plex/internal/utils"
 )
 
-type AttributesMap map[string]dom.Attribute
+type AttributesMap map[string]*dom.Attribute
 
 func (p AttributesMap) Get(key string) utils.StringOption {
 	attr, ok := p[key]

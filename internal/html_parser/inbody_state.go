@@ -840,7 +840,7 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 			tok := html_tokenizer.NewTokenTag(nodeEl.Tag(), html_tokenizer.TokenStartTag, utils.None[bool]())
 			for _, attr := range nodeEl.Attributes() {
 				name := attr.GetName()
-				tok.Attributes[name] = attr
+				tok.Attributes[name] = dom.NewAttribute(attr.NamespaceUri, attr.GetName(), attr.Value)
 			}
 			newElement := p.createElement(*tok, dom.NamespaceHTML, commonAncestor)
 
@@ -877,7 +877,7 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 		newTok := html_tokenizer.NewTokenTag(formattingEl.Tag(), html_tokenizer.TokenStartTag, utils.None[bool]())
 		for _, attr := range formattingEl.Attributes() {
 			name := attr.GetName()
-			newTok.Attributes[name] = attr
+			newTok.Attributes[name] = dom.NewAttribute(attr.NamespaceUri, attr.GetName(), attr.Value)
 		}
 		newFormattingElement := p.createElement(*newTok, dom.NamespaceHTML, furthestBlock)
 
@@ -922,34 +922,78 @@ func adjustMathMLAttributes(tag *html_tokenizer.TokenTag) {
 		return
 	}
 
+	value.LocalName = "definitionURL"
 	tag.Attributes["definitionURL"] = value
 	delete(tag.Attributes, "definitionurl")
 }
 
+var svgAttributeAdjustments = map[string]string{
+	"attributename":       "attributeName",
+	"attributetype":       "attributeType",
+	"basefrequency":       "baseFrequency",
+	"baseprofile":         "baseProfile",
+	"calcmode":            "calcMode",
+	"clippathunits":       "clipPathUnits",
+	"diffuseconstant":     "diffuseConstant",
+	"edgemode":            "edgeMode",
+	"filterunits":         "filterUnits",
+	"glyphref":            "glyphRef",
+	"gradienttransform":   "gradientTransform",
+	"gradientunits":       "gradientUnits",
+	"kernelmatrix":        "kernelMatrix",
+	"kernelunitlength":    "kernelUnitLength",
+	"keypoints":           "keyPoints",
+	"keysplines":          "keySplines",
+	"keytimes":            "keyTimes",
+	"lengthadjust":        "lengthAdjust",
+	"limitingconeangle":   "limitingConeAngle",
+	"markerheight":        "markerHeight",
+	"markerunits":         "markerUnits",
+	"markerwidth":         "markerWidth",
+	"maskcontentunits":    "maskContentUnits",
+	"maskunits":           "maskUnits",
+	"numoctaves":          "numOctaves",
+	"pathlength":          "pathLength",
+	"patterncontentunits": "patternContentUnits",
+	"patterntransform":    "patternTransform",
+	"patternunits":        "patternUnits",
+	"pointsatx":           "pointsAtX",
+	"pointsaty":           "pointsAtY",
+	"pointsatz":           "pointsAtZ",
+	"preservealpha":       "preserveAlpha",
+	"preserveaspectratio": "preserveAspectRatio",
+	"primitiveunits":      "primitiveUnits",
+	"refx":                "refX",
+	"refy":                "refY",
+	"repeatcount":         "repeatCount",
+	"repeatdur":           "repeatDur",
+	"requiredextensions":  "requiredExtensions",
+	"requiredfeatures":    "requiredFeatures",
+	"specularconstant":    "specularConstant",
+	"specularexponent":    "specularExponent",
+	"spreadmethod":        "spreadMethod",
+	"startoffset":         "startOffset",
+	"stddeviation":        "stdDeviation",
+	"stitchtiles":         "stitchTiles",
+	"surfacescale":        "surfaceScale",
+	"systemlanguage":      "systemLanguage",
+	"tablevalues":         "tableValues",
+	"targetx":             "targetX",
+	"targety":             "targetY",
+	"textlength":          "textLength",
+	"viewbox":             "viewBox",
+	"viewtarget":          "viewTarget",
+	"xchannelselector":    "xChannelSelector",
+	"ychannelselector":    "yChannelSelector",
+	"zoomandpan":          "zoomAndPan",
+}
+
 func adjustSvgAttributes(tag *html_tokenizer.TokenTag) {
-	keyToMod := []string{}
-	for key := range tag.Attributes {
-		switch key {
-		case "attributename", "attributetype", "basefrequency", "baseprofile", "calcmode",
-			"clippathunits", "diffuseconstant", "edgemode", "filterunits", "glyphref", "gradienttransform",
-			"gradientunits", "kernelmatrix", "kernelunitlength", "keypoints", "keysplines", "keytimes",
-			"lengthadjust", "limitingconeangle", "markerheight", "markerunits", "markerwidth", "maskcontentunits",
-			"maskunits", "numoctaves", "pathlength", "patterncontentunits", "patterntransform", "patternunits",
-			"pointsatx", "pointsaty", "pointsatz", "preservealpha", "preserveaspectratio", "primitiveunits",
-			"refx", "refy", "repeatcount", "repeatdur", "requiredextensions", "requiredfeatures", "specularconstant",
-			"specularexponent", "spreadmethod", "startoffset", "stddeviation", "stitchtiles", "surfacescale",
-			"systemlanguage", "tablevalues", "targetx", "targety", "textlength", "viewbox", "viewtarget", "xchannelselector",
-			"ychannelselector", "zoomandpan":
-			keyToMod = append(keyToMod, key)
+	for key, attr := range tag.Attributes {
+		if mapped, ok := svgAttributeAdjustments[key]; ok {
+			attr.LocalName = mapped
 		}
 	}
-
-	for _, key := range keyToMod {
-		value := tag.Attributes[key]
-		tag.Attributes[utils.ToCamelCase(key, false)] = value
-		delete(tag.Attributes, key)
-	}
-
 }
 
 func adjustForeignAttributes(tag *html_tokenizer.TokenTag) {
