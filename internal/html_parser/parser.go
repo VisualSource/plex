@@ -1,6 +1,7 @@
 package html_parser
 
 import (
+	"errors"
 	"io"
 	"slices"
 	"strings"
@@ -109,53 +110,7 @@ parseLoop:
 				continue
 			}
 
-			var err error
-			switch p.insertionMode {
-			case mode_Initial:
-				err = p.state_Initial(token)
-			case mode_BeforeHtml:
-				err = p.state_BeforeHtml(token)
-			case mode_BeforeHead:
-				err = p.state_BeforeHead(token)
-			case mode_InHead:
-				err = p.state_InHead(token)
-			case mode_InHeadNoScript:
-				err = p.state_InHeadNoScript(token)
-			case mode_AfterHead:
-				err = p.state_AfterHead(token)
-			case mode_InBody:
-				err = p.state_InBody(token)
-			case mode_Text:
-				err = p.state_Text(token)
-			case mode_InTable:
-				err = p.state_InTable(token)
-			case mode_InTableText:
-				err = p.state_InTableText(token)
-			case mode_InCaption:
-				err = p.state_InCaption(token)
-			case mode_InColumnGroup:
-				err = p.state_InColumnGroup(token)
-			case mode_InTableBody:
-				err = p.state_InTableBody(token)
-			case mode_InRow:
-				err = p.state_InRow(token)
-			case mode_InCell:
-				err = p.state_InCell(token)
-			case mode_InTemplate:
-				err = p.state_InTemplate(token)
-			case mode_AfterBody:
-				err = p.state_AfterBody(token)
-			case mode_InFrameset:
-				err = p.state_InFrameset(token)
-			case mode_AfterFrameset:
-				err = p.state_AfterFrameset(token)
-			case mode_AfterAfterBody:
-				err = p.state_AfterAfterBody(token)
-			case mode_AfterAfterFrameset:
-				err = p.state_AfterAfterFrameset(token)
-			}
-
-			if err != nil {
+			if err := p.processHTMLContent(token); err != nil {
 				if err == io.EOF {
 					break parseLoop
 				}
@@ -167,6 +122,55 @@ parseLoop:
 	p.parseEnd()
 
 	return p.document, nil
+}
+
+func (p *HtmlParser) processHTMLContent(token html_tokenizer.Token) error {
+	switch p.insertionMode {
+	case mode_Initial:
+		return p.state_Initial(token)
+	case mode_BeforeHtml:
+		return p.state_BeforeHtml(token)
+	case mode_BeforeHead:
+		return p.state_BeforeHead(token)
+	case mode_InHead:
+		return p.state_InHead(token)
+	case mode_InHeadNoScript:
+		return p.state_InHeadNoScript(token)
+	case mode_AfterHead:
+		return p.state_AfterHead(token)
+	case mode_InBody:
+		return p.state_InBody(token)
+	case mode_Text:
+		return p.state_Text(token)
+	case mode_InTable:
+		return p.state_InTable(token)
+	case mode_InTableText:
+		return p.state_InTableText(token)
+	case mode_InCaption:
+		return p.state_InCaption(token)
+	case mode_InColumnGroup:
+		return p.state_InColumnGroup(token)
+	case mode_InTableBody:
+		return p.state_InTableBody(token)
+	case mode_InRow:
+		return p.state_InRow(token)
+	case mode_InCell:
+		return p.state_InCell(token)
+	case mode_InTemplate:
+		return p.state_InTemplate(token)
+	case mode_AfterBody:
+		return p.state_AfterBody(token)
+	case mode_InFrameset:
+		return p.state_InFrameset(token)
+	case mode_AfterFrameset:
+		return p.state_AfterFrameset(token)
+	case mode_AfterAfterBody:
+		return p.state_AfterAfterBody(token)
+	case mode_AfterAfterFrameset:
+		return p.state_AfterAfterFrameset(token)
+	default:
+		return errors.New("unknown state")
+	}
 }
 
 func (p *HtmlParser) openStackPop() dom.Node {
@@ -1983,57 +1987,88 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 					node = p.currentNode()
 				}
 
-				switch p.insertionMode {
-				case mode_Initial:
-					return p.state_Initial(token)
-				case mode_BeforeHtml:
-					return p.state_BeforeHtml(token)
-				case mode_BeforeHead:
-					return p.state_BeforeHead(token)
-				case mode_InHead:
-					return p.state_InHead(token)
-				case mode_InHeadNoScript:
-					return p.state_InHeadNoScript(token)
-				case mode_AfterHead:
-					return p.state_AfterHead(token)
-				case mode_InBody:
-					return p.state_InBody(token)
-				case mode_Text:
-					return p.state_Text(token)
-				case mode_InTable:
-					return p.state_InTable(token)
-				case mode_InTableText:
-					return p.state_InTableText(token)
-				case mode_InCaption:
-					return p.state_InCaption(token)
-				case mode_InColumnGroup:
-					return p.state_InColumnGroup(token)
-				case mode_InTableBody:
-					return p.state_InTableBody(token)
-				case mode_InRow:
-					return p.state_InRow(token)
-				case mode_InCell:
-					return p.state_InCell(token)
-				case mode_InTemplate:
-					return p.state_InTemplate(token)
-				case mode_AfterBody:
-					return p.state_AfterBody(token)
-				case mode_InFrameset:
-					return p.state_InFrameset(token)
-				case mode_AfterFrameset:
-					return p.state_AfterFrameset(token)
-				case mode_AfterAfterBody:
-					return p.state_AfterAfterBody(token)
-				case mode_AfterAfterFrameset:
-					return p.state_AfterAfterFrameset(token)
-				}
-				return nil
+				return p.processHTMLContent(token)
 			default:
 				aj := p.adjustedCurrentNode()
 				if aj.Namespace() == dom.NamespaceMathML {
 					adjustMathMLAttributes(tag)
 				} else if aj.Namespace() == dom.NamespaceSVG {
-					//TODO: fix scg tag name
+					switch name {
+					case "altglyph":
+						tag.SetName("altGlyph")
+					case "altglyphdef":
+						tag.SetName("altGlyphDef")
+					case "altglyphitem":
+						tag.SetName("altGlyphItem")
+					case "animatecolor":
+						tag.SetName("animateColor")
+					case "animatemotion":
+						tag.SetName("animateMotion")
+					case "animatetransform":
+						tag.SetName("animateTransform")
+					case "clippath":
+						tag.SetName("clipPath")
+					case "feblend":
+						tag.SetName("feBlend")
+					case "fecolormatrix":
+						tag.SetName("feColorMatrix")
+					case "fecomponenttransfer":
+						tag.SetName("feComponentTransfer")
+					case "fecomposite":
+						tag.SetName("feComposite")
+					case "feconvolvematrix":
+						tag.SetName("feConvolveMatrix")
+					case "fediffuselighting":
+						tag.SetName("feDiffuseLighting")
+					case "fedisplacementmap":
+						tag.SetName("feDisplacementMap")
+					case "fedistantlight":
+						tag.SetName("feDistantLight")
+					case "fedropshadow":
+						tag.SetName("feDropShadown")
+					case "feflood":
+						tag.SetName("feFlood")
+					case "fefunca":
+						tag.SetName("feFuncA")
+					case "fefuncb":
+						tag.SetName("feFuncB")
+					case "fefuncg":
+						tag.SetName("feFuncG")
+					case "fefuncr":
+						tag.SetName("feFuncR")
+					case "fegaussianblur":
+						tag.SetName("feGaussianBlur")
+					case "feimage":
+						tag.SetName("feImage")
+					case "femerge":
+						tag.SetName("feMerge")
+					case "femergenode":
+						tag.SetName("feMergeNode")
+					case "femorphology":
+						tag.SetName("feMorphology")
+					case "feoffset":
+						tag.SetName("feOffset")
+					case "fepointlight":
+						tag.SetName("fePointLight")
+					case "fespecularlighting":
+						tag.SetName("feSpecularLighting")
+					case "fespotlight":
+						tag.SetName("feSpotLight")
+					case "fetile":
+						tag.SetName("feTile")
+					case "feturbulence":
+						tag.SetName("feTurbulence")
+					case "foreignobject":
+						tag.SetName("foreignObject")
+					case "glyphref":
+						tag.SetName("glyphRef")
+					case "lineargradient":
+						tag.SetName("linearGradient")
+					case "radialgradient":
+						tag.SetName("radialGradient")
+					case "textpath":
+						tag.SetName("textPath")
+					}
 
 					adjustSvgAttributes(tag)
 				}
@@ -2063,51 +2098,7 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 					node = p.currentNode()
 				}
 
-				switch p.insertionMode {
-				case mode_Initial:
-					return p.state_Initial(token)
-				case mode_BeforeHtml:
-					return p.state_BeforeHtml(token)
-				case mode_BeforeHead:
-					return p.state_BeforeHead(token)
-				case mode_InHead:
-					return p.state_InHead(token)
-				case mode_InHeadNoScript:
-					return p.state_InHeadNoScript(token)
-				case mode_AfterHead:
-					return p.state_AfterHead(token)
-				case mode_InBody:
-					return p.state_InBody(token)
-				case mode_Text:
-					return p.state_Text(token)
-				case mode_InTable:
-					return p.state_InTable(token)
-				case mode_InTableText:
-					return p.state_InTableText(token)
-				case mode_InCaption:
-					return p.state_InCaption(token)
-				case mode_InColumnGroup:
-					return p.state_InColumnGroup(token)
-				case mode_InTableBody:
-					return p.state_InTableBody(token)
-				case mode_InRow:
-					return p.state_InRow(token)
-				case mode_InCell:
-					return p.state_InCell(token)
-				case mode_InTemplate:
-					return p.state_InTemplate(token)
-				case mode_AfterBody:
-					return p.state_AfterBody(token)
-				case mode_InFrameset:
-					return p.state_InFrameset(token)
-				case mode_AfterFrameset:
-					return p.state_AfterFrameset(token)
-				case mode_AfterAfterBody:
-					return p.state_AfterAfterBody(token)
-				case mode_AfterAfterFrameset:
-					return p.state_AfterAfterFrameset(token)
-				}
-				return nil
+				return p.processHTMLContent(token)
 			case "script":
 				if p.currentNode().Namespace() == dom.NamespaceSVG {
 					p.openStackPop()
@@ -2145,55 +2136,10 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 						continue
 					}
 
-					switch p.insertionMode {
-					case mode_Initial:
-						return p.state_Initial(token)
-					case mode_BeforeHtml:
-						return p.state_BeforeHtml(token)
-					case mode_BeforeHead:
-						return p.state_BeforeHead(token)
-					case mode_InHead:
-						return p.state_InHead(token)
-					case mode_InHeadNoScript:
-						return p.state_InHeadNoScript(token)
-					case mode_AfterHead:
-						return p.state_AfterHead(token)
-					case mode_InBody:
-						return p.state_InBody(token)
-					case mode_Text:
-						return p.state_Text(token)
-					case mode_InTable:
-						return p.state_InTable(token)
-					case mode_InTableText:
-						return p.state_InTableText(token)
-					case mode_InCaption:
-						return p.state_InCaption(token)
-					case mode_InColumnGroup:
-						return p.state_InColumnGroup(token)
-					case mode_InTableBody:
-						return p.state_InTableBody(token)
-					case mode_InRow:
-						return p.state_InRow(token)
-					case mode_InCell:
-						return p.state_InCell(token)
-					case mode_InTemplate:
-						return p.state_InTemplate(token)
-					case mode_AfterBody:
-						return p.state_AfterBody(token)
-					case mode_InFrameset:
-						return p.state_InFrameset(token)
-					case mode_AfterFrameset:
-						return p.state_AfterFrameset(token)
-					case mode_AfterAfterBody:
-						return p.state_AfterAfterBody(token)
-					case mode_AfterAfterFrameset:
-						return p.state_AfterAfterFrameset(token)
-					}
-					return nil
+					return p.processHTMLContent(token)
 				}
 			}
 		}
-
 	}
 
 	return nil

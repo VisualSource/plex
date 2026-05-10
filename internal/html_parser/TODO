@@ -114,9 +114,9 @@ Passing Tests:
     ✔ test7 @done(26-05-08 23:01)
     ☐ test8
     ✔ test9 @done(26-05-09 20:46)
-    ☐ test10
-    ☐ test11 - attr rename on svg
-    ☐ test12
+    ✔ test10 @done(26-05-10 15:50)
+    ✔ test11 - attr rename on svg @done(26-05-10 15:43)
+    ✔ test12 @done(26-05-10 15:43)
     ✔ test13 @done(26-05-09 20:48)
     ✔ test14 @done(26-05-09 20:48)
     ✔ test15 @done(26-05-09 20:48)
@@ -130,7 +130,7 @@ Passing Tests:
     [] test23
     ✔ test24 @done(26-05-09 20:49)
     ✔ test25 @done(26-05-09 20:49)
-    [] test26
+    ✔ test26 @done(26-05-10 15:47)
     [] tricky01
     [] webkit01
     [] webkit02
