@@ -508,6 +508,7 @@ func (p *HtmlParser) resetInsertionModeAppropriately() {
 		case "head":
 			if !last {
 				p.insertionMode = mode_InHead
+				return
 			}
 		case "body":
 			p.insertionMode = mode_InBody
@@ -769,6 +770,13 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 	return nil
 }
 
+func generateAllImpliedEndTagsThoroughly(p *HtmlParser) {
+	node := p.currentNode()
+	for !slices.Contains([]string{"caption", "colgroup", "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc", "tbody", "td", "tfoot", "th", "thead", "tr"}, node.Tag()) {
+		p.openStackPop()
+	}
+}
+
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inhead
 func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 
@@ -867,21 +875,68 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				p.insertionMode = mode_Text
 				return nil
 			case "template":
-
 				p.activeFormattingElements = append(p.activeFormattingElements, newActiveFormatingMarker())
 				p.framesetOk = false
 				p.insertionMode = mode_InTemplate
 				p.templateInsertionModesStack = append(p.templateInsertionModesStack, mode_InTemplate)
 
-				parent, _ := p.appropriatePlaceForInsertingNode(nil)
-				//document := parent.Document()
+				intendedParent, _ := p.appropriatePlaceForInsertingNode(nil)
+				document := intendedParent.Document()
 
-				//TODO: other two cheks
-				if slices.Index(p.openElementsStack, parent) != 0 {
+				shadowrootmodeOpt := tag.Attributes.Get("shadowrootmode")
+				hasShadowMode := shadowrootmodeOpt.IsSome() &&
+					*shadowrootmodeOpt.Value != "" && *shadowrootmodeOpt.Value != "none"
+				adjustedCurrent := p.adjustedCurrentNode()
+				isNotTopmost := len(p.openElementsStack) > 0 && adjustedCurrent != p.openElementsStack[0]
+
+				if !hasShadowMode || !document.AllowDeclarativeShadowRoots || !isNotTopmost {
 					p.insertHtmlElement(*tag)
-				} else {
-
+					return nil
 				}
+
+				// Declarative shadow DOM path
+				declarativeShadowHost := adjustedCurrent
+				template := p.insertForeignElement(*tag, dom.NamespaceHTML, true)
+
+				mode := *shadowrootmodeOpt.Value
+
+				slotAssignment := "named"
+				if slotOpt := tag.Attributes.Get("shadowrootslotassignment"); slotOpt.IsSome() && *slotOpt.Value == "manual" {
+					slotAssignment = "manual"
+				}
+
+				clonable := tag.Attributes["shadowrootclonable"] != nil
+				serializable := tag.Attributes["shadowrootserializable"] != nil
+				delegatesFocus := tag.Attributes["shadowrootdelegatesfocus"] != nil
+				keepRegistryNull := tag.Attributes["shadowrootcustomelementregistry"] != nil
+
+				hostEl, ok := declarativeShadowHost.(*dom.Element)
+				if !ok {
+					p.insertElement(template)
+					return nil
+				}
+
+				if hostEl.IsShadowHost() {
+					p.insertElement(template)
+					return nil
+				}
+
+				shadow, err := hostEl.AttachShadow(document, mode, slotAssignment,
+					clonable, serializable, delegatesFocus, keepRegistryNull)
+				if err != nil {
+					p.insertElement(template)
+					return nil
+				}
+
+				shadow.Declarative = true
+				if tmpl, ok := template.(*dom.TemplateElement); ok {
+					tmpl.SetTemplateContents(shadow)
+				}
+				shadow.AvailableToElementInternals = true
+				if keepRegistryNull {
+					shadow.KeepCustomElementRegistryNull = true
+				}
+
 				return nil
 			case "head":
 				//TOOD : parse error
@@ -900,8 +955,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 					return nil
 				}
 
-				//TODO: genearte all implied end tags thoroughly
-
+				generateAllImpliedEndTagsThoroughly(p)
 				if node := p.currentNode(); node == nil || node.Tag() != "template" {
 					//TODO: parse error
 				}
@@ -1723,8 +1777,7 @@ func (p *HtmlParser) state_InTemplate(token html_tokenizer.Token) error {
 		//TODO: parse error
 
 		for {
-			node := p.openStackPop()
-			if node == nil || node.Tag() == "template" {
+			if node := p.openStackPop(); node == nil || node.Tag() == "template" {
 				break
 			}
 		}
@@ -2045,7 +2098,7 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 					case "femergenode":
 						tag.SetName("feMergeNode")
 					case "femorphology":
-						tag.SetName("feMorphlogy")
+						tag.SetName("feMorphology")
 					case "feoffset":
 						tag.SetName("feOffset")
 					case "fepointlight":

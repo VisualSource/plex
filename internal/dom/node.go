@@ -49,6 +49,8 @@ func setParent(node Node, parent Node) {
 		n.parent = parent
 	case *DocumentType:
 		n.parent = parent
+	case *ShadowRoot:
+		n.parent = parent
 	}
 }
 
@@ -251,6 +253,16 @@ type Element struct {
 	attributes []*Attribute
 	prefix     utils.StringOption
 	parent     Node
+	shadowRoot *ShadowRoot
+}
+
+func (e *Element) IsShadowHost() bool        { return e.shadowRoot != nil }
+func (e *Element) GetShadowRoot() *ShadowRoot { return e.shadowRoot }
+
+func (e *Element) AttachShadow(doc *Document, mode, slotAssignment string, clonable, serializable, delegatesFocus, keepRegistryNull bool) (*ShadowRoot, error) {
+	shadow := NewShadowRoot(doc, e, mode, slotAssignment, clonable, serializable, delegatesFocus, keepRegistryNull)
+	e.shadowRoot = shadow
+	return shadow, nil
 }
 
 func (e Element) Parent() Node {
@@ -373,9 +385,14 @@ func (e *Element) RemoveChild(node Node) Node {
 
 type TemplateElement struct {
 	templateContents []Node
+	shadowContents   *ShadowRoot
 	document         *Document
 	parent           Node
 	attributes       []*Attribute
+}
+
+func (e *TemplateElement) SetTemplateContents(shadow *ShadowRoot) {
+	e.shadowContents = shadow
 }
 
 func (e TemplateElement) Document() *Document {
@@ -395,16 +412,28 @@ func (e TemplateElement) Namespace() Namespace {
 	return NamespaceHTML
 }
 func (e *TemplateElement) AppendChild(node Node) {
+	if e.shadowContents != nil {
+		e.shadowContents.AppendChild(node)
+		return
+	}
 	adoptNode(node, e)
 	setParent(node, e)
 	e.templateContents = append(e.templateContents, node)
 }
 func (e *TemplateElement) PrependChild(node Node) {
+	if e.shadowContents != nil {
+		e.shadowContents.PrependChild(node)
+		return
+	}
 	adoptNode(node, e)
 	setParent(node, e)
 	e.templateContents = slices.Insert(e.templateContents, 0, node)
 }
 func (e *TemplateElement) InsertBefore(node Node, ref Node) {
+	if e.shadowContents != nil {
+		e.shadowContents.InsertBefore(node, ref)
+		return
+	}
 	adoptNode(node, e)
 	setParent(node, e)
 	idx := slices.Index(e.templateContents, ref)

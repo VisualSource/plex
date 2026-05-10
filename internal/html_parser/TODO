@@ -122,9 +122,9 @@ Passing Tests:
     ✔ test15 @done(26-05-09 20:48)
     ✔ test16 @done(26-05-10 16:48)
     ✔ test17 @done(26-05-09 20:48)
-    [] test18
+    ✔ test18 @done(26-05-10 18:45)
     [] test19
-    [] test20
+    ✔ test20 @done(26-05-10 18:47)
     [] test21
     [] test22
     [] test23
