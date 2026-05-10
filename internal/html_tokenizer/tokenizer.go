@@ -838,7 +838,7 @@ func (t *Tokenizer) state_ScriptData_LessThanSign() error {
 // https://html.spec.whatwg.org/#script-data-end-tag-open-state
 func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
 	char, err := t.consume()
-	if err != nil && err == io.EOF {
+	if err != nil && err != io.EOF {
 		return nil
 	}
 
@@ -854,7 +854,6 @@ func (t *Tokenizer) state_ScriptData_EndTagOpen() error {
 	if err == io.EOF {
 		return nil
 	}
-
 	return t.reader.UnreadRune()
 }
 
