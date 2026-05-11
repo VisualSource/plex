@@ -1060,7 +1060,7 @@ func (p *HtmlParser) state_AfterHead(token html_tokenizer.Token) error {
 			case "body":
 				p.insertHtmlElement(*tag)
 
-				p.framesetOk = true
+				p.framesetOk = false
 				p.insertionMode = mode_InBody
 				return nil
 			case "frameset":
