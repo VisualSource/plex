@@ -242,16 +242,12 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 
 			p.reconstructActiveFormattingElements()
 			node := p.insertHtmlElement(*tag)
-			p.activeFormattingElements = append(p.activeFormattingElements, activeFormattingItem{
-				Element: node,
-			})
+			p.pushActiveFormattingElement(node)
 			return nil
 		case "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u":
 			p.reconstructActiveFormattingElements()
 			node := p.insertHtmlElement(*tag)
-			p.activeFormattingElements = append(p.activeFormattingElements, activeFormattingItem{
-				Element: node,
-			})
+			p.pushActiveFormattingElement(node)
 			return nil
 		case "nobr":
 			p.reconstructActiveFormattingElements()
@@ -263,7 +259,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			}
 
 			node := p.insertHtmlElement(*tag)
-			p.activeFormattingElements = append(p.activeFormattingElements, activeFormattingItem{Element: node})
+			p.pushActiveFormattingElement(node)
 			return nil
 		case "applet", "marquee", "object":
 			p.reconstructActiveFormattingElements()

@@ -26,6 +26,12 @@ type Tokenizer struct {
 
 	workingAttrName  strings.Builder
 	workingAttrValue strings.Builder
+
+	adjustedNodeIsNotHTML bool
+}
+
+func (t *Tokenizer) SetAdjustedNodeIsNotHTML(v bool) {
+	t.adjustedNodeIsNotHTML = v
 }
 
 func NewTokenizer(stream io.Reader) *Tokenizer {
@@ -1678,9 +1684,10 @@ func (t *Tokenizer) state_MarkupDeclarationOpen() error {
 				return err
 			}
 
-			// TODO
-			// If there is an adjusted current node and it is not an element in the HTML namespace,
-			// then switch to the CDATA section state.
+			if t.adjustedNodeIsNotHTML {
+				t.state = state_CDATA_Section
+				return nil
+			}
 
 			t.errors = append(t.errors, NewTokenizerError(ErrCdataInHtmlContent, -1, -1))
 			t.workingToken = NewTokenComment(value)

@@ -70,6 +70,9 @@ func (p *HtmlParser) Parse() (*dom.Document, error) {
 
 parseLoop:
 	for {
+		aj := p.adjustedCurrentNode()
+		p.tokenizer.SetAdjustedNodeIsNotHTML(aj != nil && aj.Namespace() != dom.NamespaceHTML)
+
 		err := p.tokenizer.Next()
 		if err != nil && err != io.EOF {
 			return nil, err
@@ -404,6 +407,71 @@ func (p *HtmlParser) insertCharacter(value rune) {
 
 	text := dom.NewTextNode(parent.Document(), string(value), parent)
 	insertNode(text, parent, before)
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#push-onto-the-list-of-active-formatting-elements
+func (p *HtmlParser) pushActiveFormattingElement(element dom.Node) {
+	markerIdx := -1
+	for i := len(p.activeFormattingElements) - 1; i >= 0; i-- {
+		if p.activeFormattingElements[i].IsMarker {
+			markerIdx = i
+			break
+		}
+	}
+
+	newEl, _ := element.(dom.ElementNode)
+	count := 0
+	firstMatchIdx := -1
+	for i := markerIdx + 1; i < len(p.activeFormattingElements); i++ {
+		entry := p.activeFormattingElements[i]
+		if entry.IsMarker || entry.Element == nil {
+			continue
+		}
+		if entry.Element.Tag() != element.Tag() || entry.Element.Namespace() != element.Namespace() {
+			continue
+		}
+		entryEl, _ := entry.Element.(dom.ElementNode)
+		if !formattingAttrsMatch(newEl, entryEl) {
+			continue
+		}
+		count++
+		if firstMatchIdx == -1 {
+			firstMatchIdx = i
+		}
+	}
+
+	if count >= 3 && firstMatchIdx != -1 {
+		p.activeFormattingElements = slices.Delete(p.activeFormattingElements, firstMatchIdx, firstMatchIdx+1)
+	}
+
+	p.activeFormattingElements = append(p.activeFormattingElements, activeFormattingItem{Element: element})
+}
+
+func formattingAttrsMatch(a, b dom.ElementNode) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	aAttrs := a.Attributes()
+	bAttrs := b.Attributes()
+	if len(aAttrs) != len(bAttrs) {
+		return false
+	}
+	for _, attr := range aAttrs {
+		found := false
+		for _, bAttr := range bAttrs {
+			if attr.LocalName == bAttr.LocalName && attr.NamespaceUri == bAttr.NamespaceUri && attr.Value == bAttr.Value {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // https://html.spec.whatwg.org/multipage/parsing.html#reconstruct-the-active-formatting-elements
