@@ -1,9 +1,6 @@
 package dom
 
 import (
-	"slices"
-	"strings"
-
 	"github.com/VisualSource/plex/internal/utils"
 )
 
@@ -15,6 +12,9 @@ type Node interface {
 	PrependChild(node Node)
 	InsertBefore(node Node, ref Node)
 	Parent() Node
+	// setParent updates a node's parent pointer. Used by AppendChild/PrependChild/
+	// InsertBefore to keep parent backrefs consistent when nodes are moved.
+	SetParent(Node)
 	// removes the element from its parent node. If it has no parent node, calling remove() does nothing.
 	Remove()
 	// removes a child node from the DOM and returns the removed node.
@@ -34,40 +34,6 @@ type ElementNode interface {
 	HasAttribute(key string) bool
 	Attributes() []*Attribute
 }
-
-// setParent updates a node's parent pointer. Used by AppendChild/PrependChild/
-// InsertBefore to keep parent backrefs consistent when nodes are moved.
-func setParent(node Node, parent Node) {
-	switch n := node.(type) {
-	case *Element:
-		n.parent = parent
-	case *TemplateElement:
-		n.parent = parent
-	case *Text:
-		n.parent = parent
-	case *Comment:
-		n.parent = parent
-	case *DocumentType:
-		n.parent = parent
-	case *ShadowRoot:
-		n.parent = parent
-	}
-}
-
-// adoptNode detaches node from its current parent (if it has one that isn't
-// newParent) so it can be re-parented under newParent. The old parent's
-// children list is updated; the node's parent pointer is left for the caller
-// to update via setParent.
-func adoptNode(node Node, newParent Node) {
-	if node == nil {
-		return
-	}
-	current := node.Parent()
-	if current != nil && current != newParent {
-		current.RemoveChild(node)
-	}
-}
-
 type DocumentType struct {
 	Name     string
 	PublicId string
@@ -78,6 +44,9 @@ type DocumentType struct {
 
 func (d DocumentType) Parent() Node {
 	return d.parent
+}
+func (d *DocumentType) SetParent(parent Node) {
+	d.parent = parent
 }
 func (d DocumentType) IsNode() uint {
 	return 1
@@ -123,6 +92,9 @@ type Text struct {
 
 func (t Text) Parent() Node {
 	return t.parent
+}
+func (t *Text) SetParent(node Node) {
+	t.parent = node
 }
 func (t Text) IsNode() uint {
 	return 2
@@ -172,6 +144,9 @@ type Comment struct {
 
 func (c Comment) Parent() Node {
 	return c.parent
+}
+func (c *Comment) SetParent(parent Node) {
+	c.parent = parent
 }
 func (c Comment) IsNode() uint {
 	return 3
@@ -233,316 +208,5 @@ func NewAttribute(namespace Namespace, name string, value string) *Attribute {
 		Prefix:       utils.None[string](),
 		LocalName:    name,
 		Value:        value,
-	}
-}
-
-type Element struct {
-	children   []Node
-	localName  string
-	namespace  Namespace
-	Is         utils.StringOption
-	document   *Document
-	attributes []*Attribute
-	prefix     utils.StringOption
-	parent     Node
-	shadowRoot *ShadowRoot
-}
-
-func (e *Element) IsShadowHost() bool        { return e.shadowRoot != nil }
-func (e *Element) GetShadowRoot() *ShadowRoot { return e.shadowRoot }
-
-func (e *Element) AttachShadow(doc *Document, mode, slotAssignment string, clonable, serializable, delegatesFocus, keepRegistryNull bool) (*ShadowRoot, error) {
-	shadow := NewShadowRoot(doc, e, mode, slotAssignment, clonable, serializable, delegatesFocus, keepRegistryNull)
-	e.shadowRoot = shadow
-	return shadow, nil
-}
-
-func (e Element) Parent() Node {
-	return e.parent
-}
-func (e Element) IsNode() uint {
-	return 4
-}
-func (e Element) Tag() string {
-	return e.localName
-}
-func (e Element) Namespace() Namespace {
-	return e.namespace
-}
-func (e *Element) AppendChild(node Node) {
-	adoptNode(node, e)
-	setParent(node, e)
-	e.children = append(e.children, node)
-}
-func (e *Element) PrependChild(node Node) {
-	adoptNode(node, e)
-	setParent(node, e)
-	e.children = slices.Insert(e.children, 0, node)
-}
-func (e *Element) InsertBefore(node Node, ref Node) {
-	adoptNode(node, e)
-	setParent(node, e)
-	idx := slices.Index(e.children, ref)
-	if idx == -1 {
-		e.children = append(e.children, node)
-	} else {
-		e.children = slices.Insert(e.children, idx, node)
-	}
-}
-func (e Element) Document() *Document {
-	return e.document
-}
-func (e Element) PreviousSibling() Node {
-	parent := e.Parent()
-
-	if parent == nil {
-		return nil
-	}
-
-	children := parent.Children()
-	if children == nil {
-		return nil
-	}
-
-	idx := slices.IndexFunc(children, func(node Node) bool {
-		return node == &e
-	})
-
-	if idx == -1 || idx-1 < 0 {
-		return nil
-	}
-
-	return children[idx-1]
-}
-func (e Element) Children() []Node {
-	return e.children
-}
-func (e *Element) SetAttributeNode(node *Attribute) {
-	e.attributes = append(e.attributes, node)
-}
-func (e *Element) SetAttribute(key string, value string) {
-	e.attributes = append(e.attributes, NewAttribute(NamespaceHTML, key, value))
-}
-func (e *Element) SetAttributeNS(namespace Namespace, key string, value string) {
-	e.attributes = append(e.attributes, NewAttribute(namespace, key, value))
-}
-func (e Element) GetAttribute(key string) *Attribute {
-	name := strings.ToLower(key)
-
-	for _, attr := range e.attributes {
-		qualName := attr.LocalName
-		if attr.Prefix.IsSome() {
-			qualName = *attr.Prefix.Value + ":" + attr.LocalName
-		}
-
-		if qualName == name {
-			return attr
-		}
-	}
-
-	return nil
-}
-func (e Element) GetAttributeNS(namespace Namespace, localname string) *Attribute {
-	for _, attr := range e.attributes {
-		if attr.NamespaceUri == namespace && attr.LocalName == localname {
-			return attr
-		}
-	}
-
-	return nil
-}
-func (e Element) HasAttribute(key string) bool {
-	attr := e.GetAttribute(key)
-	return attr != nil
-}
-func (e Element) Attributes() []*Attribute {
-	return e.attributes
-}
-func (e *Element) Remove() {
-	if e.parent != nil {
-		e.parent.RemoveChild(e)
-	}
-}
-func (e *Element) RemoveChild(node Node) Node {
-	idx := slices.Index(e.children, node)
-	if idx == -1 {
-		return nil
-	}
-
-	removed := e.children[idx]
-	e.children = slices.Delete(e.children, idx, idx+1)
-
-	return removed
-}
-
-type TemplateElement struct {
-	templateContents []Node
-	shadowContents   *ShadowRoot
-	document         *Document
-	parent           Node
-	attributes       []*Attribute
-}
-
-func (e *TemplateElement) SetTemplateContents(shadow *ShadowRoot) {
-	e.shadowContents = shadow
-}
-
-func (e TemplateElement) Document() *Document {
-	return e.document
-}
-
-func (e TemplateElement) Parent() Node {
-	return e.parent
-}
-func (e TemplateElement) IsNode() uint {
-	return 4
-}
-func (e TemplateElement) Tag() string {
-	return "template"
-}
-func (e TemplateElement) Namespace() Namespace {
-	return NamespaceHTML
-}
-func (e *TemplateElement) AppendChild(node Node) {
-	if e.shadowContents != nil {
-		e.shadowContents.AppendChild(node)
-		return
-	}
-	adoptNode(node, e)
-	setParent(node, e)
-	e.templateContents = append(e.templateContents, node)
-}
-func (e *TemplateElement) PrependChild(node Node) {
-	if e.shadowContents != nil {
-		e.shadowContents.PrependChild(node)
-		return
-	}
-	adoptNode(node, e)
-	setParent(node, e)
-	e.templateContents = slices.Insert(e.templateContents, 0, node)
-}
-func (e *TemplateElement) InsertBefore(node Node, ref Node) {
-	if e.shadowContents != nil {
-		e.shadowContents.InsertBefore(node, ref)
-		return
-	}
-	adoptNode(node, e)
-	setParent(node, e)
-	idx := slices.Index(e.templateContents, ref)
-	if idx == -1 {
-		e.templateContents = append(e.templateContents, node)
-	} else {
-		e.templateContents = slices.Insert(e.templateContents, idx, node)
-	}
-}
-func (e TemplateElement) PreviousSibling() Node {
-	parent := e.Parent()
-
-	if parent == nil {
-		return nil
-	}
-
-	children := parent.Children()
-	if children == nil {
-		return nil
-	}
-
-	idx := slices.IndexFunc(children, func(node Node) bool {
-		return node == &e
-	})
-
-	if idx == -1 || idx-1 < 0 {
-		return nil
-	}
-
-	return children[idx-1]
-}
-func (e TemplateElement) Children() []Node {
-	return e.templateContents
-}
-func (e *TemplateElement) SetAttributeNode(node *Attribute) {
-	e.attributes = append(e.attributes, node)
-}
-func (e *TemplateElement) SetAttribute(key string, value string) {
-	e.attributes = append(e.attributes, NewAttribute(NamespaceHTML, key, value))
-}
-func (e *TemplateElement) SetAttributeNS(namespace Namespace, key string, value string) {
-	e.attributes = append(e.attributes, NewAttribute(namespace, key, value))
-}
-func (e TemplateElement) GetAttribute(key string) *Attribute {
-	name := strings.ToLower(key)
-
-	for _, attr := range e.attributes {
-		qualName := attr.LocalName
-		if attr.Prefix.IsSome() {
-			qualName = *attr.Prefix.Value + ":" + attr.LocalName
-		}
-
-		if qualName == name {
-			return attr
-		}
-	}
-
-	return nil
-}
-func (e TemplateElement) GetAttributeNS(namespace Namespace, localname string) *Attribute {
-	for _, attr := range e.attributes {
-		if attr.NamespaceUri == namespace && attr.LocalName == localname {
-			return attr
-		}
-	}
-
-	return nil
-}
-func (e TemplateElement) HasAttribute(key string) bool {
-	attr := e.GetAttribute(key)
-	return attr != nil
-}
-func (e TemplateElement) Attributes() []*Attribute {
-	return e.attributes
-}
-func (e *TemplateElement) Remove() {
-	if e.parent != nil {
-		e.parent.RemoveChild(e)
-	}
-}
-func (e *TemplateElement) RemoveChild(node Node) Node {
-	idx := slices.Index(e.templateContents, node)
-	if idx != -1 {
-		return nil
-	}
-
-	removed := e.templateContents[idx]
-	e.templateContents = slices.Delete(e.templateContents, idx, idx+1)
-
-	return removed
-}
-
-// https://dom.spec.whatwg.org/#concept-create-element
-func NewElement(
-	document *Document,
-	localName string,
-	namespace utils.Option[Namespace],
-	prefix utils.StringOption,
-	is utils.StringOption, synchronusCustomElement bool,
-	registry utils.StringOption,
-	parent Node) ElementNode {
-
-	if utils.ValueOf(namespace.Value, NamespaceHTML) == NamespaceHTML && localName == "template" {
-		return &TemplateElement{
-			document:   document,
-			parent:     parent,
-			attributes: make([]*Attribute, 0),
-		}
-	}
-
-	return &Element{
-		document:   document,
-		localName:  localName,
-		namespace:  utils.ValueOf(namespace.Value, NamespaceHTML),
-		prefix:     prefix,
-		Is:         is,
-		parent:     parent,
-		attributes: make([]*Attribute, 0),
 	}
 }

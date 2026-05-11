@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/VisualSource/plex/internal/dom"
+	"github.com/VisualSource/plex/internal/dom/elements"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
 	"github.com/kr/pretty"
 )
@@ -36,6 +37,7 @@ func (m *mockNode) AppendChild(dom.Node)                     {}
 func (m *mockNode) PrependChild(dom.Node)                    {}
 func (m *mockNode) InsertBefore(node dom.Node, ref dom.Node) {}
 func (m *mockNode) Parent() dom.Node                         { return m.parent }
+func (m *mockNode) SetParent(dom.Node)                       {}
 func (m *mockNode) Document() *dom.Document                  { return nil }
 func (m *mockNode) PreviousSibling() dom.Node                { return nil }
 func (m *mockNode) Children() []dom.Node                     { return nil }
@@ -111,7 +113,7 @@ func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 	t.Run("returns adjusted when it is itself a TemplateElement", func(t *testing.T) {
 		// spec step 3: if adjusted IS a template element, insert into its template contents;
 		// TemplateElement.AppendChild already routes to templateContents, so returning adjusted is correct
-		templateEl := &dom.TemplateElement{}
+		templateEl := &elements.TemplateElement{}
 		p := newParser()
 		p.openElementsStack = []dom.Node{templateEl}
 		parent, before := p.appropriatePlaceForInsertingNode(nil)
@@ -120,7 +122,7 @@ func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 
 	t.Run("returns adjusted even when its parent is a TemplateElement", func(t *testing.T) {
 		// spec step 3 checks if adjusted itself is a template element, not its parent
-		templateEl := &dom.TemplateElement{}
+		templateEl := &elements.TemplateElement{}
 		div := newMock("div", templateEl)
 		p := newParser()
 		p.openElementsStack = []dom.Node{div}
@@ -139,7 +141,7 @@ func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 
 	t.Run("returns override target even when its parent is a TemplateElement", func(t *testing.T) {
 		// spec step 3 checks if adjusted itself is a template element, not its parent
-		templateEl := &dom.TemplateElement{}
+		templateEl := &elements.TemplateElement{}
 		div := newMock("div", nil)
 		span := newMock("span", templateEl)
 		p := newParser()
@@ -465,7 +467,7 @@ func printTree(root dom.Node, ident int) []string {
 			output = append(output, fmt.Sprintf("%s\"%s\"", strings.Repeat(" ", ident), tag.Data))
 		case *dom.Comment:
 			output = append(output, fmt.Sprintf("%s<!-- %s -->", strings.Repeat(" ", ident), tag.Data))
-		case *dom.Element:
+		case *elements.SelectedContentElement:
 			namespace := ""
 			switch tag.Namespace() {
 			case dom.NamespaceMathML:
@@ -501,7 +503,43 @@ func printTree(root dom.Node, ident int) []string {
 				tree := printTree(node, ident+2)
 				output = append(output, tree...)
 			}
-		case *dom.TemplateElement:
+		case *elements.Element:
+			namespace := ""
+			switch tag.Namespace() {
+			case dom.NamespaceMathML:
+				namespace = "math "
+			case dom.NamespaceSVG:
+				namespace = "svg "
+			case dom.NamespaceXLink:
+			case dom.NamespaceXMLNS:
+			case dom.NamespaceXML:
+			}
+
+			output = append(output, fmt.Sprintf("%s<%s%s>", strings.Repeat(" ", ident), namespace, tag.Tag()))
+
+			sortedAttrs := slices.SortedFunc(slices.Values(tag.Attributes()), func(a, b *dom.Attribute) int {
+				return strings.Compare(a.LocalName, b.LocalName)
+			})
+			for _, attr := range sortedAttrs {
+				var localName string
+
+				if attr.Prefix.IsSome() {
+					if tag.Namespace() != dom.NamespaceHTML {
+						localName = *attr.Prefix.Value + " " + attr.LocalName
+					} else {
+						localName = *attr.Prefix.Value + ":" + attr.LocalName
+					}
+				} else {
+					localName = attr.LocalName
+				}
+				output = append(output, fmt.Sprintf("%s%s=\"%s\"", strings.Repeat(" ", ident+2), localName, attr.Value))
+			}
+
+			if children := node.Children(); children != nil {
+				tree := printTree(node, ident+2)
+				output = append(output, tree...)
+			}
+		case *elements.TemplateElement:
 			output = append(output, fmt.Sprintf("%s<%s>", strings.Repeat(" ", ident), tag.Tag()))
 			sortedTemplateAttrs := slices.SortedFunc(slices.Values(tag.Attributes()), func(a, b *dom.Attribute) int {
 				return strings.Compare(a.LocalName, b.LocalName)

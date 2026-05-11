@@ -12,6 +12,7 @@ type Document struct {
 func (d Document) Parent() Node {
 	return nil
 }
+func (d *Document) SetParent(parent Node) {}
 func (d Document) IsNode() uint {
 	return 0
 }

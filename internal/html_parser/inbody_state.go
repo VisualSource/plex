@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/VisualSource/plex/internal/dom"
+	"github.com/VisualSource/plex/internal/dom/elements"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
 )
@@ -20,7 +21,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				return nil
 			}
 
-			if el, ok := p.openElementsStack[0].(*dom.Element); ok {
+			if el, ok := p.openElementsStack[0].(*elements.Element); ok {
 				for attrName, attrValue := range tag.Attributes {
 					if !el.HasAttribute(attrName) {
 						el.SetAttributeNode(attrValue)
@@ -40,7 +41,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			}
 			p.framesetOk = false
 
-			if el, ok := p.openElementsStack[1].(*dom.Element); ok {
+			if el, ok := p.openElementsStack[1].(*elements.Element); ok {
 				for attrName, attrValue := range tag.Attributes {
 					if !el.HasAttribute(attrName) {
 						el.SetAttributeNode(attrValue)
