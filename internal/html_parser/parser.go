@@ -1067,7 +1067,7 @@ func (p *HtmlParser) state_InHeadNoScript(token html_tokenizer.Token) error {
 			switch name {
 			case "html":
 				return p.state_InBody(token)
-			case "basefont", "bssound", "link", "meta", "noframes", "style":
+			case "basefont", "bgsound", "link", "meta", "noframes", "style":
 				return p.state_InHead(token)
 			case "head", "noscript":
 				// TODO: parse error
