@@ -11,11 +11,11 @@ Finished states:
         ✔ A start tag whose tag name is "noscript", if scripting mode is not Disabled @done(26-05-06 19:55)
         ✔ A start tag whose tag name is one of: "noframes", "style" @done(26-05-06 19:56)
         ✔ A start tag whose tag name is "noscript", if scripting mode is Disabled @done(26-05-06 19:56)
-        [] A start tag whose tag name is "script"
+        ✔ A start tag whose tag name is "script" @done(26-05-10 20:39)
         ✔ An end tag whose tag name is "head" @done(26-05-06 20:03)
         ✔ An end tag whose tag name is one of: "body", "html", "br" @done(26-05-06 20:12)
-        [] A start tag whose tag name is "template"
-        [] An end tag whose tag name is "template"
+        ✔ A start tag whose tag name is "template" @done(26-05-10 20:38)
+        ✔ An end tag whose tag name is "template" @done(26-05-10 20:38)
         ✔ A start tag whose tag name is "head" @done(26-05-06 20:11)
         ✔ Any other end tag @done(26-05-06 20:12)
         ✔ Anything else @done(26-05-06 20:12)
@@ -71,40 +71,40 @@ Finished states:
         ✔ A start tag whose tag name is "optgroup" @done(26-05-06 19:35)
         ✔ A start tag whose tag name is one of: "rb", "rtc" @done(26-05-06 19:36)
         ✔ A start tag whose tag name is one of: "rp", "rt" @done(26-05-06 19:38)
-        [] A start tag whose tag name is "math"
-        [] A start tag whose tag name is "svg"
+        ✔ A start tag whose tag name is "math" @done(26-05-10 20:38)
+        ✔ A start tag whose tag name is "svg" @done(26-05-10 20:38)
         ✔ A start tag whose tag name is one of: "caption", "col", "colgroup", "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr" @done(26-05-04 13:26)
         ✔ Any other start tag @done(26-05-04 13:27)
         ✔ Any other end tag @done(26-05-04 13:27)
-Passing Tests:
+Passing Tests (Non fragment):
     [] adoption01
-    [] adoption02
+    ✔ adoption02 @done(26-05-10 20:41)
     [] blocks
     ✔ comments01 @done(26-05-07 13:20)
     [] doctype01
     [] domjs-unsafe
     ✔ entities01 @done(26-05-07 13:21)
     ✔ entities02 @done(26-05-07 13:21)
-    [] foreign-fragment
-    [] html5test-com
-    [] inbody01
-    [] isindex
-    [] main-element
-    [] math
-    [] menuitem-element
+    ✔ foreign-fragment @done(26-05-10 20:43)
+    ✔ html5test-com @done(26-05-10 20:43)
+    ✔ inbody01 @done(26-05-10 20:43)
+    ✔ isindex @done(26-05-10 20:43)
+    ✔ main-element @done(26-05-10 20:44)
+    ✔ math @done(26-05-10 20:44)
+    ✔ menuitem-element @done(26-05-10 20:44)
     [] namespace-sensitivity
     [] noscript01
-    [] pending-spec-changes-plain-text-unsafe
+    ✔ pending-spec-changes-plain-text-unsafe @done(26-05-10 20:45)
     [] pending-spec-changes
-    [] plain-text-unsafe
+    ✔ plain-text-unsafe @done(26-05-10 20:45)
     [] quirks01
-    [] ruby
-    [] scriptdata01
-    [] search-element
-    [] svg
-    [] tables01
+    ✔ ruby @done(26-05-10 20:45)
+    ✔ scriptdata01 @done(26-05-10 20:45)
+    ✔ search-element @done(26-05-10 20:46)
+    ✔ svg @done(26-05-10 20:46)
+    ✔ tables01 @done(26-05-10 20:46)
     [] template
-    [] tests_innerHTML_1
+    ✔ tests_innerHTML_1 @done(26-05-10 20:47)
     ✔ test1 @done(26-05-08 19:57)
     ✔ test2 @done(26-05-08 20:51)
     ✔ test3 @done(26-05-08 20:28)
@@ -131,7 +131,7 @@ Passing Tests:
     ✔ test24 @done(26-05-09 20:49)
     ✔ test25 @done(26-05-09 20:49)
     ✔ test26 @done(26-05-10 15:47)
-    [] tricky01
+    ✔ tricky01 @done(26-05-10 20:48)
     [] webkit01
     [] webkit02
 
