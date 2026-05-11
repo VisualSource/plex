@@ -228,17 +228,9 @@ func (attr Attribute) GetName() string {
 }
 
 func NewAttribute(namespace Namespace, name string, value string) *Attribute {
-	prefix := utils.None[string]()
-
-	if strings.Contains(name, ":") {
-		items := strings.Split(name, ":")
-		prefix.Set(items[0])
-		name = items[1]
-	}
-
 	return &Attribute{
 		NamespaceUri: namespace,
-		Prefix:       prefix,
+		Prefix:       utils.None[string](),
 		LocalName:    name,
 		Value:        value,
 	}

@@ -306,7 +306,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			//TODO: ack self closing
 
 			typeAttr := tag.Attributes.Get("type")
-			if typeAttr.IsNone() || strings.EqualFold(*typeAttr.Value, "hidden") {
+			if typeAttr.IsNone() || !strings.EqualFold(*typeAttr.Value, "hidden") {
 				p.framesetOk = false
 			}
 			return nil
@@ -843,7 +843,12 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 			tok := html_tokenizer.NewTokenTag(nodeEl.Tag(), html_tokenizer.TokenStartTag, utils.None[bool]())
 			for _, attr := range nodeEl.Attributes() {
 				name := attr.GetName()
-				tok.Attributes[name] = dom.NewAttribute(attr.NamespaceUri, attr.GetName(), attr.Value)
+				tok.Attributes[name] = &dom.Attribute{
+					NamespaceUri: attr.NamespaceUri,
+					Prefix:       attr.Prefix,
+					LocalName:    attr.LocalName,
+					Value:        attr.Value,
+				}
 			}
 			newElement := p.createElement(*tok, dom.NamespaceHTML, commonAncestor)
 
@@ -880,7 +885,12 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 		newTok := html_tokenizer.NewTokenTag(formattingEl.Tag(), html_tokenizer.TokenStartTag, utils.None[bool]())
 		for _, attr := range formattingEl.Attributes() {
 			name := attr.GetName()
-			newTok.Attributes[name] = dom.NewAttribute(attr.NamespaceUri, attr.GetName(), attr.Value)
+			newTok.Attributes[name] = &dom.Attribute{
+				NamespaceUri: attr.NamespaceUri,
+				Prefix:       attr.Prefix,
+				LocalName:    attr.LocalName,
+				Value:        attr.Value,
+			}
 		}
 		newFormattingElement := p.createElement(*newTok, dom.NamespaceHTML, furthestBlock)
 
@@ -1002,14 +1012,21 @@ func adjustSvgAttributes(tag *html_tokenizer.TokenTag) {
 func adjustForeignAttributes(tag *html_tokenizer.TokenTag) {
 	for key, attr := range tag.Attributes {
 		switch key {
-		case "xlink:actuate", "xlink:arcrole":
+		case "xlink:actuate", "xlink:arcrole",
+			"xlink:href", "xlink:role", "xlink:show", "xlink:title", "xlink:type":
 			attr.NamespaceUri = dom.NamespaceXLink
-		case "xlink:href", "xlink:role", "xlink:show", "xlink:title", "xlink:type":
-			attr.NamespaceUri = dom.NamespaceXLink
+			attr.Prefix = utils.Some("xlink")
+			attr.LocalName = key[len("xlink:"):]
 		case "xml:lang", "xml:space":
 			attr.NamespaceUri = dom.NamespaceXML
-		case "xmlns", "xmlns:xlink":
+			attr.Prefix = utils.Some("xml")
+			attr.LocalName = key[len("xml:"):]
+		case "xmlns":
 			attr.NamespaceUri = dom.NamespaceXMLNS
+		case "xmlns:xlink":
+			attr.NamespaceUri = dom.NamespaceXMLNS
+			attr.Prefix = utils.Some("xmlns")
+			attr.LocalName = "xlink"
 		}
 	}
 }

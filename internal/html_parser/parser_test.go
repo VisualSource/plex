@@ -331,7 +331,7 @@ func TestHtmlParser_Parse(t *testing.T) {
 func loadTestCases(t *testing.T) map[string][]testCase {
 	t.Helper()
 
-	testSubset := "tests23" //, _ := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
+	testSubset, _ := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
 	wantTestSubset := strings.Split(testSubset, ",")
 	useSubset := testSubset != "" && len(wantTestSubset) != 0
 
