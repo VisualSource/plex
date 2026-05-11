@@ -843,6 +843,7 @@ func generateAllImpliedEndTagsThoroughly(p *HtmlParser) {
 	node := p.currentNode()
 	for !slices.Contains([]string{"caption", "colgroup", "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc", "tbody", "td", "tfoot", "th", "thead", "tr"}, node.Tag()) {
 		p.openStackPop()
+		node = p.currentNode()
 	}
 }
 
@@ -1747,7 +1748,8 @@ func (p *HtmlParser) state_InCell(token html_tokenizer.Token) error {
 				}
 
 				for {
-					if node := p.openStackPop(); node == nil || node.Tag() == name {
+					node := p.openStackPop()
+					if node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
 						break
 					}
 				}
