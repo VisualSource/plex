@@ -13,6 +13,7 @@ type characterReferences struct {
 	V [][]int
 }
 
+//go:generate go run ../../scripts/character_ref_to_bin.go ../../resources/character_reference.json character_reference.bin
 //go:embed character_reference.bin
 var characterReferencesRaw []byte
 var characterReferenceTrie = createCharacterReferenceTrie()

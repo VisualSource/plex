@@ -15,16 +15,17 @@ type characterReference struct {
 }
 
 func main() {
+	args := os.Args[1:]
+
+	inputPath := args[0]
+	outputPathRoot := args[1]
+
 	gp, err := filepath.Abs("./")
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("GOPATH: %s\n", gp)
-
-	cr := filepath.Join(gp, "resources/character_reference.json")
-
-	source, err := os.ReadFile(cr)
+	source, err := os.ReadFile(inputPath)
 	if err != nil {
 		panic(err)
 	}
@@ -45,7 +46,7 @@ func main() {
 		output.V = append(output.V, value.Codepoints)
 	}
 
-	outputPath := filepath.Join(gp, "internal/html_tokenizer/character_reference.bin")
+	outputPath := filepath.Join(gp, outputPathRoot)
 	fmt.Printf("Output file: %s\n", outputPath)
 
 	file, err := os.Create(outputPath)

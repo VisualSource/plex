@@ -173,3 +173,5 @@ fabric.properties
 
 # Editor-based Rest Client
 .idea/httpRequests
+
+/internal/html_tokenizer/character_reference.bin

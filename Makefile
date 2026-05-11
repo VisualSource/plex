@@ -30,8 +30,8 @@ test-build: ## Tests whether the code compiles
 
 build: out/bin ## Builds all binaries
 
-gen-char-ref-bin: ## Genearte the character reference binrary from json file
-	@go run ./scripts/character_ref_to_bin.go
+generate-char-ref-bin: ## Genearte the character reference binrary from json file
+	@go run ./scripts/character_ref_to_bin.go ./resources/character_reference.json ./internal/html_tokenizer/character_reference.bin
 
 GO_BUILD = mkdir -pv "$(@)" && go build -ldflags="-w -s" -o "$(@)" ./...
 .PHONY: out/bin
