@@ -605,9 +605,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		}
 		return nil
 	case "h1", "h2", "h3", "h4", "h5", "h6":
-		if !p.haveAnElementTargetNode(name, func(tag string, namespace dom.Namespace) bool {
-			return hasParticularElementInScope(tag, namespace)
-		}) {
+		if !(p.hasElementInScope("h1") || p.hasElementInScope("h2") || p.hasElementInScope("h3") || p.hasElementInScope("h4") || p.hasElementInScope("h5") || p.hasElementInScope("h6")) {
 			//TODO: parse error
 			return nil
 		}
@@ -619,8 +617,15 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		}
 
 		for {
-			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+			node := p.openStackPop()
+			if node == nil {
 				break
+			}
+			if node.Namespace() == dom.NamespaceHTML {
+				t := node.Tag()
+				if t == "h1" || t == "h2" || t == "h3" || t == "h4" || t == "h5" || t == "h6" {
+					break
+				}
 			}
 		}
 		return nil
