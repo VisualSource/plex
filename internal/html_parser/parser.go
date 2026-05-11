@@ -262,7 +262,7 @@ func (p *HtmlParser) appropriatePlaceForInsertingNode(overrideTarget dom.Node) (
 		lastTemplate, tempIdx := p.lastElementOfType("template")
 		lastTable, tableIdx := p.lastElementOfType("table")
 
-		if lastTemplate != nil && (tableIdx != -1 || tempIdx > tableIdx) {
+		if lastTemplate != nil && (tableIdx == -1 || tempIdx > tableIdx) {
 			return lastTemplate, nil
 		} else if tableIdx == -1 {
 			return p.openElementsStack[0], nil
@@ -719,6 +719,8 @@ func (p *HtmlParser) state_Initial(token html_tokenizer.Token) error {
 		if !p.document.IsIframeSrcDoc() && !p.document.ParserNoChangeMode {
 			if tag.GetForceQuirks() || !name.Is("html") {
 				p.document.QuirksMode = dom.QuirksMode_Quirks
+			} else if sysIdent.IsSome() && strings.EqualFold(*sysIdent.Value, "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd") {
+				p.document.QuirksMode = dom.QuirksMode_Quirks
 			} else if pubIdent.IsSome() {
 				if (sysIdent.IsNone() || sysIdent.Is("")) && (strings.HasPrefix(strings.ToUpper(*pubIdent.Value), "-//W3C//DTD HTML 4.01 Frameset//") ||
 					strings.HasPrefix(strings.ToUpper(*pubIdent.Value), "-//W3C//DTD HTML 4.01 Transitional//")) {
@@ -841,7 +843,7 @@ func (p *HtmlParser) state_BeforeHead(token html_tokenizer.Token) error {
 
 func generateAllImpliedEndTagsThoroughly(p *HtmlParser) {
 	node := p.currentNode()
-	for !slices.Contains([]string{"caption", "colgroup", "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc", "tbody", "td", "tfoot", "th", "thead", "tr"}, node.Tag()) {
+	for slices.Contains([]string{"caption", "colgroup", "dd", "dt", "li", "optgroup", "option", "p", "rb", "rp", "rt", "rtc", "tbody", "td", "tfoot", "th", "thead", "tr"}, node.Tag()) {
 		p.openStackPop()
 		node = p.currentNode()
 	}
@@ -1560,7 +1562,7 @@ func (p *HtmlParser) state_InColumnGroup(token html_tokenizer.Token) error {
 				return p.state_InHead(token)
 			}
 		}
-	case html_tokenizer.TokenEOF:
+	case *html_tokenizer.TokenEOF:
 		return p.state_InBody(token)
 	}
 
