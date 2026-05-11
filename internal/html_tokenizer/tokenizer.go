@@ -1420,7 +1420,7 @@ func (t *Tokenizer) state_AfterAttributeName() error {
 	if err != nil {
 		if err == io.EOF {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
-			t.emitCurrentWithTokens(NewTokenEOF())
+			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
@@ -1488,7 +1488,7 @@ func (t *Tokenizer) state_AttributeValue_DoubleQuote() error {
 	if err != nil {
 		if err == io.EOF {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
-			t.emitCurrentWithTokens(NewTokenEOF())
+			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
@@ -1518,7 +1518,7 @@ func (t *Tokenizer) state_AttributeValue_SignleQuote() error {
 	if err != nil {
 		if err == io.EOF {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
-			t.emitCurrentWithTokens(NewTokenEOF())
+			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
@@ -1548,7 +1548,7 @@ func (t *Tokenizer) state_AttributeValue_Unquoted() error {
 	if err != nil {
 		if err == io.EOF {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
-			t.emitCurrentWithTokens(NewTokenEOF())
+			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
@@ -1625,7 +1625,7 @@ func (t *Tokenizer) state_SelfClosingStartTag() error {
 	if err != nil {
 		if err == io.EOF {
 			t.errors = append(t.errors, NewTokenizerError(ErrEofInTag, -1, -1))
-			t.emitCurrentWithTokens(NewTokenEOF())
+			t.tokens = append(t.tokens, NewTokenEOF())
 		}
 		return err
 	}
