@@ -491,7 +491,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		p.insertionMode = mode_AfterBody
 		p.tokenizer.ReconsumeToken(tag)
 		return nil
-	case "address", "article", "aside", "blockquote", "button", "center", "details", "dialong", "dir", "div", "dl", "fieldset",
+	case "address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl", "fieldset",
 		"figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search",
 		"section", "select", "summary", "ul":
 		if !p.hasElementInScope(name) {
