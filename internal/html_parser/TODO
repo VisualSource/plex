@@ -77,12 +77,12 @@ Finished states:
         ✔ Any other start tag @done(26-05-04 13:27)
         ✔ Any other end tag @done(26-05-04 13:27)
 Passing Tests (Non fragment):
-    [] adoption01
+    ✔ adoption01 @done(26-05-11 18:04)
     ✔ adoption02 @done(26-05-10 20:41)
-    [] blocks
+    ✔ blocks @done(26-05-11 18:31)
     ✔ comments01 @done(26-05-07 13:20)
-    [] doctype01
-    [] domjs-unsafe
+    ✔ doctype01 @done(26-05-11 18:42)
+    ✔ domjs-unsafe @done(26-05-11 18:54)
     ✔ entities01 @done(26-05-07 13:21)
     ✔ entities02 @done(26-05-07 13:21)
     ✔ foreign-fragment @done(26-05-10 20:43)

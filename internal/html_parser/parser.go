@@ -2089,14 +2089,7 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 
 		if tag.GetType() == html_tokenizer.TokenStartTag {
 			switch name {
-			case "font":
-				hasColor := tag.Attributes.Get("color").IsSome()
-				hasFace := tag.Attributes.Get("face").IsSome()
-				hasSize := tag.Attributes.Get("size").IsSome()
-				if !(hasColor || hasFace || hasSize) {
-					break
-				}
-				fallthrough
+
 			case "b", "big", "blockquote", "body", "br", "center", "code", "dd", "div",
 				"dl", "dt", "em", "embed", "h1", "h2", "h3", "h4", "h5", "h6", "head", "hr",
 				"i", "img", "li", "listing", "menu", "meta", "nobr", "ol", "p", "pre", "ruby",
@@ -2110,6 +2103,21 @@ func (p *HtmlParser) foreignContent(token html_tokenizer.Token) error {
 				}
 
 				return p.processHTMLContent(token)
+			case "font":
+				hasColor := tag.Attributes.Get("color").IsSome()
+				hasFace := tag.Attributes.Get("face").IsSome()
+				hasSize := tag.Attributes.Get("size").IsSome()
+				if hasColor || hasFace || hasSize {
+					//TODO: parse error
+					node := p.currentNode()
+					for !(isMathMLIntegrationPoint(node) || isHTMLIntegrationPoint(node) || node.Namespace() == dom.NamespaceHTML) {
+						p.openStackPop()
+						node = p.currentNode()
+					}
+
+					return p.processHTMLContent(token)
+				}
+				fallthrough
 			default:
 				aj := p.adjustedCurrentNode()
 				if aj.Namespace() == dom.NamespaceMathML {
