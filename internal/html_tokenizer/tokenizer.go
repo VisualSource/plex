@@ -2314,6 +2314,7 @@ func (t *Tokenizer) state_BeforeDOCTYPE_PublicIdentifier() error {
 		}
 
 		t.reader.Forget()
+		t.state = State_Data
 		t.emitCurrentWithTokens()
 		return nil
 	}
