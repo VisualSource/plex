@@ -135,7 +135,7 @@ Passing Tests (Non fragment):
     ✔ webkit01 @done(26-05-11 12:07)
     ✔ webkit02 @done(26-05-11 14:10)
 Passing Tests (fragment):
-    ☐ adoption01
+    ✔ adoption01 @done(26-05-11 22:35)
     ✔ adoption02 @done(26-05-11 20:29)
     ✔ blocks @done(26-05-11 20:29)
     ✔ comments01 @done(26-05-11 20:30)
@@ -148,7 +148,7 @@ Passing Tests (fragment):
     ✔ inbody01 @done(26-05-11 20:31)
     ✔ isindex @done(26-05-11 20:31)
     ✔ main-element @done(26-05-11 20:31)
-    ☐ math
+    ✔ math @done(26-05-11 22:03)
     ✔ menuitem-element @done(26-05-11 20:31)
     ✔ namespace-sensitivity @done(26-05-11 20:32)
     ✔ noscript01 @done(26-05-11 20:32)
@@ -159,7 +159,7 @@ Passing Tests (fragment):
     ✔ ruby @done(26-05-11 20:33)
     ✔ scriptdata01 @done(26-05-11 20:33)
     ✔ search-element @done(26-05-11 20:33)
-    ☐ svg
+    ✔ svg @done(26-05-11 22:03)
     ✔ tables01 @done(26-05-11 20:34)
     ✔ template @done(26-05-11 21:39)
     ☐ tests_innerHTML_1

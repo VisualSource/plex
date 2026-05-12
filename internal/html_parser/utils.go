@@ -52,7 +52,7 @@ func isSpecialElement(tag string, namespace dom.NamespaceOption) bool {
 		"input", "keygen", "li", "link", "listing", "main", "marquee", "menu", "meta", "nav", "noembed", "noframes", "noscript", "object",
 		"ol", "p", "param", "plaintext", "pre", "script", "search", "section", "select", "source", "style", "summary", "table", "tbody", "td",
 		"template", "textarea", "tfoot", "th", "thead", "tr", "track", "ul", "wbr", "xmp":
-		return true
+		return namespace.Is(dom.NamespaceHTML)
 
 	case "mi", "mo", "mn", "ms", "mtext", "annotation-xml":
 		if !namespace.Is(dom.NamespaceMathML) {
@@ -67,11 +67,7 @@ func isSpecialElement(tag string, namespace dom.NamespaceOption) bool {
 		return true
 
 	case "title":
-		if !namespace.IsNone() || !(namespace.Is("") || namespace.Is(dom.NamespaceSVG)) {
-			return false
-		}
-
-		return true
+		return namespace.Is(dom.NamespaceHTML) || namespace.Is(dom.NamespaceSVG)
 	}
 
 	return false
