@@ -46,10 +46,17 @@ type EOFToken struct{}
 
 func (b EOFToken) isToken() {}
 
+const (
+	Numeric_Number = iota
+	Numeric_Percentage
+	Numeric_Dimension
+)
+
 // <number-token>, <percentage-token>, and <dimension-token>
 type NumericToken struct {
 	Value float64
 	Unit  string
+	Flag  uint
 }
 
 func (n NumericToken) isToken() {}
