@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/VisualSource/plex/internal/dom"
-	"github.com/VisualSource/plex/internal/dom/elements"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
 	"github.com/kr/pretty"
@@ -114,7 +113,7 @@ func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 	t.Run("returns adjusted when it is itself a TemplateElement", func(t *testing.T) {
 		// spec step 3: if adjusted IS a template element, insert into its template contents;
 		// TemplateElement.AppendChild already routes to templateContents, so returning adjusted is correct
-		templateEl := &elements.TemplateElement{}
+		templateEl := &dom.TemplateElement{}
 		p := newParser()
 		p.openElementsStack = []dom.Node{templateEl}
 		parent, before := p.appropriatePlaceForInsertingNode(nil)
@@ -123,7 +122,7 @@ func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 
 	t.Run("returns adjusted even when its parent is a TemplateElement", func(t *testing.T) {
 		// spec step 3 checks if adjusted itself is a template element, not its parent
-		templateEl := &elements.TemplateElement{}
+		templateEl := &dom.TemplateElement{}
 		div := newMock("div", templateEl)
 		p := newParser()
 		p.openElementsStack = []dom.Node{div}
@@ -142,7 +141,7 @@ func TestHtmlParser_appropriatePlaceForInsertingNode(t *testing.T) {
 
 	t.Run("returns override target even when its parent is a TemplateElement", func(t *testing.T) {
 		// spec step 3 checks if adjusted itself is a template element, not its parent
-		templateEl := &elements.TemplateElement{}
+		templateEl := &dom.TemplateElement{}
 		div := newMock("div", nil)
 		span := newMock("span", templateEl)
 		p := newParser()
@@ -484,7 +483,7 @@ func printNodes(nodes []dom.Node, ident int) []string {
 			output = append(output, fmt.Sprintf("%s\"%s\"", strings.Repeat(" ", ident), tag.Data))
 		case *dom.Comment:
 			output = append(output, fmt.Sprintf("%s<!-- %s -->", strings.Repeat(" ", ident), tag.Data))
-		case *elements.SelectedContentElement:
+		case *dom.SelectedContentElement:
 			namespace := ""
 			switch tag.Namespace() {
 			case dom.NamespaceMathML:
@@ -519,7 +518,7 @@ func printNodes(nodes []dom.Node, ident int) []string {
 			if children := node.Children(); children != nil {
 				output = append(output, printNodes(children, ident+2)...)
 			}
-		case *elements.Element:
+		case *dom.Element:
 			namespace := ""
 			switch tag.Namespace() {
 			case dom.NamespaceMathML:
@@ -554,7 +553,7 @@ func printNodes(nodes []dom.Node, ident int) []string {
 			if children := node.Children(); children != nil {
 				output = append(output, printNodes(children, ident+2)...)
 			}
-		case *elements.TemplateElement:
+		case *dom.TemplateElement:
 			output = append(output, fmt.Sprintf("%s<%s>", strings.Repeat(" ", ident), tag.Tag()))
 			sortedTemplateAttrs := slices.SortedFunc(slices.Values(tag.Attributes()), func(a, b *dom.Attribute) int {
 				return strings.Compare(a.LocalName, b.LocalName)
@@ -602,7 +601,7 @@ func newFragmentContextElement(frag string, scripting bool) dom.ElementNode {
 		ns, localName = dom.NamespaceHTML, frag
 	}
 
-	return elements.NewElement(
+	return dom.NewElement(
 		doc, localName,
 		utils.Some(ns),
 		utils.None[string](), utils.None[string](),

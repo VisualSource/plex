@@ -1,38 +1,37 @@
-package elements
+package dom
 
 import (
 	"slices"
 	"strings"
 
-	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/utils"
 )
 
 type Element struct {
-	children   []dom.Node
+	children   []Node
 	localName  string
-	namespace  dom.Namespace
+	namespace  Namespace
 	Is         utils.StringOption
-	document   *dom.Document
-	attributes []*dom.Attribute
+	document   *Document
+	attributes []*Attribute
 	prefix     utils.StringOption
-	parent     dom.Node
+	parent     Node
 	shadowRoot *ShadowRoot
 }
 
 func (e *Element) IsShadowHost() bool         { return e.shadowRoot != nil }
 func (e *Element) GetShadowRoot() *ShadowRoot { return e.shadowRoot }
 
-func (e *Element) AttachShadow(doc *dom.Document, mode, slotAssignment string, clonable, serializable, delegatesFocus, keepRegistryNull bool) (*ShadowRoot, error) {
+func (e *Element) AttachShadow(doc *Document, mode, slotAssignment string, clonable, serializable, delegatesFocus, keepRegistryNull bool) (*ShadowRoot, error) {
 	shadow := NewShadowRoot(doc, e, mode, slotAssignment, clonable, serializable, delegatesFocus, keepRegistryNull)
 	e.shadowRoot = shadow
 	return shadow, nil
 }
 
-func (e Element) Parent() dom.Node {
+func (e Element) Parent() Node {
 	return e.parent
 }
-func (e *Element) SetParent(node dom.Node) {
+func (e *Element) SetParent(node Node) {
 	e.parent = node
 }
 func (e Element) IsNode() uint {
@@ -41,20 +40,20 @@ func (e Element) IsNode() uint {
 func (e Element) Tag() string {
 	return e.localName
 }
-func (e Element) Namespace() dom.Namespace {
+func (e Element) Namespace() Namespace {
 	return e.namespace
 }
-func (e *Element) AppendChild(node dom.Node) {
+func (e *Element) AppendChild(node Node) {
 	adoptNode(node, e)
 	node.SetParent(e)
 	e.children = append(e.children, node)
 }
-func (e *Element) PrependChild(node dom.Node) {
+func (e *Element) PrependChild(node Node) {
 	adoptNode(node, e)
 	node.SetParent(e)
 	e.children = slices.Insert(e.children, 0, node)
 }
-func (e *Element) InsertBefore(node dom.Node, ref dom.Node) {
+func (e *Element) InsertBefore(node Node, ref Node) {
 	adoptNode(node, e)
 	node.SetParent(e)
 	idx := slices.Index(e.children, ref)
@@ -64,10 +63,10 @@ func (e *Element) InsertBefore(node dom.Node, ref dom.Node) {
 		e.children = slices.Insert(e.children, idx, node)
 	}
 }
-func (e Element) Document() *dom.Document {
+func (e Element) Document() *Document {
 	return e.document
 }
-func (e Element) PreviousSibling() dom.Node {
+func (e Element) PreviousSibling() Node {
 	parent := e.Parent()
 
 	if parent == nil {
@@ -79,7 +78,7 @@ func (e Element) PreviousSibling() dom.Node {
 		return nil
 	}
 
-	idx := slices.IndexFunc(children, func(node dom.Node) bool {
+	idx := slices.IndexFunc(children, func(node Node) bool {
 		return node == &e
 	})
 
@@ -89,19 +88,19 @@ func (e Element) PreviousSibling() dom.Node {
 
 	return children[idx-1]
 }
-func (e Element) Children() []dom.Node {
+func (e Element) Children() []Node {
 	return e.children
 }
-func (e *Element) SetAttributeNode(node *dom.Attribute) {
+func (e *Element) SetAttributeNode(node *Attribute) {
 	e.attributes = append(e.attributes, node)
 }
 func (e *Element) SetAttribute(key string, value string) {
-	e.attributes = append(e.attributes, dom.NewAttribute(dom.NamespaceHTML, key, value))
+	e.attributes = append(e.attributes, NewAttribute(NamespaceHTML, key, value))
 }
-func (e *Element) SetAttributeNS(namespace dom.Namespace, key string, value string) {
-	e.attributes = append(e.attributes, dom.NewAttribute(namespace, key, value))
+func (e *Element) SetAttributeNS(namespace Namespace, key string, value string) {
+	e.attributes = append(e.attributes, NewAttribute(namespace, key, value))
 }
-func (e Element) GetAttribute(key string) *dom.Attribute {
+func (e Element) GetAttribute(key string) *Attribute {
 	name := strings.ToLower(key)
 
 	for _, attr := range e.attributes {
@@ -117,7 +116,7 @@ func (e Element) GetAttribute(key string) *dom.Attribute {
 
 	return nil
 }
-func (e Element) GetAttributeNS(namespace dom.Namespace, localname string) *dom.Attribute {
+func (e Element) GetAttributeNS(namespace Namespace, localname string) *Attribute {
 	for _, attr := range e.attributes {
 		if attr.NamespaceUri == namespace && attr.LocalName == localname {
 			return attr
@@ -130,7 +129,7 @@ func (e Element) HasAttribute(key string) bool {
 	attr := e.GetAttribute(key)
 	return attr != nil
 }
-func (e Element) Attributes() []*dom.Attribute {
+func (e Element) Attributes() []*Attribute {
 	return e.attributes
 }
 func (e *Element) Remove() {
@@ -138,7 +137,7 @@ func (e *Element) Remove() {
 		e.parent.RemoveChild(e)
 	}
 }
-func (e *Element) RemoveChild(node dom.Node) dom.Node {
+func (e *Element) RemoveChild(node Node) Node {
 	idx := slices.Index(e.children, node)
 	if idx == -1 {
 		return nil

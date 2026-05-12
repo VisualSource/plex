@@ -1,32 +1,30 @@
-package elements
+package dom
 
 import (
 	"slices"
 	"strings"
-
-	"github.com/VisualSource/plex/internal/dom"
 )
 
 type TemplateElement struct {
-	templateContents []dom.Node
+	templateContents []Node
 	shadowContents   *ShadowRoot
-	document         *dom.Document
-	parent           dom.Node
-	attributes       []*dom.Attribute
+	document         *Document
+	parent           Node
+	attributes       []*Attribute
 }
 
 func (e *TemplateElement) SetTemplateContents(shadow *ShadowRoot) {
 	e.shadowContents = shadow
 }
 
-func (e TemplateElement) Document() *dom.Document {
+func (e TemplateElement) Document() *Document {
 	return e.document
 }
 
-func (e TemplateElement) Parent() dom.Node {
+func (e TemplateElement) Parent() Node {
 	return e.parent
 }
-func (e TemplateElement) SetParent(node dom.Node) {
+func (e TemplateElement) SetParent(node Node) {
 	e.parent = node
 }
 func (e TemplateElement) IsNode() uint {
@@ -35,10 +33,10 @@ func (e TemplateElement) IsNode() uint {
 func (e TemplateElement) Tag() string {
 	return "template"
 }
-func (e TemplateElement) Namespace() dom.Namespace {
-	return dom.NamespaceHTML
+func (e TemplateElement) Namespace() Namespace {
+	return NamespaceHTML
 }
-func (e *TemplateElement) AppendChild(node dom.Node) {
+func (e *TemplateElement) AppendChild(node Node) {
 	if e.shadowContents != nil {
 		e.shadowContents.AppendChild(node)
 		return
@@ -47,7 +45,7 @@ func (e *TemplateElement) AppendChild(node dom.Node) {
 	node.SetParent(e)
 	e.templateContents = append(e.templateContents, node)
 }
-func (e *TemplateElement) PrependChild(node dom.Node) {
+func (e *TemplateElement) PrependChild(node Node) {
 	if e.shadowContents != nil {
 		e.shadowContents.PrependChild(node)
 		return
@@ -56,7 +54,7 @@ func (e *TemplateElement) PrependChild(node dom.Node) {
 	node.SetParent(e)
 	e.templateContents = slices.Insert(e.templateContents, 0, node)
 }
-func (e *TemplateElement) InsertBefore(node dom.Node, ref dom.Node) {
+func (e *TemplateElement) InsertBefore(node Node, ref Node) {
 	if e.shadowContents != nil {
 		e.shadowContents.InsertBefore(node, ref)
 		return
@@ -70,7 +68,7 @@ func (e *TemplateElement) InsertBefore(node dom.Node, ref dom.Node) {
 		e.templateContents = slices.Insert(e.templateContents, idx, node)
 	}
 }
-func (e TemplateElement) PreviousSibling() dom.Node {
+func (e TemplateElement) PreviousSibling() Node {
 	parent := e.Parent()
 
 	if parent == nil {
@@ -82,7 +80,7 @@ func (e TemplateElement) PreviousSibling() dom.Node {
 		return nil
 	}
 
-	idx := slices.IndexFunc(children, func(node dom.Node) bool {
+	idx := slices.IndexFunc(children, func(node Node) bool {
 		return node == &e
 	})
 
@@ -92,19 +90,19 @@ func (e TemplateElement) PreviousSibling() dom.Node {
 
 	return children[idx-1]
 }
-func (e TemplateElement) Children() []dom.Node {
+func (e TemplateElement) Children() []Node {
 	return e.templateContents
 }
-func (e *TemplateElement) SetAttributeNode(node *dom.Attribute) {
+func (e *TemplateElement) SetAttributeNode(node *Attribute) {
 	e.attributes = append(e.attributes, node)
 }
 func (e *TemplateElement) SetAttribute(key string, value string) {
-	e.attributes = append(e.attributes, dom.NewAttribute(dom.NamespaceHTML, key, value))
+	e.attributes = append(e.attributes, NewAttribute(NamespaceHTML, key, value))
 }
-func (e *TemplateElement) SetAttributeNS(namespace dom.Namespace, key string, value string) {
-	e.attributes = append(e.attributes, dom.NewAttribute(namespace, key, value))
+func (e *TemplateElement) SetAttributeNS(namespace Namespace, key string, value string) {
+	e.attributes = append(e.attributes, NewAttribute(namespace, key, value))
 }
-func (e TemplateElement) GetAttribute(key string) *dom.Attribute {
+func (e TemplateElement) GetAttribute(key string) *Attribute {
 	name := strings.ToLower(key)
 
 	for _, attr := range e.attributes {
@@ -120,7 +118,7 @@ func (e TemplateElement) GetAttribute(key string) *dom.Attribute {
 
 	return nil
 }
-func (e TemplateElement) GetAttributeNS(namespace dom.Namespace, localname string) *dom.Attribute {
+func (e TemplateElement) GetAttributeNS(namespace Namespace, localname string) *Attribute {
 	for _, attr := range e.attributes {
 		if attr.NamespaceUri == namespace && attr.LocalName == localname {
 			return attr
@@ -133,7 +131,7 @@ func (e TemplateElement) HasAttribute(key string) bool {
 	attr := e.GetAttribute(key)
 	return attr != nil
 }
-func (e TemplateElement) Attributes() []*dom.Attribute {
+func (e TemplateElement) Attributes() []*Attribute {
 	return e.attributes
 }
 func (e *TemplateElement) Remove() {
@@ -141,7 +139,7 @@ func (e *TemplateElement) Remove() {
 		e.parent.RemoveChild(e)
 	}
 }
-func (e *TemplateElement) RemoveChild(node dom.Node) dom.Node {
+func (e *TemplateElement) RemoveChild(node Node) Node {
 	idx := slices.Index(e.templateContents, node)
 	if idx != -1 {
 		return nil

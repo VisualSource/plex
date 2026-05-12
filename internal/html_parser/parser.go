@@ -8,7 +8,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/VisualSource/plex/internal/dom"
-	"github.com/VisualSource/plex/internal/dom/elements"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
 )
@@ -108,7 +107,7 @@ func ParseHTMLFragment(node dom.ElementNode, input string, allowDeclarativeShado
 		}
 	}
 
-	root := elements.NewElement(
+	root := dom.NewElement(
 		doc, "html",
 		utils.Some(dom.NamespaceHTML),
 		utils.None[string](), utils.None[string](),
@@ -382,7 +381,7 @@ func (p *HtmlParser) createElement(token html_tokenizer.TokenTag, namespace dom.
 		//TODO: document write/open re-entrancy
 	}
 
-	element := elements.NewElement(
+	element := dom.NewElement(
 		document,
 		token.GetName(),
 		utils.Some(namespace),
@@ -1069,7 +1068,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				delegatesFocus := tag.Attributes["shadowrootdelegatesfocus"] != nil
 				keepRegistryNull := tag.Attributes["shadowrootcustomelementregistry"] != nil
 
-				hostEl, ok := declarativeShadowHost.(*elements.Element)
+				hostEl, ok := declarativeShadowHost.(*dom.Element)
 				if !ok {
 					p.insertElement(template)
 					return nil
@@ -1088,7 +1087,7 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				}
 
 				shadow.Declarative = true
-				if tmpl, ok := template.(*elements.TemplateElement); ok {
+				if tmpl, ok := template.(*dom.TemplateElement); ok {
 					tmpl.SetTemplateContents(shadow)
 				}
 				shadow.AvailableToElementInternals = true
