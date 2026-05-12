@@ -13,6 +13,7 @@ import (
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/dom/elements"
 	"github.com/VisualSource/plex/internal/html_tokenizer"
+	"github.com/VisualSource/plex/internal/utils"
 	"github.com/kr/pretty"
 )
 
@@ -303,28 +304,44 @@ func TestHtmlParser_insertCharacter(t *testing.T) {
 func TestHtmlParser_Parse(t *testing.T) {
 	files := loadTestCases(t)
 
+	runFragmentTest, isFragmentEnvSet := os.LookupEnv("TEST_HTML_PARSER_FRAGMENT")
+
 	for filename, tests := range files {
 		for idx, tt := range tests {
 			testname := fmt.Sprintf("[%s]: test %d", filename, idx)
 
 			input := strings.NewReader(tt.data)
 			t.Run(testname, func(t *testing.T) {
-				if tt.documentFragment != "" {
-					t.Skipf("Skipping test '%s;' due to Fragment: %v", testname, tt.documentFragment != "")
-					return
+				isFragmentTest := tt.documentFragment != ""
+
+				if isFragmentEnvSet && runFragmentTest != "" {
+					if runFragmentTest == "fragment-only" && !isFragmentTest {
+						t.Skipf("Skipping non fragment subtest '%s'", testname)
+						return
+					} else if runFragmentTest == "ignore" && isFragmentTest {
+						t.Skipf("Skipping fragment subtest '%s'", testname)
+						return
+					}
 				}
 
-				parser := NewHtmlParser(input)
-				if tt.scripting == "off" {
-					parser.scriptingMode = mode_Disabled
+				if isFragmentTest {
+					contextEl := newFragmentContextElement(tt.documentFragment, tt.scripting != "off")
+					nodes, err := ParseHTMLFragment(contextEl, tt.data, utils.None[bool](), utils.None[ScriptingMode]())
+					if err != nil {
+						t.Fatal(err)
+					}
+					validateFragmentTest(t, nodes, &tt)
+				} else {
+					parser := NewHtmlParser(input)
+					if tt.scripting == "off" {
+						parser.scriptingMode = mode_Disabled
+					}
+					document, err := parser.Parse()
+					if err != nil {
+						t.Fatal(err)
+					}
+					validateTest(t, document, parser, &tt)
 				}
-
-				document, err := parser.Parse()
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				validateTest(t, document, parser, &tt)
 			})
 		}
 	}
@@ -333,9 +350,9 @@ func TestHtmlParser_Parse(t *testing.T) {
 func loadTestCases(t *testing.T) map[string][]testCase {
 	t.Helper()
 
-	testSubset, _ := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
+	testSubset, isSubtestEnvSet := os.LookupEnv("TEST_HTML_PARSER_SUBSET")
 	wantTestSubset := strings.Split(testSubset, ",")
-	useSubset := testSubset != "" && len(wantTestSubset) != 0
+	useSubset := isSubtestEnvSet && testSubset != "" && len(wantTestSubset) != 0
 
 	paths, err := filepath.Glob(filepath.Join("testdata", "*.test"))
 	if err != nil {
@@ -448,10 +465,10 @@ func loadTestCases(t *testing.T) map[string][]testCase {
 	return tests
 }
 
-func printTree(root dom.Node, ident int) []string {
+func printNodes(nodes []dom.Node, ident int) []string {
 	var output []string
 
-	for _, node := range root.Children() {
+	for _, node := range nodes {
 
 		switch tag := node.(type) {
 		case *dom.DocumentType:
@@ -500,8 +517,7 @@ func printTree(root dom.Node, ident int) []string {
 			}
 
 			if children := node.Children(); children != nil {
-				tree := printTree(node, ident+2)
-				output = append(output, tree...)
+				output = append(output, printNodes(children, ident+2)...)
 			}
 		case *elements.Element:
 			namespace := ""
@@ -536,8 +552,7 @@ func printTree(root dom.Node, ident int) []string {
 			}
 
 			if children := node.Children(); children != nil {
-				tree := printTree(node, ident+2)
-				output = append(output, tree...)
+				output = append(output, printNodes(children, ident+2)...)
 			}
 		case *elements.TemplateElement:
 			output = append(output, fmt.Sprintf("%s<%s>", strings.Repeat(" ", ident), tag.Tag()))
@@ -561,13 +576,53 @@ func printTree(root dom.Node, ident int) []string {
 
 			output = append(output, fmt.Sprintf("%scontent", strings.Repeat(" ", ident+2)))
 			if children := node.Children(); children != nil {
-				tree := printTree(node, ident+4)
-				output = append(output, tree...)
+				output = append(output, printNodes(children, ident+4)...)
 			}
 		}
 	}
 
 	return output
+}
+
+func printTree(root dom.Node, ident int) []string {
+	return printNodes(root.Children(), ident)
+}
+
+func newFragmentContextElement(frag string, scripting bool) dom.ElementNode {
+	doc := dom.NewDocument()
+	doc.Scripting = scripting
+
+	var ns dom.Namespace
+	var localName string
+	if rest, ok := strings.CutPrefix(frag, "svg "); ok {
+		ns, localName = dom.NamespaceSVG, rest
+	} else if rest, ok := strings.CutPrefix(frag, "math "); ok {
+		ns, localName = dom.NamespaceMathML, rest
+	} else {
+		ns, localName = dom.NamespaceHTML, frag
+	}
+
+	return elements.NewElement(
+		doc, localName,
+		utils.Some(ns),
+		utils.None[string](), utils.None[string](),
+		false, utils.None[string](),
+		doc,
+	)
+}
+
+func validateFragmentTest(t *testing.T, nodes []dom.Node, testCase *testCase) {
+	t.Helper()
+	tree := printNodes(nodes, 0)
+	if !slices.Equal(testCase.document, tree) {
+		diff := pretty.Diff(testCase.document, tree)
+		t.Fatalf("tree mismatch:\nInput: %s\nFragment: %s\n%s\n\n(-expected +got):\n%s",
+			testCase.data,
+			testCase.documentFragment,
+			strings.Join(diff, "\n"),
+			unifiedDiff(testCase.document, tree),
+		)
+	}
 }
 
 func validateTest(t *testing.T, document *dom.Document, _ *HtmlParser, testCase *testCase) {
@@ -577,8 +632,14 @@ func validateTest(t *testing.T, document *dom.Document, _ *HtmlParser, testCase 
 
 	if !slices.Equal(testCase.document, tree) {
 		diff := pretty.Diff(testCase.document, tree)
-		t.Fatalf("tree mismatch:\nInput:%s\n%s\n\n(-expected +got):\n%s",
+		fragment := ""
+		if testCase.documentFragment != "" {
+			fragment = fmt.Sprintf("Fragment: %s\n", testCase.documentFragment)
+		}
+
+		t.Fatalf("tree mismatch:\nInput:%s\n%s%s\n\n(-expected +got):\n%s",
 			testCase.data,
+			fragment,
 			strings.Join(diff, "\n"),
 			unifiedDiff(testCase.document, tree),
 		)

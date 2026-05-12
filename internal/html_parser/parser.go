@@ -57,6 +57,7 @@ type HtmlParser struct {
 	pendingTableCharacters []html_tokenizer.TokenCharacter
 }
 
+// https://html.spec.whatwg.org/multipage/parsing.html#parsing-html-fragments
 func NewHtmlParser(stream io.Reader) *HtmlParser {
 	return &HtmlParser{
 		insertionMode: mode_Initial,
@@ -64,6 +65,90 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 		document:      dom.NewDocument(),
 		framesetOk:    true,
 	}
+}
+
+// https://html.spec.whatwg.org/multipage/parsing.html#parsing-html-fragments
+func ParseHTMLFragment(node dom.ElementNode, input string, allowDeclarativeShadowRoots utils.BoolOption, scriptingMode utils.Option[ScriptingMode]) ([]dom.Node, error) {
+	mode := utils.ValueOf(scriptingMode.Value, mode_Inert)
+	if mode != mode_Fragment && mode != mode_Inert {
+		panic("scripting mode must be of Fragment or Inert")
+	}
+
+	contextDocument := node.Document()
+
+	doc := dom.NewDocument()
+	switch contextDocument.QuirksMode {
+	case dom.QuirksMode_Quirks:
+		doc.QuirksMode = dom.QuirksMode_Quirks
+	case dom.QuirksMode_Limited:
+		doc.QuirksMode = dom.QuirksMode_Limited
+	}
+	doc.AllowDeclarativeShadowRoots = utils.ValueOf(allowDeclarativeShadowRoots.Value, false)
+
+	if !contextDocument.Scripting {
+		mode = mode_Disabled
+	}
+
+	tok := html_tokenizer.NewTokenizer(strings.NewReader(input))
+
+	if node.Namespace() == dom.NamespaceHTML {
+		switch node.Tag() {
+		case "title", "textarea":
+			tok.SetState(html_tokenizer.State_RCData)
+		case "style", "xmp", "iframe", "noembed", "noframes":
+			tok.SetState(html_tokenizer.State_RawText)
+		case "script":
+			tok.SetState(html_tokenizer.State_ScriptData)
+		case "noscript":
+			if mode != mode_Disabled {
+				tok.SetState(html_tokenizer.State_RawText)
+			}
+		case "plaintext":
+			tok.SetState(html_tokenizer.State_PlainText)
+		}
+	}
+
+	root := elements.NewElement(
+		doc, "html",
+		utils.Some(dom.NamespaceHTML),
+		utils.None[string](), utils.None[string](),
+		false, utils.None[string](),
+		doc,
+	)
+	doc.AppendChild(root)
+
+	parser := &HtmlParser{
+		isFragmentParsing: true,
+		scriptingMode:     mode,
+		insertionMode:     mode_Initial,
+		tokenizer:         tok,
+		document:          doc,
+		framesetOk:        true,
+		openElementsStack: []dom.Node{root},
+		context:           node,
+	}
+
+	if node.Tag() == "template" {
+		parser.templateInsertionModesStack = append(
+			parser.templateInsertionModesStack, mode_InTemplate,
+		)
+	}
+
+	for ancestor := dom.Node(node); ancestor != nil; ancestor = ancestor.Parent() {
+		if ancestor.Tag() == "form" && ancestor.Namespace() == dom.NamespaceHTML {
+			parser.form = ancestor
+			break
+		}
+	}
+
+	parser.resetInsertionModeAppropriately()
+
+	_, err := parser.Parse()
+	if err != nil {
+		return nil, err
+	}
+
+	return root.Children(), nil
 }
 
 // https://html.spec.whatwg.org/#tree-construction
@@ -544,7 +629,7 @@ func (p *HtmlParser) resetInsertionModeAppropriately() {
 			last = true
 
 			if p.isFragmentParsing {
-				//TODO: set node to context element
+				node = p.context
 			}
 		}
 
@@ -572,8 +657,10 @@ func (p *HtmlParser) resetInsertionModeAppropriately() {
 			p.insertionMode = mode_InTable
 			return
 		case "template":
-			p.insertionMode = p.currentTemplateInsertionMode()
-			return
+			if node.Namespace() == dom.NamespaceHTML {
+				p.insertionMode = p.currentTemplateInsertionMode()
+				return
+			}
 		case "head":
 			if !last {
 				p.insertionMode = mode_InHead
@@ -607,7 +694,7 @@ func (p *HtmlParser) resetInsertionModeAppropriately() {
 // https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-context
 func (p *HtmlParser) clearStackBackToTableContext() {
 	node := p.currentNode()
-	for !slices.Contains([]string{"table", "template", "html"}, node.Tag()) {
+	for !(node.Namespace() == dom.NamespaceHTML && slices.Contains([]string{"table", "template", "html"}, node.Tag())) {
 		p.openStackPop()
 		node = p.currentNode()
 	}
@@ -616,7 +703,7 @@ func (p *HtmlParser) clearStackBackToTableContext() {
 // https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-body-context
 func (p *HtmlParser) clearStackBackToTableBodyContext() {
 	x := p.currentNode()
-	for !slices.Contains([]string{"tbody", "tfoot", "thead", "template", "html"}, x.Tag()) {
+	for !(x.Namespace() == dom.NamespaceHTML && slices.Contains([]string{"tbody", "tfoot", "thead", "template", "html"}, x.Tag())) {
 		p.openStackPop()
 		x = p.currentNode()
 	}
@@ -625,7 +712,7 @@ func (p *HtmlParser) clearStackBackToTableBodyContext() {
 // https://html.spec.whatwg.org/multipage/parsing.html#clear-the-stack-back-to-a-table-row-context
 func (p *HtmlParser) clearStackBackToRowContext() {
 	x := p.currentNode()
-	for !slices.Contains([]string{"tr", "template", "html"}, x.Tag()) {
+	for !(x.Namespace() == dom.NamespaceHTML && slices.Contains([]string{"tr", "template", "html"}, x.Tag())) {
 		p.openStackPop()
 		x = p.currentNode()
 	}
@@ -652,7 +739,7 @@ func (p *HtmlParser) generateImpliedEndTags(ignore ...string) {
 func (p *HtmlParser) haveAnElementTargetNode(target string, checkElementType func(tag string, namespace dom.Namespace) bool) bool {
 	for idx := len(p.openElementsStack) - 1; idx >= 0; idx-- {
 		node := p.openElementsStack[idx]
-		if node.Tag() == target {
+		if node.Tag() == target && node.Namespace() == dom.NamespaceHTML {
 			return true
 		} else if checkElementType(node.Tag(), node.Namespace()) {
 			return false
@@ -1022,7 +1109,14 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				return nil
 			case "body", "html", "br":
 			case "template":
-				if temp, _ := p.lastElementOfType("template"); temp == nil {
+				hasHTMLTemplate := false
+				for _, n := range p.openElementsStack {
+					if n.Tag() == "template" && n.Namespace() == dom.NamespaceHTML {
+						hasHTMLTemplate = true
+						break
+					}
+				}
+				if !hasHTMLTemplate {
 					//TODO: parse error
 					return nil
 				}
@@ -1033,7 +1127,8 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				}
 
 				for {
-					if el := p.openStackPop(); el == nil || el.Tag() == "template" {
+					el := p.openStackPop()
+					if el == nil || (el.Tag() == "template" && el.Namespace() == dom.NamespaceHTML) {
 						break
 					}
 				}
@@ -1596,7 +1691,7 @@ func (p *HtmlParser) state_InTableBody(token html_tokenizer.Token) error {
 				p.insertionMode = mode_InRow
 				p.tokenizer.ReconsumeToken(token)
 				return nil
-			case "caption", "col", "colgroup", "tbody", "tfoot":
+			case "caption", "col", "colgroup", "tbody", "tfoot", "thead":
 				if !(p.isInTableScope("tbody") || p.isInTableScope("thead") || p.isInTableScope("tfoot")) {
 					//TODO: parse error
 					return nil
@@ -1844,13 +1939,21 @@ func (p *HtmlParser) state_InTemplate(token html_tokenizer.Token) error {
 			}
 		}
 	case *html_tokenizer.TokenEOF:
-		if last, _ := p.lastElementOfType("template"); last == nil {
+		hasHTMLTemplate := false
+		for _, n := range p.openElementsStack {
+			if n.Tag() == "template" && n.Namespace() == dom.NamespaceHTML {
+				hasHTMLTemplate = true
+				break
+			}
+		}
+		if !hasHTMLTemplate {
 			return io.EOF
 		}
 		//TODO: parse error
 
 		for {
-			if node := p.openStackPop(); node == nil || node.Tag() == "template" {
+			node := p.openStackPop()
+			if node == nil || (node.Tag() == "template" && node.Namespace() == dom.NamespaceHTML) {
 				break
 			}
 		}

@@ -7,6 +7,8 @@ type Document struct {
 	QuirksMode                  QuirksMode
 	ParserNoChangeMode          bool
 	AllowDeclarativeShadowRoots bool
+	Type                        string
+	Scripting                   bool
 }
 
 func (d Document) Parent() Node {
@@ -67,5 +69,7 @@ func NewDocument() *Document {
 		AllowDeclarativeShadowRoots: true,
 		QuirksMode:                  QuirksMode_NoQuirks,
 		children:                    make([]Node, 0),
+		Type:                        "html",
+		Scripting:                   true,
 	}
 }
