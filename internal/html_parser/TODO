@@ -162,7 +162,7 @@ Passing Tests (fragment):
     ✔ svg @done(26-05-11 22:03)
     ✔ tables01 @done(26-05-11 20:34)
     ✔ template @done(26-05-11 21:39)
-    ☐ tests_innerHTML_1
+    ✔ tests_innerHTML_1 @done(26-05-11 22:56)
     ✔ test1 @done(26-05-11 20:25)
     ✔ test2 @done(26-05-11 20:25)
     ✔ test3 @done(26-05-11 20:26)
