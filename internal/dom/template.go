@@ -69,26 +69,7 @@ func (e *TemplateElement) InsertBefore(node Node, ref Node) {
 	}
 }
 func (e TemplateElement) PreviousSibling() Node {
-	parent := e.Parent()
-
-	if parent == nil {
-		return nil
-	}
-
-	children := parent.Children()
-	if children == nil {
-		return nil
-	}
-
-	idx := slices.IndexFunc(children, func(node Node) bool {
-		return node == &e
-	})
-
-	if idx == -1 || idx-1 < 0 {
-		return nil
-	}
-
-	return children[idx-1]
+	return previousSibling(&e)
 }
 func (e TemplateElement) Children() []Node {
 	return e.templateContents
@@ -124,7 +105,6 @@ func (e TemplateElement) GetAttributeNS(namespace Namespace, localname string) *
 			return attr
 		}
 	}
-
 	return nil
 }
 func (e TemplateElement) HasAttribute(key string) bool {

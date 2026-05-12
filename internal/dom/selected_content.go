@@ -1,9 +1,5 @@
 package dom
 
-import (
-	"slices"
-)
-
 type SelectedContentElement struct {
 	parent     Node
 	namespace  Namespace
@@ -41,26 +37,7 @@ func (e SelectedContentElement) Document() *Document {
 	return e.document
 }
 func (e SelectedContentElement) PreviousSibling() Node {
-	parent := e.Parent()
-
-	if parent == nil {
-		return nil
-	}
-
-	children := parent.Children()
-	if children == nil {
-		return nil
-	}
-
-	idx := slices.IndexFunc(children, func(node Node) bool {
-		return node == &e
-	})
-
-	if idx == -1 || idx-1 < 0 {
-		return nil
-	}
-
-	return children[idx-1]
+	return previousSibling(&e)
 }
 func (e SelectedContentElement) Children() []Node {
 	parent := e.Parent()

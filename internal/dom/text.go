@@ -46,7 +46,7 @@ func (t *Text) RemoveChild(Node) Node {
 	return nil
 }
 func (t Text) PreviousSibling() Node {
-	return nil
+	return previousSibling(&t)
 }
 func (t Text) Children() []Node {
 	return nil

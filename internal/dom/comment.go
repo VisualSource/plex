@@ -38,7 +38,7 @@ func (c Comment) Document() *Document {
 	return c.document
 }
 func (c Comment) PreviousSibling() Node {
-	return nil
+	return previousSibling(&c)
 }
 func (c Comment) Children() []Node {
 	return nil

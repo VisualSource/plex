@@ -1,6 +1,8 @@
 package dom
 
 import (
+	"slices"
+
 	"github.com/VisualSource/plex/internal/utils"
 )
 
@@ -95,6 +97,8 @@ func NewElement(
 	}
 }
 
+//#region node utils
+
 // adoptNode detaches node from its current parent (if it has one that isn't
 // newParent) so it can be re-parented under newParent. The old parent's
 // children list is updated; the node's parent pointer is left for the caller
@@ -108,3 +112,29 @@ func adoptNode(node Node, newParent Node) {
 		current.RemoveChild(node)
 	}
 }
+
+func previousSibling(node Node) Node {
+	parent := node.Parent()
+
+	if parent == nil {
+		return nil
+	}
+
+	children := parent.Children()
+	if children == nil {
+		return nil
+	}
+
+	idx := slices.IndexFunc(children, func(node Node) bool {
+		return node == node
+	})
+
+	if idx == -1 || idx-1 < 0 {
+		return nil
+	}
+
+	return children[idx-1]
+
+}
+
+//#endregion

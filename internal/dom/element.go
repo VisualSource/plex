@@ -67,26 +67,7 @@ func (e Element) Document() *Document {
 	return e.document
 }
 func (e Element) PreviousSibling() Node {
-	parent := e.Parent()
-
-	if parent == nil {
-		return nil
-	}
-
-	children := parent.Children()
-	if children == nil {
-		return nil
-	}
-
-	idx := slices.IndexFunc(children, func(node Node) bool {
-		return node == &e
-	})
-
-	if idx == -1 || idx-1 < 0 {
-		return nil
-	}
-
-	return children[idx-1]
+	return previousSibling(&e)
 }
 func (e Element) Children() []Node {
 	return e.children
