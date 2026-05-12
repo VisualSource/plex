@@ -22,7 +22,7 @@ type Element struct {
 func (e *Element) IsShadowHost() bool         { return e.shadowRoot != nil }
 func (e *Element) GetShadowRoot() *ShadowRoot { return e.shadowRoot }
 
-func (e *Element) AttachShadow(doc *Document, mode, slotAssignment string, clonable, serializable, delegatesFocus, keepRegistryNull bool) (*ShadowRoot, error) {
+func (e *Element) AttachShadow(doc *Document, mode ShadowRootMode, slotAssignment ShadowRootSlotAssignment, clonable, serializable, delegatesFocus, keepRegistryNull bool) (*ShadowRoot, error) {
 	shadow := NewShadowRoot(doc, e, mode, slotAssignment, clonable, serializable, delegatesFocus, keepRegistryNull)
 	e.shadowRoot = shadow
 	return shadow, nil

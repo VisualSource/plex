@@ -4,14 +4,25 @@ import (
 	"slices"
 )
 
+type ShadowRootMode string
+type ShadowRootSlotAssignment string
+
+const (
+	ShadowRootMode_Open   ShadowRootMode = "open"
+	ShadowRootMode_Closed ShadowRootMode = "closed"
+
+	ShadowRootSlotAssignment_Named  ShadowRootSlotAssignment = "named"
+	ShadowRootSlotAssignment_Manual ShadowRootSlotAssignment = "manual"
+)
+
 type ShadowRoot struct {
 	children                      []Node
 	host                          *Element
-	Mode                          string // "open" | "closed"
+	Mode                          ShadowRootMode
 	Clonable                      bool
 	Serializable                  bool
 	DelegatesFocus                bool
-	SlotAssignment                string // "named" | "manual"
+	SlotAssignment                ShadowRootSlotAssignment
 	Declarative                   bool
 	AvailableToElementInternals   bool
 	KeepCustomElementRegistryNull bool
@@ -22,8 +33,8 @@ type ShadowRoot struct {
 func NewShadowRoot(
 	document *Document,
 	host *Element,
-	mode string,
-	slotAssignment string,
+	mode ShadowRootMode,
+	slotAssignment ShadowRootSlotAssignment,
 	clonable bool,
 	serializable bool,
 	delegatesFocus bool,

@@ -195,4 +195,4 @@ Passing Tests (fragment):
 Final:
     [] cleanup parser file
     [] move utils function to there own file
-    [] add tests of the pr tests form html5lib
+    ✔ add tests of the pr tests form html5lib @done(26-05-12 08:29)

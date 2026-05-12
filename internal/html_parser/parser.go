@@ -1056,11 +1056,14 @@ func (p *HtmlParser) state_InHead(token html_tokenizer.Token) error {
 				declarativeShadowHost := adjustedCurrent
 				template := p.insertForeignElement(*tag, dom.NamespaceHTML, true)
 
-				mode := *shadowrootmodeOpt.Value
+				mode := dom.ShadowRootMode_Open
+				if *shadowrootmodeOpt.Value == "closed" {
+					mode = dom.ShadowRootMode_Closed
+				}
 
-				slotAssignment := "named"
+				slotAssignment := dom.ShadowRootSlotAssignment_Named
 				if slotOpt := tag.Attributes.Get("shadowrootslotassignment"); slotOpt.IsSome() && *slotOpt.Value == "manual" {
-					slotAssignment = "manual"
+					slotAssignment = dom.ShadowRootSlotAssignment_Manual
 				}
 
 				clonable := tag.Attributes["shadowrootclonable"] != nil
