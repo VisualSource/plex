@@ -62,23 +62,23 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.openElementsStack[1].Remove()
 
 			for len(p.openElementsStack) > 1 {
-				p.openStackPop()
+				p.popOpenStack()
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			p.insertionMode = mode_InFrameset
 			return nil
 		case "address", "article", "aside", "blockquote", "center", "details",
 			"dialog", "dir", "div", "dl", "fieldset", "figcaption", "figure", "footer",
 			"header", "hgroup", "main", "menu", "nav", "ol", "p", "search", "section", "summary", "ul":
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "h1", "h2", "h3", "h4", "h5", "h6":
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
@@ -86,18 +86,18 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			if current.Namespace() == dom.NamespaceHTML {
 				switch current.Tag() {
 				case "h1", "h2", "h3", "h4", "h5", "h6":
-					p.openStackPop()
+					p.popOpenStack()
 				}
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "pre", "listing":
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 
 			p.skipNextLineFeed = true
 
@@ -111,11 +111,11 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				return nil
 			}
 
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			node := p.insertHtmlElement(*tag)
+			node := p.insertHtmlElement(tag)
 			if template, _ = p.lastElementOfType("template"); template == nil {
 				p.form = node
 			}
@@ -127,13 +127,13 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			for idx >= 0 {
 				node := p.openElementsStack[idx]
 				if node.Tag() == "li" {
-					p.generateImpliedEndTags("li")
+					generateImpliedEndTags(p, "li")
 					if p.currentNode().Tag() != "li" {
 						//TODO: parse error
 					}
 
 					for {
-						if popped := p.openStackPop(); popped == nil || popped.Tag() == "li" {
+						if popped := p.popOpenStack(); popped == nil || popped.Tag() == "li" {
 							break
 						}
 					}
@@ -146,11 +146,11 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				idx--
 			}
 
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "dd", "dt":
 			p.framesetOk = false
@@ -160,12 +160,12 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				node := p.openElementsStack[idx]
 				name := node.Tag()
 				if name == "dt" || name == "dd" {
-					p.generateImpliedEndTags(name)
+					generateImpliedEndTags(p, name)
 					if p.currentNode().Tag() != name {
 						//TODO: parse error
 					}
 					for {
-						if el := p.openStackPop(); el == nil || el.Tag() == name {
+						if el := p.popOpenStack(); el == nil || el.Tag() == name {
 							break
 						}
 					}
@@ -177,18 +177,18 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				idx--
 			}
 
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "plaintext":
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			p.tokenizer.SetState(html_tokenizer.State_PlainText)
 			return nil
 		case "button":
@@ -196,9 +196,9 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				return hasParticularElementInScope(tag, namespace)
 			}) {
 				//TODO: parse error
-				p.generateImpliedEndTags()
+				generateImpliedEndTags(p)
 				for {
-					node := p.openStackPop()
+					node := p.popOpenStack()
 					if node == nil || node.Tag() == "button" {
 						break
 					}
@@ -206,7 +206,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			}
 
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			p.framesetOk = false
 			return nil
 		case "a":
@@ -241,45 +241,45 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			}
 
 			p.reconstructActiveFormattingElements()
-			node := p.insertHtmlElement(*tag)
+			node := p.insertHtmlElement(tag)
 			p.pushActiveFormattingElement(node)
 			return nil
 		case "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u":
 			p.reconstructActiveFormattingElements()
-			node := p.insertHtmlElement(*tag)
+			node := p.insertHtmlElement(tag)
 			p.pushActiveFormattingElement(node)
 			return nil
 		case "nobr":
 			p.reconstructActiveFormattingElements()
 
-			if p.hasElementInScope("nobr") {
+			if hasElementInScope(p, "nobr") {
 				//TODO: parse error
 				inBody_adoptionAgency(p, tag)
 				p.reconstructActiveFormattingElements()
 			}
 
-			node := p.insertHtmlElement(*tag)
+			node := p.insertHtmlElement(tag)
 			p.pushActiveFormattingElement(node)
 			return nil
 		case "applet", "marquee", "object":
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
-			p.activeFormattingElements = append(p.activeFormattingElements, newActiveFormatingMarker())
+			p.insertHtmlElement(tag)
+			p.activeFormattingElements = append(p.activeFormattingElements, newActiveFormattingMarker())
 			p.framesetOk = false
 			return nil
 		case "table":
-			if p.document.QuirksMode != dom.QuirksMode_Quirks && p.isInButtonScope("p") {
+			if p.document.QuirksMode != dom.QuirksMode_Quirks && isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			p.framesetOk = false
 			p.insertionMode = mode_InTable
 			return nil
 		case "area", "br", "embed", "img", "keygen", "wbr":
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
-			p.openStackPop()
+			p.insertHtmlElement(tag)
+			p.popOpenStack()
 			//TODO: ack self-closing
 			p.framesetOk = false
 			return nil
@@ -289,19 +289,19 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				return nil
 			}
 
-			if p.hasElementInScope("select") {
+			if hasElementInScope(p, "select") {
 				//TODO: parse error
 
 				for {
-					if node := p.openStackPop(); node == nil || node.Tag() == "select" {
+					if node := p.popOpenStack(); node == nil || node.Tag() == "select" {
 						break
 					}
 				}
 			}
 
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
-			p.openStackPop()
+			p.insertHtmlElement(tag)
+			p.popOpenStack()
 
 			//TODO: ack self closing
 
@@ -311,25 +311,25 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			}
 			return nil
 		case "param", "source", "track":
-			p.insertHtmlElement(*tag)
-			p.openStackPop()
+			p.insertHtmlElement(tag)
+			p.popOpenStack()
 			//TOOD: ack self close if set
 			return nil
 		case "hr":
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 
-			if p.hasElementInScope("select") {
-				p.generateImpliedEndTags()
+			if hasElementInScope(p, "select") {
+				generateImpliedEndTags(p)
 
-				if p.hasElementInScope("option") || p.hasElementInScope("optgroup") {
+				if hasElementInScope(p, "option") || hasElementInScope(p, "optgroup") {
 					//TODO: parse error
 				}
 			}
 
-			p.insertHtmlElement(*tag)
-			p.openStackPop()
+			p.insertHtmlElement(tag)
+			p.popOpenStack()
 			// ack self close is set
 			p.framesetOk = false
 			return nil
@@ -340,7 +340,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.tokenizer.ReconsumeToken(tag)
 			return nil
 		case "textarea":
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 
 			p.skipNextLineFeed = true
 
@@ -350,7 +350,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.insertionMode = mode_Text
 			return nil
 		case "xmp":
-			if p.isInButtonScope("p") {
+			if isInButtonScope(p, "p") {
 				inBody_ClosePTag(p)
 			}
 			p.reconstructActiveFormattingElements()
@@ -359,7 +359,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.framesetOk = false
 			fallthrough
 		case "noembed":
-			p.genericElementParse(*tag, "text")
+			genericElementParse(p, tag, "text")
 			return nil
 		case "select":
 			if p.isFragmentParsing && p.context != nil && p.context.Tag() == "select" {
@@ -367,11 +367,11 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				return nil
 			}
 
-			if p.hasElementInScope("select") {
+			if hasElementInScope(p, "select") {
 				//TODO: parse error
 
 				for {
-					if node := p.openStackPop(); node == nil || node.Tag() == "select" {
+					if node := p.popOpenStack(); node == nil || node.Tag() == "select" {
 						break
 					}
 				}
@@ -380,64 +380,64 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			}
 
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			p.framesetOk = false
 			return nil
 		case "option":
-			if p.hasElementInScope("select") {
-				p.generateImpliedEndTags("optgroup")
-				if p.hasElementInScope("option") {
+			if hasElementInScope(p, "select") {
+				generateImpliedEndTags(p, "optgroup")
+				if hasElementInScope(p, "option") {
 					//TODO: parse error
 				}
 			} else if node := p.currentNode(); node != nil && node.Tag() == "option" {
-				p.openStackPop()
+				p.popOpenStack()
 
 			}
 
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "optgroup":
-			if p.hasElementInScope("select") {
-				p.generateImpliedEndTags()
+			if hasElementInScope(p, "select") {
+				generateImpliedEndTags(p)
 
-				if p.hasElementInScope("option") || p.hasElementInScope("optgroup") {
+				if hasElementInScope(p, "option") || hasElementInScope(p, "optgroup") {
 					//TODO: parse error
 				}
 			} else if node := p.currentNode(); node != nil && node.Tag() == "option" {
-				p.openStackPop()
+				p.popOpenStack()
 			}
 
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "rb", "rtc":
-			if p.hasElementInScope("ruby") {
-				p.generateImpliedEndTags()
+			if hasElementInScope(p, "ruby") {
+				generateImpliedEndTags(p)
 				if node := p.currentNode(); node == nil || node.Tag() != "ruby" {
 					//TODO: parse error
 				}
 			}
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "rp", "rt":
-			if p.hasElementInScope("ruby") {
-				p.generateImpliedEndTags("rtc")
+			if hasElementInScope(p, "ruby") {
+				generateImpliedEndTags(p, "rtc")
 				if node := p.currentNode(); node == nil || !(node.Tag() == "rtc" || node.Tag() == "ruby") {
 					//TODO: parse error
 				}
 			}
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		case "math":
 			p.reconstructActiveFormattingElements()
 
 			adjustMathMLAttributes(tag)
 			adjustForeignAttributes(tag)
-			p.insertForeignElement(*tag, dom.NamespaceMathML, false)
+			p.insertForeignElement(tag, dom.NamespaceMathML, false)
 
 			if tag.IsSelfClosingSet() {
-				p.openStackPop()
+				p.popOpenStack()
 				//TODO: ack self close
 			}
 
@@ -446,10 +446,10 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			p.reconstructActiveFormattingElements()
 			adjustSvgAttributes(tag)
 			adjustForeignAttributes(tag)
-			p.insertForeignElement(*tag, dom.NamespaceSVG, false)
+			p.insertForeignElement(tag, dom.NamespaceSVG, false)
 
 			if tag.IsSelfClosingSet() {
-				p.openStackPop()
+				p.popOpenStack()
 				//TODO: ack self close
 			}
 			return nil
@@ -457,13 +457,13 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			return nil
 		case "noscript":
 			if p.scriptingMode != mode_Disabled {
-				p.genericElementParse(*tag, "text")
+				genericElementParse(p, tag, "text")
 				return nil
 			}
 			fallthrough
 		default:
 			p.reconstructActiveFormattingElements()
-			p.insertHtmlElement(*tag)
+			p.insertHtmlElement(tag)
 			return nil
 		}
 	}
@@ -472,7 +472,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 	case "template":
 		return p.state_InHead(tag)
 	case "body":
-		if !p.hasElementInScope("body") {
+		if !hasElementInScope(p, "body") {
 			return nil
 		}
 
@@ -481,7 +481,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		p.insertionMode = mode_AfterBody
 		return nil
 	case "html":
-		if !p.hasElementInScope("html") {
+		if !hasElementInScope(p, "html") {
 			return nil
 		}
 
@@ -493,18 +493,18 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 	case "address", "article", "aside", "blockquote", "button", "center", "details", "dialog", "dir", "div", "dl", "fieldset",
 		"figcaption", "figure", "footer", "header", "hgroup", "listing", "main", "menu", "nav", "ol", "pre", "search",
 		"section", "select", "summary", "ul":
-		if !p.hasElementInScope(name) {
+		if !hasElementInScope(p, name) {
 			//TODO: parse error
 			return nil
 		}
 
-		p.generateImpliedEndTags()
+		generateImpliedEndTags(p)
 		if node := p.currentNode(); node.Namespace() != dom.NamespaceHTML || node.Tag() != tag.GetName() {
 			//TODO: parse error
 		}
 
 		for {
-			if node := p.openStackPop(); node == nil || node.Tag() == name && node.Namespace() == dom.NamespaceHTML {
+			if node := p.popOpenStack(); node == nil || node.Tag() == name && node.Namespace() == dom.NamespaceHTML {
 				break
 			}
 		}
@@ -519,14 +519,14 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 				return nil
 			}
 
-			p.generateImpliedEndTags()
+			generateImpliedEndTags(p)
 
 			if node := p.currentNode(); node == nil || node.Tag() != "form" {
 				//TODO: parse error
 			}
 
 			for {
-				if node := p.openStackPop(); node == nil || node.Tag() == name && node.Namespace() == dom.NamespaceHTML {
+				if node := p.popOpenStack(); node == nil || node.Tag() == name && node.Namespace() == dom.NamespaceHTML {
 					break
 				}
 			}
@@ -542,7 +542,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			return nil
 		}
 
-		p.generateImpliedEndTags()
+		generateImpliedEndTags(p)
 
 		if node != p.currentNode() {
 			//TODO: parse error
@@ -556,26 +556,26 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 		p.openElementsStack = slices.Delete(p.openElementsStack, idx, idx+1)
 		return nil
 	case "p":
-		if !p.isInButtonScope("p") {
+		if !isInButtonScope(p, "p") {
 			//TODO: parse error
-			p.insertHtmlElement(*html_tokenizer.NewTokenTag("p", html_tokenizer.TokenStartTag, utils.Some(false)))
+			p.insertHtmlElement(html_tokenizer.NewTokenTag("p", html_tokenizer.TokenStartTag, utils.Some(false)))
 		}
 
 		inBody_ClosePTag(p)
 		return nil
 	case "li":
-		if !p.isInListScope("li") {
+		if !isInListScope(p, "li") {
 			//TODO: parse error
 			return nil
 		}
 
-		p.generateImpliedEndTags("li")
+		generateImpliedEndTags(p, "li")
 		if node := p.currentNode(); node == nil || node.Tag() != "li" {
 			//TODO: parse error
 		}
 
 		for {
-			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+			if node := p.popOpenStack(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
 				break
 			}
 		}
@@ -588,32 +588,32 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			return nil
 		}
 
-		p.generateImpliedEndTags(name)
+		generateImpliedEndTags(p, name)
 
 		if node := p.currentNode(); node == nil || node.Tag() != name {
 			//TODO: parse error
 		}
 
 		for {
-			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+			if node := p.popOpenStack(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
 				break
 			}
 		}
 		return nil
 	case "h1", "h2", "h3", "h4", "h5", "h6":
-		if !(p.hasElementInScope("h1") || p.hasElementInScope("h2") || p.hasElementInScope("h3") || p.hasElementInScope("h4") || p.hasElementInScope("h5") || p.hasElementInScope("h6")) {
+		if !(hasElementInScope(p, "h1") || hasElementInScope(p, "h2") || hasElementInScope(p, "h3") || hasElementInScope(p, "h4") || hasElementInScope(p, "h5") || hasElementInScope(p, "h6")) {
 			//TODO: parse error
 			return nil
 		}
 
-		p.generateImpliedEndTags()
+		generateImpliedEndTags(p)
 
 		if node := p.currentNode(); node == nil || node.Tag() != name {
 			//TODO: parse error
 		}
 
 		for {
-			node := p.openStackPop()
+			node := p.popOpenStack()
 			if node == nil {
 				break
 			}
@@ -636,25 +636,25 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 			return nil
 		}
 
-		p.generateImpliedEndTags()
+		generateImpliedEndTags(p)
 		if node := p.currentNode(); node == nil || node.Tag() != name {
 			//TODO: parse error
 		}
 
 		for {
-			if node := p.openStackPop(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
+			if node := p.popOpenStack(); node == nil || (node.Tag() == name && node.Namespace() == dom.NamespaceHTML) {
 				break
 			}
 		}
 
-		clearFormattingElsTolastMarker(p)
+		clearFormattingElsToLastMarker(p)
 		return nil
 	case "br":
 		clear(tag.Attributes)
 
 		p.reconstructActiveFormattingElements()
-		p.insertHtmlElement(*tag)
-		p.openStackPop()
+		p.insertHtmlElement(tag)
+		p.popOpenStack()
 		//TODO: ack self-closing
 		p.framesetOk = false
 		return nil
@@ -670,7 +670,7 @@ func inBody_HandleTag(p *HtmlParser, tag *html_tokenizer.TokenTag) error {
 
 // https://html.spec.whatwg.org/multipage/parsing.html#close-a-p-element
 func inBody_ClosePTag(p *HtmlParser) {
-	p.generateImpliedEndTags("p")
+	generateImpliedEndTags(p, "p")
 	if p.currentNode().Tag() != "p" {
 		//TODO: parse error
 	}
@@ -678,7 +678,7 @@ func inBody_ClosePTag(p *HtmlParser) {
 	for {
 		node := p.currentNode()
 		isP := node.Tag() == "p"
-		p.openStackPop()
+		p.popOpenStack()
 		if isP || node == nil {
 			break
 		}
@@ -691,7 +691,7 @@ func inBody_anyOtherEndTag(p *HtmlParser, t *html_tokenizer.TokenTag) {
 	for {
 		node := p.openElementsStack[idx]
 		if node.Namespace() == dom.NamespaceHTML && node.Tag() == t.GetName() {
-			p.generateImpliedEndTags(t.GetName())
+			generateImpliedEndTags(p, t.GetName())
 			if node != p.currentNode() {
 				//TODO: parse error
 			}
@@ -717,7 +717,7 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 		!slices.ContainsFunc(p.activeFormattingElements, func(e activeFormattingItem) bool {
 			return e.Element == currentNode
 		}) {
-		p.openStackPop()
+		p.popOpenStack()
 		return
 	}
 
@@ -777,7 +777,7 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 
 		if furthestBlock == nil {
 			for len(p.openElementsStack) > stackIdx {
-				p.openStackPop()
+				p.popOpenStack()
 			}
 			p.activeFormattingElements = slices.Delete(p.activeFormattingElements, formattingElemIdx, formattingElemIdx+1)
 			return
@@ -850,7 +850,7 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 					Value:        attr.Value,
 				}
 			}
-			newElement := p.createElement(*tok, dom.NamespaceHTML, commonAncestor)
+			newElement := p.createElement(tok, dom.NamespaceHTML, commonAncestor)
 
 			p.activeFormattingElements[nodeFormattingIdx] = activeFormattingItem{Element: newElement}
 
@@ -892,7 +892,7 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 				Value:        attr.Value,
 			}
 		}
-		newFormattingElement := p.createElement(*newTok, dom.NamespaceHTML, furthestBlock)
+		newFormattingElement := p.createElement(newTok, dom.NamespaceHTML, furthestBlock)
 
 		// Move furthestBlock's children to the new element
 		children := slices.Clone(furthestBlock.Children())
@@ -925,108 +925,6 @@ func inBody_adoptionAgency(p *HtmlParser, tagToken *html_tokenizer.TokenTag) {
 		furthestBlockIdx = slices.Index(p.openElementsStack, furthestBlock)
 		if furthestBlockIdx != -1 {
 			p.openElementsStack = slices.Insert(p.openElementsStack, furthestBlockIdx+1, newFormattingElement)
-		}
-	}
-}
-
-func adjustMathMLAttributes(tag *html_tokenizer.TokenTag) {
-	value, ok := tag.Attributes["definitionurl"]
-	if !ok {
-		return
-	}
-
-	value.LocalName = "definitionURL"
-	tag.Attributes["definitionURL"] = value
-	delete(tag.Attributes, "definitionurl")
-}
-
-var svgAttributeAdjustments = map[string]string{
-	"attributename":       "attributeName",
-	"attributetype":       "attributeType",
-	"basefrequency":       "baseFrequency",
-	"baseprofile":         "baseProfile",
-	"calcmode":            "calcMode",
-	"clippathunits":       "clipPathUnits",
-	"diffuseconstant":     "diffuseConstant",
-	"edgemode":            "edgeMode",
-	"filterunits":         "filterUnits",
-	"glyphref":            "glyphRef",
-	"gradienttransform":   "gradientTransform",
-	"gradientunits":       "gradientUnits",
-	"kernelmatrix":        "kernelMatrix",
-	"kernelunitlength":    "kernelUnitLength",
-	"keypoints":           "keyPoints",
-	"keysplines":          "keySplines",
-	"keytimes":            "keyTimes",
-	"lengthadjust":        "lengthAdjust",
-	"limitingconeangle":   "limitingConeAngle",
-	"markerheight":        "markerHeight",
-	"markerunits":         "markerUnits",
-	"markerwidth":         "markerWidth",
-	"maskcontentunits":    "maskContentUnits",
-	"maskunits":           "maskUnits",
-	"numoctaves":          "numOctaves",
-	"pathlength":          "pathLength",
-	"patterncontentunits": "patternContentUnits",
-	"patterntransform":    "patternTransform",
-	"patternunits":        "patternUnits",
-	"pointsatx":           "pointsAtX",
-	"pointsaty":           "pointsAtY",
-	"pointsatz":           "pointsAtZ",
-	"preservealpha":       "preserveAlpha",
-	"preserveaspectratio": "preserveAspectRatio",
-	"primitiveunits":      "primitiveUnits",
-	"refx":                "refX",
-	"refy":                "refY",
-	"repeatcount":         "repeatCount",
-	"repeatdur":           "repeatDur",
-	"requiredextensions":  "requiredExtensions",
-	"requiredfeatures":    "requiredFeatures",
-	"specularconstant":    "specularConstant",
-	"specularexponent":    "specularExponent",
-	"spreadmethod":        "spreadMethod",
-	"startoffset":         "startOffset",
-	"stddeviation":        "stdDeviation",
-	"stitchtiles":         "stitchTiles",
-	"surfacescale":        "surfaceScale",
-	"systemlanguage":      "systemLanguage",
-	"tablevalues":         "tableValues",
-	"targetx":             "targetX",
-	"targety":             "targetY",
-	"textlength":          "textLength",
-	"viewbox":             "viewBox",
-	"viewtarget":          "viewTarget",
-	"xchannelselector":    "xChannelSelector",
-	"ychannelselector":    "yChannelSelector",
-	"zoomandpan":          "zoomAndPan",
-}
-
-func adjustSvgAttributes(tag *html_tokenizer.TokenTag) {
-	for key, attr := range tag.Attributes {
-		if mapped, ok := svgAttributeAdjustments[key]; ok {
-			attr.LocalName = mapped
-		}
-	}
-}
-
-func adjustForeignAttributes(tag *html_tokenizer.TokenTag) {
-	for key, attr := range tag.Attributes {
-		switch key {
-		case "xlink:actuate", "xlink:arcrole",
-			"xlink:href", "xlink:role", "xlink:show", "xlink:title", "xlink:type":
-			attr.NamespaceUri = dom.NamespaceXLink
-			attr.Prefix = utils.Some("xlink")
-			attr.LocalName = key[len("xlink:"):]
-		case "xml:lang", "xml:space":
-			attr.NamespaceUri = dom.NamespaceXML
-			attr.Prefix = utils.Some("xml")
-			attr.LocalName = key[len("xml:"):]
-		case "xmlns":
-			attr.NamespaceUri = dom.NamespaceXMLNS
-		case "xmlns:xlink":
-			attr.NamespaceUri = dom.NamespaceXMLNS
-			attr.Prefix = utils.Some("xmlns")
-			attr.LocalName = "xlink"
 		}
 	}
 }
