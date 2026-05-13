@@ -105,3 +105,58 @@ func loadTestFiles(t *testing.T) map[string][]testCase {
 func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 
 }
+
+func isToken(value string, id tokenizer.TokenId) bool {
+	switch value {
+	case "}-token":
+		return id == tokenizer.TokenId_BracketCurlyClose
+	case "{-token":
+		return id == tokenizer.TokenId_BracketCurlyOpen
+	case "[-token":
+		return id == tokenizer.TokenId_BracketSquareOpen
+	case "]-token":
+		return id == tokenizer.TokenId_BracketSquareClose
+	case "at-keyword-token":
+		return id == tokenizer.TokenId_AtKeyword
+	case "whitespace-token":
+		return id == tokenizer.TokenId_Whitespace
+	case "delim-token":
+		return id == tokenizer.TokenId_Delim
+	case "ident-token":
+		return id == tokenizer.TokenId_Ident
+	case "function-token":
+		return id == tokenizer.TokenId_Function
+	case "hash-token":
+		return id == tokenizer.TokenId_Hash
+	case "string-token":
+		return id == tokenizer.TokenId_String
+	case "bad-string-token":
+		return id == tokenizer.TokenId_BadString
+	case "url-token":
+		return id == tokenizer.TokenId_Url
+	case "bad-url-token":
+		return id == tokenizer.TokenId_BadUrl
+	case "number-token":
+		return id == tokenizer.TokenId_Number
+	case "percentage-token":
+		return id == tokenizer.TokenId_Percentage
+	case "dimension-token":
+		return id == tokenizer.TokenId_Dimension
+	case "cdo-token":
+		return id == tokenizer.TokenId_CDO
+	case "cdc-token":
+		return id == tokenizer.TokenId_CDC
+	case "colon-token":
+		return id == tokenizer.TokenId_Colon
+	case "semicolon":
+		return id == tokenizer.TokenId_Semicolon
+	case "comma":
+		return id == tokenizer.TokenId_Comma
+	case "(-token":
+		return id == tokenizer.TokenId_BracketParamOpen
+	case ")-token":
+		return id == tokenizer.TokenId_BracketParamClose
+	default:
+		return false
+	}
+}
