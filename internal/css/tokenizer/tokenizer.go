@@ -34,6 +34,10 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		return nil, err
 	}
 
+	if err == io.EOF {
+		return &EOFToken{}, nil
+	}
+
 	switch char {
 	case '\n', '\t', ' ':
 		if err := t.consumeWhitespace(); err != nil {
@@ -45,9 +49,10 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		return t.consumeStringToken(char)
 	case '#':
 		chars, err := t.stream.Peek(3)
-		if err != nil || err != io.EOF {
+		if err != nil && err != io.EOF {
 			return nil, err
 		}
+		chars = padRunes(chars, 3)
 
 		if isIdentStartCodePoint(chars[0]) || checkIfValidEscape(chars[0], chars[1]) {
 			value, err := t.consumeIdentSequence()
@@ -70,6 +75,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
+		chars = padRunes(chars, 2)
 
 		if checkIfWouldStartNumber(char, chars[0], chars[1]) {
 			if err := t.stream.UnreadRune(); err != nil {
@@ -84,6 +90,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
+		chars = padRunes(chars, 2)
 
 		if checkIfWouldStartNumber(char, chars[0], chars[1]) {
 			if err := t.stream.UnreadRune(); err != nil {
@@ -108,6 +115,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
+		chars = padRunes(chars, 2)
 
 		if checkIfWouldStartNumber(char, chars[0], chars[1]) {
 			if err := t.stream.UnreadRune(); err != nil {
@@ -136,6 +144,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
+		chars = padRunes(chars, 3)
 
 		if checkIfWouldStartIdentSequence(chars[0], chars[1], chars[2]) {
 			ident, err := t.consumeIdentSequence()
@@ -152,6 +161,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		if err != nil && err != io.EOF {
 			return nil, err
 		}
+		nextChar = padRunes(nextChar, 1)
 
 		if checkIfValidEscape(char, nextChar[0]) {
 			if err := t.stream.UnreadRune(); err != nil {
@@ -198,17 +208,16 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		return t.consumeIdentLikeToken()
 	}
 
-	if err == io.EOF {
-		return &EOFToken{}, nil
-	}
-
 	return NewSingleCharacterToken(TokenId_Delim, char), nil
 }
 
 func (t *CssTokenizer) consumeWhitespace() error {
 	for {
 		char, _, err := t.stream.ReadRune()
-		if err != nil && err != io.EOF {
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
 			return err
 		}
 
@@ -255,7 +264,7 @@ func (t *CssTokenizer) consumeComments() error {
 					return err
 				}
 
-				if next[0] == '/' {
+				if len(next) == 1 && next[0] == '/' {
 					if err := t.stream.Discard(1); err != nil {
 						return err
 					}
@@ -406,7 +415,7 @@ func (t *CssTokenizer) consumeStringToken(endingRune rune) (Token, error) {
 				return nil, err
 			}
 
-			if chars[0] == '\n' {
+			if len(chars) == 1 && chars[0] == '\n' {
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
 				}
@@ -597,8 +606,9 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 		if err != nil {
 			return "", err
 		}
+		next = padRunes(next, 1)
 
-		if len(next) != 0 && checkIfValidEscape(char, next[0]) {
+		if checkIfValidEscape(char, next[0]) {
 			escape, err := t.consumeEscapedCodePoint()
 			if err != nil {
 				return "", err

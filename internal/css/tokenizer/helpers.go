@@ -58,3 +58,15 @@ func isHexDigit(r rune) bool {
 func isDigit(r rune) bool {
 	return r >= '0' && r <= '9'
 }
+
+// padRunes returns a slice of length n. If chars is shorter (e.g. a short
+// Peek result near EOF), the tail is padded with rune(0), which the checkIf
+// helpers all treat as a non-matching character.
+func padRunes(chars []rune, n int) []rune {
+	if len(chars) >= n {
+		return chars
+	}
+	out := make([]rune, n)
+	copy(out, chars)
+	return out
+}

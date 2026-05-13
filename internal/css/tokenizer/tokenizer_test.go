@@ -104,6 +104,17 @@ func loadTestFiles(t *testing.T) map[string][]testCase {
 
 func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 
+	for i, expected := range tt.Tokens {
+		if len(result) < i {
+			t.Fatal("result does not match len of expected")
+			break
+		}
+
+		if !isToken(expected.Type, result[i].IsToken()) {
+			t.Fatal("Token type does not match")
+		}
+	}
+
 }
 
 func isToken(value string, id tokenizer.TokenId) bool {
