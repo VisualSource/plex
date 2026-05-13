@@ -1,0 +1,330 @@
+{
+    "tests": [
+        {
+            "source": "url(\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url(\n",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": ""
+                    }
+                }
+            ]
+        },
+        {
+            "source": "url(a\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url(a\n",
+                    "startIndex": 0,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": "a"
+                    }
+                }
+            ]
+        },
+        {
+            "source": "url( a\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url( a\n",
+                    "startIndex": 0,
+                    "endIndex": 7,
+                    "structured": {
+                        "value": "a"
+                    }
+                }
+            ]
+        },
+        {
+            "source": "url()\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url()",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": ""
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url( )\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url( )",
+                    "startIndex": 0,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": ""
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url( a)\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url( a)",
+                    "startIndex": 0,
+                    "endIndex": 7,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 7,
+                    "endIndex": 8,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url( a )\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url( a )",
+                    "startIndex": 0,
+                    "endIndex": 8,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 8,
+                    "endIndex": 9,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url( \\) )\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url( \\) )",
+                    "startIndex": 0,
+                    "endIndex": 9,
+                    "structured": {
+                        "value": ")"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 9,
+                    "endIndex": 10,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url(https://https:⁄⁄www.netmeister.org@https://www.netmeister.org/https:⁄⁄www.netmeister.org⁄?https://www.netmeister.org=https://www.netmeister.org;https://www.netmeister.org#https://www.netmeister.org)\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url(https://https:⁄⁄www.netmeister.org@https://www.netmeister.org/https:⁄⁄www.netmeister.org⁄?https://www.netmeister.org=https://www.netmeister.org;https://www.netmeister.org#https://www.netmeister.org)",
+                    "startIndex": 0,
+                    "endIndex": 202,
+                    "structured": {
+                        "value": "https://https:⁄⁄www.netmeister.org@https://www.netmeister.org/https:⁄⁄www.netmeister.org⁄?https://www.netmeister.org=https://www.netmeister.org;https://www.netmeister.org#https://www.netmeister.org"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 202,
+                    "endIndex": 203,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url(https://www.netmeister.org/%62%6C%6F%67/%75%72%6C%73%2E%68%74%6D%6C?!@#$%25=+_\\)\\(*\u0026^#top)\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url(https://www.netmeister.org/%62%6C%6F%67/%75%72%6C%73%2E%68%74%6D%6C?!@#$%25=+_\\)\\(*\u0026^#top)",
+                    "startIndex": 0,
+                    "endIndex": 94,
+                    "structured": {
+                        "value": "https://www.netmeister.org/%62%6C%6F%67/%75%72%6C%73%2E%68%74%6D%6C?!@#$%25=+_)(*\u0026^#top"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 94,
+                    "endIndex": 95,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "Url(a)\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "Url(a)",
+                    "startIndex": 0,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "uRl(a)\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "uRl(a)",
+                    "startIndex": 0,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "urL(a)\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "urL(a)",
+                    "startIndex": 0,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "uri(a)\n",
+            "tokens": [
+                {
+                    "type": "function-token",
+                    "raw": "uri(",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": "uri"
+                    }
+                },
+                {
+                    "type": "ident-token",
+                    "raw": "a",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": ")-token",
+                    "raw": ")",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "uul(a)\n",
+            "tokens": [
+                {
+                    "type": "function-token",
+                    "raw": "uul(",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": "uul"
+                    }
+                },
+                {
+                    "type": "ident-token",
+                    "raw": "a",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": ")-token",
+                    "raw": ")",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

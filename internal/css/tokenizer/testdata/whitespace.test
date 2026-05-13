@@ -1,0 +1,177 @@
+{
+    "tests": [
+        {
+            "source": "\n",
+            "tokens": [
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": " \n",
+            "tokens": [
+                {
+                    "type": "whitespace-token",
+                    "raw": " \n",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "a  b\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "a",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "  ",
+                    "startIndex": 1,
+                    "endIndex": 3,
+                    "structured": null
+                },
+                {
+                    "type": "ident-token",
+                    "raw": "b",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": "b"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\\61 b\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "\\61 b",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "ab"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\\000061 b\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "\\000061 b",
+                    "startIndex": 0,
+                    "endIndex": 9,
+                    "structured": {
+                        "value": "ab"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 9,
+                    "endIndex": 10,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\\61  b\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "\\61 ",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": " ",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": null
+                },
+                {
+                    "type": "ident-token",
+                    "raw": "b",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": "b"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\t\n",
+            "tokens": [
+                {
+                    "type": "whitespace-token",
+                    "raw": "\t\n",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "f\\ o\\\to\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "f\\ o\\\to",
+                    "startIndex": 0,
+                    "endIndex": 7,
+                    "structured": {
+                        "value": "f o\to"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 7,
+                    "endIndex": 8,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

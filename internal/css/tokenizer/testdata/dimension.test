@@ -1,0 +1,174 @@
+{
+    "tests": [
+        {
+            "source": "10px\n",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10px",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": 10,
+                        "type": "integer",
+                        "unit": "px"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "10\\70 x\n",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10\\70 x",
+                    "startIndex": 0,
+                    "endIndex": 7,
+                    "structured": {
+                        "value": 10,
+                        "type": "integer",
+                        "unit": "px"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 7,
+                    "endIndex": 8,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "10--custom-px\n",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10--custom-px",
+                    "startIndex": 0,
+                    "endIndex": 13,
+                    "structured": {
+                        "value": 10,
+                        "type": "integer",
+                        "unit": "--custom-px"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 13,
+                    "endIndex": 14,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "10e2px\n",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10e2px",
+                    "startIndex": 0,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": 1000,
+                        "type": "number",
+                        "unit": "px"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "10E2PX\n",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10E2PX",
+                    "startIndex": 0,
+                    "endIndex": 6,
+                    "structured": {
+                        "value": 1000,
+                        "type": "number",
+                        "unit": "PX"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 6,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "10\\0\n",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10\\0\n",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": 10,
+                        "type": "integer",
+                        "unit": "�"
+                    }
+                }
+            ]
+        },
+        {
+            "source": "10a𐀀\n",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10a𐀀",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": 10,
+                        "type": "integer",
+                        "unit": "a𐀀"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "10a\u0000",
+            "tokens": [
+                {
+                    "type": "dimension-token",
+                    "raw": "10a\u0000",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": 10,
+                        "type": "integer",
+                        "unit": "a�"
+                    }
+                }
+            ]
+        }
+    ]
+}

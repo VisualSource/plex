@@ -1,0 +1,220 @@
+{
+    "tests": [
+        {
+            "source": "foo\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "foo",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "foo"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "--\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "--",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "--"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "--0\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "--0",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "--0"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "-\\\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "-",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "-"
+                    }
+                },
+                {
+                    "type": "delim-token",
+                    "raw": "\\",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "\\"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "-\\ \n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "-\\ ",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "- "
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "--💅\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "--💅",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": "--💅"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "-§\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "-",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "-"
+                    }
+                },
+                {
+                    "type": "delim-token",
+                    "raw": "§",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "§"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "-×\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "-",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "-"
+                    }
+                },
+                {
+                    "type": "delim-token",
+                    "raw": "×",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "×"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "--a𐀀\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "--a𐀀",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "--a𐀀"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

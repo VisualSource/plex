@@ -1,0 +1,125 @@
+{
+    "tests": [
+        {
+            "source": "url(\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url(\n",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": ""
+                    }
+                }
+            ]
+        },
+        {
+            "source": "url( a\n",
+            "tokens": [
+                {
+                    "type": "url-token",
+                    "raw": "url( a\n",
+                    "startIndex": 0,
+                    "endIndex": 7,
+                    "structured": {
+                        "value": "a"
+                    }
+                }
+            ]
+        },
+        {
+            "source": "url( a a\n",
+            "tokens": [
+                {
+                    "type": "bad-url-token",
+                    "raw": "url( a a\n",
+                    "startIndex": 0,
+                    "endIndex": 9,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url( a a)\n",
+            "tokens": [
+                {
+                    "type": "bad-url-token",
+                    "raw": "url( a a)",
+                    "startIndex": 0,
+                    "endIndex": 9,
+                    "structured": null
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 9,
+                    "endIndex": 10,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url( a a\\)\n",
+            "tokens": [
+                {
+                    "type": "bad-url-token",
+                    "raw": "url( a a\\)\n",
+                    "startIndex": 0,
+                    "endIndex": 11,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url( \\\n",
+            "tokens": [
+                {
+                    "type": "bad-url-token",
+                    "raw": "url( \\\n",
+                    "startIndex": 0,
+                    "endIndex": 7,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url(a'')\n",
+            "tokens": [
+                {
+                    "type": "bad-url-token",
+                    "raw": "url(a'')",
+                    "startIndex": 0,
+                    "endIndex": 8,
+                    "structured": null
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 8,
+                    "endIndex": 9,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "url(a\")\n",
+            "tokens": [
+                {
+                    "type": "bad-url-token",
+                    "raw": "url(a\")",
+                    "startIndex": 0,
+                    "endIndex": 7,
+                    "structured": null
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 7,
+                    "endIndex": 8,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

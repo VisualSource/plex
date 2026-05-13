@@ -1,0 +1,342 @@
+{
+    "tests": [
+        {
+            "source": "#1\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#1",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "1",
+                        "type": "unrestricted"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#-2\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#-2",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "-2",
+                        "type": "unrestricted"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#--3\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#--3",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": "--3",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#---4\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#---4",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "---4",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#a\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#a",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "a",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#-b\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#-b",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "-b",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#--c\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#--c",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": {
+                        "value": "--c",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#---d\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#---d",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "---d",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#_\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#_",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "_",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#_1\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#_1",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "_1",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#-\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#-",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "-",
+                        "type": "unrestricted"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#+\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "#",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "#"
+                    }
+                },
+                {
+                    "type": "delim-token",
+                    "raw": "+",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "+"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "##\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "#",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "#"
+                    }
+                },
+                {
+                    "type": "delim-token",
+                    "raw": "#",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "#"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "#",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "#",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "#"
+                    }
+                }
+            ]
+        },
+        {
+            "source": "#aa𐀀\n",
+            "tokens": [
+                {
+                    "type": "hash-token",
+                    "raw": "#aa𐀀",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "aa𐀀",
+                        "type": "id"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

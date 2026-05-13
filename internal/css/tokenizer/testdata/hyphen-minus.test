@@ -1,0 +1,134 @@
+{
+    "tests": [
+        {
+            "source": "-\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "-",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "-"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "-1\n",
+            "tokens": [
+                {
+                    "type": "number-token",
+                    "raw": "-1",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "signCharacter": "-",
+                        "value": -1,
+                        "type": "integer"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "-.1\n",
+            "tokens": [
+                {
+                    "type": "number-token",
+                    "raw": "-.1",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "signCharacter": "-",
+                        "value": -0.1,
+                        "type": "number"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "--1\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "--1",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "--1"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "-0\n",
+            "tokens": [
+                {
+                    "type": "number-token",
+                    "raw": "-0",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "signCharacter": "-",
+                        "value": -0,
+                        "type": "integer"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "--\u003e\n",
+            "tokens": [
+                {
+                    "type": "CDC-token",
+                    "raw": "--\u003e",
+                    "startIndex": 0,
+                    "endIndex": 3,
+                    "structured": null
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

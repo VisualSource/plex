@@ -1,0 +1,77 @@
+{
+    "tests": [
+        {
+            "source": ".\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": ".",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "."
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": ".a\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": ".",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "."
+                    }
+                },
+                {
+                    "type": "ident-token",
+                    "raw": "a",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "a"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": ".1\n",
+            "tokens": [
+                {
+                    "type": "number-token",
+                    "raw": ".1",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": 0.1,
+                        "type": "number"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

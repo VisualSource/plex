@@ -1,0 +1,102 @@
+{
+    "tests": [
+        {
+            "source": "\\\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "\\",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "\\"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\\#\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "\\#",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "#"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\\ \n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "\\ ",
+                    "startIndex": 0,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": " "
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\\61 b\n",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "\\61 b",
+                    "startIndex": 0,
+                    "endIndex": 5,
+                    "structured": {
+                        "value": "ab"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 5,
+                    "endIndex": 6,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\\",
+            "tokens": [
+                {
+                    "type": "ident-token",
+                    "raw": "\\",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "�"
+                    }
+                }
+            ]
+        }
+    ]
+}

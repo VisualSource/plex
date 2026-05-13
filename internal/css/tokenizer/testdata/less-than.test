@@ -1,0 +1,113 @@
+{
+    "tests": [
+        {
+            "source": "\u003c\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "\u003c",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "\u003c"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\u003c!--\n",
+            "tokens": [
+                {
+                    "type": "CDO-token",
+                    "raw": "\u003c!--",
+                    "startIndex": 0,
+                    "endIndex": 4,
+                    "structured": null
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 4,
+                    "endIndex": 5,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\u003c--\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "\u003c",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "\u003c"
+                    }
+                },
+                {
+                    "type": "ident-token",
+                    "raw": "--",
+                    "startIndex": 1,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "--"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        },
+        {
+            "source": "\u003c!-\n",
+            "tokens": [
+                {
+                    "type": "delim-token",
+                    "raw": "\u003c",
+                    "startIndex": 0,
+                    "endIndex": 1,
+                    "structured": {
+                        "value": "\u003c"
+                    }
+                },
+                {
+                    "type": "delim-token",
+                    "raw": "!",
+                    "startIndex": 1,
+                    "endIndex": 2,
+                    "structured": {
+                        "value": "!"
+                    }
+                },
+                {
+                    "type": "delim-token",
+                    "raw": "-",
+                    "startIndex": 2,
+                    "endIndex": 3,
+                    "structured": {
+                        "value": "-"
+                    }
+                },
+                {
+                    "type": "whitespace-token",
+                    "raw": "\n",
+                    "startIndex": 3,
+                    "endIndex": 4,
+                    "structured": null
+                }
+            ]
+        }
+    ]
+}

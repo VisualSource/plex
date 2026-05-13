@@ -32,7 +32,7 @@ const (
 
 // https://www.w3.org/TR/css-syntax-3/#tokenization
 type Token interface {
-	isToken() TokenId
+	IsToken() TokenId
 }
 
 // <ident-token>, <function-token>, <at-keyword-token>, <hash-token>, <string-token>, and <url-token>
@@ -42,7 +42,7 @@ type MultiCharacterToken struct {
 	Flag  string
 }
 
-func (i MultiCharacterToken) isToken() TokenId {
+func (i MultiCharacterToken) IsToken() TokenId {
 	return i.Type
 }
 func NewMultiCharacterToken(t TokenId, value string) *MultiCharacterToken {
@@ -58,7 +58,7 @@ type SingleCharacterToken struct {
 	Value rune
 }
 
-func (b SingleCharacterToken) isToken() TokenId {
+func (b SingleCharacterToken) IsToken() TokenId {
 	return b.Type
 }
 
@@ -71,7 +71,7 @@ func NewSingleCharacterToken(t TokenId, value rune) *SingleCharacterToken {
 
 type EOFToken struct{}
 
-func (b EOFToken) isToken() TokenId { return TokenId_EOF }
+func (b EOFToken) IsToken() TokenId { return TokenId_EOF }
 func NewEOFToken() *EOFToken        { return &EOFToken{} }
 
 // <number-token>, <percentage-token>, and <dimension-token>
@@ -85,7 +85,7 @@ type NumericToken struct {
 	Flag string // integer, number
 }
 
-func (n NumericToken) isToken() TokenId { return n.Type }
+func (n NumericToken) IsToken() TokenId { return n.Type }
 func NewNumericToken(t TokenId, value float64) *NumericToken {
 	return &NumericToken{
 		Type:  t,
@@ -98,5 +98,5 @@ type DataToken struct {
 	Type TokenId
 }
 
-func (i DataToken) isToken() TokenId    { return i.Type }
+func (i DataToken) IsToken() TokenId    { return i.Type }
 func NewDataToken(t TokenId) *DataToken { return &DataToken{Type: t} }
