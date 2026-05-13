@@ -1,0 +1,14 @@
+Tokenizer:
+    ✔ ConsumeToken @done(26-05-12 20:03)
+    [] consume comments
+    [] consume numeric token
+    [] consume ident -like token
+    [] consume string token
+    [] consume url token
+    [] consume escaped code point
+    [] check if voiad escape
+    [] check if would start an ident seq
+    [] check if would start a number
+    [] consume an ident seq
+    [] consume number
+    [] consume remnants of a bad url

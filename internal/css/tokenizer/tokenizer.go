@@ -2,6 +2,7 @@ package tokenizer
 
 import (
 	"io"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -39,7 +40,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 				return nil, err
 			}
 
-			if char != '\n' || char != '\t' && char != ' ' {
+			if char != '\n' && char != '\t' && char != ' ' {
 				if err := t.stream.UnreadRune(); err != nil {
 					return nil, err
 				}
@@ -48,8 +49,8 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		}
 
 		return &InfoToken{Type: Info_Whitespace}, nil
-	case '"', '`':
-		return t.consumeStringToken()
+	case '"', '\'':
+		return t.consumeStringToken(char)
 	case '#':
 		chars, err := t.stream.Peek(3)
 		if err != nil || err != io.EOF {
@@ -144,10 +145,6 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		}
 
 		if checkIfWouldStartIdentSequence(chars[0], chars[1], chars[2]) {
-			if err := t.stream.UnreadRune(); err != nil {
-				return nil, err
-			}
-
 			ident, err := t.consumeIdentSequence()
 			if err != nil {
 				return nil, err
@@ -202,7 +199,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 // https://www.w3.org/TR/css-syntax-3/#consume-comment
 func (t *CssTokenizer) consumeComments() error {
 	chars, err := t.stream.Peek(2)
-	if err != nil || err != io.EOF {
+	if err != nil && err != io.EOF {
 		return err
 	}
 	if string(chars) != "/*" {
@@ -283,7 +280,7 @@ func (t *CssTokenizer) consumeIdentLikeToken() (Token, error) {
 	}
 
 	chars, err := t.stream.Peek(1)
-	if err != nil || err != io.EOF {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 
@@ -367,7 +364,101 @@ func (t *CssTokenizer) consumeStringToken(endingRune ...rune) (Token, error) {
 
 // https://www.w3.org/TR/css-syntax-3/#consume-url-token
 func (t *CssTokenizer) consumeUrlToken() (Token, error) {
-	return nil, nil
+
+	consumeWhitespace := func() error {
+		for {
+			char, _, err := t.stream.ReadRune()
+			if err != nil && err != io.EOF {
+				return err
+			}
+
+			if isWhitespace(char) {
+				continue
+			}
+
+			if err := t.stream.UnreadRune(); err != nil {
+				return err
+			}
+			break
+		}
+
+		return nil
+	}
+
+	if err := consumeWhitespace(); err != nil {
+		return nil, err
+	}
+
+	value := strings.Builder{}
+
+	for {
+		char, _, err := t.stream.ReadRune()
+		if err != nil {
+			if err == io.EOF {
+				//TODO: parse error
+				return &MultiCharacterToken{Value: value.String(), Type: IdentType_Url}, nil
+			}
+			return nil, err
+		}
+
+		switch char {
+		case '\n', '\t', ' ':
+			if err := consumeWhitespace(); err != nil {
+				return nil, err
+			}
+			chars, err := t.stream.Peek(1)
+			if err != nil && err != io.EOF {
+				return nil, err
+			}
+
+			if err == io.EOF || chars[0] == ')' {
+				if err != io.EOF {
+					//TODO: parse error
+					if err := t.stream.UnreadRune(); err != nil {
+						return nil, err
+					}
+				}
+				return &MultiCharacterToken{Value: value.String(), Type: IdentType_Url}, nil
+			}
+
+			return t.consumeRemnantsOfBadUrl()
+		case '"', '\'', '(':
+			//TODO: parse error
+			return t.consumeRemnantsOfBadUrl()
+		case '\\':
+			chars, err := t.stream.Peek(1)
+			if err != nil && err != io.EOF {
+				return nil, err
+			}
+
+			if checkIfValidEscape(char, chars[0]) {
+				escaped, err := t.consumeEscapedCodePoint()
+				if err != nil {
+					return nil, err
+				}
+
+				if _, err := value.WriteRune(escaped); err != nil {
+					return nil, err
+				}
+			} else {
+				//TODO: parse error
+				return t.consumeRemnantsOfBadUrl()
+			}
+
+		default:
+			if int(char) >= 0x0000 && int(char) <= 0x0008 ||
+				int(char) >= 0x000E && int(char) <= 0x001F ||
+				int(char) == 0x007F || int(char) == 0x000B {
+				//TODO: parse error
+				return t.consumeRemnantsOfBadUrl()
+			}
+
+			if _, err := value.WriteRune(char); err != nil {
+				return nil, err
+			}
+		}
+
+	}
 }
 
 // https://www.w3.org/TR/css-syntax-3/#consume-escaped-code-point
@@ -388,7 +479,10 @@ func (t *CssTokenizer) consumeEscapedCodePoint() (rune, error) {
 }
 
 // https://www.w3.org/TR/css-syntax-3/#consume-remnants-of-bad-url
-func (t *CssTokenizer) consumeRemnantsOfBadUrl() {}
+func (t *CssTokenizer) consumeRemnantsOfBadUrl() (Token, error) {
+
+	return nil, nil
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-name
 func (t *CssTokenizer) consumeIdentSequence() (string, error) {
@@ -401,12 +495,19 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 			return "", err
 		}
 
-		switch {
-		case isIdentCodePoint(char):
+		if isIdentCodePoint(char) {
 			if _, err := result.WriteRune(char); err != nil {
 				return "", err
 			}
-		case checkIfValidEscape(char, ' '): //TODO: get second param
+			continue
+		}
+
+		next, err := t.stream.Peek(1)
+		if err != nil {
+			return "", err
+		}
+
+		if len(next) != 0 && checkIfValidEscape(char, next[0]) {
 			escape, err := t.consumeEscapedCodePoint()
 			if err != nil {
 				return "", err
@@ -415,12 +516,14 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 			if _, err := result.WriteRune(escape); err != nil {
 				return "", err
 			}
-		default:
-			if err := t.stream.UnreadRune(); err != nil {
-				return "", err
-			}
-			return result.String(), nil
+
+			continue
 		}
+
+		if err := t.stream.UnreadRune(); err != nil {
+			return "", err
+		}
+		return result.String(), nil
 	}
 }
 
@@ -462,37 +565,44 @@ func (t *CssTokenizer) consumeNumber() (float64, error) {
 	}
 
 	if next[0] == '.' && unicode.IsDigit(next[1]) {
-
+		if err := t.stream.Discard(2); err != nil {
+			return 0.0, err
+		}
+		if _, err := repr.WriteString(string(next)); err != nil {
+			return 0.0, err
+		}
 	}
 
-	return 0.0, nil
-}
-
-// https://www.w3.org/TR/css-syntax-3/#starts-with-a-valid-escape
-func checkIfValidEscape(a, b rune) bool {
-	return a == '\\' && b != '\n'
-}
-
-// https://www.w3.org/TR/css-syntax-3/#would-start-an-identifier
-func checkIfWouldStartIdentSequence(a, b, c rune) bool {
-	switch a {
-	case '-':
-		return isIdentStartCodePoint(b) || b == '-' || checkIfValidEscape(b, c)
-	case '\\':
-		return checkIfValidEscape(a, b)
-	default:
-		return isIdentStartCodePoint(a)
+	next, err = t.stream.Peek(3)
+	if err != nil && err != io.EOF {
+		return 0.0, err
 	}
-}
 
-// https://www.w3.org/TR/css-syntax-3/#starts-with-a-number
-func checkIfWouldStartNumber(a, b, c rune) bool {
-	switch a {
-	case '+', '-':
-		return unicode.IsDigit(b) || b == '.' && unicode.IsDigit(c)
-	case '.':
-		return unicode.IsDigit(b)
-	default:
-		return unicode.IsDigit(a)
+	if next[0] == 'e' || next[0] == 'E' {
+		if next[1] == '-' || next[1] == '+' {
+			if unicode.IsDigit(next[2]) {
+				if err := t.stream.Discard(3); err != nil {
+					return 0.0, err
+				}
+				if _, err := repr.WriteString(string(next)); err != nil {
+					return 0.0, err
+				}
+			}
+		} else if unicode.IsDigit(next[1]) {
+			if err := t.stream.Discard(2); err != nil {
+				return 0.0, err
+			}
+
+			if _, err := repr.WriteString(string(next[:1])); err != nil {
+				return 0.0, err
+			}
+		}
 	}
+
+	value, err := strconv.ParseFloat(repr.String(), 64)
+	if err != nil {
+		return 0.0, err
+	}
+
+	return value, nil
 }

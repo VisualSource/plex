@@ -193,6 +193,6 @@ Passing Tests (fragment):
     ✔ webkit01 @done(26-05-11 20:28)
     ✔ webkit02 @done(26-05-11 21:38)
 Final:
-    [] cleanup parser file
-    [] move utils function to there own file
+    ✔ cleanup parser file @done(26-05-12 17:25)
+    ✔ move utils function to there own file @done(26-05-12 17:25)
     ✔ add tests of the pr tests form html5lib @done(26-05-12 08:29)
