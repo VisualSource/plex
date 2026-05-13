@@ -1,77 +1,102 @@
 package tokenizer
 
-//https://www.w3.org/TR/css-syntax-3/#tokenization
-type Token interface {
-	isToken()
-}
-
-type IdentToken struct {
-	Value string
-}
-
-func (i IdentToken) isToken() {}
+type TokenId uint
 
 const (
-	IdentType_Hash = iota
-	IdentType_Ident
-	IdentType_Function
-	IdentType_AtKeyword
-	IdentType_String
-	IdentType_Url
+	TokenId_Ident TokenId = iota
+	TokenId_Function
+	TokenId_AtKeyword
+	TokenId_Hash
+	TokenId_String
+	TokenId_BadString
+	TokenId_Url
+	TokenId_BadUrl
+	TokenId_Delim
+	TokenId_Number
+	TokenId_Percentage
+	TokenId_Dimension
+	TokenId_Whitespace
+	TokenId_CDO
+	TokenId_CDC
+	TokenId_Colon
+	TokenId_Semicolon
+	TokenId_Comma
+	TokenId_BracketSquareOpen
+	TokenId_BracketSquareClose
+	TokenId_BracketParamOpen
+	TokenId_BracketParamClose
+	TokenId_BracketCurlyOpen
+	TokenId_BracketCurlyClose
+	TokenId_EOF
 )
+
+// https://www.w3.org/TR/css-syntax-3/#tokenization
+type Token interface {
+	isToken() TokenId
+}
 
 // <ident-token>, <function-token>, <at-keyword-token>, <hash-token>, <string-token>, and <url-token>
 type MultiCharacterToken struct {
-	Type  uint
+	Type  TokenId
 	Value string
 	Flag  string
 }
 
-func (i MultiCharacterToken) isToken() {}
-
-const (
-	CharType_Delim = iota
-	CharType_AsRune
-)
-
-// <colon-token>, <semicolon-token>, <comma-token>, <[-token>, <]-token>, <(-token>, <)-token>, <{-token>, and <}-token>. <delim-token>
-type SingleCharacterToken struct {
-	Value rune
-	Type  uint
+func (i MultiCharacterToken) isToken() TokenId {
+	return i.Type
+}
+func NewMultiCharacterToken(t TokenId, value string) *MultiCharacterToken {
+	return &MultiCharacterToken{
+		Type:  t,
+		Value: value,
+	}
 }
 
-func (b SingleCharacterToken) isToken() {}
+// <delim-token>
+type SingleCharacterToken struct {
+	Type  TokenId
+	Value rune
+}
+
+func (b SingleCharacterToken) isToken() TokenId {
+	return b.Type
+}
+
+func NewSingleCharacterToken(t TokenId, value rune) *SingleCharacterToken {
+	return &SingleCharacterToken{
+		Type:  t,
+		Value: value,
+	}
+}
 
 type EOFToken struct{}
 
-func (b EOFToken) isToken() {}
-
-const (
-	Numeric_Number = iota
-	Numeric_Percentage
-	Numeric_Dimension
-)
+func (b EOFToken) isToken() TokenId { return TokenId_EOF }
+func NewEOFToken() *EOFToken        { return &EOFToken{} }
 
 // <number-token>, <percentage-token>, and <dimension-token>
 type NumericToken struct {
+	Type TokenId
+
 	Value float64
-	Unit  string
-	Flag  uint
+
+	Unit string // px, and other stuff
+
+	Flag string // integer, number
 }
 
-func (n NumericToken) isToken() {}
-
-const (
-	Info_Whitespace = iota
-	Info_CDO
-	Info_CDC
-	Info_BadString
-	Info_BadUrl
-)
-
-// <bad-string-token>, <bad-url-token>, <whitespace-token>, <CDO-token>, <CDC-token>,
-type InfoToken struct {
-	Type uint
+func (n NumericToken) isToken() TokenId { return n.Type }
+func NewNumericToken(t TokenId, value float64) *NumericToken {
+	return &NumericToken{
+		Type:  t,
+		Value: value,
+	}
 }
 
-func (i InfoToken) isToken() {}
+// <colon-token>, <semicolon-token>, <comma-token>, <[-token>, <]-token>, <(-token>, <)-token>, <{-token>, and <}-token>. <bad-string-token>, <bad-url-token>, <whitespace-token>, <CDO-token>, <CDC-token>,
+type DataToken struct {
+	Type TokenId
+}
+
+func (i DataToken) isToken() TokenId    { return i.Type }
+func NewDataToken(t TokenId) *DataToken { return &DataToken{Type: t} }

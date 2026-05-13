@@ -72,8 +72,6 @@ func (rd *RuneReader) ReadRune() (rune, int, error) {
 
 // Peek returns the next n runes without advancing the reader.
 // If EOF is encountered, the available runes up to EOF are returned.
-// After calling Peek, UnreadRune is disabled until the next Read,
-// ReadRune, or Discard call.
 func (rd *RuneReader) Peek(n int) ([]rune, error) {
 	if n < 0 {
 		return nil, ErrNegativeCount

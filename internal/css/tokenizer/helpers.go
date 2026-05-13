@@ -11,7 +11,7 @@ func isIdentStartCodePoint(char rune) bool {
 }
 
 func isIdentCodePoint(char rune) bool {
-	return isIdentStartCodePoint(char) || unicode.IsDigit(char) || char == '-'
+	return isIdentStartCodePoint(char) || isDigit(char) || char == '-'
 }
 
 // https://www.w3.org/TR/css-syntax-3/#starts-with-a-valid-escape
@@ -35,10 +35,26 @@ func checkIfWouldStartIdentSequence(a, b, c rune) bool {
 func checkIfWouldStartNumber(a, b, c rune) bool {
 	switch a {
 	case '+', '-':
-		return unicode.IsDigit(b) || b == '.' && unicode.IsDigit(c)
+		return isDigit(b) || b == '.' && isDigit(c)
 	case '.':
-		return unicode.IsDigit(b)
+		return isDigit(b)
 	default:
-		return unicode.IsDigit(a)
+		return isDigit(a)
 	}
+}
+
+// https://www.w3.org/TR/css-syntax-3/#non-printable-code-point
+func isNonPrintableCodePoint(char rune) bool {
+	a := int(char)
+	return a >= 0x0000 && a <= 0x0008 || a == 0x000B || a >= 0x000E && a <= 0x001F || a == 0x007F
+}
+
+func isHexDigit(r rune) bool {
+	return (r >= '0' && r <= '9') ||
+		(r >= 'a' && r <= 'f') ||
+		(r >= 'A' && r <= 'F')
+}
+
+func isDigit(r rune) bool {
+	return r >= '0' && r <= '9'
 }

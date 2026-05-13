@@ -4,7 +4,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/VisualSource/plex/internal/runeio"
@@ -16,12 +15,15 @@ type CssTokenizer struct {
 
 func NewCssTokenizer(stream io.Reader) *CssTokenizer {
 	return &CssTokenizer{
-		stream: runeio.NewReader(stream),
+		stream: runeio.NewReader(newPreprocessor(stream)),
 	}
 }
 
 // https://www.w3.org/TR/css-syntax-3/#consume-token
 func (t *CssTokenizer) ConsumeToken() (Token, error) {
+	defer func() {
+		t.stream.Forget()
+	}()
 
 	if err := t.consumeComments(); err != nil {
 		return nil, err
@@ -34,21 +36,11 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 
 	switch char {
 	case '\n', '\t', ' ':
-		for {
-			char, _, err := t.stream.ReadRune()
-			if err != nil && err != io.EOF {
-				return nil, err
-			}
-
-			if char != '\n' && char != '\t' && char != ' ' {
-				if err := t.stream.UnreadRune(); err != nil {
-					return nil, err
-				}
-				break
-			}
+		if err := t.consumeWhitespace(); err != nil {
+			return nil, err
 		}
 
-		return &InfoToken{Type: Info_Whitespace}, nil
+		return NewDataToken(TokenId_Whitespace), nil
 	case '"', '\'':
 		return t.consumeStringToken(char)
 	case '#':
@@ -63,14 +55,15 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 				return nil, err
 			}
 
-			flag := "unrestricted"
+			token := NewMultiCharacterToken(TokenId_Hash, value)
+			token.Flag = "unrestricted"
 			if checkIfWouldStartIdentSequence(chars[0], chars[1], chars[2]) {
-				flag = "id"
+				token.Flag = "id"
 			}
-			return &MultiCharacterToken{Value: value, Type: IdentType_Hash, Flag: flag}, nil
+			return token, nil
 		}
 
-		return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+		return NewSingleCharacterToken(TokenId_Delim, char), nil
 
 	case '+':
 		chars, err := t.stream.Peek(2)
@@ -85,7 +78,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 			return t.consumeNumericToken()
 		}
 
-		return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+		return NewSingleCharacterToken(TokenId_Delim, char), nil
 	case '-':
 		chars, err := t.stream.Peek(2)
 		if err != nil && err != io.EOF {
@@ -101,7 +94,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 			if err := t.stream.Discard(2); err != nil {
 				return nil, err
 			}
-			return &InfoToken{Type: Info_CDC}, nil
+			return NewDataToken(TokenId_CDC), nil
 		} else if checkIfWouldStartIdentSequence(char, chars[0], chars[1]) {
 			if err := t.stream.UnreadRune(); err != nil {
 				return nil, err
@@ -109,7 +102,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 			return t.consumeIdentLikeToken()
 		}
 
-		return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+		return NewSingleCharacterToken(TokenId_Delim, char), nil
 	case '.':
 		chars, err := t.stream.Peek(2)
 		if err != nil && err != io.EOF {
@@ -122,7 +115,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 			}
 			return t.consumeNumericToken()
 		}
-		return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+		return NewSingleCharacterToken(TokenId_Delim, char), nil
 	case '<':
 		chars, err := t.stream.Peek(3)
 		if err != nil && err != io.EOF {
@@ -134,10 +127,10 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 				return nil, err
 			}
 
-			return &InfoToken{Type: Info_CDO}, nil
+			return NewDataToken(TokenId_CDO), nil
 		}
 
-		return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+		return NewSingleCharacterToken(TokenId_Delim, char), nil
 	case '@':
 		chars, err := t.stream.Peek(3)
 		if err != nil && err != io.EOF {
@@ -150,10 +143,10 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 				return nil, err
 			}
 
-			return &MultiCharacterToken{Value: ident, Type: IdentType_AtKeyword}, nil
+			return NewMultiCharacterToken(TokenId_AtKeyword, ident), nil
 		}
 
-		return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+		return NewSingleCharacterToken(TokenId_Delim, char), nil
 	case '\\':
 		nextChar, err := t.stream.Peek(1)
 		if err != nil && err != io.EOF {
@@ -169,13 +162,29 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 
 		//TODO: parse error
 
-		return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+		return NewSingleCharacterToken(TokenId_Delim, char), nil
 
-	case ',', ';', ':', '[', ']', '}', '{', '(', ')':
-		return &SingleCharacterToken{Value: char, Type: CharType_AsRune}, nil
+	case ',':
+		return NewDataToken(TokenId_Comma), nil
+	case ';':
+		return NewDataToken(TokenId_Semicolon), nil
+	case ':':
+		return NewDataToken(TokenId_Colon), nil
+	case '[':
+		return NewDataToken(TokenId_BracketSquareOpen), nil
+	case ']':
+		return NewDataToken(TokenId_BracketSquareClose), nil
+	case '{':
+		return NewDataToken(TokenId_BracketCurlyOpen), nil
+	case '}':
+		return NewDataToken(TokenId_BracketCurlyClose), nil
+	case '(':
+		return NewDataToken(TokenId_BracketParamOpen), nil
+	case ')':
+		return NewDataToken(TokenId_BracketParamClose), nil
 	}
 
-	if unicode.IsDigit(char) {
+	if isDigit(char) {
 		if err := t.stream.UnreadRune(); err != nil {
 			return nil, err
 		}
@@ -193,52 +202,75 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		return &EOFToken{}, nil
 	}
 
-	return &SingleCharacterToken{Value: char, Type: CharType_Delim}, nil
+	return NewSingleCharacterToken(TokenId_Delim, char), nil
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-comment
-func (t *CssTokenizer) consumeComments() error {
-	chars, err := t.stream.Peek(2)
-	if err != nil && err != io.EOF {
-		return err
-	}
-	if string(chars) != "/*" {
-		return nil
-	}
-
-	if err := t.stream.Discard(2); err != nil {
-		return err
-	}
-
+func (t *CssTokenizer) consumeWhitespace() error {
 	for {
 		char, _, err := t.stream.ReadRune()
-		if err != nil {
-			if err == io.EOF {
-				//TODO: parse error
-			}
-			return nil
+		if err != nil && err != io.EOF {
+			return err
 		}
 
-		if char == '*' {
-			next, err := t.stream.Peek(1)
-			if err != nil {
-				return err
-			}
-
-			if next[0] == '/' {
-				break
-			}
+		if isWhitespace(char) {
+			continue
 		}
 
+		if err := t.stream.UnreadRune(); err != nil {
+			return err
+		}
+		break
 	}
 
 	return nil
 }
 
+// https://www.w3.org/TR/css-syntax-3/#consume-comment
+func (t *CssTokenizer) consumeComments() error {
+	for {
+		chars, err := t.stream.Peek(2)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if len(chars) != 2 || string(chars) != "/*" {
+			return nil
+		}
+		if err := t.stream.Discard(2); err != nil {
+			return err
+		}
+
+		for {
+			char, _, err := t.stream.ReadRune()
+			if err != nil {
+				if err == io.EOF {
+					//TODO: parse error
+					return nil
+				}
+				return err
+			}
+
+			if char == '*' {
+				next, err := t.stream.Peek(1)
+				if err != nil {
+					return err
+				}
+
+				if next[0] == '/' {
+					if err := t.stream.Discard(1); err != nil {
+						return err
+					}
+					break
+				}
+			}
+
+		}
+	}
+}
+
 // https://www.w3.org/TR/css-syntax-3/#consume-numeric-token
 func (t *CssTokenizer) consumeNumericToken() (Token, error) {
 
-	num, err := t.consumeNumber()
+	num, numType, err := t.consumeNumber()
 	if err != nil {
 		return nil, err
 	}
@@ -248,29 +280,42 @@ func (t *CssTokenizer) consumeNumericToken() (Token, error) {
 		return nil, err
 	}
 
-	if len(chars) == 3 && checkIfWouldStartIdentSequence(chars[0], chars[1], chars[2]) {
+	var a, b, c rune
+	if len(chars) > 0 {
+		a = chars[0]
+	}
+	if len(chars) > 1 {
+		b = chars[1]
+	}
+	if len(chars) > 2 {
+		c = chars[2]
+	}
+
+	if checkIfWouldStartIdentSequence(a, b, c) {
 		ident, err := t.consumeIdentSequence()
 		if err != nil {
 			return nil, err
 		}
 
-		return &NumericToken{
-			Value: num,
-			Unit:  ident,
-			Flag:  Numeric_Dimension,
-		}, nil
-	} else if len(chars) == 1 && chars[0] == '%' {
-		return &NumericToken{
-			Value: num,
-			Flag:  Numeric_Percentage,
-		}, nil
+		token := NewNumericToken(TokenId_Dimension, num)
+		token.Flag = numType
+		token.Unit = ident
+
+		return token, nil
+	} else if a == '%' {
+		if err := t.stream.Discard(1); err != nil {
+			return nil, err
+		}
+		return NewNumericToken(TokenId_Percentage, num), nil
 	}
 
-	return &NumericToken{
-		Value: num,
-		Flag:  Numeric_Number,
-	}, nil
+	token := NewNumericToken(TokenId_Number, num)
+	token.Flag = numType
+
+	return token, nil
 }
+
+func isQuote(r rune) bool { return r == '"' || r == '\'' }
 
 // https://www.w3.org/TR/css-syntax-3/#consume-ident-like-token
 func (t *CssTokenizer) consumeIdentLikeToken() (Token, error) {
@@ -284,33 +329,53 @@ func (t *CssTokenizer) consumeIdentLikeToken() (Token, error) {
 		return nil, err
 	}
 
-	if strings.EqualFold(ident, "url") && chars[0] == '(' {
+	var next rune
+	if len(chars) > 0 {
+		next = chars[0]
+	}
 
-	} else if chars[0] == '(' {
+	if strings.EqualFold(ident, "url") && next == '(' {
+		if err := t.stream.Discard(1); err != nil {
+			return nil, err
+		}
+		for {
+			ws, err := t.stream.Peek(2)
+			if err != nil && err != io.EOF {
+				return nil, err
+			}
+			if len(ws) < 2 || !isWhitespace(ws[0]) || !isWhitespace(ws[1]) {
+				break
+			}
+			if err := t.stream.Discard(1); err != nil {
+				return nil, err
+			}
+		}
+		la, err := t.stream.Peek(2)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		switch {
+		case len(la) >= 1 && isQuote(la[0]):
+			return NewMultiCharacterToken(TokenId_Function, ident), nil
+		case len(la) >= 2 && isWhitespace(la[0]) && isQuote(la[1]):
+			return NewMultiCharacterToken(TokenId_Function, ident), nil
+		default:
+			return t.consumeUrlToken()
+		}
+	} else if next == '(' {
 		if err := t.stream.Discard(1); err != nil {
 			return nil, err
 		}
 
-		return &MultiCharacterToken{
-			Value: ident,
-			Type:  IdentType_Function,
-		}, nil
+		return NewMultiCharacterToken(TokenId_Function, ident), nil
 	}
 
-	return &MultiCharacterToken{
-		Value: ident,
-		Type:  IdentType_Ident,
-	}, nil
+	return NewMultiCharacterToken(TokenId_Ident, ident), nil
 }
 
 // https://www.w3.org/TR/css-syntax-3/#consume-string-token
-func (t *CssTokenizer) consumeStringToken(endingRune ...rune) (Token, error) {
-	var endCodePoint rune
-	if len(endingRune) >= 1 {
-		endCodePoint = endingRune[0]
-	} else {
-	}
-
+func (t *CssTokenizer) consumeStringToken(endingRune rune) (Token, error) {
 	value := strings.Builder{}
 
 	for {
@@ -322,15 +387,16 @@ func (t *CssTokenizer) consumeStringToken(endingRune ...rune) (Token, error) {
 		switch {
 		case err == io.EOF:
 			//TODO: parse error
-			return &MultiCharacterToken{
-				Type:  IdentType_String,
-				Value: value.String(),
-			}, nil
-		case char == endCodePoint:
-			return &MultiCharacterToken{
-				Type:  IdentType_String,
-				Value: value.String(),
-			}, nil
+			return NewMultiCharacterToken(TokenId_String, value.String()), nil
+		case char == endingRune:
+			return NewMultiCharacterToken(TokenId_String, value.String()), nil
+		case char == '\n':
+			if err := t.stream.UnreadRune(); err != nil {
+				return nil, err
+			}
+
+			return NewDataToken(TokenId_BadString), nil
+
 		case char == '\\':
 			chars, err := t.stream.Peek(1)
 			if err != nil {
@@ -364,28 +430,7 @@ func (t *CssTokenizer) consumeStringToken(endingRune ...rune) (Token, error) {
 
 // https://www.w3.org/TR/css-syntax-3/#consume-url-token
 func (t *CssTokenizer) consumeUrlToken() (Token, error) {
-
-	consumeWhitespace := func() error {
-		for {
-			char, _, err := t.stream.ReadRune()
-			if err != nil && err != io.EOF {
-				return err
-			}
-
-			if isWhitespace(char) {
-				continue
-			}
-
-			if err := t.stream.UnreadRune(); err != nil {
-				return err
-			}
-			break
-		}
-
-		return nil
-	}
-
-	if err := consumeWhitespace(); err != nil {
+	if err := t.consumeWhitespace(); err != nil {
 		return nil, err
 	}
 
@@ -396,14 +441,16 @@ func (t *CssTokenizer) consumeUrlToken() (Token, error) {
 		if err != nil {
 			if err == io.EOF {
 				//TODO: parse error
-				return &MultiCharacterToken{Value: value.String(), Type: IdentType_Url}, nil
+				return NewMultiCharacterToken(TokenId_Url, value.String()), nil
 			}
 			return nil, err
 		}
 
 		switch char {
+		case ')':
+			return NewMultiCharacterToken(TokenId_Url, value.String()), nil
 		case '\n', '\t', ' ':
-			if err := consumeWhitespace(); err != nil {
+			if err := t.consumeWhitespace(); err != nil {
 				return nil, err
 			}
 			chars, err := t.stream.Peek(1)
@@ -411,46 +458,58 @@ func (t *CssTokenizer) consumeUrlToken() (Token, error) {
 				return nil, err
 			}
 
-			if err == io.EOF || chars[0] == ')' {
+			if err == io.EOF || len(chars) > 0 && chars[0] == ')' {
 				if err != io.EOF {
-					//TODO: parse error
-					if err := t.stream.UnreadRune(); err != nil {
+					if err := t.stream.Discard(1); err != nil {
 						return nil, err
 					}
 				}
-				return &MultiCharacterToken{Value: value.String(), Type: IdentType_Url}, nil
+
+				if err == io.EOF {
+					//TODO: parse error
+				}
+
+				return NewMultiCharacterToken(TokenId_Url, value.String()), nil
 			}
 
-			return t.consumeRemnantsOfBadUrl()
+			if err := t.consumeRemnantsOfBadUrl(); err != nil {
+				return nil, err
+			}
+			return NewDataToken(TokenId_BadUrl), nil
 		case '"', '\'', '(':
 			//TODO: parse error
-			return t.consumeRemnantsOfBadUrl()
+			if err := t.consumeRemnantsOfBadUrl(); err != nil {
+				return nil, err
+			}
+			return NewDataToken(TokenId_BadUrl), nil
 		case '\\':
 			chars, err := t.stream.Peek(1)
 			if err != nil && err != io.EOF {
 				return nil, err
 			}
 
-			if checkIfValidEscape(char, chars[0]) {
+			if len(chars) > 0 && checkIfValidEscape(char, chars[0]) {
 				escaped, err := t.consumeEscapedCodePoint()
 				if err != nil {
 					return nil, err
 				}
 
-				if _, err := value.WriteRune(escaped); err != nil {
-					return nil, err
-				}
+				value.WriteRune(escaped)
 			} else {
 				//TODO: parse error
-				return t.consumeRemnantsOfBadUrl()
+				if err := t.consumeRemnantsOfBadUrl(); err != nil {
+					return nil, err
+				}
+				return NewDataToken(TokenId_BadUrl), nil
 			}
 
 		default:
-			if int(char) >= 0x0000 && int(char) <= 0x0008 ||
-				int(char) >= 0x000E && int(char) <= 0x001F ||
-				int(char) == 0x007F || int(char) == 0x000B {
+			if isNonPrintableCodePoint(char) {
 				//TODO: parse error
-				return t.consumeRemnantsOfBadUrl()
+				if err := t.consumeRemnantsOfBadUrl(); err != nil {
+					return nil, err
+				}
+				return NewDataToken(TokenId_BadUrl), nil
 			}
 
 			if _, err := value.WriteRune(char); err != nil {
@@ -468,7 +527,42 @@ func (t *CssTokenizer) consumeEscapedCodePoint() (rune, error) {
 		return utf8.RuneError, err
 	}
 
-	//TODO: parse hex digit
+	if isHexDigit(char) {
+		hex := []rune{char}
+		for len(hex) < 6 {
+			peeked, err := t.stream.Peek(1)
+			if err != nil && err != io.EOF {
+				return utf8.RuneError, err
+			}
+			if len(peeked) == 0 || !isHexDigit(peeked[0]) {
+				break
+			}
+			if err := t.stream.Discard(1); err != nil {
+				return utf8.RuneError, err
+			}
+			hex = append(hex, peeked[0])
+		}
+
+		// consume one trailing whitespace if present
+		peeked, err := t.stream.Peek(1)
+		if err != nil && err != io.EOF {
+			return utf8.RuneError, err
+		}
+		if len(peeked) > 0 && isWhitespace(peeked[0]) {
+			if err := t.stream.Discard(1); err != nil {
+				return utf8.RuneError, err
+			}
+		}
+
+		n, err := strconv.ParseUint(string(hex), 16, 32)
+		if err != nil {
+			return utf8.RuneError, err
+		}
+		if n == 0 || (n >= 0xD800 && n <= 0xDFFF) || n > 0x10FFFF {
+			return utf8.RuneError, nil
+		}
+		return rune(n), nil
+	}
 
 	if err == io.EOF {
 		//TODO: parse error
@@ -478,12 +572,6 @@ func (t *CssTokenizer) consumeEscapedCodePoint() (rune, error) {
 	return char, nil
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-remnants-of-bad-url
-func (t *CssTokenizer) consumeRemnantsOfBadUrl() (Token, error) {
-
-	return nil, nil
-}
-
 // https://www.w3.org/TR/css-syntax-3/#consume-name
 func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 
@@ -491,7 +579,10 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 
 	for {
 		char, _, err := t.stream.ReadRune()
-		if err != nil && err != io.EOF {
+		if err != nil {
+			if err == io.EOF {
+				return result.String(), nil
+			}
 			return "", err
 		}
 
@@ -528,81 +619,122 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 }
 
 // https://www.w3.org/TR/css-syntax-3/#consume-number
-func (t *CssTokenizer) consumeNumber() (float64, error) {
+func (t *CssTokenizer) consumeNumber() (float64, string, error) {
 	repr := strings.Builder{}
+	numType := "integer"
 
 	next, err := t.stream.Peek(1)
 	if err != nil && err != io.EOF {
-		return 0.0, err
+		return 0.0, "", err
 	}
-	if next[0] == '+' || next[0] == '-' {
+	if len(next) > 0 && (next[0] == '+' || next[0] == '-') {
 		if err := t.stream.Discard(1); err != nil {
-			return 0.0, err
+			return 0.0, numType, err
 		}
 		if _, err := repr.WriteRune(next[0]); err != nil {
-			return 0.0, err
+			return 0.0, numType, err
 		}
 	}
 
-	for {
-		char, _, err := t.stream.ReadRune()
-		if err != nil && err != io.EOF {
-			return 0.0, err
-		}
-
-		if !unicode.IsDigit(char) {
-			break
-		}
-
-		if _, err := repr.WriteRune(char); err != nil {
-			return 0.0, err
-		}
+	if err := t.consumeDigits(&repr); err != nil {
+		return 0, "", err
 	}
 
 	next, err = t.stream.Peek(2)
 	if err != nil && err != io.EOF {
-		return 0.0, err
+		return 0.0, "", err
 	}
 
-	if next[0] == '.' && unicode.IsDigit(next[1]) {
+	if len(next) == 2 && next[0] == '.' && isDigit(next[1]) {
 		if err := t.stream.Discard(2); err != nil {
-			return 0.0, err
+			return 0.0, "", err
 		}
-		if _, err := repr.WriteString(string(next)); err != nil {
-			return 0.0, err
+		repr.WriteRune(next[0])
+		repr.WriteRune(next[1])
+		numType = "number"
+		if err := t.consumeDigits(&repr); err != nil {
+			return 0, "", err
 		}
 	}
 
 	next, err = t.stream.Peek(3)
 	if err != nil && err != io.EOF {
-		return 0.0, err
+		return 0.0, "", err
 	}
 
-	if next[0] == 'e' || next[0] == 'E' {
-		if next[1] == '-' || next[1] == '+' {
-			if unicode.IsDigit(next[2]) {
-				if err := t.stream.Discard(3); err != nil {
-					return 0.0, err
-				}
-				if _, err := repr.WriteString(string(next)); err != nil {
-					return 0.0, err
-				}
+	if len(next) >= 2 && (next[0] == 'e' || next[0] == 'E') {
+		switch {
+		case len(next) >= 3 && (next[1] == '-' || next[1] == '+') && isDigit(next[2]):
+			if err := t.stream.Discard(3); err != nil {
+				return 0.0, "", err
 			}
-		} else if unicode.IsDigit(next[1]) {
+			repr.WriteString(string(next))
+			numType = "number"
+			if err := t.consumeDigits(&repr); err != nil {
+				return 0, "", err
+			}
+		case isDigit(next[1]):
 			if err := t.stream.Discard(2); err != nil {
-				return 0.0, err
+				return 0.0, "", err
 			}
-
-			if _, err := repr.WriteString(string(next[:1])); err != nil {
-				return 0.0, err
+			repr.WriteString(string(next[:2]))
+			numType = "number"
+			if err := t.consumeDigits(&repr); err != nil {
+				return 0, "", err
 			}
 		}
 	}
 
 	value, err := strconv.ParseFloat(repr.String(), 64)
 	if err != nil {
-		return 0.0, err
+		return 0.0, "", err
 	}
 
-	return value, nil
+	return value, numType, nil
+}
+
+func (t *CssTokenizer) consumeDigits(builder *strings.Builder) error {
+	for {
+		char, _, err := t.stream.ReadRune()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		if !isDigit(char) {
+			return t.stream.UnreadRune()
+		}
+
+		builder.WriteRune(char)
+	}
+}
+
+// https://www.w3.org/TR/css-syntax-3/#consume-remnants-of-bad-url
+func (t *CssTokenizer) consumeRemnantsOfBadUrl() error {
+
+	for {
+		char, _, err := t.stream.ReadRune()
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		if char == ')' {
+			return nil
+		}
+
+		next, err := t.stream.Peek(1)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if len(next) == 1 && checkIfValidEscape(char, next[0]) {
+			if _, err := t.consumeEscapedCodePoint(); err != nil {
+				return err
+			}
+		}
+	}
 }
