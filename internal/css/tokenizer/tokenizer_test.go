@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/VisualSource/plex/internal/css/tokenizer"
+	"github.com/kr/pretty"
 )
 
 type testCase struct {
@@ -105,14 +106,70 @@ func loadTestFiles(t *testing.T) map[string][]testCase {
 func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 
 	for i, expected := range tt.Tokens {
-		if len(result) < i {
-			t.Fatal("result does not match len of expected")
+		if len(result) <= i {
+			t.Fatal(pretty.Sprintf("was expecting %v results but was given %v", tt.Tokens, result))
 			break
 		}
 
 		if !isToken(expected.Type, result[i].IsToken()) {
-			t.Fatal("Token type does not match")
+			t.Fatalf("was expecting token type of %s but was given %s", expected.Type, tokenAsText(result[i].IsToken()))
 		}
+	}
+
+}
+
+func tokenAsText(id tokenizer.TokenId) string {
+	switch id {
+	case tokenizer.TokenId_BracketCurlyClose:
+		return "}-token"
+	case tokenizer.TokenId_BracketCurlyOpen:
+		return "{-token"
+	case tokenizer.TokenId_BracketSquareOpen:
+		return "[-token"
+	case tokenizer.TokenId_BracketSquareClose:
+		return "]-token"
+	case tokenizer.TokenId_AtKeyword:
+		return "at-keyword-token"
+	case tokenizer.TokenId_Whitespace:
+		return "whitespace-token"
+	case tokenizer.TokenId_Delim:
+		return "delim-token"
+	case tokenizer.TokenId_Ident:
+		return "ident-token"
+	case tokenizer.TokenId_Function:
+		return "function-token"
+	case tokenizer.TokenId_Hash:
+		return "hash-token"
+	case tokenizer.TokenId_String:
+		return "string-token"
+	case tokenizer.TokenId_BadString:
+		return "bad-string-token"
+	case tokenizer.TokenId_Url:
+		return "url-token"
+	case tokenizer.TokenId_BadUrl:
+		return "bad-url-token"
+	case tokenizer.TokenId_Number:
+		return "number-token"
+	case tokenizer.TokenId_Percentage:
+		return "percentage-token"
+	case tokenizer.TokenId_Dimension:
+		return "dimension-token"
+	case tokenizer.TokenId_CDO:
+		return "cdo-token"
+	case tokenizer.TokenId_CDC:
+		return "cdc-token"
+	case tokenizer.TokenId_Colon:
+		return "colon-token"
+	case tokenizer.TokenId_Semicolon:
+		return "semicolon"
+	case tokenizer.TokenId_Comma:
+		return "comma"
+	case tokenizer.TokenId_BracketParamOpen:
+		return "(-token"
+	case tokenizer.TokenId_BracketParamClose:
+		return ")-token"
+	default:
+		return "UNKNOWN"
 	}
 
 }
