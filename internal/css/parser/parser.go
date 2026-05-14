@@ -1,11 +1,35 @@
 package parser
 
-import "github.com/VisualSource/plex/internal/css/cssom"
+import (
+	"errors"
+	"io"
+	"slices"
 
-type CssParser struct{}
+	"github.com/VisualSource/plex/internal/css/cssom"
+	"github.com/VisualSource/plex/internal/css/tokenizer"
+	"github.com/VisualSource/plex/internal/utils"
+)
+
+type CssParser struct {
+	tok    *tokenizer.CssTokenizer
+	tokens []tokenizer.Token
+}
 
 func NewCssParser() *CssParser {
 	return &CssParser{}
+}
+
+func (p *CssParser) consumeToken() (tokenizer.Token, error) {
+	if len(p.tokens) != 0 {
+		last := p.tokens[len(p.tokens)-1]
+		p.tokens = slices.Delete(p.tokens, len(p.tokens)-1, len(p.tokens))
+		return last, nil
+	}
+
+	return p.tok.ConsumeToken()
+}
+func (p *CssParser) reconsumeToken(token tokenizer.Token) {
+	p.tokens = append(p.tokens, token)
 }
 
 // #region Entry Points
@@ -27,14 +51,27 @@ func (p *CssParser) ParseListAccordingToCssGrammar() []any {
 // Intended to be the normal parser entry point, for parsing stylesheets.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-stylesheet
-func (p *CssParser) ParseStylesheet() *cssom.Stylesheet {
-	return cssom.NewStylesheet()
+func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) *cssom.Stylesheet {
+	p.tok = tokenizer.NewCssTokenizer(input) // TODO: look into using shared tokenizer
+	stylesheet := cssom.NewStylesheet(location)
+
+	rules := p.consumeListOfRules(true)
+
+	stylesheet.Value = rules
+
+	return stylesheet
 }
 
 // Intended for the content of at-rules such as @media. It differs from "Parse a stylesheet" in the handling of <CDO-token> and <CDC-token>.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-rules
-func (p *CssParser) ParseListOfRules() {}
+func (p *CssParser) ParseListOfRules(input io.Reader) []cssom.Rule {
+	p.tok = tokenizer.NewCssTokenizer(input)
+
+	rules := p.consumeListOfRules(false)
+
+	return rules
+}
 
 // Intended for use by the CSSStyleSheet#insertRule method, and similar functions which might exist, which parse text into a single rule.
 //
@@ -48,17 +85,40 @@ func (p *CssParser) ParseRule() (cssom.Rule, error) {
 // Unlike "Parse a list of declarations", this parses only a declaration and not an at-rule.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-declaration
-func (p *CssParser) ParseDeclaration() (any, error) {
+func (p *CssParser) ParseDeclaration(stream io.Reader) (*cssom.Declaration, error) {
+	tok := tokenizer.NewCssTokenizer(stream)
 
-	return nil, nil
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return nil, err
+		}
+
+		if token.IsToken() == tokenizer.TokenId_Whitespace {
+			continue
+		}
+
+		if token.IsToken() != tokenizer.TokenId_Ident {
+			return nil, errors.New("syntax error")
+		}
+
+		result := p.consumeDeclaration(tok, token)
+		if result != nil {
+			return result, nil
+		}
+
+		return nil, errors.New("syntax error")
+	}
 }
 
 // This algorithm parses the contents of style rules, which need to allow nested style rules and other at-rules.
 // If you don’t need nested style rules, such as in @page or in @keyframes child rules, use parse a list of declarations.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-style-blocks-contents
-func (p *CssParser) ParseStyleBlockContents() any {
-	return nil
+func (p *CssParser) ParseStyleBlockContents(stream io.Reader) []*cssom.Declaration {
+	tok := tokenizer.NewCssTokenizer(stream)
+
+	return p.consumeStyleBlockContents(tok)
 }
 
 // For the contents of a style attribute, which parses text into the contents of a single style rule.
@@ -68,15 +128,56 @@ func (p *CssParser) ParseStyleBlockContents() any {
 // This algorithm does not handle nested style rules. If your use requires that, use parse a style block’s contents.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-declarations
-func (p *CssParser) ParseListOfDeclarations() []any {
-	return nil
+func (p *CssParser) ParseListOfDeclarations(stream io.Reader) []*cssom.Declaration {
+	tok := tokenizer.NewCssTokenizer(stream)
+
+	return p.consumeListOfDeclarations(tok)
 }
 
 // For things that need to consume a single value, like the parsing rules for attr().
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-component-value
-func (p *CssParser) ParseComponentValue() (any, error) {
-	return nil, nil
+func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, error) {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+	//whitespace -> ignore
+	// eof -> error
+	//component
+	// whitespace -> ignore
+	// eof -> end
+
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return cssom.Component{}, err
+		}
+
+		if token.IsToken() == tokenizer.TokenId_Whitespace {
+			continue
+		} else if token.IsToken() == tokenizer.TokenId_EOF {
+			return cssom.Component{}, errors.New("syntax error")
+		}
+
+		p.reconsumeToken(token)
+		break
+	}
+
+	value := p.consumeComponentValue()
+
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return cssom.Component{}, err
+		}
+
+		if token.IsToken() == tokenizer.TokenId_Whitespace {
+			continue
+		} else if token.IsToken() == tokenizer.TokenId_EOF {
+			return cssom.Component{}, nil
+		}
+
+		return cssom.Component{}, errors.New("syntax error")
+	}
+
 }
 
 // for the contents of presentational attributes, which parse text into a single declaration’s value,
@@ -84,36 +185,130 @@ func (p *CssParser) ParseComponentValue() (any, error) {
 // as in Selectors API or the media HTML attribute.
 //
 // https://www.w3.org/TR/css-syntax-3/#parse-list-of-component-values
-func (p *CssParser) ParseListOfComponentValues() []any {
-	return nil
+func (p *CssParser) ParseListOfComponentValues(stream io.Reader) []cssom.Component {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+
+	list := make([]cssom.Component, 0)
+
+	for {
+		value := p.consumeComponentValue()
+
+		list = append(list, value)
+
+		//TOOD: get eof token to break
+	}
+
+	return list
+}
+
+func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) [][]cssom.Component {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+	clvs := make([][]cssom.Component, 0)
+
+	return clvs
 }
 
 //#endregion
 
 // #region algorithms
 // https://www.w3.org/TR/css-syntax-3/#consume-list-of-rules
-func (p *CssParser) consumeListOfRules() {}
+func (p *CssParser) consumeListOfRules(topLevel bool) ([]cssom.Rule, error) {
+	rules := make([]cssom.Rule, 0)
+
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return nil, err
+		}
+
+		switch token.IsToken() {
+		case tokenizer.TokenId_Whitespace:
+			continue
+		case tokenizer.TokenId_EOF:
+			return rules, nil
+		case tokenizer.TokenId_AtKeyword:
+			p.reconsumeToken(token)
+
+			atRule := p.consumeAtRule()
+			rules = append(rules, atRule)
+		case tokenizer.TokenId_CDO, tokenizer.TokenId_CDC:
+			if topLevel {
+				continue
+			}
+			fallthrough
+		default:
+			p.reconsumeToken(token)
+
+			value, err := p.consumeQualifiedRule()
+			if err != nil {
+				if !errors.Is(err, NoValue) {
+					return nil, err
+				}
+				continue
+			}
+			rules = append(rules, value)
+
+		}
+	}
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-at-rule
-func (p *CssParser) consumeAtRule() {}
+func (p *CssParser) consumeAtRule() cssom.Rule {
+	return cssom.Rule{}
+}
+
+var NoValue = errors.New("no value")
 
 // https://www.w3.org/TR/css-syntax-3/#consume-qualified-rule
-func (p *CssParser) consumeQualifiedRule() {}
+func (p *CssParser) consumeQualifiedRule() (cssom.Rule, error) {
+
+	return cssom.Rule{}, nil
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-style-block
-func (p *CssParser) consumeStyleBlockContents() {}
+func (p *CssParser) consumeStyleBlockContents(tok *tokenizer.CssTokenizer) []*cssom.Declaration {
+	decls := make([]*cssom.Declaration, 0)
+
+	return decls
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-list-of-declarations
-func (p *CssParser) consumeListOfDeclarations() {}
+func (p *CssParser) consumeListOfDeclarations(tok *tokenizer.CssTokenizer) []*cssom.Declaration {
+	decls := make([]*cssom.Declaration, 0)
+
+	return decls
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-declaration
-func (p *CssParser) consumeDeclaration() {}
+func (p *CssParser) consumeDeclaration(tok *tokenizer.CssTokenizer, ident tokenizer.Token) *cssom.Declaration {
+
+	return nil
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-component-value
-func (p *CssParser) consumeComponentValue() {}
+func (p *CssParser) consumeComponentValue() (cssom.Component, error) {
+	token, err := p.consumeToken()
+	if err != nil {
+		return cssom.Component{}, err
+	}
+
+	switch token.IsToken() {
+	case tokenizer.TokenId_BracketSquareOpen, tokenizer.TokenId_BracketCurlyOpen, tokenizer.TokenId_BracketParamOpen:
+		p.consumeSimpleBlock()
+		return cssom.Component{}, nil
+	case tokenizer.TokenId_Function:
+		p.consumeFunction()
+		return cssom.Component{}, nil
+	default:
+		return cssom.Component{}, nil
+	}
+
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-simple-block
-func (p *CssParser) consumeSimpleBlock() {}
+func (p *CssParser) consumeSimpleBlock() {
+
+}
 
 // https://www.w3.org/TR/css-syntax-3/#consume-function
 func (p *CssParser) consumeFunction() {}
