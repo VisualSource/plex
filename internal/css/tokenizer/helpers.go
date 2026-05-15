@@ -6,8 +6,40 @@ func isWhitespace(char rune) bool {
 	return char == '\n' || char == '\t' || char == ' '
 }
 
+// https://www.w3.org/TR/css-syntax-3/#ident-start-code-point
 func isIdentStartCodePoint(char rune) bool {
-	return unicode.IsLetter(char) || int(char) >= 0x0080 || char == '_'
+	return unicode.IsLetter(char) || isNonASCIIIdentCodePoint(char) || char == '_'
+}
+
+// https://www.w3.org/TR/css-syntax-3/#non-ascii-ident-code-point
+func isNonASCIIIdentCodePoint(char rune) bool {
+	switch {
+	case char == 0x00B7:
+		return true
+	case char >= 0x00C0 && char <= 0x00D6:
+		return true
+	case char >= 0x00D8 && char <= 0x00F6:
+		return true
+	case char >= 0x00F8 && char <= 0x037D:
+		return true
+	case char >= 0x037F && char <= 0x1FFF:
+		return true
+	case char == 0x200C, char == 0x200D, char == 0x203F, char == 0x2040:
+		return true
+	case char >= 0x2070 && char <= 0x218F:
+		return true
+	case char >= 0x2C00 && char <= 0x2FEF:
+		return true
+	case char >= 0x3001 && char <= 0xD7FF:
+		return true
+	case char >= 0xF900 && char <= 0xFDCF:
+		return true
+	case char >= 0xFDF0 && char <= 0xFFFD:
+		return true
+	case char >= 0x10000 && char <= 0xEFFFF:
+		return true
+	}
+	return false
 }
 
 func isIdentCodePoint(char rune) bool {

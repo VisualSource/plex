@@ -3,6 +3,7 @@ package tokenizer_test
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -112,7 +113,89 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 		}
 
 		if !isToken(expected.Type, result[i].IsToken()) {
-			t.Fatalf("was expecting token type of %s but was given %s", expected.Type, tokenAsText(result[i].IsToken()))
+			t.Fatalf("was expecting token type of %s but was given %s at idx %d", expected.Type, tokenAsText(result[i].IsToken()), i)
+		}
+
+		switch result[i].IsToken() {
+		case tokenizer.TokenId_AtKeyword:
+			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+				exp := expected.Structured["value"].(string)
+				if tok.Value != exp {
+					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
+				}
+			} else {
+				t.Fatalf("current token is not a multi character token got %#v", result[i])
+			}
+		case tokenizer.TokenId_Delim:
+			if tok, ok := (result[i].(*tokenizer.SingleCharacterToken)); ok {
+				exp := []rune(expected.Structured["value"].(string))[0]
+
+				if tok.Value != exp {
+					t.Fatalf("was expecting a value of '%c' but was given '%c'", exp, tok.Value)
+				}
+			} else {
+				t.Fatalf("current token is not a single character token got %#v", result[i])
+			}
+		case tokenizer.TokenId_Dimension:
+			if tok, ok := (result[i].(*tokenizer.NumericToken)); ok {
+				v := expected.Structured["value"].(float64)
+				ttv := expected.Structured["type"].(string)
+				u := expected.Structured["unit"].(string)
+
+				if !(math.Abs(tok.Value-v) < 1e-9 && ttv == tok.Flag && u == tok.Unit) {
+					t.Fatalf("was expecting Value(%f) Type(%s) Unit(%s) but was given Value(%f) Type(%s) Unit(%s)", v, ttv, u, tok.Value, tok.Flag, tok.Unit)
+				}
+			} else {
+				t.Fatalf("current token is not a multi character token got %#v", result[i])
+			}
+		case tokenizer.TokenId_Function:
+			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+				exp := expected.Structured["value"].(string)
+				if tok.Value != exp {
+					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
+				}
+			} else {
+				t.Fatalf("current token is not a multi character token got %#v", result[i])
+			}
+		case tokenizer.TokenId_Hash:
+			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+				exp := expected.Structured["value"].(string)
+				id := expected.Structured["type"].(string)
+				if !(tok.Value == exp && tok.Flag == id) {
+					t.Fatalf("was expecting a value of '%s','%s' but was given '%s','%s'", exp, id, tok.Value, tok.Flag)
+				}
+			} else {
+				t.Fatalf("current token is not a multi character token got %#v", result[i])
+			}
+		case tokenizer.TokenId_Number:
+			if tok, ok := (result[i].(*tokenizer.NumericToken)); ok {
+				v := expected.Structured["value"].(float64)
+				ttv := expected.Structured["type"].(string)
+
+				if !(math.Abs(tok.Value-v) < 1e-9 && ttv == tok.Flag) {
+					t.Fatalf("was expecting Value(%f) Type(%s) but was given Value(%f) Type(%s)", v, ttv, tok.Value, tok.Flag)
+				}
+			} else {
+				t.Fatalf("current token is not a multi character token got %#v", result[i])
+			}
+		case tokenizer.TokenId_String:
+			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+				exp := expected.Structured["value"].(string)
+				if tok.Value != exp {
+					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
+				}
+			} else {
+				t.Fatalf("current token is not a multi character token got %#v", result[i])
+			}
+		case tokenizer.TokenId_Url:
+			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+				exp := expected.Structured["value"].(string)
+				if tok.Value != exp {
+					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
+				}
+			} else {
+				t.Fatalf("current token is not a multi character token got %#v", result[i])
+			}
 		}
 	}
 
@@ -210,15 +293,15 @@ func isToken(value string, id tokenizer.TokenId) bool {
 		return id == tokenizer.TokenId_Percentage
 	case "dimension-token":
 		return id == tokenizer.TokenId_Dimension
-	case "cdo-token":
+	case "CDO-token":
 		return id == tokenizer.TokenId_CDO
-	case "cdc-token":
+	case "CDC-token":
 		return id == tokenizer.TokenId_CDC
 	case "colon-token":
 		return id == tokenizer.TokenId_Colon
-	case "semicolon":
+	case "semicolon-token":
 		return id == tokenizer.TokenId_Semicolon
-	case "comma":
+	case "comma-token":
 		return id == tokenizer.TokenId_Comma
 	case "(-token":
 		return id == tokenizer.TokenId_BracketParamOpen

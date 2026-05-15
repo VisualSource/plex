@@ -54,7 +54,7 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		}
 		chars = padRunes(chars, 3)
 
-		if isIdentStartCodePoint(chars[0]) || checkIfValidEscape(chars[0], chars[1]) {
+		if isIdentCodePoint(chars[0]) || checkIfValidEscape(chars[0], chars[1]) {
 			value, err := t.consumeIdentSequence()
 			if err != nil {
 				return nil, err
@@ -372,7 +372,9 @@ func (t *CssTokenizer) consumeIdentLikeToken() (Token, error) {
 		default:
 			return t.consumeUrlToken()
 		}
-	} else if next == '(' {
+	}
+
+	if next == '(' {
 		if err := t.stream.Discard(1); err != nil {
 			return nil, err
 		}
@@ -408,14 +410,16 @@ func (t *CssTokenizer) consumeStringToken(endingRune rune) (Token, error) {
 
 		case char == '\\':
 			chars, err := t.stream.Peek(1)
-			if err != nil {
-				if err == io.EOF {
-					continue
-				}
+			if err != nil && err != io.EOF {
 				return nil, err
 			}
 
-			if len(chars) == 1 && chars[0] == '\n' {
+			// Next input code point is EOF: do nothing (per spec).
+			if len(chars) == 0 {
+				continue
+			}
+
+			if chars[0] == '\n' {
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
 				}
@@ -467,15 +471,13 @@ func (t *CssTokenizer) consumeUrlToken() (Token, error) {
 				return nil, err
 			}
 
-			if err == io.EOF || len(chars) > 0 && chars[0] == ')' {
-				if err != io.EOF {
+			if len(chars) == 0 || chars[0] == ')' {
+				if len(chars) == 0 {
+					//TODO: parse error
+				} else {
 					if err := t.stream.Discard(1); err != nil {
 						return nil, err
 					}
-				}
-
-				if err == io.EOF {
-					//TODO: parse error
 				}
 
 				return NewMultiCharacterToken(TokenId_Url, value.String()), nil
