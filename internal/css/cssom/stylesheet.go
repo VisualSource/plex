@@ -14,7 +14,11 @@ func NewStylesheet(location utils.StringOption) *Stylesheet {
 	}
 }
 
-type Rule struct{}
+type Rule struct {
+	Prelude []any
+	Value   any
+	Block   *Block
+}
 
 type Declaration struct {
 	Important bool
@@ -29,3 +33,12 @@ func NewDeclaration(name string) *Declaration {
 }
 
 type Component struct{}
+
+type Block struct {
+	Value []Component
+}
+
+type Function struct {
+	Name  string
+	Value []Component
+}
