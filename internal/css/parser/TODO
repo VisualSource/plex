@@ -1,0 +1,22 @@
+Entry Points:
+    [] parse something according to a css grammar
+    [] parse a comma-separated list according to a css grammar
+    ✔ parse a stylesheet @done(26-05-17 19:32)
+    ✔ parse a list or rules @done(26-05-17 19:33)
+    ✔ parse a rule @done(26-05-17 20:30)
+    ✔ parse a declaration @done(26-05-17 19:33)
+    ✔ parse a style block's contents @done(26-05-17 19:34)
+    ✔ parse a list of declarations @done(26-05-17 19:34)
+    ✔ parse a components value @done(26-05-17 20:20)
+    ✔ parse a list of componenent values @done(26-05-17 20:12)
+    ✔ parse comma-separated list of component value @done(26-05-17 20:18)
+Parse algorithms:
+    [] consume a list of rules
+    [] consume an at-rule
+    [] consume an qualified rule
+    [] consume a style block's contents
+    [] consume a list of declarations
+    [] consume a declaration
+    [] consume a component value
+    [] consume a simple block
+    [] consume a function

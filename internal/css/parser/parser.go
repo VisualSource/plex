@@ -39,45 +39,108 @@ func (p *CssParser) reconsumeToken(token tokenizer.Token) {
 // Consult the CSSWG for guidance first if you think you need to use one of the other algorithms.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-grammar
-func (p *CssParser) ParseAccordingToCssGrammar() error {
-	return nil
+func (p *CssParser) ParseAccordingToCssGrammar(stream io.Reader) ([]cssom.Component, error) {
+	result, err := p.ParseListOfComponentValues(stream)
+	if err != nil {
+		return nil, err
+	}
+	// TODO: match against grammar
+
+	return result, nil
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#parse-comma-list
-func (p *CssParser) ParseListAccordingToCssGrammar() []any {
-	return nil
+func (p *CssParser) ParseListAccordingToCssGrammar(stream io.Reader) ([]any, error) {
+	result := make([]any, 0)
+
+	// white space
+	//    -> result
+
+	_list, err := p.ParseCommaListOfComponentValues(stream)
+	if err != nil {
+		return nil, err
+	}
+
+	//TODO: parse item with grammar
+
+	return result, nil
 }
 
 // Intended to be the normal parser entry point, for parsing stylesheets.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-stylesheet
-func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) *cssom.Stylesheet {
+func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) (*cssom.Stylesheet, error) {
 	p.tok = tokenizer.NewCssTokenizer(input) // TODO: look into using shared tokenizer
 	stylesheet := cssom.NewStylesheet(location)
 
-	rules := p.consumeListOfRules(true)
+	rules, err := p.consumeListOfRules(true)
+	if err != nil {
+		return nil, err
+	}
 
 	stylesheet.Value = rules
 
-	return stylesheet
+	return stylesheet, nil
 }
 
 // Intended for the content of at-rules such as @media. It differs from "Parse a stylesheet" in the handling of <CDO-token> and <CDC-token>.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-rules
-func (p *CssParser) ParseListOfRules(input io.Reader) []cssom.Rule {
+func (p *CssParser) ParseListOfRules(input io.Reader) ([]cssom.Rule, error) {
 	p.tok = tokenizer.NewCssTokenizer(input)
 
-	rules := p.consumeListOfRules(false)
+	rules, err := p.consumeListOfRules(false)
+	if err != nil {
+		return nil, err
+	}
 
-	return rules
+	return rules, nil
 }
 
 // Intended for use by the CSSStyleSheet#insertRule method, and similar functions which might exist, which parse text into a single rule.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-rule
-func (p *CssParser) ParseRule() (cssom.Rule, error) {
-	return cssom.Rule{}, nil
+func (p *CssParser) ParseRule(stream io.Reader) (*cssom.Rule, error) {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+
+	var rule *cssom.Rule
+	isFirstStage := true
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return nil, err
+		}
+
+		if token.IsToken() == tokenizer.TokenId_Whitespace {
+			continue
+		}
+
+		if isFirstStage {
+			switch token.IsToken() {
+			case tokenizer.TokenId_EOF:
+				return nil, errors.New("syntax error")
+			case tokenizer.TokenId_AtKeyword:
+				r, err := p.consumeQualifiedRule()
+				if err != nil {
+					return nil, err
+				}
+
+				if r == nil {
+					return nil, errors.New("syntax error")
+				}
+
+				rule = r
+				isFirstStage = false
+				continue
+			}
+		}
+
+		if token.IsToken() == tokenizer.TokenId_EOF {
+			return rule, nil
+		}
+
+		return nil, errors.New("syntax error")
+	}
 }
 
 // Used in @supports conditions. [CSS3-CONDITIONAL]
@@ -139,11 +202,6 @@ func (p *CssParser) ParseListOfDeclarations(stream io.Reader) []*cssom.Declarati
 // @see https://www.w3.org/TR/css-syntax-3/#parse-component-value
 func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
-	//whitespace -> ignore
-	// eof -> error
-	//component
-	// whitespace -> ignore
-	// eof -> end
 
 	for {
 		token, err := p.consumeToken()
@@ -161,7 +219,10 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, erro
 		break
 	}
 
-	value := p.consumeComponentValue()
+	value, err := p.consumeComponentValue()
+	if err != nil {
+		return cssom.Component{}, err
+	}
 
 	for {
 		token, err := p.consumeToken()
@@ -172,7 +233,7 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, erro
 		if token.IsToken() == tokenizer.TokenId_Whitespace {
 			continue
 		} else if token.IsToken() == tokenizer.TokenId_EOF {
-			return cssom.Component{}, nil
+			return value, nil
 		}
 
 		return cssom.Component{}, errors.New("syntax error")
@@ -185,27 +246,65 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, erro
 // as in Selectors API or the media HTML attribute.
 //
 // https://www.w3.org/TR/css-syntax-3/#parse-list-of-component-values
-func (p *CssParser) ParseListOfComponentValues(stream io.Reader) []cssom.Component {
+func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]cssom.Component, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
 	list := make([]cssom.Component, 0)
 
 	for {
-		value := p.consumeComponentValue()
+		token, err := p.consumeToken()
+		if err != nil {
+			return nil, err
+		}
 
+		if token.IsToken() == tokenizer.TokenId_EOF {
+			break
+		}
+		p.reconsumeToken(token)
+
+		value, err := p.consumeComponentValue()
+		if err != nil {
+			return nil, err
+		}
 		list = append(list, value)
 
-		//TOOD: get eof token to break
 	}
-
-	return list
+	return list, nil
 }
 
-func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) [][]cssom.Component {
+// https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
+func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]cssom.Component, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 	clvs := make([][]cssom.Component, 0)
 
-	return clvs
+	for {
+		sublist := make([]cssom.Component, 0)
+		eof := false
+		for {
+			token, err := p.consumeToken()
+			if err != nil {
+				return nil, err
+			}
+			if token.IsToken() == tokenizer.TokenId_EOF {
+				eof = true
+				break
+			}
+			if token.IsToken() == tokenizer.TokenId_Comma {
+				break
+			}
+			p.reconsumeToken(token)
+			component, err := p.consumeComponentValue()
+			if err != nil {
+				return nil, err
+			}
+			sublist = append(sublist, component)
+		}
+		clvs = append(clvs, sublist) // single append point for both exit conditions
+		if eof {
+			break
+		}
+	}
+	return clvs, nil
 }
 
 //#endregion
@@ -260,9 +359,9 @@ func (p *CssParser) consumeAtRule() cssom.Rule {
 var NoValue = errors.New("no value")
 
 // https://www.w3.org/TR/css-syntax-3/#consume-qualified-rule
-func (p *CssParser) consumeQualifiedRule() (cssom.Rule, error) {
+func (p *CssParser) consumeQualifiedRule() (*cssom.Rule, error) {
 
-	return cssom.Rule{}, nil
+	return nil, nil
 }
 
 // https://www.w3.org/TR/css-syntax-3/#consume-style-block
