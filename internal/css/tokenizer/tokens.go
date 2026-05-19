@@ -4,7 +4,7 @@ type TokenId uint
 
 const (
 	TokenId_Ident TokenId = iota
-	TokenId_Function
+	TokenId_FunctionToken
 	TokenId_AtKeyword
 	TokenId_Hash
 	TokenId_String

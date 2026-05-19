@@ -148,7 +148,7 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a multi character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_Function:
+		case tokenizer.TokenId_FunctionToken:
 			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
 				exp := expected.Structured["value"].(string)
 				if tok.Value != exp {
@@ -219,7 +219,7 @@ func tokenAsText(id tokenizer.TokenId) string {
 		return "delim-token"
 	case tokenizer.TokenId_Ident:
 		return "ident-token"
-	case tokenizer.TokenId_Function:
+	case tokenizer.TokenId_FunctionToken:
 		return "function-token"
 	case tokenizer.TokenId_Hash:
 		return "hash-token"
@@ -276,7 +276,7 @@ func isToken(value string, id tokenizer.TokenId) bool {
 	case "ident-token":
 		return id == tokenizer.TokenId_Ident
 	case "function-token":
-		return id == tokenizer.TokenId_Function
+		return id == tokenizer.TokenId_FunctionToken
 	case "hash-token":
 		return id == tokenizer.TokenId_Hash
 	case "string-token":

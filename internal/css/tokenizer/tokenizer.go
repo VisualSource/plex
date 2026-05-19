@@ -366,9 +366,9 @@ func (t *CssTokenizer) consumeIdentLikeToken() (Token, error) {
 
 		switch {
 		case len(la) >= 1 && isQuote(la[0]):
-			return NewMultiCharacterToken(TokenId_Function, ident), nil
+			return NewMultiCharacterToken(TokenId_FunctionToken, ident), nil
 		case len(la) >= 2 && isWhitespace(la[0]) && isQuote(la[1]):
-			return NewMultiCharacterToken(TokenId_Function, ident), nil
+			return NewMultiCharacterToken(TokenId_FunctionToken, ident), nil
 		default:
 			return t.consumeUrlToken()
 		}
@@ -379,7 +379,7 @@ func (t *CssTokenizer) consumeIdentLikeToken() (Token, error) {
 			return nil, err
 		}
 
-		return NewMultiCharacterToken(TokenId_Function, ident), nil
+		return NewMultiCharacterToken(TokenId_FunctionToken, ident), nil
 	}
 
 	return NewMultiCharacterToken(TokenId_Ident, ident), nil
