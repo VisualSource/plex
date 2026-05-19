@@ -1,15 +1,23 @@
 package parser
 
-import "github.com/VisualSource/plex/internal/css/tokenizer"
+import (
+	"github.com/VisualSource/plex/internal/css/tokenizer"
+	"github.com/VisualSource/plex/internal/utils"
+)
 
 const (
 	TokenId_SimpleBlock     tokenizer.TokenId = 25
 	TokenId_DeclarationList tokenizer.TokenId = 26
 	TokenId_RuleList        tokenizer.TokenId = 27
 	TokenId_Function        tokenizer.TokenId = 28
-	TokenId_Declaraction    tokenizer.TokenId = 29
+	TokenId_Declaration     tokenizer.TokenId = 29
 	TokenId_Rule            tokenizer.TokenId = 30
 )
+
+type Stylesheet struct {
+	Value    []*Rule
+	Location utils.StringOption
+}
 
 type Rule struct {
 	Name    tokenizer.Token
@@ -31,12 +39,13 @@ func (s SimpleBlock) IsToken() tokenizer.TokenId {
 }
 
 type Declaration struct {
-	Name  tokenizer.Token
-	Value []tokenizer.Token
+	Name      tokenizer.Token
+	Value     []tokenizer.Token
+	Important bool
 }
 
 func (d Declaration) IsToken() tokenizer.TokenId {
-	return TokenId_Declaraction
+	return TokenId_Declaration
 }
 
 type DeclarationList struct{}

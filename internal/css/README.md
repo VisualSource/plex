@@ -5,7 +5,7 @@ https://www.w3.org/TR/css/#css-official
 ## Modules
 
 ### Core
-- Syntax 3: https://www.w3.org/TR/css-syntax-3/
+- Syntax 3: https://www.w3.org/TR/css-syntax-3/ | https://drafts.csswg.org/css-syntax/
 - Selector 4: https://www.w3.org/TR/selectors-4/
 
 ### modules

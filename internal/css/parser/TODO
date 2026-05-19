@@ -1,22 +1,22 @@
 Entry Points:
     [] parse something according to a css grammar
     [] parse a comma-separated list according to a css grammar
-    ✔ parse a stylesheet @done(26-05-17 19:32)
-    ✔ parse a list or rules @done(26-05-17 19:33)
-    ✔ parse a rule @done(26-05-17 20:30)
-    ✔ parse a declaration @done(26-05-17 19:33)
-    ✔ parse a style block's contents @done(26-05-17 19:34)
-    ✔ parse a list of declarations @done(26-05-17 19:34)
-    ✔ parse a components value @done(26-05-17 20:20)
-    ✔ parse a list of componenent values @done(26-05-17 20:12)
-    ✔ parse comma-separated list of component value @done(26-05-17 20:18)
+    ✔ parse a stylesheet @done(26-05-19 12:53)
+    ✔ parse a list or rules @done(26-05-19 12:47)
+    ✔ parse a rule @done(26-05-19 12:47)
+    ✔ parse a declaration @done(26-05-19 12:47)
+    ✔ parse a style block's contents @done(26-05-19 12:46)
+    ✔ parse a list of declarations @done(26-05-19 12:46)
+    ✔ parse a components value @done(26-05-19 12:44)
+    ✔ parse a list of componenent values @done(26-05-19 12:45)
+    ✔ parse comma-separated list of component value @done(26-05-19 12:45)
 Parse algorithms:
     ✔ consume a list of rules @done(26-05-18 21:21)
     ✔ consume an at-rule @done(26-05-18 19:47)
     ✔ consume an qualified rule @done(26-05-18 21:16)
-    [] consume a style block's contents
-    [] consume a list of declarations
-    [] consume a declaration
+    ✔ consume a style block's contents @done(26-05-19 12:43)
+    ✔ consume a list of declarations @done(26-05-19 12:40)
+    ✔ consume a declaration @done(26-05-19 12:32)
     ✔ consume a component value @done(26-05-18 19:13)
     ✔ consume a simple block @done(26-05-18 19:12)
     ✔ consume a function @done(26-05-18 19:12)

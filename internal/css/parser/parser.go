@@ -4,8 +4,8 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"strings"
 
-	"github.com/VisualSource/plex/internal/css/cssom"
 	"github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
 )
@@ -39,39 +39,23 @@ func (p *CssParser) reconsumeToken(token tokenizer.Token) {
 // Consult the CSSWG for guidance first if you think you need to use one of the other algorithms.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-grammar
-func (p *CssParser) ParseAccordingToCssGrammar(stream io.Reader) ([]cssom.Component, error) {
-	result, err := p.ParseListOfComponentValues(stream)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: match against grammar
-
-	return result, nil
+func (p *CssParser) ParseAccordingToCssGrammarStream(stream io.Reader) ([]any, error) {
+	return nil, nil
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#parse-comma-list
-func (p *CssParser) ParseListAccordingToCssGrammar(stream io.Reader) ([]any, error) {
-	result := make([]any, 0)
-
-	// white space
-	//    -> result
-
-	_, err := p.ParseCommaListOfComponentValues(stream)
-	if err != nil {
-		return nil, err
-	}
-
-	//TODO: parse item with grammar
-
-	return result, nil
+func (p *CssParser) ParseListAccordingToCssGrammarStream(stream io.Reader) ([]any, error) {
+	return nil, nil
 }
 
 // Intended to be the normal parser entry point, for parsing stylesheets.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-stylesheet
-func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) (*cssom.Stylesheet, error) {
+func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) (*Stylesheet, error) {
 	p.tok = tokenizer.NewCssTokenizer(input) // TODO: look into using shared tokenizer
-	stylesheet := cssom.NewStylesheet(location)
+	stylesheet := &Stylesheet{
+		Location: location,
+	}
 
 	rules, err := p.consumeListOfRules(true)
 	if err != nil {
@@ -86,7 +70,7 @@ func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption
 // Intended for the content of at-rules such as @media. It differs from "Parse a stylesheet" in the handling of <CDO-token> and <CDC-token>.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-rules
-func (p *CssParser) ParseListOfRules(input io.Reader) ([]cssom.Rule, error) {
+func (p *CssParser) ParseListOfRules(input io.Reader) ([]*Rule, error) {
 	p.tok = tokenizer.NewCssTokenizer(input)
 
 	rules, err := p.consumeListOfRules(false)
@@ -100,10 +84,10 @@ func (p *CssParser) ParseListOfRules(input io.Reader) ([]cssom.Rule, error) {
 // Intended for use by the CSSStyleSheet#insertRule method, and similar functions which might exist, which parse text into a single rule.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-rule
-func (p *CssParser) ParseRule(stream io.Reader) (*cssom.Rule, error) {
+func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
-	var rule *cssom.Rule
+	var rule *Rule
 	isFirstStage := true
 	for {
 		token, err := p.consumeToken()
@@ -148,8 +132,8 @@ func (p *CssParser) ParseRule(stream io.Reader) (*cssom.Rule, error) {
 // Unlike "Parse a list of declarations", this parses only a declaration and not an at-rule.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-declaration
-func (p *CssParser) ParseDeclaration(stream io.Reader) (*cssom.Declaration, error) {
-	tok := tokenizer.NewCssTokenizer(stream)
+func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
+	p.tok = tokenizer.NewCssTokenizer(stream)
 
 	for {
 		token, err := p.consumeToken()
@@ -165,7 +149,8 @@ func (p *CssParser) ParseDeclaration(stream io.Reader) (*cssom.Declaration, erro
 			return nil, ErrSyntax
 		}
 
-		result := p.consumeDeclaration(tok, token)
+		p.reconsumeToken(token)
+		result, err := p.consumeDeclaration()
 		if result != nil {
 			return result, nil
 		}
@@ -178,7 +163,7 @@ func (p *CssParser) ParseDeclaration(stream io.Reader) (*cssom.Declaration, erro
 // If you don’t need nested style rules, such as in @page or in @keyframes child rules, use parse a list of declarations.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-style-blocks-contents
-func (p *CssParser) ParseStyleBlockContents(stream io.Reader) []*cssom.Declaration {
+func (p *CssParser) ParseStyleBlockContents(stream io.Reader) ([]tokenizer.Token, error) {
 	tok := tokenizer.NewCssTokenizer(stream)
 
 	return p.consumeStyleBlockContents(tok)
@@ -191,28 +176,27 @@ func (p *CssParser) ParseStyleBlockContents(stream io.Reader) []*cssom.Declarati
 // This algorithm does not handle nested style rules. If your use requires that, use parse a style block’s contents.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-declarations
-func (p *CssParser) ParseListOfDeclarations(stream io.Reader) []*cssom.Declaration {
+func (p *CssParser) ParseListOfDeclarations(stream io.Reader) ([]tokenizer.Token, error) {
 	tok := tokenizer.NewCssTokenizer(stream)
-
 	return p.consumeListOfDeclarations(tok)
 }
 
 // For things that need to consume a single value, like the parsing rules for attr().
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-component-value
-func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, error) {
+func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
 	for {
 		token, err := p.consumeToken()
 		if err != nil {
-			return cssom.Component{}, err
+			return nil, err
 		}
 
 		if token.IsToken() == tokenizer.TokenId_Whitespace {
 			continue
 		} else if token.IsToken() == tokenizer.TokenId_EOF {
-			return cssom.Component{}, ErrSyntax
+			return nil, ErrSyntax
 		}
 
 		p.reconsumeToken(token)
@@ -221,13 +205,13 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, erro
 
 	value, err := p.consumeComponentValue()
 	if err != nil {
-		return cssom.Component{}, err
+		return nil, err
 	}
 
 	for {
 		token, err := p.consumeToken()
 		if err != nil {
-			return cssom.Component{}, err
+			return nil, err
 		}
 
 		if token.IsToken() == tokenizer.TokenId_Whitespace {
@@ -236,7 +220,7 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, erro
 			return value, nil
 		}
 
-		return cssom.Component{}, ErrSyntax
+		return nil, ErrSyntax
 	}
 
 }
@@ -245,11 +229,11 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (cssom.Component, erro
 // or for parsing a stand-alone selector [SELECT](https://www.w3.org/TR/css-syntax-3/#biblio-select) or list of Media Queries [MEDIAQ](https://www.w3.org/TR/css-syntax-3/#biblio-mediaq),
 // as in Selectors API or the media HTML attribute.
 //
-// https://www.w3.org/TR/css-syntax-3/#parse-list-of-component-values
-func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]cssom.Component, error) {
+// @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-component-values
+func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
-	list := make([]cssom.Component, 0)
+	list := make([]tokenizer.Token, 0)
 
 	for {
 		token, err := p.consumeToken()
@@ -272,13 +256,13 @@ func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]cssom.Compon
 	return list, nil
 }
 
-// https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
-func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]cssom.Component, error) {
+// @see https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
+func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
-	clvs := make([][]cssom.Component, 0)
+	clvs := make([][]tokenizer.Token, 0)
 
 	for {
-		sublist := make([]cssom.Component, 0)
+		sublist := make([]tokenizer.Token, 0)
 		eof := false
 		for {
 			token, err := p.consumeToken()
@@ -310,7 +294,7 @@ func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]cssom
 //#endregion
 
 // #region algorithms
-// https://www.w3.org/TR/css-syntax-3/#consume-list-of-rules
+// @see https://www.w3.org/TR/css-syntax-3/#consume-list-of-rules
 func (p *CssParser) consumeListOfRules(topLevel bool) ([]*Rule, error) {
 	rules := make([]*Rule, 0)
 
@@ -353,7 +337,7 @@ func (p *CssParser) consumeListOfRules(topLevel bool) ([]*Rule, error) {
 	}
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-at-rule
+// @see https://www.w3.org/TR/css-syntax-3/#consume-at-rule
 func (p *CssParser) consumeAtRule() (*Rule, error) {
 	nameToken, err := p.consumeToken()
 	if err != nil {
@@ -403,7 +387,7 @@ func (p *CssParser) consumeAtRule() (*Rule, error) {
 	}
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-qualified-rule
+// @see https://www.w3.org/TR/css-syntax-3/#consume-qualified-rule
 func (p *CssParser) consumeQualifiedRule() (*Rule, error) {
 	qr := &Rule{}
 
@@ -445,7 +429,7 @@ func (p *CssParser) consumeQualifiedRule() (*Rule, error) {
 	}
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-style-block
+// @see https://www.w3.org/TR/css-syntax-3/#consume-style-block
 func (p *CssParser) consumeStyleBlockContents(tok *tokenizer.CssTokenizer) ([]tokenizer.Token, error) {
 	decls := make([]tokenizer.Token, 0)
 
@@ -470,7 +454,45 @@ func (p *CssParser) consumeStyleBlockContents(tok *tokenizer.CssTokenizer) ([]to
 			}
 			decls = append(decls, atRule)
 		case tokenizer.TokenId_Ident:
-			//TODO:
+			temp := []tokenizer.Token{token}
+
+			for {
+				t, err := p.consumeToken()
+				if err != nil {
+					return nil, err
+				}
+
+				if t.IsToken() == tokenizer.TokenId_Semicolon || t.IsToken() == tokenizer.TokenId_EOF {
+					p.reconsumeToken(t)
+					break
+				}
+
+				p.reconsumeToken(t)
+				value, err := p.consumeComponentValue()
+				if err != nil {
+					return nil, err
+				}
+
+				temp = append(temp, value)
+			}
+
+			// Consume a declaration from the temporary list: push EOF beneath
+			// temp (so consumeDeclaration stops at the end of temp) then temp
+			// in reverse so it pops in original order. The semicolon/EOF that
+			// terminated the inner loop is already on the stack below, ready
+			// for the outer loop.
+			p.reconsumeToken(tokenizer.EOFToken{})
+			for i := len(temp) - 1; i >= 0; i-- {
+				p.reconsumeToken(temp[i])
+			}
+
+			dec, err := p.consumeDeclaration()
+			if err != nil {
+				return nil, err
+			}
+			if dec != nil {
+				decls = append(decls, dec)
+			}
 		case tokenizer.TokenId_Delim:
 			if tag, ok := token.(*tokenizer.SingleCharacterToken); ok && tag.Value == '&' {
 				p.reconsumeToken(token)
@@ -478,7 +500,9 @@ func (p *CssParser) consumeStyleBlockContents(tok *tokenizer.CssTokenizer) ([]to
 				if err != nil {
 					return nil, err
 				}
-				rules = append(rules, rule)
+				if rule != nil {
+					rules = append(rules, rule)
+				}
 				continue
 			}
 			fallthrough
@@ -493,10 +517,11 @@ func (p *CssParser) consumeStyleBlockContents(tok *tokenizer.CssTokenizer) ([]to
 				}
 
 				if t.IsToken() == tokenizer.TokenId_Semicolon || t.IsToken() == tokenizer.TokenId_EOF {
-					p.reconsumeToken(token)
+					p.reconsumeToken(t)
 					break
 				}
 
+				p.reconsumeToken(t)
 				if _, err := p.consumeComponentValue(); err != nil {
 					return nil, err
 				}
@@ -506,7 +531,7 @@ func (p *CssParser) consumeStyleBlockContents(tok *tokenizer.CssTokenizer) ([]to
 	}
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-list-of-declarations
+// @see https://www.w3.org/TR/css-syntax-3/#consume-list-of-declarations
 func (p *CssParser) consumeListOfDeclarations(tok *tokenizer.CssTokenizer) ([]tokenizer.Token, error) {
 	decls := make([]tokenizer.Token, 0)
 
@@ -544,13 +569,22 @@ func (p *CssParser) consumeListOfDeclarations(tok *tokenizer.CssTokenizer) ([]to
 					break
 				}
 
-				p.reconsumeToken(token)
+				p.reconsumeToken(t)
 				value, err := p.consumeComponentValue()
 				if err != nil {
 					return nil, err
 				}
 
 				temp = append(temp, value)
+			}
+
+			// Consume a declaration from the temporary list: push EOF beneath temp
+			// (so consumeDeclaration stops at the end of temp) then temp in reverse
+			// so it pops in original order. The semicolon/EOF that terminated the
+			// inner loop is already on the stack below, ready for the outer loop.
+			p.reconsumeToken(tokenizer.EOFToken{})
+			for i := len(temp) - 1; i >= 0; i-- {
+				p.reconsumeToken(temp[i])
 			}
 
 			dec, err := p.consumeDeclaration()
@@ -586,8 +620,8 @@ func (p *CssParser) consumeListOfDeclarations(tok *tokenizer.CssTokenizer) ([]to
 
 // Note: This algorithm assumes that the next input token has already been checked to be an <ident-token>.
 //
-// https://www.w3.org/TR/css-syntax-3/#consume-declaration
-func (p *CssParser) consumeDeclaration(tok *tokenizer.CssTokenizer, ident tokenizer.Token) (*Declaration, error) {
+// @see https://www.w3.org/TR/css-syntax-3/#consume-declaration
+func (p *CssParser) consumeDeclaration() (*Declaration, error) {
 	nameToken, err := p.consumeToken()
 	if err != nil {
 		return nil, err
@@ -597,7 +631,7 @@ func (p *CssParser) consumeDeclaration(tok *tokenizer.CssTokenizer, ident tokeni
 		Name: nameToken,
 	}
 
-	firstSection := true
+	firstPass := true
 	for {
 		token, err := p.consumeToken()
 		if err != nil {
@@ -608,34 +642,64 @@ func (p *CssParser) consumeDeclaration(tok *tokenizer.CssTokenizer, ident tokeni
 			continue
 		}
 
-		if firstSection {
-			switch {
-			case token.IsToken() != tokenizer.TokenId_Colon:
-				//TOOO: parse error
-				return nil, nil
+		if firstPass {
+			switch token.IsToken() {
+			case tokenizer.TokenId_Colon:
+				firstPass = false
 			default:
-				firstSection = false
+				//TODO: parse error
+				return nil, nil
 			}
+
 			continue
 		}
 
-		switch {
-		case token.IsToken() != tokenizer.TokenId_EOF:
-			value, err := p.consumeComponentValue()
-			if err != nil {
-				return nil, err
-			}
-
-			decl.Value = append(decl.Value, value)
-
+		if token.IsToken() == tokenizer.TokenId_EOF {
+			break
 		}
 
+		p.reconsumeToken(token)
+
+		value, err := p.consumeComponentValue()
+		if err != nil {
+			return nil, err
+		}
+
+		decl.Value = append(decl.Value, value)
+	}
+
+	lastIdx, secondLastIdx := -1, -1
+	for i := len(decl.Value) - 1; i >= 0; i-- {
+		if decl.Value[i].IsToken() == tokenizer.TokenId_Whitespace {
+			continue
+		}
+		if lastIdx == -1 {
+			lastIdx = i
+		} else {
+			secondLastIdx = i
+			break
+		}
+	}
+
+	if lastIdx != -1 && secondLastIdx != -1 {
+		bang, bangOk := decl.Value[secondLastIdx].(*tokenizer.SingleCharacterToken)
+		ident, identOk := decl.Value[lastIdx].(*tokenizer.MultiCharacterToken)
+		if bangOk && bang.Type == tokenizer.TokenId_Delim && bang.Value == '!' &&
+			identOk && ident.Type == tokenizer.TokenId_Ident && strings.EqualFold(ident.Value, "important") {
+			decl.Value = slices.Delete(decl.Value, lastIdx, lastIdx+1)
+			decl.Value = slices.Delete(decl.Value, secondLastIdx, secondLastIdx+1)
+			decl.Important = true
+		}
+	}
+
+	for len(decl.Value) > 0 && decl.Value[len(decl.Value)-1].IsToken() == tokenizer.TokenId_Whitespace {
+		decl.Value = decl.Value[:len(decl.Value)-1]
 	}
 
 	return decl, nil
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-component-value
+// @see https://www.w3.org/TR/css-syntax-3/#consume-component-value
 func (p *CssParser) consumeComponentValue() (tokenizer.Token, error) {
 	token, err := p.consumeToken()
 	if err != nil {
