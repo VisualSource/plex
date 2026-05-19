@@ -63,6 +63,11 @@ func checkIfWouldStartIdentSequence(a, b, c rune) bool {
 	}
 }
 
+// https://drafts.csswg.org/css-syntax/#check-if-three-code-points-would-start-a-unicode-range
+func checkIfWouldStartUnicodeRange(a, b, c rune) bool {
+	return (a == 'u' || a == 'U') && b == '+' && (c == '?' || isHexDigit(c))
+}
+
 // https://www.w3.org/TR/css-syntax-3/#starts-with-a-number
 func checkIfWouldStartNumber(a, b, c rune) bool {
 	switch a {

@@ -19,6 +19,38 @@ func NewCssParser() *CssParser {
 	return &CssParser{}
 }
 
+func (p *CssParser) isEmpty() (bool, error) {
+	token, err := p.consumeToken()
+	if err != nil {
+		return false, err
+	}
+
+	if token.IsToken() == tokenizer.TokenId_EOF {
+		return true, nil
+	}
+
+	p.reconsumeToken(token)
+	return false, nil
+}
+
+func (p *CssParser) discardWhitespace() error {
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return err
+		}
+
+		if token.IsToken() == tokenizer.TokenId_Whitespace {
+			continue
+		}
+
+		p.reconsumeToken(token)
+		break
+	}
+
+	return nil
+}
+
 func (p *CssParser) consumeToken() (tokenizer.Token, error) {
 	if len(p.tokens) != 0 {
 		last := p.tokens[len(p.tokens)-1]
@@ -57,7 +89,7 @@ func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption
 		Location: location,
 	}
 
-	rules, err := p.consumeListOfRules(true)
+	rules, err := p.consumeStylesheetContents()
 	if err != nil {
 		return nil, err
 	}
@@ -67,140 +99,115 @@ func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption
 	return stylesheet, nil
 }
 
-// Intended for the content of at-rules such as @media. It differs from "Parse a stylesheet" in the handling of <CDO-token> and <CDC-token>.
-//
-// @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-rules
-func (p *CssParser) ParseListOfRules(input io.Reader) ([]*Rule, error) {
-	p.tok = tokenizer.NewCssTokenizer(input)
+// https://drafts.csswg.org/css-syntax/#parse-stylesheet-contents
+func (p *CssParser) ParseStylesheetContents(stream io.Reader) ([]*Rule, error) {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+	return p.consumeStylesheetContents()
+}
 
-	rules, err := p.consumeListOfRules(false)
+func (p *CssParser) ParseBlocksContents(stream io.Reader) {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+
+	return p.consumeBlock()
+}
+
+//#endregion
+
+// Intended for use by the CSSStyleSheet#insertRule method, and similar functions which might exist, which parse text into a single rule.
+//
+// @see https://drafts.csswg.org/css-syntax/#parse-rule
+func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+
+	if err := p.discardWhitespace(); err != nil {
+		return nil, err
+	}
+
+	var rule *Rule
+
+	token, err := p.consumeToken()
 	if err != nil {
 		return nil, err
 	}
 
-	return rules, nil
-}
-
-// Intended for use by the CSSStyleSheet#insertRule method, and similar functions which might exist, which parse text into a single rule.
-//
-// @see https://www.w3.org/TR/css-syntax-3/#parse-rule
-func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
-
-	var rule *Rule
-	isFirstStage := true
-	for {
-		token, err := p.consumeToken()
+	switch token.IsToken() {
+	case tokenizer.TokenId_EOF:
+		return nil, ErrSyntax
+	case tokenizer.TokenId_AtKeyword:
+		atRule, err := p.consumeAtRule()
+		if err != nil {
+			return nil, err
+		}
+		rule = atRule
+	default:
+		qRule, err := p.consumeQualifiedRule()
 		if err != nil {
 			return nil, err
 		}
 
-		if token.IsToken() == tokenizer.TokenId_Whitespace {
-			continue
+		if qRule == nil {
+			return nil, ErrSyntax
 		}
-
-		if isFirstStage {
-			switch token.IsToken() {
-			case tokenizer.TokenId_EOF:
-				return nil, ErrSyntax
-			case tokenizer.TokenId_AtKeyword:
-				r, err := p.consumeQualifiedRule()
-				if err != nil {
-					return nil, err
-				}
-
-				if r == nil {
-					return nil, ErrSyntax
-				}
-
-				rule = r
-				isFirstStage = false
-				continue
-			}
-		}
-
-		if token.IsToken() == tokenizer.TokenId_EOF {
-			return rule, nil
-		}
-
-		return nil, ErrSyntax
+		rule = qRule
 	}
+
+	if err := p.discardWhitespace(); err != nil {
+		return nil, err
+	}
+
+	token, err = p.consumeToken()
+	if err != nil {
+		return nil, err
+	}
+
+	if token.IsToken() == tokenizer.TokenId_EOF {
+		return rule, nil
+	}
+
+	return nil, ErrSyntax
 }
 
 // Used in @supports conditions. [CSS3-CONDITIONAL]
 //
 // Unlike "Parse a list of declarations", this parses only a declaration and not an at-rule.
 //
-// @see https://www.w3.org/TR/css-syntax-3/#parse-declaration
+// @see https://drafts.csswg.org/css-syntax/#parse-declaration
 func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
-
-		if token.IsToken() == tokenizer.TokenId_Whitespace {
-			continue
-		}
-
-		if token.IsToken() != tokenizer.TokenId_Ident {
-			return nil, ErrSyntax
-		}
-
-		p.reconsumeToken(token)
-		result, err := p.consumeDeclaration()
-		if result != nil {
-			return result, nil
-		}
-
-		return nil, ErrSyntax
+	if err := p.discardWhitespace(); err != nil {
+		return nil, err
 	}
-}
 
-// This algorithm parses the contents of style rules, which need to allow nested style rules and other at-rules.
-// If you don’t need nested style rules, such as in @page or in @keyframes child rules, use parse a list of declarations.
-//
-// @see https://www.w3.org/TR/css-syntax-3/#parse-style-blocks-contents
-func (p *CssParser) ParseStyleBlockContents(stream io.Reader) ([]tokenizer.Token, error) {
-	tok := tokenizer.NewCssTokenizer(stream)
+	decl, err := p.consumeDeclaration()
+	if err != nil {
+		return nil, err
+	}
 
-	return p.consumeStyleBlockContents(tok)
-}
+	if decl != nil {
+		return decl, nil
+	}
 
-// For the contents of a style attribute, which parses text into the contents of a single style rule.
-
-// Despite the name, this actually parses a mixed list of declarations and at-rules, as CSS 2.1 does for @page. Unexpected at-rules (which could be all of them, in a given context) are invalid and will be ignored by the consumer.
-//
-// This algorithm does not handle nested style rules. If your use requires that, use parse a style block’s contents.
-//
-// @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-declarations
-func (p *CssParser) ParseListOfDeclarations(stream io.Reader) ([]tokenizer.Token, error) {
-	tok := tokenizer.NewCssTokenizer(stream)
-	return p.consumeListOfDeclarations(tok)
+	return nil, ErrSyntax
 }
 
 // For things that need to consume a single value, like the parsing rules for attr().
 //
-// @see https://www.w3.org/TR/css-syntax-3/#parse-component-value
+// @see https://drafts.csswg.org/css-syntax/#parse-component-value
 func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
+	if err := p.discardWhitespace(); err != nil {
+		return nil, err
+	}
 
-		if token.IsToken() == tokenizer.TokenId_Whitespace {
-			continue
-		} else if token.IsToken() == tokenizer.TokenId_EOF {
-			return nil, ErrSyntax
-		}
+	empty, err := p.isEmpty()
+	if err != nil {
+		return nil, err
+	}
 
-		p.reconsumeToken(token)
-		break
+	if empty {
+		return nil, ErrSyntax
 	}
 
 	value, err := p.consumeComponentValue()
@@ -208,32 +215,50 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, erro
 		return nil, err
 	}
 
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
+	if err := p.discardWhitespace(); err != nil {
+		return nil, err
+	}
 
-		if token.IsToken() == tokenizer.TokenId_Whitespace {
-			continue
-		} else if token.IsToken() == tokenizer.TokenId_EOF {
-			return value, nil
-		}
+	empty, err = p.isEmpty()
+	if err != nil {
+		return nil, err
+	}
 
+	if empty {
 		return nil, ErrSyntax
 	}
 
+	return value, nil
 }
 
 // for the contents of presentational attributes, which parse text into a single declaration’s value,
 // or for parsing a stand-alone selector [SELECT](https://www.w3.org/TR/css-syntax-3/#biblio-select) or list of Media Queries [MEDIAQ](https://www.w3.org/TR/css-syntax-3/#biblio-mediaq),
 // as in Selectors API or the media HTML attribute.
 //
-// @see https://www.w3.org/TR/css-syntax-3/#parse-list-of-component-values
+// @see https://drafts.csswg.org/css-syntax/#parse-list-of-component-values
 func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
-	list := make([]tokenizer.Token, 0)
+}
+
+// @see https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
+func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]tokenizer.Token, error) {
+	p.tok = tokenizer.NewCssTokenizer(stream)
+
+	groups := make([][]tokenizer.Token, 0)
+
+	//TODO
+
+	return groups, nil
+}
+
+//#endregion
+
+// #region algorithms
+
+// @see https://drafts.csswg.org/css-syntax/#consume-stylesheet-contents
+func (p *CssParser) consumeStylesheetContents() ([]*Rule, error) {
+	rules := make([]*Rule, 0)
 
 	for {
 		token, err := p.consumeToken()
@@ -241,59 +266,33 @@ func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.To
 			return nil, err
 		}
 
-		if token.IsToken() == tokenizer.TokenId_EOF {
-			break
-		}
-		p.reconsumeToken(token)
-
-		value, err := p.consumeComponentValue()
-		if err != nil {
-			return nil, err
-		}
-		list = append(list, value)
-
-	}
-	return list, nil
-}
-
-// @see https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
-func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
-	clvs := make([][]tokenizer.Token, 0)
-
-	for {
-		sublist := make([]tokenizer.Token, 0)
-		eof := false
-		for {
-			token, err := p.consumeToken()
+		switch token.IsToken() {
+		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_CDC, tokenizer.TokenId_CDO:
+			continue
+		case tokenizer.TokenId_EOF:
+			return rules, nil
+		case tokenizer.TokenId_AtKeyword:
+			atRule, err := p.consumeAtRule()
 			if err != nil {
 				return nil, err
 			}
-			if token.IsToken() == tokenizer.TokenId_EOF {
-				eof = true
-				break
+
+			if atRule != nil {
+				rules = append(rules, atRule)
 			}
-			if token.IsToken() == tokenizer.TokenId_Comma {
-				break
-			}
-			p.reconsumeToken(token)
-			component, err := p.consumeComponentValue()
+		default:
+			rule, err := p.consumeQualifiedRule()
 			if err != nil {
 				return nil, err
 			}
-			sublist = append(sublist, component)
-		}
-		clvs = append(clvs, sublist) // single append point for both exit conditions
-		if eof {
-			break
+
+			if rule != nil {
+				rules = append(rules, rule)
+			}
 		}
 	}
-	return clvs, nil
 }
 
-//#endregion
-
-// #region algorithms
 // @see https://www.w3.org/TR/css-syntax-3/#consume-list-of-rules
 func (p *CssParser) consumeListOfRules(topLevel bool) ([]*Rule, error) {
 	rules := make([]*Rule, 0)
@@ -812,5 +811,13 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 		}
 	}
 }
+
+// @see https://drafts.csswg.org/css-syntax/#consume-unicode-range-value
+func (p *CssParser) consumeUnicodeRangeValue() {
+
+}
+
+func (p *CssParser) consumeBlock()          {}
+func (p *CssParser) consumeBlocksContents() {}
 
 //#endregion

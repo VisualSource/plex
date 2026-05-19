@@ -1,22 +1,26 @@
 Entry Points:
     [] parse something according to a css grammar
     [] parse a comma-separated list according to a css grammar
-    ✔ parse a stylesheet @done(26-05-19 12:53)
-    ✔ parse a list or rules @done(26-05-19 12:47)
-    ✔ parse a rule @done(26-05-19 12:47)
-    ✔ parse a declaration @done(26-05-19 12:47)
-    ✔ parse a style block's contents @done(26-05-19 12:46)
-    ✔ parse a list of declarations @done(26-05-19 12:46)
-    ✔ parse a components value @done(26-05-19 12:44)
-    ✔ parse a list of componenent values @done(26-05-19 12:45)
-    ✔ parse comma-separated list of component value @done(26-05-19 12:45)
+    ✔ parse a stylesheet @done(26-05-19 19:18)
+    ✔ parse a stylesheet content @done(26-05-19 19:21)
+    ✘ parse a list or rules @cancelled(26-05-19 19:22)
+    [] parse a blocks content
+    ✔ parse a rule @done(26-05-19 19:47)
+    ✔ parse a declaration @done(26-05-19 19:49)
+    ✘ parse a style block's contents @cancelled(26-05-19 19:22)
+    ✘ parse a list of declarations @cancelled(26-05-19 19:22)
+    ✔ parse a component value @done(26-05-19 19:55)
+    ☐ parse a list of componenent values
+    ☐ parse comma-separated list of component value
 Parse algorithms:
-    ✔ consume a list of rules @done(26-05-18 21:21)
-    ✔ consume an at-rule @done(26-05-18 19:47)
-    ✔ consume an qualified rule @done(26-05-18 21:16)
-    ✔ consume a style block's contents @done(26-05-19 12:43)
-    ✔ consume a list of declarations @done(26-05-19 12:40)
-    ✔ consume a declaration @done(26-05-19 12:32)
-    ✔ consume a component value @done(26-05-18 19:13)
-    ✔ consume a simple block @done(26-05-18 19:12)
-    ✔ consume a function @done(26-05-18 19:12)
+    ✔ consume a stylesheet's contents @done(26-05-19 19:18)
+    ✘ consume a list of rules @cancelled(26-05-19 19:18)
+    ☐ consume an at-rule
+    ☐ consume an qualified rule
+    ☐ consume a style block's contents
+    ✘ consume a list of declarations @cancelled(26-05-19 19:18)
+    ☐ consume a declaration
+    ☐ consume a component value
+    ☐ consume a simple block
+    ☐ consume a function
+    [] consume a unicode range

@@ -28,6 +28,7 @@ const (
 	TokenId_BracketCurlyOpen
 	TokenId_BracketCurlyClose
 	TokenId_EOF
+	TokenId_UnicodeRange
 )
 
 // https://www.w3.org/TR/css-syntax-3/#tokenization
@@ -100,3 +101,17 @@ type DataToken struct {
 
 func (i DataToken) IsToken() TokenId    { return i.Type }
 func NewDataToken(t TokenId) *DataToken { return &DataToken{Type: t} }
+
+type UnicodeRangeToken struct {
+	Start int
+	End   int
+}
+
+func (i UnicodeRangeToken) IsToken() TokenId { return TokenId_UnicodeRange }
+
+func NewUnicodeRangeToken(start int, end int) *UnicodeRangeToken {
+	return &UnicodeRangeToken{
+		Start: start,
+		End:   end,
+	}
+}

@@ -156,6 +156,25 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 		}
 
 		return NewSingleCharacterToken(TokenId_Delim, char), nil
+	case 'U', 'u':
+		peeked, err := t.stream.Peek(2)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		checked := padRunes(peeked, 2)
+		if checkIfWouldStartUnicodeRange(char, checked[0], checked[1]) {
+			if err := t.stream.UnreadRune(); err != nil {
+				return nil, err
+			}
+
+			return t.consumeUnicodeRange()
+		}
+
+		if err := t.stream.UnreadRune(); err != nil {
+			return nil, err
+		}
+		return t.consumeIdentLikeToken()
 	case '\\':
 		nextChar, err := t.stream.Peek(1)
 		if err != nil && err != io.EOF {
@@ -749,4 +768,97 @@ func (t *CssTokenizer) consumeRemnantsOfBadUrl() error {
 			}
 		}
 	}
+}
+
+// This algorithm does not do the verification of the first few code points that are necessary to ensure the returned code points would constitute an <unicode-range-token>.
+//
+//	Ensure that the stream would start a unicode-range before calling this algorithm.
+//
+// This token is not produced by the tokenizer under normal circumstances.
+//
+//	This algorithm is only called during consume the value of a unicode-range descriptor,
+//
+// which itself is only called as a special case for parsing the unicode-range descriptor;
+// this single invocation in the entire language is due to a bad syntax design in early CSS.
+//
+// https://drafts.csswg.org/css-syntax/#consume-unicode-range-token
+func (t *CssTokenizer) consumeUnicodeRange() (*UnicodeRangeToken, error) {
+	if err := t.stream.Discard(2); err != nil {
+		return nil, err
+	}
+
+	hex := []rune{}
+	inQuestion := false
+	for len(hex) < 6 {
+		peeked, err := t.stream.Peek(1)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		if len(peeked) == 0 {
+			break
+		}
+		if !inQuestion && isHexDigit(peeked[0]) {
+			hex = append(hex, peeked[0])
+		} else if peeked[0] == '?' {
+			inQuestion = true
+			hex = append(hex, peeked[0])
+		} else {
+			break
+		}
+		if err := t.stream.Discard(1); err != nil {
+			return nil, err
+		}
+	}
+
+	hasQuestionMark := strings.ContainsRune(string(hex), '?')
+	if hasQuestionMark {
+		startN, err := strconv.ParseUint(strings.ReplaceAll(string(hex), "?", "0"), 16, 32)
+		if err != nil {
+			return nil, err
+		}
+		endN, err := strconv.ParseUint(strings.ReplaceAll(string(hex), "?", "F"), 16, 32)
+		if err != nil {
+			return nil, err
+		}
+		return NewUnicodeRangeToken(int(startN), int(endN)), nil
+	}
+
+	startN, err := strconv.ParseUint(string(hex), 16, 32)
+	if err != nil {
+		return nil, err
+	}
+	startOfRange := int(startN)
+
+	peeked, err := t.stream.Peek(2)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	peeked = padRunes(peeked, 2)
+
+	if peeked[0] == '-' && isHexDigit(peeked[1]) {
+		if err := t.stream.Discard(1); err != nil {
+			return nil, err
+		}
+		endHex := []rune{}
+		for len(endHex) < 6 {
+			p, err := t.stream.Peek(1)
+			if err != nil && err != io.EOF {
+				return nil, err
+			}
+			if len(p) == 0 || !isHexDigit(p[0]) {
+				break
+			}
+			if err := t.stream.Discard(1); err != nil {
+				return nil, err
+			}
+			endHex = append(endHex, p[0])
+		}
+		endN, err := strconv.ParseUint(string(endHex), 16, 32)
+		if err != nil {
+			return nil, err
+		}
+		return NewUnicodeRangeToken(startOfRange, int(endN)), nil
+	}
+
+	return NewUnicodeRangeToken(startOfRange, startOfRange), nil
 }

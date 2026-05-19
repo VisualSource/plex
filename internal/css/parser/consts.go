@@ -6,12 +6,12 @@ import (
 )
 
 const (
-	TokenId_SimpleBlock     tokenizer.TokenId = 25
-	TokenId_DeclarationList tokenizer.TokenId = 26
-	TokenId_RuleList        tokenizer.TokenId = 27
-	TokenId_Function        tokenizer.TokenId = 28
-	TokenId_Declaration     tokenizer.TokenId = 29
-	TokenId_Rule            tokenizer.TokenId = 30
+	TokenId_SimpleBlock     tokenizer.TokenId = 26
+	TokenId_DeclarationList tokenizer.TokenId = 27
+	TokenId_RuleList        tokenizer.TokenId = 28
+	TokenId_Function        tokenizer.TokenId = 29
+	TokenId_Declaration     tokenizer.TokenId = 30
+	TokenId_Rule            tokenizer.TokenId = 31
 )
 
 type Stylesheet struct {
