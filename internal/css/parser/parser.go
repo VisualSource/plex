@@ -239,6 +239,7 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, erro
 func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream)
 
+	return p.consumeListOfComponentValues(nil)
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
@@ -247,7 +248,24 @@ func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]token
 
 	groups := make([][]tokenizer.Token, 0)
 
-	//TODO
+	delim := tokenizer.NewDataToken(tokenizer.TokenId_Comma)
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return nil, err
+		}
+
+		if token.IsToken() == tokenizer.TokenId_EOF {
+			break
+		}
+
+		result, err := p.consumeListOfComponentValues(delim)
+		if err != nil {
+			return nil, err
+		}
+
+		groups = append(groups, result)
+	}
 
 	return groups, nil
 }
@@ -293,54 +311,15 @@ func (p *CssParser) consumeStylesheetContents() ([]*Rule, error) {
 	}
 }
 
-// @see https://www.w3.org/TR/css-syntax-3/#consume-list-of-rules
-func (p *CssParser) consumeListOfRules(topLevel bool) ([]*Rule, error) {
-	rules := make([]*Rule, 0)
-
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
-
-		switch token.IsToken() {
-		case tokenizer.TokenId_Whitespace:
-			continue
-		case tokenizer.TokenId_EOF:
-			return rules, nil
-		case tokenizer.TokenId_AtKeyword:
-			p.reconsumeToken(token)
-
-			atRule, err := p.consumeAtRule()
-			if err != nil {
-				return nil, err
-			}
-			rules = append(rules, atRule)
-		case tokenizer.TokenId_CDO, tokenizer.TokenId_CDC:
-			if topLevel {
-				continue
-			}
-			fallthrough
-		default:
-			p.reconsumeToken(token)
-
-			value, err := p.consumeQualifiedRule()
-			if err != nil {
-				return nil, err
-			}
-
-			if value != nil {
-				rules = append(rules, value)
-			}
-		}
-	}
-}
-
 // @see https://www.w3.org/TR/css-syntax-3/#consume-at-rule
-func (p *CssParser) consumeAtRule() (*Rule, error) {
+func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 	nameToken, err := p.consumeToken()
 	if err != nil {
 		return nil, err
+	}
+
+	if nameToken.IsToken() != tokenizer.TokenId_AtKeyword {
+		panic("should have been a at keyword token")
 	}
 
 	atRule := &Rule{
@@ -354,26 +333,28 @@ func (p *CssParser) consumeAtRule() (*Rule, error) {
 		}
 
 		switch token.IsToken() {
-		case tokenizer.TokenId_Semicolon:
+		case tokenizer.TokenId_Semicolon, tokenizer.TokenId_EOF:
+			// invalid check?
 			return atRule, nil
-		case tokenizer.TokenId_EOF:
-			//TOOD: parse error
-			return atRule, nil
+		case tokenizer.TokenId_BracketCurlyClose:
+			if nested {
+				// is valid
+
+				return atRule, nil
+			}
+
+			atRule.Prelude = append(atRule.Prelude, token)
 		case tokenizer.TokenId_BracketCurlyOpen:
-			block, err := p.consumeSimpleBlock()
+			block, err := p.consumeBlock()
 			if err != nil {
 				return nil, err
 			}
 
-			atRule.Value = block
+			atRule.ChildRules = append(atRule.ChildRules, block)
+
+			// valid check
 
 			return atRule, nil
-		case TokenId_SimpleBlock:
-			if block, ok := token.(*SimpleBlock); ok && block.StartDelim.IsToken() == tokenizer.TokenId_BracketCurlyOpen {
-				atRule.Value = block
-				return atRule, nil
-			}
-			fallthrough
 		default:
 			p.reconsumeToken(token)
 			comp, err := p.consumeComponentValue()
@@ -387,7 +368,7 @@ func (p *CssParser) consumeAtRule() (*Rule, error) {
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#consume-qualified-rule
-func (p *CssParser) consumeQualifiedRule() (*Rule, error) {
+func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Rule, error) {
 	qr := &Rule{}
 
 	for {
@@ -400,21 +381,20 @@ func (p *CssParser) consumeQualifiedRule() (*Rule, error) {
 		case token.IsToken() == tokenizer.TokenId_EOF:
 			//TODO: parse error
 			return nil, nil
-		case token.IsToken() == tokenizer.TokenId_BracketCurlyOpen:
-			block, err := p.consumeSimpleBlock()
-			if err != nil {
-				return nil, err
+		case token.IsToken() == tokenizer.TokenId_BracketCurlyClose:
+			//TODO: parse error
+			if nested {
+				return nil, nil
 			}
 
-			qr.Value = block
+			qr.Prelude = append(qr.Prelude, token)
+
+		case token.IsToken() == tokenizer.TokenId_BracketCurlyOpen:
+
+			if nested {
+			}
 
 			return qr, nil
-		case token.IsToken() == TokenId_SimpleBlock:
-			if tag, ok := token.(*SimpleBlock); ok && tag.StartDelim.IsToken() == tokenizer.TokenId_BracketCurlyOpen {
-				qr.Value = tag
-				return qr, nil
-			}
-			fallthrough
 		default:
 			p.reconsumeToken(token)
 
@@ -426,6 +406,92 @@ func (p *CssParser) consumeQualifiedRule() (*Rule, error) {
 			qr.Prelude = append(qr.Prelude, value)
 		}
 	}
+}
+
+// https://drafts.csswg.org/css-syntax/#consume-block
+func (p *CssParser) consumeBlock() (tokenizer.Token, error) {
+	token, err := p.consumeToken()
+	if err != nil {
+		return nil, err
+	}
+
+	if token.IsToken() != tokenizer.TokenId_BracketCurlyOpen {
+		panic("was expecting bracket curly open")
+	}
+
+	rules, err := p.consumeBlocksContents()
+	if err != nil {
+		return nil, err
+	}
+
+	return rules, nil
+}
+
+// https://drafts.csswg.org/css-syntax/#consume-block-contents
+func (p *CssParser) consumeBlocksContents() {
+	rules := make([]tokenizer.Token, 0)
+	decls := make([]tokenizer.Token, 0)
+
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return
+		}
+
+		switch token.IsToken() {
+		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_Semicolon:
+			continue
+		case tokenizer.TokenId_EOF, tokenizer.TokenId_BracketCurlyClose:
+			return
+		case tokenizer.TokenId_AtKeyword:
+			decls := make([]tokenizer.Token, 0)
+
+			rule, err := p.consumeAtRule(false)
+			if err != nil {
+				return
+			}
+
+			if rule != nil {
+				rules = append(rules, rule)
+			}
+		default:
+			//TODO: mark
+
+			decl, err := p.consumeDeclaration(true)
+			if err != nil {
+				return
+			}
+
+			if decl != nil {
+				decls = append(decls, decl)
+				//discard mark
+
+				continue
+			}
+
+			// resstore mark
+			qr, err := p.consumeQualifiedRule(tokenizer.NewDataToken(tokenizer.TokenId_Semicolon), true)
+			if err != nil {
+				if errors.Is(err, ErrInvalidRule) {
+					if len(decls) != 0 {
+
+					}
+					continue
+				}
+				return
+			}
+
+			if qr != nil {
+				if len(decls) != 0 {
+
+				}
+
+			}
+
+		}
+
+	}
+
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#consume-style-block
@@ -723,53 +789,6 @@ var bracketMap map[tokenizer.TokenId]tokenizer.TokenId = map[tokenizer.TokenId]t
 	tokenizer.TokenId_BracketSquareOpen: tokenizer.TokenId_BracketSquareClose,
 }
 
-// Note: This algorithm assumes that the current input token has already been checked to be an <{-token>, <[-token>, or <(-token>.
-//
-// Note: CSS has an unfortunate syntactic ambiguity between blocks that can contain declarations and blocks that can contain qualified rules,
-// so any "consume" algorithms that handle rules will initially use this more generic algorithm rather than the more specific
-// consume a list of declarations or consume a list of rules algorithms. These more specific algorithms are instead invoked when grammars are applied,
-// depending on whether it contains a <declaration-list> or a <rule-list>/<stylesheet>.
-//
-// @see https://www.w3.org/TR/css-syntax-3/#consume-simple-block
-func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
-	startingToken, err := p.consumeToken()
-	if err != nil {
-		return nil, err
-	}
-
-	endDelim, ok := bracketMap[startingToken.IsToken()]
-	if !ok {
-		return nil, errors.New("invalid starting token")
-	}
-
-	block := &SimpleBlock{
-		StartDelim: startingToken,
-	}
-
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
-
-		switch {
-		case token.IsToken() == endDelim:
-			return block, nil
-		case token.IsToken() == tokenizer.TokenId_EOF:
-			//TODO: parse error
-			return block, nil
-		default:
-			p.reconsumeToken(token)
-
-			value, err := p.consumeComponentValue()
-			if err != nil {
-				return nil, err
-			}
-			block.Value = append(block.Value, value)
-		}
-	}
-}
-
 // Note: This algorithm assumes that the current input token has already been checked to be a <function-token>.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#consume-function
@@ -816,8 +835,5 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 func (p *CssParser) consumeUnicodeRangeValue() {
 
 }
-
-func (p *CssParser) consumeBlock()          {}
-func (p *CssParser) consumeBlocksContents() {}
 
 //#endregion

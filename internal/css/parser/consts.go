@@ -20,9 +20,9 @@ type Stylesheet struct {
 }
 
 type Rule struct {
-	Name    tokenizer.Token
-	Prelude []tokenizer.Token
-	Value   tokenizer.Token
+	Name       tokenizer.Token
+	Prelude    []tokenizer.Token
+	ChildRules []tokenizer.Token
 }
 
 func (r Rule) IsToken() tokenizer.TokenId {
