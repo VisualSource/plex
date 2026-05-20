@@ -764,6 +764,42 @@ func (p *CssParser) consumeDeclaration() (*Declaration, error) {
 	return decl, nil
 }
 
+// https://drafts.csswg.org/css-syntax/#consume-list-of-components
+func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.TokenId], nested bool) ([]tokenizer.Token, error) {
+	values := make([]tokenizer.Token, 0)
+
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return nil, err
+		}
+
+		if stop.IsSome() && stop.Is(token.IsToken()) {
+			return values, nil
+		}
+
+		switch token.IsToken() {
+		case tokenizer.TokenId_EOF:
+			return values, nil
+		case tokenizer.TokenId_BracketCurlyClose:
+			if nested {
+				return values, nil
+			}
+
+			//TODO: parse error
+			values = append(values, token)
+		default:
+			value, err := p.consumeComponentValue()
+			if err != nil {
+				return nil, err
+			}
+
+			values = append(values, value)
+		}
+	}
+
+}
+
 // @see https://www.w3.org/TR/css-syntax-3/#consume-component-value
 func (p *CssParser) consumeComponentValue() (tokenizer.Token, error) {
 	token, err := p.consumeToken()
@@ -789,6 +825,45 @@ var bracketMap map[tokenizer.TokenId]tokenizer.TokenId = map[tokenizer.TokenId]t
 	tokenizer.TokenId_BracketSquareOpen: tokenizer.TokenId_BracketSquareClose,
 }
 
+func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
+	startToken, err := p.consumeToken()
+	if err != nil {
+		return nil, err
+	}
+
+	switch startToken.IsToken() {
+	case tokenizer.TokenId_BracketCurlyOpen, tokenizer.TokenId_BracketSquareOpen, tokenizer.TokenId_BracketParamOpen:
+		break
+	default:
+		panic("invalid token, should have been a {,(, or [ token")
+	}
+
+	endToken := bracketMap[startToken.IsToken()]
+
+	block := &SimpleBlock{
+		StartDelim: startToken.IsToken(),
+	}
+
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return nil, err
+		}
+
+		if token.IsToken() == tokenizer.TokenId_EOF || token.IsToken() == endToken {
+			return block, nil
+		}
+
+		value, err := p.consumeComponentValue()
+		if err != nil {
+			return nil, err
+		}
+
+		block.Value = append(block.Value, value)
+	}
+
+}
+
 // Note: This algorithm assumes that the current input token has already been checked to be a <function-token>.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#consume-function
@@ -798,13 +873,12 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 		return nil, err
 	}
 
-	v, ok := fnT.(*tokenizer.MultiCharacterToken)
-	if !ok {
-		return nil, errors.New("was expecting a multi character token")
+	if fnT.IsToken() != tokenizer.TokenId_FunctionToken {
+		panic("was expecting a function token")
 	}
 
 	fn := &Function{
-		Name: v.Value,
+		Name: fnT,
 	}
 
 	for {
@@ -813,11 +887,8 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 			return nil, err
 		}
 
-		switch {
-		case token.IsToken() == tokenizer.TokenId_BracketParamClose:
-			return fn, nil
-		case token.IsToken() == tokenizer.TokenId_EOF:
-			//TODO: parse error
+		switch token.IsToken() {
+		case tokenizer.TokenId_BracketParamClose, tokenizer.TokenId_EOF:
 			return fn, nil
 		default:
 			p.reconsumeToken(token)
