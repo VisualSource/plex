@@ -319,7 +319,7 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 	}
 
 	if nameToken.IsToken() != tokenizer.TokenId_AtKeyword {
-		panic("should have been a at keyword token")
+		return nil, errors.New("was expecting a at keyword token")
 	}
 
 	atRule := &Rule{
@@ -377,6 +377,11 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 			return nil, err
 		}
 
+		if stop != nil && stop.IsToken() == token.IsToken() {
+			//TODO: parse erro
+			return nil, nil
+		}
+
 		switch {
 		case token.IsToken() == tokenizer.TokenId_EOF:
 			//TODO: parse error
@@ -391,8 +396,7 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 
 		case token.IsToken() == tokenizer.TokenId_BracketCurlyOpen:
 
-			if nested {
-			}
+			//TODO
 
 			return qr, nil
 		default:
@@ -409,14 +413,14 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 }
 
 // https://drafts.csswg.org/css-syntax/#consume-block
-func (p *CssParser) consumeBlock() (tokenizer.Token, error) {
+func (p *CssParser) consumeBlock() ([]tokenizer.Token, error) {
 	token, err := p.consumeToken()
 	if err != nil {
 		return nil, err
 	}
 
 	if token.IsToken() != tokenizer.TokenId_BracketCurlyOpen {
-		panic("was expecting bracket curly open")
+		return nil, errors.New("was expecting a '{' token")
 	}
 
 	rules, err := p.consumeBlocksContents()
@@ -428,27 +432,27 @@ func (p *CssParser) consumeBlock() (tokenizer.Token, error) {
 }
 
 // https://drafts.csswg.org/css-syntax/#consume-block-contents
-func (p *CssParser) consumeBlocksContents() {
+func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 	rules := make([]tokenizer.Token, 0)
 	decls := make([]tokenizer.Token, 0)
 
 	for {
 		token, err := p.consumeToken()
 		if err != nil {
-			return
+			return nil, err
 		}
 
 		switch token.IsToken() {
 		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_Semicolon:
 			continue
 		case tokenizer.TokenId_EOF, tokenizer.TokenId_BracketCurlyClose:
-			return
+			return rules, nil
 		case tokenizer.TokenId_AtKeyword:
 			decls := make([]tokenizer.Token, 0)
 
 			rule, err := p.consumeAtRule(false)
 			if err != nil {
-				return
+				return nil, err
 			}
 
 			if rule != nil {
@@ -459,7 +463,7 @@ func (p *CssParser) consumeBlocksContents() {
 
 			decl, err := p.consumeDeclaration(true)
 			if err != nil {
-				return
+				return nil, err
 			}
 
 			if decl != nil {
@@ -478,7 +482,7 @@ func (p *CssParser) consumeBlocksContents() {
 					}
 					continue
 				}
-				return
+				return nil, err
 			}
 
 			if qr != nil {
@@ -494,110 +498,8 @@ func (p *CssParser) consumeBlocksContents() {
 
 }
 
-// @see https://www.w3.org/TR/css-syntax-3/#consume-style-block
-func (p *CssParser) consumeStyleBlockContents(tok *tokenizer.CssTokenizer) ([]tokenizer.Token, error) {
-	decls := make([]tokenizer.Token, 0)
-
-	rules := make([]tokenizer.Token, 0)
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
-
-		switch token.IsToken() {
-		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_Semicolon:
-			continue
-		case tokenizer.TokenId_EOF:
-			decls = append(decls, rules...)
-			return decls, nil
-		case tokenizer.TokenId_AtKeyword:
-			p.reconsumeToken(token)
-			atRule, err := p.consumeAtRule()
-			if err != nil {
-				return nil, err
-			}
-			decls = append(decls, atRule)
-		case tokenizer.TokenId_Ident:
-			temp := []tokenizer.Token{token}
-
-			for {
-				t, err := p.consumeToken()
-				if err != nil {
-					return nil, err
-				}
-
-				if t.IsToken() == tokenizer.TokenId_Semicolon || t.IsToken() == tokenizer.TokenId_EOF {
-					p.reconsumeToken(t)
-					break
-				}
-
-				p.reconsumeToken(t)
-				value, err := p.consumeComponentValue()
-				if err != nil {
-					return nil, err
-				}
-
-				temp = append(temp, value)
-			}
-
-			// Consume a declaration from the temporary list: push EOF beneath
-			// temp (so consumeDeclaration stops at the end of temp) then temp
-			// in reverse so it pops in original order. The semicolon/EOF that
-			// terminated the inner loop is already on the stack below, ready
-			// for the outer loop.
-			p.reconsumeToken(tokenizer.EOFToken{})
-			for i := len(temp) - 1; i >= 0; i-- {
-				p.reconsumeToken(temp[i])
-			}
-
-			dec, err := p.consumeDeclaration()
-			if err != nil {
-				return nil, err
-			}
-			if dec != nil {
-				decls = append(decls, dec)
-			}
-		case tokenizer.TokenId_Delim:
-			if tag, ok := token.(*tokenizer.SingleCharacterToken); ok && tag.Value == '&' {
-				p.reconsumeToken(token)
-				rule, err := p.consumeQualifiedRule()
-				if err != nil {
-					return nil, err
-				}
-				if rule != nil {
-					rules = append(rules, rule)
-				}
-				continue
-			}
-			fallthrough
-		default:
-			//TODO: parse error
-			p.reconsumeToken(token)
-
-			for {
-				t, err := p.consumeToken()
-				if err != nil {
-					return nil, err
-				}
-
-				if t.IsToken() == tokenizer.TokenId_Semicolon || t.IsToken() == tokenizer.TokenId_EOF {
-					p.reconsumeToken(t)
-					break
-				}
-
-				p.reconsumeToken(t)
-				if _, err := p.consumeComponentValue(); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-	}
-}
-
 // @see https://www.w3.org/TR/css-syntax-3/#consume-list-of-declarations
-func (p *CssParser) consumeListOfDeclarations(tok *tokenizer.CssTokenizer) ([]tokenizer.Token, error) {
+func (p *CssParser) consumeListOfDeclarations() ([]tokenizer.Token, error) {
 	decls := make([]tokenizer.Token, 0)
 
 	for {
@@ -611,7 +513,7 @@ func (p *CssParser) consumeListOfDeclarations(tok *tokenizer.CssTokenizer) ([]to
 			continue
 		case tokenizer.TokenId_AtKeyword:
 			p.reconsumeToken(token)
-			atRule, err := p.consumeAtRule()
+			atRule, err := p.consumeAtRule(false)
 			if err != nil {
 				return nil, err
 			}
@@ -686,52 +588,46 @@ func (p *CssParser) consumeListOfDeclarations(tok *tokenizer.CssTokenizer) ([]to
 // Note: This algorithm assumes that the next input token has already been checked to be an <ident-token>.
 //
 // @see https://www.w3.org/TR/css-syntax-3/#consume-declaration
-func (p *CssParser) consumeDeclaration() (*Declaration, error) {
-	nameToken, err := p.consumeToken()
+func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
+	token, err := p.consumeToken()
 	if err != nil {
 		return nil, err
 	}
 
-	decl := &Declaration{
-		Name: nameToken,
-	}
-
-	firstPass := true
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
-
-		if token.IsToken() == tokenizer.TokenId_Whitespace {
-			continue
-		}
-
-		if firstPass {
-			switch token.IsToken() {
-			case tokenizer.TokenId_Colon:
-				firstPass = false
-			default:
-				//TODO: parse error
-				return nil, nil
-			}
-
-			continue
-		}
-
-		if token.IsToken() == tokenizer.TokenId_EOF {
-			break
-		}
-
+	if token.IsToken() != tokenizer.TokenId_Ident {
 		p.reconsumeToken(token)
-
-		value, err := p.consumeComponentValue()
-		if err != nil {
-			return nil, err
-		}
-
-		decl.Value = append(decl.Value, value)
+		err = p.consumeRemnantsOfBadDeclaraction(nested)
+		return nil, err
 	}
+
+	decl := &Declaration{
+		Name: token,
+	}
+
+	if err := p.discardWhitespace(); err != nil {
+		return nil, err
+	}
+
+	token, err = p.consumeToken()
+	if err != nil {
+		return nil, err
+	}
+
+	if token.IsToken() != tokenizer.TokenId_Colon {
+		p.reconsumeToken(token)
+		return nil, p.consumeRemnantsOfBadDeclaraction(nested)
+	}
+
+	if err := p.discardWhitespace(); err != nil {
+		return nil, err
+	}
+
+	decls, err := p.consumeListOfComponentValues(utils.Some(tokenizer.TokenId_Semicolon), nested)
+	if err != nil {
+		return nil, err
+	}
+
+	decl.Value = decls
 
 	lastIdx, secondLastIdx := -1, -1
 	for i := len(decl.Value) - 1; i >= 0; i-- {
@@ -746,22 +642,50 @@ func (p *CssParser) consumeDeclaration() (*Declaration, error) {
 		}
 	}
 
-	if lastIdx != -1 && secondLastIdx != -1 {
-		bang, bangOk := decl.Value[secondLastIdx].(*tokenizer.SingleCharacterToken)
-		ident, identOk := decl.Value[lastIdx].(*tokenizer.MultiCharacterToken)
-		if bangOk && bang.Type == tokenizer.TokenId_Delim && bang.Value == '!' &&
-			identOk && ident.Type == tokenizer.TokenId_Ident && strings.EqualFold(ident.Value, "important") {
-			decl.Value = slices.Delete(decl.Value, lastIdx, lastIdx+1)
-			decl.Value = slices.Delete(decl.Value, secondLastIdx, secondLastIdx+1)
-			decl.Important = true
-		}
+	if lastIdx != -1 && secondLastIdx != -1 && isDelim(decl.Value[secondLastIdx], '!') && isIdent(decl.Value[lastIdx], "important", true) {
+		decl.Value = slices.Delete(decl.Value, secondLastIdx, lastIdx+1)
 	}
 
 	for len(decl.Value) > 0 && decl.Value[len(decl.Value)-1].IsToken() == tokenizer.TokenId_Whitespace {
-		decl.Value = decl.Value[:len(decl.Value)-1]
+		decl.Value = slices.Delete(decl.Value, len(decl.Value)-1, len(decl.Value))
 	}
 
+	switch {
+	case isCustomPropertyName(decl.Name):
+	case slices.ContainsFunc(decl.Value, isSimpleBlockWithCurlyOpen):
+		return nil, nil
+	case isIdent(decl.Name, "unicode-range", true):
+
+	}
+
+	//TODO: valid check
+
 	return decl, nil
+}
+
+// https://drafts.csswg.org/css-syntax/#consume-the-remnants-of-a-bad-declaration
+func (p *CssParser) consumeRemnantsOfBadDeclaraction(nested bool) error {
+	for {
+		token, err := p.consumeToken()
+		if err != nil {
+			return err
+		}
+
+		switch token.IsToken() {
+		case tokenizer.TokenId_EOF, tokenizer.TokenId_Semicolon:
+			return nil
+		case tokenizer.TokenId_BracketCurlyClose:
+			if nested {
+				p.reconsumeToken(token)
+				return nil
+			}
+		default:
+			p.reconsumeToken(token)
+			if _, err := p.consumeComponentValue(); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 // https://drafts.csswg.org/css-syntax/#consume-list-of-components
@@ -819,12 +743,6 @@ func (p *CssParser) consumeComponentValue() (tokenizer.Token, error) {
 	}
 }
 
-var bracketMap map[tokenizer.TokenId]tokenizer.TokenId = map[tokenizer.TokenId]tokenizer.TokenId{
-	tokenizer.TokenId_BracketCurlyOpen:  tokenizer.TokenId_BracketCurlyClose,
-	tokenizer.TokenId_BracketParamOpen:  tokenizer.TokenId_BracketParamClose,
-	tokenizer.TokenId_BracketSquareOpen: tokenizer.TokenId_BracketSquareClose,
-}
-
 func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 	startToken, err := p.consumeToken()
 	if err != nil {
@@ -835,7 +753,7 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 	case tokenizer.TokenId_BracketCurlyOpen, tokenizer.TokenId_BracketSquareOpen, tokenizer.TokenId_BracketParamOpen:
 		break
 	default:
-		panic("invalid token, should have been a {,(, or [ token")
+		return nil, errors.New("was expecting a '{','(', or '[' token")
 	}
 
 	endToken := bracketMap[startToken.IsToken()]
@@ -874,7 +792,7 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 	}
 
 	if fnT.IsToken() != tokenizer.TokenId_FunctionToken {
-		panic("was expecting a function token")
+		return nil, errors.New("was expecting a function token")
 	}
 
 	fn := &Function{
@@ -903,8 +821,11 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 }
 
 // @see https://drafts.csswg.org/css-syntax/#consume-unicode-range-value
-func (p *CssParser) consumeUnicodeRangeValue() {
-
+func (p *CssParser) consumeUnicodeRangeValue(input string) ([]tokenizer.Token, error) {
+	prev := p.tok
+	p.tok = tokenizer.NewCssTokenizer(strings.NewReader(input))
+	defer func() { p.tok = prev }()
+	return p.consumeListOfComponentValues(utils.None[tokenizer.TokenId](), false)
 }
 
 //#endregion

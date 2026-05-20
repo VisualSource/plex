@@ -14,7 +14,7 @@ Entry Points:
     ☐ parse comma-separated list of component value
 Parse algorithms:
     ✔ consume a stylesheet's contents @done(26-05-19 19:18)
-    ☐ consume an at-rule
+    ✔ consume an at-rule @done(26-05-20 17:47)
     ☐ consume an qualified rule
     [] consume a block
     [] consume block content's
@@ -23,7 +23,8 @@ Parse algorithms:
     ✔ consume a component value @done(26-05-20 13:08)
     ✔ consume a simple block @done(26-05-20 13:07)
     ✔ consume a function @done(26-05-20 13:07)
-    ✔ consume a unicode range @done(26-05-20 13:07)
+    ☐ consume a unicode range
+    ✔ consume the remnants of a bad declaration @done(26-05-20 18:59)
     ✘ consume a list of rules @cancelled(26-05-19 19:18)
     ✘ consume a style block's contents @cancelled(26-05-20 15:45)
     ✘ consume a list of declarations @cancelled(26-05-20 15:45)
