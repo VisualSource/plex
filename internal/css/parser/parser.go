@@ -165,7 +165,7 @@ func (p *CssParser) ParseStylesheetContents(stream io.Reader) ([]*Rule, error) {
 // https://drafts.csswg.org/css-syntax/#parse-block-contents
 func (p *CssParser) ParseBlocksContents(stream io.Reader) ([]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream, false)
-	return p.consumeBlock()
+	return p.consumeBlocksContents()
 }
 
 //#endregion
@@ -193,8 +193,15 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 		p.reconsumeToken(token)
 		atRule, err := p.consumeAtRule(false)
 		if err != nil {
+			if errors.Is(err, ErrInvalidRule) {
+				return nil, ErrSyntax
+			}
 			return nil, err
 		}
+		if atRule == nil {
+			return nil, ErrSyntax
+		}
+
 		rule = atRule
 	default:
 		p.reconsumeToken(token)
@@ -303,6 +310,19 @@ func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.To
 
 	return p.consumeListOfComponentValues(utils.None[tokenizer.TokenId](), false)
 }
+
+/*
+The function's text matches the spec, but the result is wrong because consumeListOfComponentValues deviates from the spec's token-stream convention: when it hits the stop token it has already advanced past it (line 753-760) rather than leaving it in the stream. The spec model for "Process input" does not advance the index on a Return action — the stop token stays.
+
+Cascading effect in ParseCommaListOfComponentValues: after consumeListOfComponentValues returns having already eaten the comma, the explicit "discard a token from input" at parser.go:326-328 eats the first token of the next group. Trace of input a,b:
+
+consumeListOfComponentValues(stop=,) consumes a, then consumes , (the stop), returns [a]. The , has been advanced past.
+The "eat delim token" line consumes b.
+Next iteration sees EOF → break.
+Returns [[a]] instead of [[a], [b]].
+Fix options: either make consumeListOfComponentValues reconsume the stop token before returning (spec-consistent), or drop the "eat delim token" call in ParseCommaListOfComponentValues. The spec-consistent fix is the first — note that consumeDeclaration also calls consumeListOfComponentValues with a semicolon stop and only works by accident because the caller (consumeBlocksContents) discards semicolons unconditionally.
+
+*/
 
 // @see https://drafts.csswg.org/css-syntax/#parse-comma-separated-list-of-component-values
 func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]tokenizer.Token, error) {
