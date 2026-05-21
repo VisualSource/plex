@@ -18,7 +18,7 @@ Parse algorithms:
     ☐ consume an qualified rule
     [] consume a block
     [] consume block content's
-    ☐ consume a declaration
+    ✔ consume a declaration @done(26-05-21 15:22)
        ✔ consume the remnants of a bad declaration @done(26-05-21 13:19)
     ✔ consume a list of component values @done(26-05-21 12:19)
     ✔ consume a component value @done(26-05-21 12:19)

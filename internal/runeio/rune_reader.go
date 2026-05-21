@@ -21,6 +21,8 @@ type RuneReader struct {
 	current     int    // index of the next rune to return
 	input       *bufio.Reader
 	peekInvalid bool // true after Peek(); blocks UnreadRune until next Read/ReadRune/Discard
+	consumed    int  // cumulative rune count advanced past (survives Forget)
+	keepHistory bool // when true, Forget does not trim the buffer
 }
 
 // NewReader returns a new RuneReader reading from input.
@@ -65,9 +67,17 @@ func (rd *RuneReader) ReadRune() (rune, int, error) {
 
 	r := rd.buffer[rd.current]
 	rd.current++
+	rd.consumed++
 	rd.peekInvalid = false
 
 	return r, utf8.RuneLen(r), nil
+}
+
+// Offset returns the cumulative number of runes advanced past since the
+// reader was created. It is not affected by Forget, so callers can use it
+// as a stable position into the (post-preprocessing) input stream.
+func (rd *RuneReader) Offset() int {
+	return rd.consumed
 }
 
 // Peek returns the next n runes without advancing the reader.
@@ -105,6 +115,7 @@ func (rd *RuneReader) UnreadRune() error {
 	}
 
 	rd.current--
+	rd.consumed--
 	return nil
 }
 
@@ -121,6 +132,7 @@ func (rd *RuneReader) Discard(n int) error {
 	}
 
 	rd.current += n
+	rd.consumed += n
 	rd.peekInvalid = false
 
 	return nil
@@ -129,7 +141,14 @@ func (rd *RuneReader) Discard(n int) error {
 // Forget discards all buffered runes before the current position, freeing
 // memory. After calling Forget, UnreadRune will return ErrInvalidUnreadRune
 // since the history before the current position is gone.
+//
+// When EnableHistory has been called, Forget is a no-op: the full history of
+// runes returned so far is retained so that Slice can recover arbitrary
+// spans.
 func (rd *RuneReader) Forget() {
+	if rd.keepHistory {
+		return
+	}
 	// Keep only the unread portion of the buffer (from current onwards).
 	remaining := len(rd.buffer) - rd.current
 	if remaining > 0 {
@@ -138,6 +157,34 @@ func (rd *RuneReader) Forget() {
 	rd.buffer = rd.buffer[:remaining]
 	rd.current = 0
 	rd.peekInvalid = true
+}
+
+// EnableHistory switches the reader into history-preserving mode: subsequent
+// calls to Forget become no-ops, and runes previously returned remain in the
+// internal buffer at their original positions so that Slice can address them
+// by absolute offset.
+//
+// Must be called before any rune is read; calling it later mixes coordinate
+// systems and Slice's results become undefined.
+func (rd *RuneReader) EnableHistory() {
+	rd.keepHistory = true
+}
+
+// Slice returns the runes between absolute offsets [start, end) in the
+// input stream. Only valid when EnableHistory was called before any rune was
+// read. Returns an empty slice if start >= end, or if the requested range
+// extends past what has been read so far.
+func (rd *RuneReader) Slice(start, end int) []rune {
+	if start < 0 || end <= start {
+		return nil
+	}
+	if end > len(rd.buffer) {
+		end = len(rd.buffer)
+	}
+	if start >= end {
+		return nil
+	}
+	return rd.buffer[start:end]
 }
 
 // ensureBuffered guarantees that at least n runes are available in the buffer

@@ -15,22 +15,44 @@ type CssTokenizer struct {
 }
 
 func NewCssTokenizer(stream io.Reader, unicodeRangesAllowed bool) *CssTokenizer {
+	rd := runeio.NewReader(newPreprocessor(stream))
+	rd.EnableHistory()
 	return &CssTokenizer{
-		stream:               runeio.NewReader(newPreprocessor(stream)),
+		stream:               rd,
 		unicodeRangesAllowed: unicodeRangesAllowed,
 	}
 }
 
+// Source returns the substring of the post-preprocessing input stream
+// between rune offsets [start, end). The offsets correspond to those
+// reported by Token.Range. Returns an empty string if the requested range
+// is out of bounds or empty.
+func (t *CssTokenizer) Source(start, end int) string {
+	return string(t.stream.Slice(start, end))
+}
+
 // https://drafts.csswg.org/css-syntax/#consume-token
 func (t *CssTokenizer) ConsumeToken() (Token, error) {
-	defer func() {
-		t.stream.Forget()
-	}()
-
 	if err := t.consumeComments(); err != nil {
 		return nil, err
 	}
 
+	start := t.stream.Offset()
+	tok, err := t.consumeTokenInner()
+	end := t.stream.Offset()
+
+	t.stream.Forget()
+
+	if err != nil {
+		return tok, err
+	}
+	if rs, ok := tok.(rangeSetter); ok {
+		rs.setRange(start, end)
+	}
+	return tok, nil
+}
+
+func (t *CssTokenizer) consumeTokenInner() (Token, error) {
 	char, _, err := t.stream.ReadRune()
 	if err != nil && err != io.EOF {
 		return nil, err

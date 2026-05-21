@@ -23,48 +23,57 @@ type Rule struct {
 	Name       tokenizer.Token
 	Prelude    []tokenizer.Token
 	ChildRules []tokenizer.Token
+	Start      int
+	End        int
 }
 
-func (r Rule) IsToken() tokenizer.TokenId {
-	return TokenId_Rule
-}
+func (r Rule) IsToken() tokenizer.TokenId { return TokenId_Rule }
+func (r Rule) Range() (int, int)          { return r.Start, r.End }
 
 type SimpleBlock struct {
 	StartDelim tokenizer.Token
 	Value      []tokenizer.Token
+	Start      int
+	End        int
 }
 
-func (s SimpleBlock) IsToken() tokenizer.TokenId {
-	return TokenId_SimpleBlock
-}
+func (s SimpleBlock) IsToken() tokenizer.TokenId { return TokenId_SimpleBlock }
+func (s SimpleBlock) Range() (int, int)          { return s.Start, s.End }
 
 type Declaration struct {
-	Name      tokenizer.Token
-	Value     []tokenizer.Token
-	Important bool
+	Name         tokenizer.Token
+	Value        []tokenizer.Token
+	Important    bool
+	OriginalText utils.StringOption
+	Start        int
+	End          int
 }
 
-func (d Declaration) IsToken() tokenizer.TokenId {
-	return TokenId_Declaration
+func (d Declaration) IsToken() tokenizer.TokenId { return TokenId_Declaration }
+func (d Declaration) Range() (int, int)          { return d.Start, d.End }
+
+type DeclarationList struct {
+	Start int
+	End   int
 }
 
-type DeclarationList struct{}
+func (d DeclarationList) IsToken() tokenizer.TokenId { return TokenId_DeclarationList }
+func (d DeclarationList) Range() (int, int)          { return d.Start, d.End }
 
-func (d DeclarationList) IsToken() tokenizer.TokenId {
-	return TokenId_DeclarationList
+type RuleList struct {
+	Start int
+	End   int
 }
 
-type RuleList struct{}
-
-func (r RuleList) IsToken() tokenizer.TokenId {
-	return TokenId_RuleList
-}
+func (r RuleList) IsToken() tokenizer.TokenId { return TokenId_RuleList }
+func (r RuleList) Range() (int, int)          { return r.Start, r.End }
 
 type Function struct {
 	Name  string
 	Value []tokenizer.Token
+	Start int
+	End   int
 }
 
-func (f Function) IsToken() tokenizer.TokenId {
-	return TokenId_Function
-}
+func (f Function) IsToken() tokenizer.TokenId { return TokenId_Function }
+func (f Function) Range() (int, int)          { return f.Start, f.End }

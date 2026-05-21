@@ -65,3 +65,14 @@ func getTokenValueAsString(v tokenizer.Token) string {
 	}
 	return ""
 }
+
+// valueSourceSegment returns the substring of the post-preprocessing source
+// that spans decl.Value's tokens. Returns "" if decl.Value is empty.
+func (p *CssParser) valueSourceSegment(decl *Declaration) string {
+	if len(decl.Value) == 0 {
+		return ""
+	}
+	start, _ := decl.Value[0].Range()
+	_, end := decl.Value[len(decl.Value)-1].Range()
+	return p.tok.Source(start, end)
+}

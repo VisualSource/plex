@@ -431,7 +431,7 @@ func (p *CssParser) consumeBlock() ([]tokenizer.Token, error) {
 	return rules, nil
 }
 
-// https://drafts.csswg.org/css-syntax/#consume-block-contents
+// @see https://drafts.csswg.org/css-syntax/#consume-block-contents
 func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 	rules := make([]tokenizer.Token, 0)
 	decls := make([]tokenizer.Token, 0)
@@ -566,6 +566,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 
 	switch {
 	case isCustomPropertyName(decl.Name):
+		decl.OriginalText = utils.Some(p.valueSourceSegment(decl))
 	case slices.ContainsFunc(decl.Value, isSimpleBlockWithCurlyOpen):
 		seenCurly := false
 		for _, v := range decl.Value {
@@ -579,7 +580,11 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 			return nil, nil
 		}
 	case isIdent(decl.Name, "unicode-range", true):
-
+		tokens, err := p.consumeUnicodeRangeValue(p.valueSourceSegment(decl))
+		if err != nil {
+			return nil, err
+		}
+		decl.Value = tokens
 	}
 
 	if !p.declarationIsValid(decl) {
@@ -694,8 +699,10 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 
 	endToken := bracketMap[startToken.IsToken()]
 
+	startPos, _ := startToken.Range()
 	block := &SimpleBlock{
 		StartDelim: startToken,
+		Start:      startPos,
 	}
 
 	for {
@@ -705,6 +712,7 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 		}
 
 		if token.IsToken() == tokenizer.TokenId_EOF || token.IsToken() == endToken {
+			_, block.End = token.Range()
 			return block, nil
 		}
 
@@ -732,8 +740,10 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 		return nil, errors.New("was expecting a function token")
 	}
 
+	startPos, _ := fnT.Range()
 	fn := &Function{
-		Name: getTokenValueAsString(fnT),
+		Name:  getTokenValueAsString(fnT),
+		Start: startPos,
 	}
 
 	for {
@@ -744,6 +754,7 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 
 		switch token.IsToken() {
 		case tokenizer.TokenId_BracketParamClose, tokenizer.TokenId_EOF:
+			_, fn.End = token.Range()
 			return fn, nil
 		default:
 			p.reconsumeToken(token)
