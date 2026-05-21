@@ -21,7 +21,7 @@ type Stylesheet struct {
 }
 
 type Rule struct {
-	Name         tokenizer.Token
+	Name         string
 	Prelude      []tokenizer.Token
 	Declarations *DeclarationList
 	ChildRules   []tokenizer.Token

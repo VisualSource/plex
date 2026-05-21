@@ -343,7 +343,9 @@ func (p *CssParser) consumeStylesheetContents() ([]*Rule, error) {
 		case tokenizer.TokenId_EOF:
 			return rules, nil
 		case tokenizer.TokenId_AtKeyword:
-			atRule, err := p.consumeAtRule()
+			p.reconsumeToken(token)
+
+			atRule, err := p.consumeAtRule(false)
 			if err != nil {
 				return nil, err
 			}
@@ -352,7 +354,8 @@ func (p *CssParser) consumeStylesheetContents() ([]*Rule, error) {
 				rules = append(rules, atRule)
 			}
 		default:
-			rule, err := p.consumeQualifiedRule()
+			p.reconsumeToken(token)
+			rule, err := p.consumeQualifiedRule(nil, false)
 			if err != nil {
 				return nil, err
 			}
@@ -364,7 +367,7 @@ func (p *CssParser) consumeStylesheetContents() ([]*Rule, error) {
 	}
 }
 
-// @see https://www.w3.org/TR/css-syntax-3/#consume-at-rule
+// @see https://drafts.csswg.org/css-syntax/#consume-at-rule
 func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 	nameToken, err := p.consumeToken()
 	if err != nil {
@@ -376,7 +379,7 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 	}
 
 	atRule := &Rule{
-		Name: nameToken,
+		Name: getTokenValueAsString(nameToken),
 	}
 
 	for {
@@ -387,25 +390,31 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 
 		switch token.IsToken() {
 		case tokenizer.TokenId_Semicolon, tokenizer.TokenId_EOF:
-			// invalid check?
+			if !p.ruleIsValid(atRule) {
+				return nil, nil
+			}
 			return atRule, nil
 		case tokenizer.TokenId_BracketCurlyClose:
 			if nested {
-				// is valid
-
+				if !p.ruleIsValid(atRule) {
+					return nil, nil
+				}
 				return atRule, nil
 			}
 
 			atRule.Prelude = append(atRule.Prelude, token)
 		case tokenizer.TokenId_BracketCurlyOpen:
+			p.reconsumeToken(token)
 			block, err := p.consumeBlock()
 			if err != nil {
 				return nil, err
 			}
 
-			atRule.ChildRules = append(atRule.ChildRules, block)
+			atRule.ChildRules = block
 
-			// valid check
+			if !p.ruleIsValid(atRule) {
+				return nil, nil
+			}
 
 			return atRule, nil
 		default:
@@ -478,7 +487,7 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 			}
 			qr.ChildRules = childRules
 
-			if !p.qualifiedRuleIsValid(qr) {
+			if !p.ruleIsValid(qr) {
 				return nil, ErrInvalidRule
 			}
 			return qr, nil
@@ -697,7 +706,7 @@ func (p *CssParser) declarationIsValid(decl *Declaration) bool {
 // qualifiedRuleIsValid implements the spec's "valid in the current context"
 // check for qualified rules. Until a context-aware rule grammar exists in this
 // package, every qualified rule is treated as valid.
-func (p *CssParser) qualifiedRuleIsValid(rule *Rule) bool {
+func (p *CssParser) ruleIsValid(rule *Rule) bool {
 	return true
 }
 
