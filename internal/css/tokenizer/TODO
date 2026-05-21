@@ -1,14 +1,14 @@
 Tokenizer:
     ✔ ConsumeToken @done(26-05-21 12:41)
-    ☐ consume comments
-    ☐ consume numeric token
-    ☐ consume ident -like token
-    ☐ consume string token
-    ☐ consume url token
-    ☐ consume escaped code point
-    ☐ check if voiad escape
-    ☐ check if would start an ident seq
-    ☐ check if would start a number
-    ☐ consume an ident seq
-    ☐ consume number
-    ☐ consume remnants of a bad url
+    ✔ consume comments @done(26-05-21 13:18)
+    ✔ consume numeric token @done(26-05-21 13:18)
+    ✔ consume ident -like token @done(26-05-21 13:18)
+    ✔ consume string token @done(26-05-21 13:18)
+    ✔ consume url token @done(26-05-21 13:18)
+    ✔ consume escaped code point @done(26-05-21 13:18)
+    ✔ check if voiad escape @done(26-05-21 13:18)
+    ✔ check if would start an ident seq @done(26-05-21 13:18)
+    ✔ check if would start a number @done(26-05-21 13:18)
+    ✔ consume an ident seq @done(26-05-21 13:18)
+    ✔ consume number @done(26-05-21 13:18)
+    ✔ consume remnants of a bad url @done(26-05-21 13:18)

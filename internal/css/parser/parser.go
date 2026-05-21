@@ -84,7 +84,7 @@ func (p *CssParser) ParseListAccordingToCssGrammarStream(stream io.Reader) ([]an
 //
 // @see https://www.w3.org/TR/css-syntax-3/#parse-stylesheet
 func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) (*Stylesheet, error) {
-	p.tok = tokenizer.NewCssTokenizer(input) // TODO: look into using shared tokenizer
+	p.tok = tokenizer.NewCssTokenizer(input, false) // TODO: look into using shared tokenizer
 	stylesheet := &Stylesheet{
 		Location: location,
 	}
@@ -101,12 +101,12 @@ func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption
 
 // https://drafts.csswg.org/css-syntax/#parse-stylesheet-contents
 func (p *CssParser) ParseStylesheetContents(stream io.Reader) ([]*Rule, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
+	p.tok = tokenizer.NewCssTokenizer(stream, false)
 	return p.consumeStylesheetContents()
 }
 
 func (p *CssParser) ParseBlocksContents(stream io.Reader) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
+	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
 	return p.consumeBlock()
 }
@@ -117,7 +117,7 @@ func (p *CssParser) ParseBlocksContents(stream io.Reader) {
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-rule
 func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
+	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
 	if err := p.discardWhitespace(); err != nil {
 		return nil, err
@@ -173,7 +173,7 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-declaration
 func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
+	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
 	if err := p.discardWhitespace(); err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-component-value
 func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
+	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
 	if err := p.discardWhitespace(); err != nil {
 		return nil, err
@@ -237,14 +237,14 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, erro
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-list-of-component-values
 func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
+	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
 	return p.consumeListOfComponentValues(nil)
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
 func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream)
+	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
 	groups := make([][]tokenizer.Token, 0)
 
@@ -498,96 +498,9 @@ func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 
 }
 
-// @see https://www.w3.org/TR/css-syntax-3/#consume-list-of-declarations
-func (p *CssParser) consumeListOfDeclarations() ([]tokenizer.Token, error) {
-	decls := make([]tokenizer.Token, 0)
-
-	for {
-		token, err := p.consumeToken()
-		if err != nil {
-			return nil, err
-		}
-
-		switch token.IsToken() {
-		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_Semicolon:
-			continue
-		case tokenizer.TokenId_AtKeyword:
-			p.reconsumeToken(token)
-			atRule, err := p.consumeAtRule(false)
-			if err != nil {
-				return nil, err
-			}
-
-			decls = append(decls, atRule)
-
-		case tokenizer.TokenId_EOF:
-			return decls, nil
-		case tokenizer.TokenId_Ident:
-			temp := []tokenizer.Token{token}
-
-			for {
-				t, err := p.consumeToken()
-				if err != nil {
-					return nil, err
-				}
-
-				if t.IsToken() == tokenizer.TokenId_EOF || t.IsToken() == tokenizer.TokenId_Semicolon {
-					p.reconsumeToken(t)
-					break
-				}
-
-				p.reconsumeToken(t)
-				value, err := p.consumeComponentValue()
-				if err != nil {
-					return nil, err
-				}
-
-				temp = append(temp, value)
-			}
-
-			// Consume a declaration from the temporary list: push EOF beneath temp
-			// (so consumeDeclaration stops at the end of temp) then temp in reverse
-			// so it pops in original order. The semicolon/EOF that terminated the
-			// inner loop is already on the stack below, ready for the outer loop.
-			p.reconsumeToken(tokenizer.EOFToken{})
-			for i := len(temp) - 1; i >= 0; i-- {
-				p.reconsumeToken(temp[i])
-			}
-
-			dec, err := p.consumeDeclaration()
-			if err != nil {
-				return nil, err
-			}
-			if dec != nil {
-				decls = append(decls, dec)
-			}
-		default:
-			//TODO: parse error
-			p.reconsumeToken(token)
-
-			for {
-				t, err := p.consumeToken()
-				if err != nil {
-					return nil, err
-				}
-
-				if t.IsToken() == tokenizer.TokenId_Semicolon || t.IsToken() == tokenizer.TokenId_EOF {
-					p.reconsumeToken(t)
-					break
-				}
-
-				p.reconsumeToken(token)
-				if _, err = p.consumeComponentValue(); err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-}
-
 // Note: This algorithm assumes that the next input token has already been checked to be an <ident-token>.
 //
-// @see https://www.w3.org/TR/css-syntax-3/#consume-declaration
+// @see https://drafts.csswg.org/css-syntax/#consume-declaration
 func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 	token, err := p.consumeToken()
 	if err != nil {
@@ -596,7 +509,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 
 	if token.IsToken() != tokenizer.TokenId_Ident {
 		p.reconsumeToken(token)
-		err = p.consumeRemnantsOfBadDeclaraction(nested)
+		err = p.consumeRemnantsOfBadDeclaration(nested)
 		return nil, err
 	}
 
@@ -615,7 +528,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 
 	if token.IsToken() != tokenizer.TokenId_Colon {
 		p.reconsumeToken(token)
-		return nil, p.consumeRemnantsOfBadDeclaraction(nested)
+		return nil, p.consumeRemnantsOfBadDeclaration(nested)
 	}
 
 	if err := p.discardWhitespace(); err != nil {
@@ -644,6 +557,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 
 	if lastIdx != -1 && secondLastIdx != -1 && isDelim(decl.Value[secondLastIdx], '!') && isIdent(decl.Value[lastIdx], "important", true) {
 		decl.Value = slices.Delete(decl.Value, secondLastIdx, lastIdx+1)
+		decl.Important = true
 	}
 
 	for len(decl.Value) > 0 && decl.Value[len(decl.Value)-1].IsToken() == tokenizer.TokenId_Whitespace {
@@ -653,18 +567,38 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 	switch {
 	case isCustomPropertyName(decl.Name):
 	case slices.ContainsFunc(decl.Value, isSimpleBlockWithCurlyOpen):
-		return nil, nil
+		seenCurly := false
+		for _, v := range decl.Value {
+			if v.IsToken() == tokenizer.TokenId_Whitespace {
+				continue
+			}
+			if !seenCurly && isSimpleBlockWithCurlyOpen(v) {
+				seenCurly = true
+				continue
+			}
+			return nil, nil
+		}
 	case isIdent(decl.Name, "unicode-range", true):
 
 	}
 
-	//TODO: valid check
+	if !p.declarationIsValid(decl) {
+		return nil, nil
+	}
 
 	return decl, nil
 }
 
+// declarationIsValid implements the spec's "valid in the current context" check.
+// Validity is defined per-property by individual CSS specs; until a property
+// grammar / descriptor registry exists in this package, every declaration is
+// treated as valid.
+func (p *CssParser) declarationIsValid(decl *Declaration) bool {
+	return true
+}
+
 // https://drafts.csswg.org/css-syntax/#consume-the-remnants-of-a-bad-declaration
-func (p *CssParser) consumeRemnantsOfBadDeclaraction(nested bool) error {
+func (p *CssParser) consumeRemnantsOfBadDeclaration(nested bool) error {
 	for {
 		token, err := p.consumeToken()
 		if err != nil {
@@ -688,7 +622,7 @@ func (p *CssParser) consumeRemnantsOfBadDeclaraction(nested bool) error {
 	}
 }
 
-// https://drafts.csswg.org/css-syntax/#consume-list-of-components
+// @see https://drafts.csswg.org/css-syntax/#consume-list-of-components
 func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.TokenId], nested bool) ([]tokenizer.Token, error) {
 	values := make([]tokenizer.Token, 0)
 
@@ -713,6 +647,7 @@ func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.Tok
 			//TODO: parse error
 			values = append(values, token)
 		default:
+			p.reconsumeToken(token)
 			value, err := p.consumeComponentValue()
 			if err != nil {
 				return nil, err
@@ -724,7 +659,7 @@ func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.Tok
 
 }
 
-// @see https://www.w3.org/TR/css-syntax-3/#consume-component-value
+// @see https://drafts.csswg.org/css-syntax/#consume-component-value
 func (p *CssParser) consumeComponentValue() (tokenizer.Token, error) {
 	token, err := p.consumeToken()
 	if err != nil {
@@ -743,6 +678,7 @@ func (p *CssParser) consumeComponentValue() (tokenizer.Token, error) {
 	}
 }
 
+// https://drafts.csswg.org/css-syntax/#consume-simple-block
 func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 	startToken, err := p.consumeToken()
 	if err != nil {
@@ -759,7 +695,7 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 	endToken := bracketMap[startToken.IsToken()]
 
 	block := &SimpleBlock{
-		StartDelim: startToken.IsToken(),
+		StartDelim: startToken,
 	}
 
 	for {
@@ -772,6 +708,7 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 			return block, nil
 		}
 
+		p.reconsumeToken(token)
 		value, err := p.consumeComponentValue()
 		if err != nil {
 			return nil, err
@@ -784,7 +721,7 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 
 // Note: This algorithm assumes that the current input token has already been checked to be a <function-token>.
 //
-// @see https://www.w3.org/TR/css-syntax-3/#consume-function
+// @see https://drafts.csswg.org/css-syntax/#consume-function
 func (p *CssParser) consumeFunction() (*Function, error) {
 	fnT, err := p.consumeToken()
 	if err != nil {
@@ -796,7 +733,7 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 	}
 
 	fn := &Function{
-		Name: fnT,
+		Name: getTokenValueAsString(fnT),
 	}
 
 	for {
@@ -823,7 +760,7 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 // @see https://drafts.csswg.org/css-syntax/#consume-unicode-range-value
 func (p *CssParser) consumeUnicodeRangeValue(input string) ([]tokenizer.Token, error) {
 	prev := p.tok
-	p.tok = tokenizer.NewCssTokenizer(strings.NewReader(input))
+	p.tok = tokenizer.NewCssTokenizer(strings.NewReader(input), true)
 	defer func() { p.tok = prev }()
 	return p.consumeListOfComponentValues(utils.None[tokenizer.TokenId](), false)
 }

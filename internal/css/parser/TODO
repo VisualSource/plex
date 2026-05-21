@@ -1,30 +1,32 @@
 Entry Points:
     [] parse something according to a css grammar
     [] parse a comma-separated list according to a css grammar
-    ✔ parse a stylesheet @done(26-05-19 19:18)
-    ✔ parse a stylesheet content @done(26-05-19 19:21)
-    ✘ parse a list or rules @cancelled(26-05-19 19:22)
+    ☐ parse a stylesheet
+    ☐ parse a stylesheet content
+    ✘ parse a list or rules @cancelled(26-05-21 13:19)
     [] parse a blocks content
-    ✔ parse a rule @done(26-05-19 19:47)
-    ✔ parse a declaration @done(26-05-19 19:49)
+    ☐ parse a rule
+    ☐ parse a declaration
     ✘ parse a style block's contents @cancelled(26-05-19 19:22)
     ✘ parse a list of declarations @cancelled(26-05-19 19:22)
-    ✔ parse a component value @done(26-05-19 19:55)
+    ☐ parse a component value
     ☐ parse a list of componenent values
     ☐ parse comma-separated list of component value
 Parse algorithms:
-    ✔ consume a stylesheet's contents @done(26-05-19 19:18)
-    ✔ consume an at-rule @done(26-05-20 17:47)
+    ☐ consume a stylesheet's contents
+    ☐ consume an at-rule
     ☐ consume an qualified rule
     [] consume a block
     [] consume block content's
     ☐ consume a declaration
-    ✔ consume a list of component values @done(26-05-20 15:43)
-    ✔ consume a component value @done(26-05-20 13:08)
-    ✔ consume a simple block @done(26-05-20 13:07)
-    ✔ consume a function @done(26-05-20 13:07)
-    ☐ consume a unicode range
-    ✔ consume the remnants of a bad declaration @done(26-05-20 18:59)
+       ✔ consume the remnants of a bad declaration @done(26-05-21 13:19)
+    ✔ consume a list of component values @done(26-05-21 12:19)
+    ✔ consume a component value @done(26-05-21 12:19)
+    ✔ consume a simple block @done(26-05-21 12:09)
+    ✔ consume a function @done(26-05-21 12:09)
+    ✔ consume a unicode range @done(26-05-21 11:52)
+  
     ✘ consume a list of rules @cancelled(26-05-19 19:18)
     ✘ consume a style block's contents @cancelled(26-05-20 15:45)
-    ✘ consume a list of declarations @cancelled(26-05-20 15:45)
+    ✘ consume a list of declarations @cancelled(26-05-20 15:45) 
+    

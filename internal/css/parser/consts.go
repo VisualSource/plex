@@ -30,7 +30,7 @@ func (r Rule) IsToken() tokenizer.TokenId {
 }
 
 type SimpleBlock struct {
-	StartDelim tokenizer.TokenId
+	StartDelim tokenizer.Token
 	Value      []tokenizer.Token
 }
 
@@ -61,7 +61,7 @@ func (r RuleList) IsToken() tokenizer.TokenId {
 }
 
 type Function struct {
-	Name  tokenizer.Token
+	Name  string
 	Value []tokenizer.Token
 }
 

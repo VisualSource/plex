@@ -19,8 +19,8 @@ func isDelim(token tokenizer.Token, value rune) bool {
 	return iv.Value == value
 }
 
-func isIdent(token tokenizer.Token, value string, insenstivie bool) bool {
-	if token.IsToken() != tokenizer.TokenId_Delim {
+func isIdent(token tokenizer.Token, value string, insensitive bool) bool {
+	if token.IsToken() != tokenizer.TokenId_Ident {
 		return false
 	}
 
@@ -28,7 +28,7 @@ func isIdent(token tokenizer.Token, value string, insenstivie bool) bool {
 	if !ok {
 		return false
 	}
-	if insenstivie {
+	if insensitive {
 		return strings.EqualFold(iv.Value, value)
 	}
 
@@ -48,7 +48,7 @@ func isNotWhitespace(e tokenizer.Token) bool {
 }
 func isSimpleBlockWithCurlyOpen(e tokenizer.Token) bool {
 	if block, ok := e.(*SimpleBlock); ok {
-		return block.StartDelim == tokenizer.TokenId_BracketCurlyOpen
+		return block.StartDelim.IsToken() == tokenizer.TokenId_BracketCurlyOpen
 	}
 	return false
 }
@@ -57,4 +57,11 @@ var bracketMap map[tokenizer.TokenId]tokenizer.TokenId = map[tokenizer.TokenId]t
 	tokenizer.TokenId_BracketCurlyOpen:  tokenizer.TokenId_BracketCurlyClose,
 	tokenizer.TokenId_BracketParamOpen:  tokenizer.TokenId_BracketParamClose,
 	tokenizer.TokenId_BracketSquareOpen: tokenizer.TokenId_BracketSquareClose,
+}
+
+func getTokenValueAsString(v tokenizer.Token) string {
+	if v, ok := v.(tokenizer.MultiCharacterToken); ok {
+		return v.Value
+	}
+	return ""
 }
