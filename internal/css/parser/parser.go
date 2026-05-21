@@ -420,7 +420,7 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 	}
 }
 
-// @see https://www.w3.org/TR/css-syntax-3/#consume-qualified-rule
+// @see https://drafts.csswg.org/css-syntax/#consume-qualified-rule
 func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Rule, error) {
 	qr := &Rule{}
 
@@ -431,23 +431,56 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 		}
 
 		if stop != nil && stop.IsToken() == token.IsToken() {
-			return nil, ErrInvalidRule
+			return nil, nil
 		}
 
 		switch {
 		case token.IsToken() == tokenizer.TokenId_EOF:
-			return nil, ErrInvalidRule
+			return nil, nil
 		case token.IsToken() == tokenizer.TokenId_BracketCurlyClose:
 			if nested {
-				return nil, ErrInvalidRule
+				return nil, nil
 			}
 
 			qr.Prelude = append(qr.Prelude, token)
 
 		case token.IsToken() == tokenizer.TokenId_BracketCurlyOpen:
+			if preludeLooksLikeCustomPropertyDecl(qr.Prelude) {
+				if nested {
+					if err := p.consumeRemnantsOfBadDeclaration(true); err != nil {
+						return nil, err
+					}
+					return nil, nil
+				}
+				p.reconsumeToken(token)
+				if _, err := p.consumeBlock(); err != nil {
+					return nil, err
+				}
+				return nil, nil
+			}
 
-			//TODO
+			p.reconsumeToken(token)
+			childRules, err := p.consumeBlock()
+			if err != nil {
+				return nil, err
+			}
 
+			if len(childRules) > 0 {
+				if dl, ok := childRules[0].(*DeclarationList); ok {
+					qr.Declarations = dl
+					childRules = childRules[1:]
+				}
+			}
+			for i, v := range childRules {
+				if dl, ok := v.(*DeclarationList); ok {
+					childRules[i] = &NestedDeclarations{Value: dl, Start: dl.Start, End: dl.End}
+				}
+			}
+			qr.ChildRules = childRules
+
+			if !p.qualifiedRuleIsValid(qr) {
+				return nil, ErrInvalidRule
+			}
 			return qr, nil
 		default:
 			p.reconsumeToken(token)
@@ -658,6 +691,13 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 // grammar / descriptor registry exists in this package, every declaration is
 // treated as valid.
 func (p *CssParser) declarationIsValid(decl *Declaration) bool {
+	return true
+}
+
+// qualifiedRuleIsValid implements the spec's "valid in the current context"
+// check for qualified rules. Until a context-aware rule grammar exists in this
+// package, every qualified rule is treated as valid.
+func (p *CssParser) qualifiedRuleIsValid(rule *Rule) bool {
 	return true
 }
 

@@ -46,6 +46,31 @@ func isCustomPropertyName(e tokenizer.Token) bool {
 func isNotWhitespace(e tokenizer.Token) bool {
 	return e.IsToken() != tokenizer.TokenId_Whitespace
 }
+
+// preludeLooksLikeCustomPropertyDecl reports whether the first two
+// non-whitespace prelude values are an ident-token whose value starts with
+// "--" followed by a colon-token. Used by consumeQualifiedRule to recognise
+// preludes that would otherwise be misparsed as a custom-property declaration.
+func preludeLooksLikeCustomPropertyDecl(prelude []tokenizer.Token) bool {
+	var first, second tokenizer.Token
+	for _, v := range prelude {
+		if v.IsToken() == tokenizer.TokenId_Whitespace {
+			continue
+		}
+		if first == nil {
+			first = v
+			continue
+		}
+		second = v
+		break
+	}
+	if first == nil || second == nil {
+		return false
+	}
+	return first.IsToken() == tokenizer.TokenId_Ident &&
+		isCustomPropertyName(first) &&
+		second.IsToken() == tokenizer.TokenId_Colon
+}
 func isSimpleBlockWithCurlyOpen(e tokenizer.Token) bool {
 	if block, ok := e.(*SimpleBlock); ok {
 		return block.StartDelim.IsToken() == tokenizer.TokenId_BracketCurlyOpen

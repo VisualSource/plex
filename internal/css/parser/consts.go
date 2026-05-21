@@ -6,12 +6,13 @@ import (
 )
 
 const (
-	TokenId_SimpleBlock     tokenizer.TokenId = 26
-	TokenId_DeclarationList tokenizer.TokenId = 27
-	TokenId_RuleList        tokenizer.TokenId = 28
-	TokenId_Function        tokenizer.TokenId = 29
-	TokenId_Declaration     tokenizer.TokenId = 30
-	TokenId_Rule            tokenizer.TokenId = 31
+	TokenId_SimpleBlock        tokenizer.TokenId = 26
+	TokenId_DeclarationList    tokenizer.TokenId = 27
+	TokenId_RuleList           tokenizer.TokenId = 28
+	TokenId_Function           tokenizer.TokenId = 29
+	TokenId_Declaration        tokenizer.TokenId = 30
+	TokenId_Rule               tokenizer.TokenId = 31
+	TokenId_NestedDeclarations tokenizer.TokenId = 32
 )
 
 type Stylesheet struct {
@@ -20,11 +21,12 @@ type Stylesheet struct {
 }
 
 type Rule struct {
-	Name       tokenizer.Token
-	Prelude    []tokenizer.Token
-	ChildRules []tokenizer.Token
-	Start      int
-	End        int
+	Name         tokenizer.Token
+	Prelude      []tokenizer.Token
+	Declarations *DeclarationList
+	ChildRules   []tokenizer.Token
+	Start        int
+	End          int
 }
 
 func (r Rule) IsToken() tokenizer.TokenId { return TokenId_Rule }
@@ -60,6 +62,15 @@ type DeclarationList struct {
 
 func (d DeclarationList) IsToken() tokenizer.TokenId { return TokenId_DeclarationList }
 func (d DeclarationList) Range() (int, int)          { return d.Start, d.End }
+
+type NestedDeclarations struct {
+	Value *DeclarationList
+	Start int
+	End   int
+}
+
+func (n NestedDeclarations) IsToken() tokenizer.TokenId { return TokenId_NestedDeclarations }
+func (n NestedDeclarations) Range() (int, int)          { return n.Start, n.End }
 
 type RuleList struct {
 	Start int
