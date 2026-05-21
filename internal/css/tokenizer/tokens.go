@@ -84,13 +84,15 @@ type NumericToken struct {
 	Unit string // px, and other stuff
 
 	Flag string // integer, number
+	Sign rune   // '+','-' or missing (0)
 }
 
 func (n NumericToken) IsToken() TokenId { return n.Type }
-func NewNumericToken(t TokenId, value float64) *NumericToken {
+func NewNumericToken(t TokenId, value float64, sign rune) *NumericToken {
 	return &NumericToken{
 		Type:  t,
 		Value: value,
+		Sign:  sign,
 	}
 }
 

@@ -10,16 +10,18 @@ import (
 )
 
 type CssTokenizer struct {
-	stream *runeio.RuneReader
+	stream               *runeio.RuneReader
+	unicodeRangesAllowed bool
 }
 
-func NewCssTokenizer(stream io.Reader) *CssTokenizer {
+func NewCssTokenizer(stream io.Reader, unicodeRangesAllowed bool) *CssTokenizer {
 	return &CssTokenizer{
-		stream: runeio.NewReader(newPreprocessor(stream)),
+		stream:               runeio.NewReader(newPreprocessor(stream)),
+		unicodeRangesAllowed: unicodeRangesAllowed,
 	}
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-token
+// https://drafts.csswg.org/css-syntax/#consume-token
 func (t *CssTokenizer) ConsumeToken() (Token, error) {
 	defer func() {
 		t.stream.Forget()
@@ -157,24 +159,26 @@ func (t *CssTokenizer) ConsumeToken() (Token, error) {
 
 		return NewSingleCharacterToken(TokenId_Delim, char), nil
 	case 'U', 'u':
-		peeked, err := t.stream.Peek(2)
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-
-		checked := padRunes(peeked, 2)
-		if checkIfWouldStartUnicodeRange(char, checked[0], checked[1]) {
-			if err := t.stream.UnreadRune(); err != nil {
+		if t.unicodeRangesAllowed {
+			peeked, err := t.stream.Peek(2)
+			if err != nil && err != io.EOF {
 				return nil, err
 			}
 
-			return t.consumeUnicodeRange()
-		}
+			checked := padRunes(peeked, 2)
+			if checkIfWouldStartUnicodeRange(char, checked[0], checked[1]) {
+				if err := t.stream.UnreadRune(); err != nil {
+					return nil, err
+				}
 
-		if err := t.stream.UnreadRune(); err != nil {
-			return nil, err
+				return t.consumeUnicodeRange()
+			}
+
+			if err := t.stream.UnreadRune(); err != nil {
+				return nil, err
+			}
+			return t.consumeIdentLikeToken()
 		}
-		return t.consumeIdentLikeToken()
 	case '\\':
 		nextChar, err := t.stream.Peek(1)
 		if err != nil && err != io.EOF {
@@ -253,7 +257,7 @@ func (t *CssTokenizer) consumeWhitespace() error {
 	return nil
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-comment
+// https://drafts.csswg.org/css-syntax/#consume-comment
 func (t *CssTokenizer) consumeComments() error {
 	for {
 		chars, err := t.stream.Peek(2)
@@ -279,7 +283,7 @@ func (t *CssTokenizer) consumeComments() error {
 
 			if char == '*' {
 				next, err := t.stream.Peek(1)
-				if err != nil {
+				if err != nil && err != io.EOF {
 					return err
 				}
 
@@ -298,7 +302,7 @@ func (t *CssTokenizer) consumeComments() error {
 // https://www.w3.org/TR/css-syntax-3/#consume-numeric-token
 func (t *CssTokenizer) consumeNumericToken() (Token, error) {
 
-	num, numType, err := t.consumeNumber()
+	num, numType, sign, err := t.consumeNumber()
 	if err != nil {
 		return nil, err
 	}
@@ -308,36 +312,27 @@ func (t *CssTokenizer) consumeNumericToken() (Token, error) {
 		return nil, err
 	}
 
-	var a, b, c rune
-	if len(chars) > 0 {
-		a = chars[0]
-	}
-	if len(chars) > 1 {
-		b = chars[1]
-	}
-	if len(chars) > 2 {
-		c = chars[2]
-	}
+	identCheck := padRunes(chars, 3)
 
-	if checkIfWouldStartIdentSequence(a, b, c) {
+	if checkIfWouldStartIdentSequence(identCheck[0], identCheck[1], identCheck[2]) {
 		ident, err := t.consumeIdentSequence()
 		if err != nil {
 			return nil, err
 		}
 
-		token := NewNumericToken(TokenId_Dimension, num)
+		token := NewNumericToken(TokenId_Dimension, num, sign)
 		token.Flag = numType
 		token.Unit = ident
 
 		return token, nil
-	} else if a == '%' {
+	} else if identCheck[0] == '%' {
 		if err := t.stream.Discard(1); err != nil {
 			return nil, err
 		}
-		return NewNumericToken(TokenId_Percentage, num), nil
+		return NewNumericToken(TokenId_Percentage, num, sign), nil
 	}
 
-	token := NewNumericToken(TokenId_Number, num)
+	token := NewNumericToken(TokenId_Number, num, sign)
 	token.Flag = numType
 
 	return token, nil
@@ -617,14 +612,12 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 		}
 
 		if isIdentCodePoint(char) {
-			if _, err := result.WriteRune(char); err != nil {
-				return "", err
-			}
+			result.WriteRune(char)
 			continue
 		}
 
 		next, err := t.stream.Peek(1)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			return "", err
 		}
 		next = padRunes(next, 1)
@@ -635,9 +628,7 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 				return "", err
 			}
 
-			if _, err := result.WriteRune(escape); err != nil {
-				return "", err
-			}
+			result.WriteRune(escape)
 
 			continue
 		}
@@ -649,79 +640,79 @@ func (t *CssTokenizer) consumeIdentSequence() (string, error) {
 	}
 }
 
-// https://www.w3.org/TR/css-syntax-3/#consume-number
-func (t *CssTokenizer) consumeNumber() (float64, string, error) {
+// https://drafts.csswg.org/css-syntax/#consume-number
+func (t *CssTokenizer) consumeNumber() (float64, string, rune, error) {
 	repr := strings.Builder{}
 	numType := "integer"
+	signChar := rune(0x0000)
 
 	next, err := t.stream.Peek(1)
 	if err != nil && err != io.EOF {
-		return 0.0, "", err
+		return 0, "", signChar, err
 	}
 	if len(next) > 0 && (next[0] == '+' || next[0] == '-') {
 		if err := t.stream.Discard(1); err != nil {
-			return 0.0, numType, err
+			return 0, numType, signChar, err
 		}
-		if _, err := repr.WriteRune(next[0]); err != nil {
-			return 0.0, numType, err
-		}
+		repr.WriteRune(next[0])
+		signChar = next[0]
 	}
 
 	if err := t.consumeDigits(&repr); err != nil {
-		return 0, "", err
+		return 0, "", signChar, err
 	}
 
 	next, err = t.stream.Peek(2)
 	if err != nil && err != io.EOF {
-		return 0.0, "", err
+		return 0, "", signChar, err
 	}
 
 	if len(next) == 2 && next[0] == '.' && isDigit(next[1]) {
 		if err := t.stream.Discard(2); err != nil {
-			return 0.0, "", err
+			return 0, "", signChar, err
 		}
 		repr.WriteRune(next[0])
 		repr.WriteRune(next[1])
 		numType = "number"
 		if err := t.consumeDigits(&repr); err != nil {
-			return 0, "", err
+			return 0, "", signChar, err
 		}
 	}
 
 	next, err = t.stream.Peek(3)
 	if err != nil && err != io.EOF {
-		return 0.0, "", err
+		return 0, "", signChar, err
 	}
 
 	if len(next) >= 2 && (next[0] == 'e' || next[0] == 'E') {
 		switch {
 		case len(next) >= 3 && (next[1] == '-' || next[1] == '+') && isDigit(next[2]):
 			if err := t.stream.Discard(3); err != nil {
-				return 0.0, "", err
+				return 0, "", signChar, err
 			}
 			repr.WriteString(string(next))
 			numType = "number"
 			if err := t.consumeDigits(&repr); err != nil {
-				return 0, "", err
+				return 0, "", signChar, err
 			}
 		case isDigit(next[1]):
 			if err := t.stream.Discard(2); err != nil {
-				return 0.0, "", err
+				return 0, "", signChar, err
 			}
 			repr.WriteString(string(next[:2]))
 			numType = "number"
 			if err := t.consumeDigits(&repr); err != nil {
-				return 0, "", err
+				return 0, "", signChar, err
 			}
 		}
 	}
 
 	value, err := strconv.ParseFloat(repr.String(), 64)
 	if err != nil {
-		return 0.0, "", err
+		return 0, "", signChar, err
 	}
 
-	return value, numType, nil
+	return value, numType, signChar, nil
 }
 
 func (t *CssTokenizer) consumeDigits(builder *strings.Builder) error {

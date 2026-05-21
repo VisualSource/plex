@@ -1,5 +1,5 @@
 Tokenizer:
-    ☐ ConsumeToken
+    ✔ ConsumeToken @done(26-05-21 12:41)
     ☐ consume comments
     ☐ consume numeric token
     ☐ consume ident -like token

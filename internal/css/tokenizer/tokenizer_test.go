@@ -26,7 +26,7 @@ func TestCssParser(t *testing.T) {
 		for i, tt := range tests {
 			testname := fmt.Sprintf("[%s]: test %d", filename, i)
 			t.Run(testname, func(t *testing.T) {
-				parser := tokenizer.NewCssTokenizer(strings.NewReader(tt.Source))
+				parser := tokenizer.NewCssTokenizer(strings.NewReader(tt.Source), false)
 
 				tokens := make([]tokenizer.Token, 0)
 				for {
