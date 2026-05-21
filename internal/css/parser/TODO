@@ -16,8 +16,8 @@ Parse algorithms:
     ☐ consume a stylesheet's contents
     ☐ consume an at-rule
     ☐ consume an qualified rule
-    [] consume a block
-    [] consume block content's
+    ✔ consume a block @done(26-05-21 15:46)
+    ✔ consume block content's @done(26-05-21 15:35)
     ✔ consume a declaration @done(26-05-21 15:22)
        ✔ consume the remnants of a bad declaration @done(26-05-21 13:19)
     ✔ consume a list of component values @done(26-05-21 12:19)

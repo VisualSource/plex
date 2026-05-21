@@ -478,6 +478,10 @@ func (p *CssParser) consumeBlock() ([]tokenizer.Token, error) {
 		return nil, err
 	}
 
+	if _, err := p.consumeToken(); err != nil {
+		return nil, err
+	}
+
 	return rules, nil
 }
 
@@ -504,6 +508,7 @@ func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_Semicolon:
 			continue
 		case tokenizer.TokenId_EOF, tokenizer.TokenId_BracketCurlyClose:
+			p.reconsumeToken(token)
 			flushDecls()
 			return rules, nil
 		case tokenizer.TokenId_AtKeyword:
