@@ -13,6 +13,7 @@ import (
 type CssParser struct {
 	tok    *tokenizer.CssTokenizer
 	tokens []tokenizer.Token
+	marks  [][]tokenizer.Token
 }
 
 func NewCssParser() *CssParser {
@@ -52,16 +53,68 @@ func (p *CssParser) discardWhitespace() error {
 }
 
 func (p *CssParser) consumeToken() (tokenizer.Token, error) {
+	var (
+		token tokenizer.Token
+		err   error
+	)
 	if len(p.tokens) != 0 {
-		last := p.tokens[len(p.tokens)-1]
+		token = p.tokens[len(p.tokens)-1]
 		p.tokens = slices.Delete(p.tokens, len(p.tokens)-1, len(p.tokens))
-		return last, nil
+	} else {
+		token, err = p.tok.ConsumeToken()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return p.tok.ConsumeToken()
+	if n := len(p.marks); n != 0 {
+		p.marks[n-1] = append(p.marks[n-1], token)
+	}
+	return token, nil
 }
 func (p *CssParser) reconsumeToken(token tokenizer.Token) {
+	if n := len(p.marks); n != 0 {
+		buf := p.marks[n-1]
+		if m := len(buf); m != 0 && buf[m-1] == token {
+			p.marks[n-1] = buf[:m-1]
+		}
+	}
 	p.tokens = append(p.tokens, token)
+}
+
+// mark pushes a new mark onto the mark stack. Every token returned by
+// consumeToken while this mark is the top of stack is recorded; restoreMark
+// pushes those tokens back so they reconsume in order, discardMark drops them.
+// Marks may nest because consumeDeclaration performs its own reconsumption.
+func (p *CssParser) mark() {
+	p.marks = append(p.marks, nil)
+}
+
+func (p *CssParser) discardMark() {
+	n := len(p.marks)
+	if n == 0 {
+		return
+	}
+	buf := p.marks[n-1]
+	p.marks = p.marks[:n-1]
+	// Tokens consumed under this mark stay consumed, but any outer mark must
+	// still see them as part of its window.
+	if outer := len(p.marks); outer != 0 {
+		p.marks[outer-1] = append(p.marks[outer-1], buf...)
+	}
+}
+
+func (p *CssParser) restoreMark() {
+	n := len(p.marks)
+	if n == 0 {
+		return
+	}
+	buf := p.marks[n-1]
+	p.marks = p.marks[:n-1]
+	// Push recorded tokens back so consumeToken returns them in original order.
+	for i := len(buf) - 1; i >= 0; i-- {
+		p.tokens = append(p.tokens, buf[i])
+	}
 }
 
 // #region Entry Points
@@ -378,18 +431,15 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 		}
 
 		if stop != nil && stop.IsToken() == token.IsToken() {
-			//TODO: parse erro
-			return nil, nil
+			return nil, ErrInvalidRule
 		}
 
 		switch {
 		case token.IsToken() == tokenizer.TokenId_EOF:
-			//TODO: parse error
-			return nil, nil
+			return nil, ErrInvalidRule
 		case token.IsToken() == tokenizer.TokenId_BracketCurlyClose:
-			//TODO: parse error
 			if nested {
-				return nil, nil
+				return nil, ErrInvalidRule
 			}
 
 			qr.Prelude = append(qr.Prelude, token)
@@ -412,7 +462,7 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 	}
 }
 
-// https://drafts.csswg.org/css-syntax/#consume-block
+// @see https://drafts.csswg.org/css-syntax/#consume-block
 func (p *CssParser) consumeBlock() ([]tokenizer.Token, error) {
 	token, err := p.consumeToken()
 	if err != nil {
@@ -433,8 +483,16 @@ func (p *CssParser) consumeBlock() ([]tokenizer.Token, error) {
 
 // @see https://drafts.csswg.org/css-syntax/#consume-block-contents
 func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
-	rules := make([]tokenizer.Token, 0)
-	decls := make([]tokenizer.Token, 0)
+	var rules []tokenizer.Token
+	var decls []*Declaration
+
+	flushDecls := func() {
+		if len(decls) == 0 {
+			return
+		}
+		rules = append(rules, &DeclarationList{Value: decls})
+		decls = nil
+	}
 
 	for {
 		token, err := p.consumeToken()
@@ -446,11 +504,13 @@ func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_Semicolon:
 			continue
 		case tokenizer.TokenId_EOF, tokenizer.TokenId_BracketCurlyClose:
+			flushDecls()
 			return rules, nil
 		case tokenizer.TokenId_AtKeyword:
-			decls := make([]tokenizer.Token, 0)
+			p.reconsumeToken(token)
+			flushDecls()
 
-			rule, err := p.consumeAtRule(false)
+			rule, err := p.consumeAtRule(true)
 			if err != nil {
 				return nil, err
 			}
@@ -459,43 +519,37 @@ func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 				rules = append(rules, rule)
 			}
 		default:
-			//TODO: mark
+			p.reconsumeToken(token)
+			p.mark()
 
 			decl, err := p.consumeDeclaration(true)
 			if err != nil {
+				p.discardMark()
 				return nil, err
 			}
 
 			if decl != nil {
+				p.discardMark()
 				decls = append(decls, decl)
-				//discard mark
-
 				continue
 			}
 
-			// resstore mark
+			p.restoreMark()
+
 			qr, err := p.consumeQualifiedRule(tokenizer.NewDataToken(tokenizer.TokenId_Semicolon), true)
-			if err != nil {
-				if errors.Is(err, ErrInvalidRule) {
-					if len(decls) != 0 {
-
-					}
-					continue
-				}
+			switch {
+			case errors.Is(err, ErrInvalidRule):
+				flushDecls()
+			case err != nil:
 				return nil, err
+			case qr == nil:
+				// nothing returned — do nothing
+			default:
+				flushDecls()
+				rules = append(rules, qr)
 			}
-
-			if qr != nil {
-				if len(decls) != 0 {
-
-				}
-
-			}
-
 		}
-
 	}
-
 }
 
 // Note: This algorithm assumes that the next input token has already been checked to be an <ident-token>.

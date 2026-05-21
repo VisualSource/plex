@@ -53,6 +53,7 @@ func (d Declaration) IsToken() tokenizer.TokenId { return TokenId_Declaration }
 func (d Declaration) Range() (int, int)          { return d.Start, d.End }
 
 type DeclarationList struct {
+	Value []*Declaration
 	Start int
 	End   int
 }
