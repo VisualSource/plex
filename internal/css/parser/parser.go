@@ -20,6 +20,8 @@ func NewCssParser() *CssParser {
 	return &CssParser{}
 }
 
+//#region helpers
+
 func (p *CssParser) isEmpty() (bool, error) {
 	token, err := p.consumeToken()
 	if err != nil {
@@ -117,6 +119,8 @@ func (p *CssParser) restoreMark() {
 	}
 }
 
+//#endregion
+
 // #region Entry Points
 
 // This algorithm, and parse a comma-separated list according to a CSS grammar, are usually the only parsing algorithms other specs will want to call.
@@ -135,7 +139,7 @@ func (p *CssParser) ParseListAccordingToCssGrammarStream(stream io.Reader) ([]an
 
 // Intended to be the normal parser entry point, for parsing stylesheets.
 //
-// @see https://www.w3.org/TR/css-syntax-3/#parse-stylesheet
+// @see https://drafts.csswg.org/css-syntax/#parse-stylesheet
 func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) (*Stylesheet, error) {
 	p.tok = tokenizer.NewCssTokenizer(input, false) // TODO: look into using shared tokenizer
 	stylesheet := &Stylesheet{
@@ -147,7 +151,7 @@ func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption
 		return nil, err
 	}
 
-	stylesheet.Value = rules
+	stylesheet.Rules = rules
 
 	return stylesheet, nil
 }
@@ -158,9 +162,9 @@ func (p *CssParser) ParseStylesheetContents(stream io.Reader) ([]*Rule, error) {
 	return p.consumeStylesheetContents()
 }
 
-func (p *CssParser) ParseBlocksContents(stream io.Reader) {
+// https://drafts.csswg.org/css-syntax/#parse-block-contents
+func (p *CssParser) ParseBlocksContents(stream io.Reader) ([]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream, false)
-
 	return p.consumeBlock()
 }
 
@@ -177,7 +181,6 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 	}
 
 	var rule *Rule
-
 	token, err := p.consumeToken()
 	if err != nil {
 		return nil, err
@@ -187,14 +190,20 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 	case tokenizer.TokenId_EOF:
 		return nil, ErrSyntax
 	case tokenizer.TokenId_AtKeyword:
-		atRule, err := p.consumeAtRule()
+		p.reconsumeToken(token)
+		atRule, err := p.consumeAtRule(false)
 		if err != nil {
 			return nil, err
 		}
 		rule = atRule
 	default:
-		qRule, err := p.consumeQualifiedRule()
+		p.reconsumeToken(token)
+		qRule, err := p.consumeQualifiedRule(nil, false)
 		if err != nil {
+			if errors.Is(err, ErrInvalidRule) {
+				return nil, ErrSyntax
+			}
+
 			return nil, err
 		}
 
@@ -232,7 +241,7 @@ func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
 		return nil, err
 	}
 
-	decl, err := p.consumeDeclaration()
+	decl, err := p.consumeDeclaration(false)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +286,7 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, erro
 		return nil, err
 	}
 
-	if empty {
+	if !empty {
 		return nil, ErrSyntax
 	}
 
@@ -292,16 +301,16 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, erro
 func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
-	return p.consumeListOfComponentValues(nil)
+	return p.consumeListOfComponentValues(utils.None[tokenizer.TokenId](), false)
 }
 
-// @see https://www.w3.org/TR/css-syntax-3/#parse-comma-separated-list-of-component-values
+// @see https://drafts.csswg.org/css-syntax/#parse-comma-separated-list-of-component-values
 func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream, false)
 
 	groups := make([][]tokenizer.Token, 0)
 
-	delim := tokenizer.NewDataToken(tokenizer.TokenId_Comma)
+	delim := utils.Some(tokenizer.TokenId_Comma)
 	for {
 		token, err := p.consumeToken()
 		if err != nil {
@@ -312,10 +321,15 @@ func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]token
 			break
 		}
 
-		result, err := p.consumeListOfComponentValues(delim)
+		p.reconsumeToken(token)
+		result, err := p.consumeListOfComponentValues(delim, false)
 		if err != nil {
 			return nil, err
 		}
+
+		if _, err = p.consumeToken(); err != nil {
+			return nil, err
+		} // eat delim token
 
 		groups = append(groups, result)
 	}

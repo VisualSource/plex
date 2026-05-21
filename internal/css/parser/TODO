@@ -3,16 +3,14 @@ Entry Points:
     [] parse a comma-separated list according to a css grammar
     ☐ parse a stylesheet
     ☐ parse a stylesheet content
-  
     [] parse a blocks content
+
     ☐ parse a rule
     ☐ parse a declaration
-
     ☐ parse a component value
     ☐ parse a list of componenent values
     ☐ parse comma-separated list of component value
 
-    
     ✘ parse a list or rules @cancelled(26-05-21 13:19)
     ✘ parse a style block's contents @cancelled(26-05-19 19:22)
     ✘ parse a list of declarations @cancelled(26-05-19 19:22)

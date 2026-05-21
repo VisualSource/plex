@@ -16,7 +16,7 @@ const (
 )
 
 type Stylesheet struct {
-	Value    []*Rule
+	Rules    []*Rule
 	Location utils.StringOption
 }
 
