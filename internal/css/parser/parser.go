@@ -123,14 +123,33 @@ func (p *CssParser) restoreMark() {
 
 //#region Entry Points
 
-// @see https://www.w3.org/TR/css-syntax-3/#parse-grammar
+// @see https://drafts.csswg.org/css-syntax/#parse-grammar
 func (p *CssParser) ParseAccordingToCssGrammarStream(stream io.Reader) ([]any, error) {
+
+	_, err := p.ParseListOfComponentValues(stream)
+	if err != nil {
+		return nil, err
+	}
+
+	//TODO: match
+
 	return nil, nil
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#parse-comma-list
 func (p *CssParser) ParseListAccordingToCssGrammarStream(stream io.Reader) ([]any, error) {
-	return nil, nil
+
+	//Whitespace check
+
+	final := make([]any, 0)
+	_, err := p.ParseCommaListOfComponentValues(stream)
+	if err != nil {
+		return nil, err
+	}
+
+	//TODO: replace grammar
+
+	return final, nil
 }
 
 // intended to be the normal parser entry point, for parsing stylesheets.

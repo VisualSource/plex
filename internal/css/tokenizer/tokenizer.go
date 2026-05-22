@@ -532,8 +532,11 @@ func (t *CssTokenizer) consumeUrlToken() (Token, error) {
 			if err != nil && err != io.EOF {
 				return nil, err
 			}
-
-			if len(chars) > 0 && checkIfValidEscape(char, chars[0]) {
+			// Spec: in a url, `\` + (anything but newline) starts a valid
+			// escape — including `\` + EOF, which consumeEscapedCodePoint
+			// resolves to U+FFFD per "consume an escaped code point" / EOF.
+			next := padRunes(chars, 1)[0]
+			if checkIfValidEscape(char, next) {
 				escaped, err := t.consumeEscapedCodePoint()
 				if err != nil {
 					return nil, err

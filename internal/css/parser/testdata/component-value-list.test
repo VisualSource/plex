@@ -56,7 +56,7 @@
 	["function", "rgba0", ["string", "a"], " ",
 		["function", "rgba1", ["ident", "a"], " ", ["ident", "b"], " ",
 			["function", "rgba2",
-				["function", "rgba3", ["string", "b"], ["error", "eof-in-string"]]
+				["function", "rgba3", ["string", "b"]]
 			]
 		]
 	]
@@ -116,7 +116,7 @@
 	["string", "Lorem \"îpsum\""], " ",
 	["string", "ab"], " ",
 	["error", "bad-string"], " ", ["ident", "b"], " ",
-	["string", "eof"], ["error", "eof-in-string"]
+	["string", "eof"]
 ],
 
 "\"\" \"Lorem 'îpsum'\" \"a\\\nb\" \"a\nb \"eof", [
@@ -124,12 +124,12 @@
 	["string", "Lorem 'îpsum'"], " ",
 	["string", "ab"], " ",
 	["error", "bad-string"], " ", ["ident", "b"], " ",
-	["string", "eof"], ["error", "eof-in-string"]
+	["string", "eof"]
 ],
 
 "\"Lo\\rem \\130 ps\\u m\" '\\376\\37 6\\000376\\0000376\\", [
 	["string", "Lorem İpsu m"], " ",
-	["string", "Ͷ76Ͷ76"], ["error", "eof-in-string"]
+	["string", "Ͷ76Ͷ76"]
 ],
 
 "url( '') url('Lorem \"îpsum\"'\n) url('a\\\nb' ) url('a\nb) url('eof", [
@@ -137,15 +137,15 @@
 	["function", "url", ["string", "Lorem \"îpsum\""], " "], " ",
 	["function", "url", ["string", "ab"], " "], " ",
 	["function", "url", ["error", "bad-string"], " ", ["ident", "b"]], " ",
-	["function", "url", ["string", "eof"], ["error", "eof-in-string"]]
+	["function", "url", ["string", "eof"]]
 ],
 
 "url(", [
-	["url", ""], ["error", "eof-in-url"]
+	["url", ""]
 ],
 
 "url( \t", [
-	["url", ""], ["error", "eof-in-url"]
+	["url", ""]
 ],
 
 "url(\"\") url(\"Lorem 'îpsum'\"\n) url(\"a\\\nb\" ) url(\"a\nb) url(\"eof", [
@@ -153,12 +153,12 @@
 	["function", "url", ["string", "Lorem 'îpsum'"], " "], " ",
 	["function", "url", ["string", "ab"], " "], " ",
 	["function", "url", ["error", "bad-string"], " ", ["ident", "b"]], " ",
-	["function", "url", ["string", "eof"], ["error", "eof-in-string"]]
+	["function", "url", ["string", "eof"]]
 ],
 
 "url(\"Lo\\rem \\130 ps\\u m\") url('\\376\\37 6\\000376\\0000376\\", [
 	["function", "url", ["string", "Lorem İpsu m"]], " ",
-	["function", "url", ["string", "Ͷ76Ͷ76"], ["error", "eof-in-string"]]
+	["function", "url", ["string", "Ͷ76Ͷ76"]]
 ],
 
 "URL(foo) Url(foo) ûrl(foo) url (foo) url\\ (foo) url(\t 'foo' ", [
@@ -195,12 +195,11 @@
 	["error", "bad-url"], " ",
 	["error", "bad-url"], " ",
 	["url", "a\nb"], " ",
-	["url", "a\uFFFD"], ["error", "eof-in-url"]
+	["url", "a\uFFFD"]
 ],
 
 "url(\u0000!#$%&*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~\u0080\u0081\u009e\u009f\u00a0\u00a1\u00a2", [
-	["url", "\uFFFD!#$%&*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~\u0080\u0081\u009e\u009f\u00a0¡¢"],
-	["error", "eof-in-url"]
+	["url", "\uFFFD!#$%&*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~\u0080\u0081\u009e\u009f\u00a0¡¢"]
 ],
 
 "url(\u0001) url(\u0002) url(\u0003) url(\u0004) url(\u0005) url(\u0006) url(\u0007) url(\u0008) url(\u000b) url(\u000e) url(\u000f) url(\u0010) url(\u0011) url(\u0012) url(\u0013) url(\u0014) url(\u0015) url(\u0016) url(\u0017) url(\u0018) url(\u0019) url(\u001a) url(\u001b) url(\u001c) url(\u001d) url(\u001e) url(\u001f) url(\u007f)", [
@@ -364,16 +363,16 @@
 ],
 
 "~=|=^=$=*=||<!------> |/**/| ~/**/=", [
-	"~=", "|=", "^=", "$=", "*=", "||", "<!--", ["ident", "----"], ">",
+	"~", "=", "|", "=", "^", "=", "$", "=", "*", "=", "|", "|", "<!--", ["ident", "----"], ">",
 	" ", "|", "|", " ", "~", "="
 ],
 
 "a:not([href^=http\\:],  [href ^=\t'https\\:'\n]) { color: rgba(0%, 100%, 50%); }", [
 	["ident", "a"], ":", ["function", "not",
 		["[]",
-			["ident", "href"], "^=", ["ident", "http:"]
+			["ident", "href"], "^", "=", ["ident", "http:"]
 		], ",", " ", ["[]",
-			["ident", "href"], " ", "^=", " ", ["string", "https:"], " "
+			["ident", "href"], " ", "^", "=", " ", ["string", "https:"], " "
 		]
 	], " ", ["{}",
 		" ", ["ident", "color"], ":", " ", ["function", "rgba",

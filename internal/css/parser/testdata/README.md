@@ -3,9 +3,9 @@
 Tests updated to reflect the 2026 W3C CSS Syntax Module Level 3 editor's draft:
 https://drafts.csswg.org/css-syntax/
 
-Original sources (2021 CR):
-- https://github.com/CourtBouillon/css-parsing-tests
-- https://github.com/servo/rust-cssparser
+Original sources
+- (2021 CR) https://github.com/CourtBouillon/css-parsing-tests
+- (2013 Draft) https://github.com/servo/rust-cssparser
 
 ### Result representation
 
