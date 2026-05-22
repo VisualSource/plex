@@ -9,20 +9,20 @@
 "@foo bar; \t/* comment */", ["at-rule", "foo", [" ", ["ident", "bar"]], null],
 " /**/ @foo bar{[(4", ["at-rule", "foo",
     [" ", ["ident", "bar"]],
-    [["[]", ["()", ["number", "4", 4, "integer"]]]]
+    [["error", "invalid"]]
 ],
 
-"@foo { bar", ["at-rule", "foo", [" "], [" ", ["ident", "bar"]]],
+"@foo { bar", ["at-rule", "foo", [" "], [["error", "invalid"]]],
 "@foo [ bar", ["at-rule", "foo", [" ", ["[]", " ", ["ident", "bar"]]], null],
 
 " /**/ div > p { color: #aaa;  } /**/ ", ["qualified rule",
     [["ident", "div"], " ", ">", " ", ["ident", "p"], " "],
-    [" ", ["ident", "color"], ":", " ", ["hash", "aaa", "id"], ";", " "]
+    [["declaration", "color", [["hash", "aaa", "id"]], false]]
 ],
 
 " /**/ { color: #aaa  ", ["qualified rule",
     [],
-    [" ", ["ident", "color"], ":", " ", ["hash", "aaa", "id"], " "]
+    [["declaration", "color", [["hash", "aaa", "id"]], false]]
 ],
 
 " /* CDO/CDC are not special */ <!-- --> {", ["qualified rule",

@@ -1,7 +1,11 @@
 ### CSS parser tests
 
-Source: https://github.com/CourtBouillon/css-parsing-tests
-Source 2: https://github.com/servo/rust-cssparser
+Tests updated to reflect the 2026 W3C CSS Syntax Module Level 3 editor's draft:
+https://drafts.csswg.org/css-syntax/
+
+Original sources (2021 CR):
+- https://github.com/CourtBouillon/css-parsing-tests
+- https://github.com/servo/rust-cssparser
 
 ### Result representation
 
@@ -40,8 +44,6 @@ Declaration
     Array of length 4: the string "percentage", the representation as a string, the value as a number, and the type as the string "integer" or "number".
 <dimension>
     Array of length 4: the string "dimension", the representation as a string, the value as a number, the type as the string "integer" or "number", and the unit as a string.
-<unicode-range>
-    Array of length 3: the string "unicode-range", followed by the start and end integers as two numbers.
 <include-match>
     The string "~=".
 <dash-match>

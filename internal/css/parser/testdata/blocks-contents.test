@@ -28,34 +28,81 @@
 ],
 
 "@media screen { div{;}} a:b;; @media print{div{", [
-    ["at-rule", "media", [" ", ["ident", "screen"], " "], [" ", ["ident", "div"], ["{}", ";"]]],
+    ["at-rule", "media", [" ", ["ident", "screen"], " "], [
+        ["qualified rule", [["ident", "div"]], []]
+    ]],
     ["declaration", "a", [["ident", "b"]], false],
-    ["at-rule", "media", [" ", ["ident", "print"]], [["ident", "div"], ["{}"]]]
+    ["at-rule", "media", [" ", ["ident", "print"]], [
+        ["qualified rule", [["ident", "div"]], []]
+    ]]
 ],
 
 "@ media screen { div{;}} a:b;; @media print{div{", [
-    ["qualified rule",   ["@", " ", ["ident", "media"], " ", ["ident", "screen"], " "],   [" ", ["ident", "div"], ["{}", ";"]]],
+    ["qualified rule",   ["@", " ", ["ident", "media"], " ", ["ident", "screen"], " "],   [
+        ["qualified rule", [["ident", "div"]], []]
+    ]],
     ["declaration", "a", [["ident", "b"]], false],
-    ["at-rule", "media", [" ", ["ident", "print"]], [["ident", "div"], ["{}"]]]
+    ["at-rule", "media", [" ", ["ident", "print"]], [
+        ["qualified rule", [["ident", "div"]], []]
+    ]]
 ],
 
 "z:x;a b{c:d;;e:f}", [
     ["declaration", "z", [["ident", "x"]], false],
-    ["qualified rule", [["ident", "a"], " ", ["ident", "b"]], [["ident", "c"], ":", ["ident", "d"], ";", ";", ["ident", "e"], ":", ["ident", "f"]]]
+    ["qualified rule", [["ident", "a"], " ", ["ident", "b"]], [
+        ["declaration", "c", [["ident", "d"]], false],
+        ["declaration", "e", [["ident", "f"]], false]
+    ]]
 ],
 
 "a {c:1}", [
-    ["qualified rule", [["ident", "a"], " "], [["ident", "c"], ":", ["number", "1", 1, "integer"]]]
+    ["qualified rule", [["ident", "a"], " "], [
+        ["declaration", "c", [["number", "1", 1, "integer"]], false]
+    ]]
 ],
 
 "a:hover {c:1}", [
-    ["qualified rule", [["ident", "a"], ":", ["ident", "hover"], " "], [["ident", "c"], ":", ["number", "1", 1, "integer"]]]
+    ["qualified rule", [["ident", "a"], ":", ["ident", "hover"], " "], [
+        ["declaration", "c", [["number", "1", 1, "integer"]], false]
+    ]]
 ],
 
 "z:x;a b{c:d}e:f", [
     ["declaration", "z", [["ident", "x"]], false],
-    ["qualified rule", [["ident", "a"], " ", ["ident", "b"]], [["ident", "c"], ":", ["ident", "d"]]],
+    ["qualified rule", [["ident", "a"], " ", ["ident", "b"]], [
+        ["declaration", "c", [["ident", "d"]], false]
+    ]],
     ["declaration", "e", [["ident", "f"]], false]
+],
+
+"color: red; .foo { color: blue; }", [
+    ["declaration", "color", [["ident", "red"]], false],
+    ["qualified rule", [".", ["ident", "foo"], " "], [
+        ["declaration", "color", [["ident", "blue"]], false]
+    ]]
+],
+
+"color: red; &:hover { color: blue; } font-size: 1em", [
+    ["declaration", "color", [["ident", "red"]], false],
+    ["qualified rule", ["&", ":", ["ident", "hover"], " "], [
+        ["declaration", "color", [["ident", "blue"]], false]
+    ]],
+    ["declaration", "font-size", [["dimension", "1", 1, "integer", "em"]], false]
+],
+
+"@media (max-width: 600px) { color: red }", [
+    ["at-rule", "media", [" ", ["()",
+        ["ident", "max-width"], ":", " ", ["dimension", "600", 600, "integer", "px"]
+    ], " "], [
+        ["declaration", "color", [["ident", "red"]], false]
+    ]]
+],
+
+"z; a:b; @foo; c:d", [
+    ["error", "invalid"],
+    ["declaration", "a", [["ident", "b"]], false],
+    ["at-rule", "foo", [], null],
+    ["declaration", "c", [["ident", "d"]], false]
 ],
 
 "", []
