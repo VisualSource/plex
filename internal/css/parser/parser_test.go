@@ -133,7 +133,7 @@ func Test_ParseComponentValue(t *testing.T) {
 			node, isNode := testCase.expected.(*node)
 			expectError := isNode && node.nodeType == "error"
 
-			result, err := p.ParseListOfComponentValues(strings.NewReader(testCase.input))
+			result, err := p.ParseComponentValue(strings.NewReader(testCase.input))
 			if err != nil {
 				if expectError && errors.Is(err, parser.ErrSyntax) {
 					return
@@ -141,7 +141,7 @@ func Test_ParseComponentValue(t *testing.T) {
 				t.Fatalf("failed to parse value: %s", err)
 			}
 
-			validateTest(t, testCase, result)
+			validateTest(t, testCase, []tokenizer.Token{result})
 		})
 	}
 }
@@ -414,12 +414,41 @@ func matchNode(t *testing.T, path string, exp *node, actual tokenizer.Token) {
 	case "qualified rule":
 		matchQualifiedRule(t, path, exp, actual)
 	case "error":
-		// Nested-block error representation needs separate investigation;
-		// log and skip for now so other comparisons in the same fixture
-		// still surface useful failures.
-		t.Logf("%s: skipping nested error node %# v (actual %# v)", path, pretty.Formatter(exp), pretty.Formatter(actual))
+		matchError(t, path, exp, actual)
 	default:
 		t.Errorf("%s: unknown node tag %q", path, exp.nodeType)
+	}
+}
+
+// matchError validates an ["error", <kind>] fixture node against the
+// corresponding spec-emitted token. The 2026 CSS Syntax draft emits only:
+//   - <bad-string-token> and <bad-url-token> for in-place tokenization errors
+//   - the literal close-bracket tokens for unmatched }, ], )
+//
+// Legacy variants ("eof-in-string", "eof-in-url", "empty", "invalid",
+// "extra-input") are not tokens in the modern spec; if any survive in a
+// fixture this matcher flags them so stale entries are loud rather than
+// silently accepted.
+func matchError(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+	t.Helper()
+	if len(exp.args) < 1 {
+		t.Errorf("%s: error node missing kind", path)
+		return
+	}
+	kind, _ := exp.args[0].(string)
+	want, ok := map[string]tokenizer.TokenId{
+		"bad-string": tokenizer.TokenId_BadString,
+		"bad-url":    tokenizer.TokenId_BadUrl,
+		"}":          tokenizer.TokenId_BracketCurlyClose,
+		"]":          tokenizer.TokenId_BracketSquareClose,
+		")":          tokenizer.TokenId_BracketParamClose,
+	}[kind]
+	if !ok {
+		t.Errorf("%s: error variant %q is not a token in the 2026 spec — fixture is stale", path, kind)
+		return
+	}
+	if actual.IsToken() != want {
+		mismatch(t, path, exp, actual)
 	}
 }
 
