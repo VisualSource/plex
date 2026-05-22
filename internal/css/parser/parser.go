@@ -123,10 +123,6 @@ func (p *CssParser) restoreMark() {
 
 //#region Entry Points
 
-// This algorithm, and parse a comma-separated list according to a CSS grammar, are usually the only parsing algorithms other specs will want to call.
-// The remaining parsing algorithms are meant mostly for [CSSOM] and related "explicitly constructing CSS structures" cases.
-// Consult the CSSWG for guidance first if you think you need to use one of the other algorithms.
-//
 // @see https://www.w3.org/TR/css-syntax-3/#parse-grammar
 func (p *CssParser) ParseAccordingToCssGrammarStream(stream io.Reader) ([]any, error) {
 	return nil, nil
@@ -137,7 +133,7 @@ func (p *CssParser) ParseListAccordingToCssGrammarStream(stream io.Reader) ([]an
 	return nil, nil
 }
 
-// Intended to be the normal parser entry point, for parsing stylesheets.
+// intended to be the normal parser entry point, for parsing stylesheets.
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-stylesheet
 func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) (*Stylesheet, error) {
@@ -156,19 +152,25 @@ func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption
 	return stylesheet, nil
 }
 
+// is intended for use by the CSSStyleSheet replace() method, and similar, which parse text into the contents of an existing stylesheet.
+//
 // https://drafts.csswg.org/css-syntax/#parse-stylesheet-contents
 func (p *CssParser) ParseStylesheetContents(stream io.Reader) ([]*Rule, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream, false)
 	return p.consumeStylesheetContents()
 }
 
+// is intended for parsing the contents of any block in CSS (including things like the style attribute),
+// and APIs such as the CSSStyleDeclaration cssText attribute.
+//
 // https://drafts.csswg.org/css-syntax/#parse-block-contents
 func (p *CssParser) ParseBlocksContents(stream io.Reader) ([]tokenizer.Token, error) {
 	p.tok = tokenizer.NewCssTokenizer(stream, false)
 	return p.consumeBlocksContents()
 }
 
-// Intended for use by the CSSStyleSheet#insertRule method, and similar functions which might exist, which parse text into a single rule.
+// is intended for use by the CSSStyleSheet insertRule() method, and similar, which parse text into a single rule.
+// CSSStyleSheet#insertRule method, and similar functions which might exist, which parse text into a single rule.
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-rule
 func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
@@ -234,9 +236,7 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 	return nil, ErrSyntax
 }
 
-// Used in @supports conditions. [CSS3-CONDITIONAL]
-//
-// Unlike "Parse a list of declarations", this parses only a declaration and not an at-rule.
+// is used in @supports conditions. [CSS3-CONDITIONAL]
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-declaration
 func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
@@ -258,7 +258,7 @@ func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
 	return nil, ErrSyntax
 }
 
-// For things that need to consume a single value, like the parsing rules for attr().
+// is for things that need to consume a single value, like the parsing rules for attr().
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-component-value
 func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, error) {
@@ -298,9 +298,8 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, erro
 	return value, nil
 }
 
-// for the contents of presentational attributes, which parse text into a single declaration’s value,
-// or for parsing a stand-alone selector [SELECT](https://www.w3.org/TR/css-syntax-3/#biblio-select) or list of Media Queries [MEDIAQ](https://www.w3.org/TR/css-syntax-3/#biblio-mediaq),
-// as in Selectors API or the media HTML attribute.
+// is for the contents of presentational attributes, which parse text into a single declaration’s value,
+// or for parsing a stand-alone selector [SELECT] or list of Media Queries [MEDIAQ], as in Selectors API or the media HTML attribute.
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-list-of-component-values
 func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.Token, error) {
