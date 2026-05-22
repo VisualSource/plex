@@ -775,6 +775,7 @@ func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.Tok
 			return values, nil
 		case tokenizer.TokenId_BracketCurlyClose:
 			if nested {
+				p.reconsumeToken(token)
 				return values, nil
 			}
 

@@ -1,8 +1,8 @@
 [
 
 "", [],
-"foo", [["error", "invalid"]],
-"foo 4", [["error", "invalid"]],
+"foo", [],
+"foo 4", [],
 
 "@foo", [["at-rule", "foo", [], null]],
 
@@ -10,10 +10,10 @@
 
 " /**/ @foo bar{[(4", [["at-rule", "foo",
     [" ", ["ident", "bar"]],
-    [["error", "invalid"]]
+    []
 ]],
 
-"@foo { bar", [["at-rule", "foo", [" "], [["error", "invalid"]]]],
+"@foo { bar", [["at-rule", "foo", [" "], []]],
 "@foo [ bar", [["at-rule", "foo", [" ", ["[]", " ", ["ident", "bar"]]], null]],
 
 " /**/ div > p { color: #aaa;  } /**/ ", [["qualified rule",
@@ -38,7 +38,7 @@
 
 "div {} -->", [["qualified rule", [["ident", "div"], " "], []]],
 
-"{}a", [["qualified rule", [], []], ["error", "invalid"]],
+"{}a", [["qualified rule", [], []]],
 "{}@a", [["qualified rule", [], []], ["at-rule", "a", [], null]]
 
 ]

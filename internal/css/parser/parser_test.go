@@ -47,7 +47,7 @@ func Test_ParseStylesheet(t *testing.T) {
 }
 
 func Test_ParseBlocksContents(t *testing.T) {
-	testCases := loadTestFile(t, "block-contents.test")
+	testCases := loadTestFile(t, "blocks-contents.test")
 
 	for i, testCase := range testCases {
 		name := fmt.Sprintf("test %d", i)
@@ -275,6 +275,7 @@ func mismatch(t *testing.T, path string, want, got any) {
 // have exactly one token, compared via matchToken).
 func matchSequence(t *testing.T, path string, expected expectedAST, actual []tokenizer.Token) {
 	t.Helper()
+	actual = flattenDeclLists(actual)
 	if list, ok := expected.([]expectedAST); ok {
 		if len(list) != len(actual) {
 			mismatch(t, path, list, actual)
@@ -290,6 +291,31 @@ func matchSequence(t *testing.T, path string, expected expectedAST, actual []tok
 		return
 	}
 	matchToken(t, path, expected, actual[0])
+}
+
+// flattenDeclLists expands the CSS Syntax §5.5.5 grouping (*DeclarationList /
+// *NestedDeclarations) into individual *Declaration items, so that the parser's
+// spec-faithful grouped output can be compared against the W3C JSON fixtures'
+// flat representation.
+func flattenDeclLists(in []tokenizer.Token) []tokenizer.Token {
+	out := make([]tokenizer.Token, 0, len(in))
+	for _, t := range in {
+		switch v := t.(type) {
+		case *parser.DeclarationList:
+			for _, d := range v.Value {
+				out = append(out, d)
+			}
+		case *parser.NestedDeclarations:
+			if v.Value != nil {
+				for _, d := range v.Value.Value {
+					out = append(out, d)
+				}
+			}
+		default:
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 func matchToken(t *testing.T, path string, expected expectedAST, actual tokenizer.Token) {
@@ -333,6 +359,16 @@ func matchStringToken(t *testing.T, path, s string, actual tokenizer.Token) {
 	case ",":
 		if actual.IsToken() != tokenizer.TokenId_Comma {
 			mismatch(t, path, ",", actual)
+		}
+		return
+	case "<!--":
+		if actual.IsToken() != tokenizer.TokenId_CDO {
+			mismatch(t, path, "<!--", actual)
+		}
+		return
+	case "-->":
+		if actual.IsToken() != tokenizer.TokenId_CDC {
+			mismatch(t, path, "-->", actual)
 		}
 		return
 	}
@@ -559,7 +595,7 @@ func matchRuleBlock(t *testing.T, path string, expected expectedAST, rule *parse
 	merged := make([]tokenizer.Token, 0)
 	if rule.Declarations != nil {
 		for _, d := range rule.Declarations.Value {
-			merged = append(merged, *d)
+			merged = append(merged, d)
 		}
 	}
 	merged = append(merged, rule.ChildRules...)

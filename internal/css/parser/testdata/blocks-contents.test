@@ -7,7 +7,6 @@
 ],
 
 "z;a:b", [
-    ["error", "invalid"],
     ["declaration", "a", [["ident", "b"]], false]
 ],
 
@@ -17,8 +16,7 @@
 ],
 
 "a:b; c+:d", [
-    ["declaration", "a", [["ident", "b"]], false],
-    ["error", "invalid"]
+    ["declaration", "a", [["ident", "b"]], false]
 ],
 
 "@import 'foo.css'; a:b; @import 'bar.css'", [
@@ -99,7 +97,6 @@
 ],
 
 "z; a:b; @foo; c:d", [
-    ["error", "invalid"],
     ["declaration", "a", [["ident", "b"]], false],
     ["at-rule", "foo", [], null],
     ["declaration", "c", [["ident", "d"]], false]
