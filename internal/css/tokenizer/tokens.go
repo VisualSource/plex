@@ -57,9 +57,9 @@ type MultiCharacterToken struct {
 	End   int
 }
 
-func (i MultiCharacterToken) IsToken() TokenId       { return i.Type }
-func (i MultiCharacterToken) Range() (int, int)      { return i.Start, i.End }
-func (i *MultiCharacterToken) setRange(s, e int)     { i.Start, i.End = s, e }
+func (i MultiCharacterToken) IsToken() TokenId   { return i.Type }
+func (i MultiCharacterToken) Range() (int, int)  { return i.Start, i.End }
+func (i *MultiCharacterToken) setRange(s, e int) { i.Start, i.End = s, e }
 
 func NewMultiCharacterToken(t TokenId, value string) *MultiCharacterToken {
 	return &MultiCharacterToken{
@@ -76,9 +76,9 @@ type SingleCharacterToken struct {
 	End   int
 }
 
-func (b SingleCharacterToken) IsToken() TokenId       { return b.Type }
-func (b SingleCharacterToken) Range() (int, int)      { return b.Start, b.End }
-func (b *SingleCharacterToken) setRange(s, e int)     { b.Start, b.End = s, e }
+func (b SingleCharacterToken) IsToken() TokenId   { return b.Type }
+func (b SingleCharacterToken) Range() (int, int)  { return b.Start, b.End }
+func (b *SingleCharacterToken) setRange(s, e int) { b.Start, b.End = s, e }
 
 func NewSingleCharacterToken(t TokenId, value rune) *SingleCharacterToken {
 	return &SingleCharacterToken{
@@ -92,9 +92,9 @@ type EOFToken struct {
 	End   int
 }
 
-func (b EOFToken) IsToken() TokenId       { return TokenId_EOF }
-func (b EOFToken) Range() (int, int)      { return b.Start, b.End }
-func (b *EOFToken) setRange(s, e int)     { b.Start, b.End = s, e }
+func (b EOFToken) IsToken() TokenId   { return TokenId_EOF }
+func (b EOFToken) Range() (int, int)  { return b.Start, b.End }
+func (b *EOFToken) setRange(s, e int) { b.Start, b.End = s, e }
 
 func NewEOFToken() *EOFToken { return &EOFToken{} }
 
@@ -113,15 +113,16 @@ type NumericToken struct {
 	End   int
 }
 
-func (n NumericToken) IsToken() TokenId       { return n.Type }
-func (n NumericToken) Range() (int, int)      { return n.Start, n.End }
-func (n *NumericToken) setRange(s, e int)     { n.Start, n.End = s, e }
+func (n NumericToken) IsToken() TokenId   { return n.Type }
+func (n NumericToken) Range() (int, int)  { return n.Start, n.End }
+func (n *NumericToken) setRange(s, e int) { n.Start, n.End = s, e }
 
-func NewNumericToken(t TokenId, value float64, sign rune) *NumericToken {
+func NewNumericToken(t TokenId, value float64, flag string, sign rune) *NumericToken {
 	return &NumericToken{
 		Type:  t,
 		Value: value,
 		Sign:  sign,
+		Flag:  flag,
 	}
 }
 
@@ -132,9 +133,9 @@ type DataToken struct {
 	End   int
 }
 
-func (i DataToken) IsToken() TokenId       { return i.Type }
-func (i DataToken) Range() (int, int)      { return i.Start, i.End }
-func (i *DataToken) setRange(s, e int)     { i.Start, i.End = s, e }
+func (i DataToken) IsToken() TokenId   { return i.Type }
+func (i DataToken) Range() (int, int)  { return i.Start, i.End }
+func (i *DataToken) setRange(s, e int) { i.Start, i.End = s, e }
 
 func NewDataToken(t TokenId) *DataToken { return &DataToken{Type: t} }
 
@@ -146,9 +147,9 @@ type UnicodeRangeToken struct {
 	SrcEnd   int // rune offset just past the token's last rune in the source
 }
 
-func (i UnicodeRangeToken) IsToken() TokenId       { return TokenId_UnicodeRange }
-func (i UnicodeRangeToken) Range() (int, int)      { return i.SrcStart, i.SrcEnd }
-func (i *UnicodeRangeToken) setRange(s, e int)     { i.SrcStart, i.SrcEnd = s, e }
+func (i UnicodeRangeToken) IsToken() TokenId   { return TokenId_UnicodeRange }
+func (i UnicodeRangeToken) Range() (int, int)  { return i.SrcStart, i.SrcEnd }
+func (i *UnicodeRangeToken) setRange(s, e int) { i.SrcStart, i.SrcEnd = s, e }
 
 func NewUnicodeRangeToken(start int, end int) *UnicodeRangeToken {
 	return &UnicodeRangeToken{

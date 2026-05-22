@@ -85,7 +85,7 @@ var bracketMap map[tokenizer.TokenId]tokenizer.TokenId = map[tokenizer.TokenId]t
 }
 
 func getTokenValueAsString(v tokenizer.Token) string {
-	if v, ok := v.(tokenizer.MultiCharacterToken); ok {
+	if v, ok := v.(*tokenizer.MultiCharacterToken); ok {
 		return v.Value
 	}
 	return ""

@@ -342,8 +342,7 @@ func (t *CssTokenizer) consumeNumericToken() (Token, error) {
 			return nil, err
 		}
 
-		token := NewNumericToken(TokenId_Dimension, num, sign)
-		token.Flag = numType
+		token := NewNumericToken(TokenId_Dimension, num, numType, sign)
 		token.Unit = ident
 
 		return token, nil
@@ -351,11 +350,10 @@ func (t *CssTokenizer) consumeNumericToken() (Token, error) {
 		if err := t.stream.Discard(1); err != nil {
 			return nil, err
 		}
-		return NewNumericToken(TokenId_Percentage, num, sign), nil
+		return NewNumericToken(TokenId_Percentage, num, numType, sign), nil
 	}
 
-	token := NewNumericToken(TokenId_Number, num, sign)
-	token.Flag = numType
+	token := NewNumericToken(TokenId_Number, num, numType, sign)
 
 	return token, nil
 }

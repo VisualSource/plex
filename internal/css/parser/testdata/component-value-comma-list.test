@@ -1,0 +1,120 @@
+[
+
+"", [],
+
+"   ", [
+	[" "]
+],
+
+"/**/ /**/", [
+	[" "]
+],
+
+"red", [
+	[["ident", "red"]]
+],
+
+"red, blue", [
+	[["ident", "red"]],
+	[" ", ["ident", "blue"]]
+],
+
+"a, b, c", [
+	[["ident", "a"]],
+	[" ", ["ident", "b"]],
+	[" ", ["ident", "c"]]
+],
+
+",", [
+	[]
+],
+
+",a", [
+	[],
+	[["ident", "a"]]
+],
+
+"a,", [
+	[["ident", "a"]]
+],
+
+"a,,b", [
+	[["ident", "a"]],
+	[],
+	[["ident", "b"]]
+],
+
+"  a , b  ", [
+	[" ", ["ident", "a"], " "],
+	[" ", ["ident", "b"], " "]
+],
+
+"rgb(1, 2, 3), blue", [
+	[["function", "rgb",
+		["number", "1", 1, "integer"], ",", " ",
+		["number", "2", 2, "integer"], ",", " ",
+		["number", "3", 3, "integer"]
+	]],
+	[" ", ["ident", "blue"]]
+],
+
+"[a, b], c", [
+	[["[]",
+		["ident", "a"], ",", " ", ["ident", "b"]
+	]],
+	[" ", ["ident", "c"]]
+],
+
+"{a, b}, c", [
+	[["{}",
+		["ident", "a"], ",", " ", ["ident", "b"]
+	]],
+	[" ", ["ident", "c"]]
+],
+
+"\"a, b\", c", [
+	[["string", "a, b"]],
+	[" ", ["ident", "c"]]
+],
+
+"h1, h2, h3", [
+	[["ident", "h1"]],
+	[" ", ["ident", "h2"]],
+	[" ", ["ident", "h3"]]
+],
+
+"\"Times New Roman\", Georgia, serif", [
+	[["string", "Times New Roman"]],
+	[" ", ["ident", "Georgia"]],
+	[" ", ["ident", "serif"]]
+],
+
+"screen and (min-width: 600px), print", [
+	[["ident", "screen"], " ", ["ident", "and"], " ", ["()",
+		["ident", "min-width"], ":", " ", ["dimension", "600", 600, "integer", "px"]
+	]],
+	[" ", ["ident", "print"]]
+],
+
+"opacity 200ms ease, transform 300ms linear", [
+	[["ident", "opacity"], " ", ["dimension", "200", 200, "integer", "ms"], " ", ["ident", "ease"]],
+	[" ", ["ident", "transform"], " ", ["dimension", "300", 300, "integer", "ms"], " ", ["ident", "linear"]]
+],
+
+"10px, 50%, 1.5", [
+	[["dimension", "10", 10, "integer", "px"]],
+	[" ", ["percentage", "50", 50, "integer"]],
+	[" ", ["number", "1.5", 1.5, "number"]]
+],
+
+"#abc, @media, .foo", [
+	[["hash", "abc", "id"]],
+	[" ", ["at-keyword", "media"]],
+	[" ", ".", ["ident", "foo"]]
+],
+
+"'unclosed, x", [
+	[["string", "unclosed, x"]]
+]
+
+]
