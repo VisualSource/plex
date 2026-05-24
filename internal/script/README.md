@@ -1,6 +1,6 @@
 # argile
 
-<keyword> struct|if|else|while|let|mut|fn
+<keyword> import|from|struct|if|else|while|let|mut|fn|null
 
 struct <ident> {
     <ident>: <type>;
@@ -33,4 +33,4 @@ let mut <ident> = 1;
 <float|float64|float32> 1.11111
 <ident>[] int[]
 
-!= == = || < > >= <=
+!= == = || < > >= <= =>

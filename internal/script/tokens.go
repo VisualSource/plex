@@ -14,8 +14,6 @@ const (
 	TokenType_Colon
 	TokenType_Comma
 	TokenType_Dot
-	TokenType_Number
-	TokenType_Float
 	TokenType_Keyword
 	TokenType_Plus
 	TokenType_Minus
@@ -37,7 +35,8 @@ const (
 	TokenType_NotEqual
 	TokenType_EqualEqual
 	TokenType_OR
-	TOkenType_AND
+	TokenType_AND
+	TokenType_Number
 )
 
 var delimMap = map[rune]TokenType{
@@ -93,6 +92,15 @@ type ValueToken struct {
 	row   int64
 	col   int64
 	Value string
+}
+
+func NewNumberToken(value string, row int64, col int64) *ValueToken {
+	return &ValueToken{
+		ttype: TokenType_Number,
+		row:   row,
+		col:   col,
+		Value: value,
+	}
 }
 
 func NewIdentToken(value string, row int64, col int64) *ValueToken {

@@ -1,0 +1,14 @@
+[
+    {
+        "name":"comment",
+        "input": "// single line comment",
+    },
+    {
+        "name":"comment with lf",
+        "input":"// comment \n",
+    },
+    {
+        "name":"comment with crlf",
+        "input":"// comment \r\n",
+    }
+]

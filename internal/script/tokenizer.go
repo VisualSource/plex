@@ -9,14 +9,19 @@ import (
 )
 
 type Tokenizer struct {
-	stream runeio.RuneReader
+	stream *runeio.RuneReader
 	tokens []Token
 	row    int64
 	col    int64
 }
 
-func NewTokenizer() *Tokenizer {
-	return &Tokenizer{}
+func NewTokenizer(stream io.Reader) *Tokenizer {
+	return &Tokenizer{
+		stream: runeio.NewReader(stream),
+		tokens: make([]Token, 0),
+		row:    0,
+		col:    0,
+	}
 }
 
 func (t *Tokenizer) Tokenize() ([]Token, error) {
@@ -102,7 +107,9 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 					return nil, err
 				}
 				t.row--
-				t.consumeNumber()
+				if err := t.consumeNumber(); err != nil {
+					return nil, err
+				}
 				continue
 			case char != '.' && char == next[0]:
 				if err := t.stream.Discard(1); err != nil {
@@ -201,7 +208,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TOkenType_AND, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_AND, t.row, t.col))
 				continue
 			}
 
@@ -391,9 +398,9 @@ func (t *Tokenizer) consumeIdent() error {
 	value := ident.String()
 
 	switch value {
-	case "while", "if", "else", "struct", "fn", "mut":
+	case "import", "from", "while", "if", "else", "struct", "fn", "mut":
 		t.tokens = append(t.tokens, NewIdentToken(value, t.row, t.col))
-	case "int", "int64", "int32", "int16", "int8", "uint", "u64", "u32", "u16", "u8", "bool":
+	case "null", "int", "int64", "int32", "int16", "int8", "uint", "u64", "u32", "u16", "u8", "bool":
 		t.tokens = append(t.tokens, NewIdentToken(value, t.row, t.col))
 	default:
 		t.tokens = append(t.tokens, NewIdentToken(value, t.row, t.col))
@@ -402,7 +409,120 @@ func (t *Tokenizer) consumeIdent() error {
 	return nil
 }
 
+func (t *Tokenizer) consumeDigits(rep *strings.Builder) error {
+	for {
+		char, _, err := t.stream.ReadRune()
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if err == io.EOF {
+			break
+		}
+		t.row++
+
+		if unicode.IsDigit(char) {
+			rep.WriteRune(char)
+			continue
+		}
+
+		if err := t.stream.UnreadRune(); err != nil {
+			return err
+		}
+		t.row--
+		break
+	}
+
+	return nil
+}
+
 func (t *Tokenizer) consumeNumber() error {
+	seenDot := false
+	value := strings.Builder{}
+
+	//#region +-. check
+	next, err := t.stream.Peek(2)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	if len(next) > 0 && (next[0] == '+' || next[0] == '-' || next[0] == '.') {
+		if err := t.stream.Discard(1); err != nil {
+			return err
+		}
+		t.row++
+		value.WriteRune(next[0])
+
+		if len(next) > 1 && next[0] != '.' && next[1] == '.' {
+			seenDot = true
+			if err := t.stream.Discard(1); err != nil {
+				return err
+			}
+			t.row++
+			value.WriteRune(next[1])
+		}
+	}
+	//#endregion
+
+	if err := t.consumeDigits(&value); err != nil {
+		return err
+	}
+
+	//#region .<DIGIT> check !seenDot
+	next, err = t.stream.Peek(2)
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	if len(next) >= 2 && next[0] == '.' {
+		if seenDot {
+			return ErrUnexpectedCharacter
+		}
+
+		if unicode.IsDigit(next[1]) {
+			if err := t.stream.Discard(2); err != nil {
+				return err
+			}
+			t.row += 2
+			value.WriteRune(next[0])
+			value.WriteRune(next[1])
+
+			if err := t.consumeDigits(&value); err != nil {
+				return err
+			}
+		}
+	}
+
+	//#region e notion check
+	next, err = t.stream.Peek(3)
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	if len(next) >= 2 && (next[0] == 'e' || next[0] == 'E') {
+		switch {
+		case len(next) >= 3 && (next[1] == '-' || next[1] == '+') && unicode.IsDigit(next[2]):
+			if err := t.stream.Discard(3); err != nil {
+				return err
+			}
+			value.WriteString(string(next))
+
+			if err := t.consumeDigits(&value); err != nil {
+				return err
+			}
+		case unicode.IsDigit(next[1]):
+			if err := t.stream.Discard(2); err != nil {
+				return err
+			}
+			t.row++
+			value.WriteString(string(next[:2]))
+
+			if err := t.consumeDigits(&value); err != nil {
+				return err
+			}
+		}
+	}
+	//#endregion
+
+	t.tokens = append(t.tokens, NewNumberToken(value.String(), t.row, t.col))
 
 	return nil
 }
