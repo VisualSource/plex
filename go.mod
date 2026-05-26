@@ -17,7 +17,10 @@ require (
 
 require (
 	codeberg.org/chavacava/garif v0.2.1 // indirect
+	github.com/Zyko0/go-sdl3 v0.1.1 // indirect
+	github.com/Zyko0/purego-gen v0.0.0-20250727121216-3bcd331a1e0c // indirect
 	github.com/alfatraining/structtag v1.0.0 // indirect
+	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect

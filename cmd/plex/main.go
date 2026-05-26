@@ -6,11 +6,9 @@ import (
 	"log/slog"
 	"os"
 
-	// This controls the maxprocs environment variable in container runtimes.
-	// see https://martin.baillie.id/wrote/gotchas-in-the-go-network-packages-defaults/#bonus-gomaxprocs-containers-and-the-cfs
-	"go.uber.org/automaxprocs/maxprocs"
-
+	"github.com/VisualSource/plex/internal/core"
 	"github.com/VisualSource/plex/internal/log"
+	"go.uber.org/automaxprocs/maxprocs"
 )
 
 func main() {
@@ -36,7 +34,5 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("setting max procs: %w", err)
 	}
 
-	logger.InfoContext(ctx, "Hello world!", slog.String("location", "world"))
-
-	return nil
+	return core.StartPlex(logger)
 }
