@@ -4,12 +4,17 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/Zyko0/go-sdl3/bin/binimg"
 	"github.com/Zyko0/go-sdl3/bin/binsdl"
+	"github.com/Zyko0/go-sdl3/bin/binttf"
 	"github.com/Zyko0/go-sdl3/sdl"
+	"github.com/Zyko0/go-sdl3/ttf"
 )
 
 func StartPlex(logger *slog.Logger) error {
 	defer binsdl.Load().Unload()
+	defer binttf.Load().Unload()
+	defer binimg.Load().Unload()
 	defer sdl.Quit()
 
 	ctx := context.Background()
@@ -17,8 +22,11 @@ func StartPlex(logger *slog.Logger) error {
 	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
 		return err
 	}
+	if err := ttf.Init(); err != nil {
+		return err
+	}
 
-	window, renderer, err := sdl.CreateWindowAndRenderer("Plex", 800, 480, 0)
+	window, renderer, err := sdl.CreateWindowAndRenderer("Plex", 800, 480, sdl.WINDOW_RESIZABLE)
 	if err != nil {
 		return err
 	}
