@@ -57,10 +57,10 @@ func StartPlex(logger *slog.Logger) error {
 		//    	-> JOB: fetch and parse script
 		//           -> compile script
 		//           -> start script engine
-		//    	-> link html and css
+		//    	-> style tree
 		//     -> layout
 		//         -> pass layout to render process
-		//-> render
+		//-> painting
 
 		renderer.Present()
 		return nil
