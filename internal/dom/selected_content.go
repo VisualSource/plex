@@ -1,5 +1,7 @@
 package dom
 
+import "github.com/VisualSource/plex/internal/utils"
+
 type SelectedContentElement struct {
 	parent     Node
 	namespace  Namespace
@@ -106,4 +108,21 @@ func (e SelectedContentElement) Attributes() []*Attribute {
 
 func NewSelectedContentElement() *SelectedContentElement {
 	return &SelectedContentElement{}
+}
+
+func (e SelectedContentElement) Classes() utils.StringOption {
+	attr := e.GetAttribute("class")
+	if attr != nil {
+		return utils.Some(attr.Value)
+	}
+
+	return utils.None[string]()
+}
+func (e SelectedContentElement) Id() utils.StringOption {
+	attr := e.GetAttribute("id")
+	if attr != nil {
+		return utils.Some(attr.Value)
+	}
+
+	return utils.None[string]()
 }

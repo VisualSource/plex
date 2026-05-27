@@ -3,6 +3,8 @@ package dom
 import (
 	"slices"
 	"strings"
+
+	"github.com/VisualSource/plex/internal/utils"
 )
 
 type TemplateElement struct {
@@ -129,4 +131,21 @@ func (e *TemplateElement) RemoveChild(node Node) Node {
 	e.templateContents = slices.Delete(e.templateContents, idx, idx+1)
 
 	return removed
+}
+
+func (e TemplateElement) Classes() utils.StringOption {
+	attr := e.GetAttribute("class")
+	if attr != nil {
+		return utils.Some(attr.Value)
+	}
+
+	return utils.None[string]()
+}
+func (e TemplateElement) Id() utils.StringOption {
+	attr := e.GetAttribute("id")
+	if attr != nil {
+		return utils.Some(attr.Value)
+	}
+
+	return utils.None[string]()
 }

@@ -35,6 +35,8 @@ type ElementNode interface {
 	SetAttributeNode(node *Attribute)
 	HasAttribute(key string) bool
 	Attributes() []*Attribute
+	Id() utils.StringOption
+	Classes() utils.StringOption
 }
 
 type Attribute struct {
