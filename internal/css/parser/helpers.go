@@ -7,7 +7,7 @@ import (
 )
 
 func IsDelim(token tokenizer.Token, value rune) bool {
-	if token.IsToken() != tokenizer.TokenId_Delim {
+	if token == nil || token.IsToken() != tokenizer.TokenId_Delim {
 		return false
 	}
 
@@ -20,7 +20,7 @@ func IsDelim(token tokenizer.Token, value rune) bool {
 }
 
 func IsIdent(token tokenizer.Token, value string, insensitive bool) bool {
-	if token.IsToken() != tokenizer.TokenId_Ident {
+	if token == nil || token.IsToken() != tokenizer.TokenId_Ident {
 		return false
 	}
 
