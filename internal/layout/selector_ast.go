@@ -1,6 +1,12 @@
 package layout
 
-import "github.com/VisualSource/plex/internal/css/tokenizer"
+import (
+	"slices"
+	"strings"
+
+	"github.com/VisualSource/plex/internal/css/tokenizer"
+	"github.com/VisualSource/plex/internal/dom"
+)
 
 // SelectorList is a <complex-selector-list> = <complex-selector>#
 //
@@ -46,9 +52,34 @@ type CompoundSelector struct {
 	Pseudos  []SimpleSelector // pseudo-element(s) and their trailing pseudo-classes
 }
 
+func (e *CompoundSelector) matches(el dom.ElementNode) bool {
+	if e.Type != nil && !e.Type.matches(el) {
+		return false
+	}
+
+	// A compound matches only when every simple selector in it matches; an empty
+	// group is vacuously satisfied.
+	for _, sub := range e.Subclass {
+		if !sub.matches(el) {
+			return false
+		}
+	}
+
+	for _, pseudo := range e.Pseudos {
+		if !pseudo.matches(el) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // SimpleSelector is the sum type of all simple selectors that can appear inside
 // a compound selector.
-type SimpleSelector interface{ isSimpleSelector() }
+type SimpleSelector interface {
+	isSimpleSelector()
+	matches(el dom.ElementNode) bool
+}
 
 // TypeSelector is <wq-name> | <ns-prefix>? '*'.
 //
@@ -65,16 +96,39 @@ type TypeSelector struct {
 }
 
 func (*TypeSelector) isSimpleSelector() {}
+func (s *TypeSelector) matches(el dom.ElementNode) bool {
+	if s.Universal {
+		return true
+	}
+
+	if s.HasNamespace && s.Prefix == dom.NamespaceToPrefix(el.Namespace()) {
+		return true
+	}
+
+	return s.LocalName == el.Tag()
+}
 
 // IdSelector is <id-selector> = <hash-token> (only hashes with the "id" type flag).
 type IdSelector struct{ Name string }
 
 func (*IdSelector) isSimpleSelector() {}
+func (i *IdSelector) matches(el dom.ElementNode) bool {
+	return el.Id().Is(i.Name)
+}
 
 // ClassSelector is <class-selector> = '.' <ident-token>.
 type ClassSelector struct{ Name string }
 
 func (*ClassSelector) isSimpleSelector() {}
+func (c *ClassSelector) matches(el dom.ElementNode) bool {
+	list := el.Classes()
+
+	if list.IsSome() {
+		return slices.Contains(strings.Split(*list.Value, " "), c.Name)
+	}
+
+	return false
+}
 
 type AttrMatcher int
 
@@ -91,7 +145,7 @@ const (
 type AttrModifier int
 
 const (
-	AttrModNone           AttrModifier = iota
+	AttrModNone            AttrModifier = iota
 	AttrModCaseInsensitive              // i
 	AttrModCaseSensitive                // s
 )
@@ -107,6 +161,62 @@ type AttributeSelector struct {
 }
 
 func (*AttributeSelector) isSimpleSelector() {}
+func (a *AttributeSelector) matches(el dom.ElementNode) bool {
+	var attr *dom.Attribute
+	if a.HasNamespace {
+		attr = el.GetAttributeNS(dom.PrefixToNamespace(a.Prefix), a.LocalName)
+	} else {
+		attr = el.GetAttribute(a.LocalName)
+	}
+
+	if attr == nil {
+		return false
+	}
+
+	switch a.Matcher {
+	case AttrPresence:
+		return true
+	case AttrEquals:
+		if a.Modifier == AttrModCaseInsensitive {
+			return strings.EqualFold(a.Value, attr.Value)
+		}
+		return a.Value == attr.Value
+	case AttrSuffix:
+		if len(attr.Value) < len(a.Value) {
+			if a.Modifier == AttrModCaseInsensitive {
+				return strings.EqualFold(attr.Value[len(attr.Value)-len(a.Value):], a.Value)
+			}
+			return strings.HasSuffix(attr.Value, a.Value)
+		}
+
+		return false
+	case AttrPrefix:
+		if len(attr.Value) >= len(a.Value) {
+			if a.Modifier == AttrModCaseInsensitive {
+				return strings.EqualFold(attr.Value[:len(attr.Value)], a.Value)
+			}
+			return strings.HasPrefix(attr.Value, a.Value)
+		}
+
+		return false
+	case AttrIncludes:
+		return slices.ContainsFunc(strings.Split(attr.Value, " "), func(v string) bool {
+			if a.Modifier == AttrModCaseInsensitive {
+				return strings.EqualFold(v, a.Value)
+			}
+			return v == a.Value
+		})
+	case AttrSubstring:
+		return strings.Contains(attr.Value, a.Value)
+	case AttrDashMatch:
+		if a.Modifier == AttrModCaseInsensitive {
+			return strings.EqualFold(a.Value, attr.Value) || ((len(attr.Value) >= len(a.Value)+1) && strings.EqualFold(attr.Value[:len(attr.Value)], a.Value+"-"))
+		}
+		return a.Value == attr.Value || strings.HasPrefix(attr.Value, a.Value+"-")
+	default:
+		return false
+	}
+}
 
 // PseudoClassSelector is ':' <ident-token> | ':' <function-token> <any-value> ')'.
 //
@@ -120,6 +230,9 @@ type PseudoClassSelector struct {
 }
 
 func (*PseudoClassSelector) isSimpleSelector() {}
+func (p *PseudoClassSelector) matches(el dom.ElementNode) bool {
+	return false
+}
 
 // PseudoElementSelector is <pseudo-element-selector>, including the legacy
 // single-colon forms (:before, :after, :first-line, :first-letter).
@@ -130,6 +243,9 @@ type PseudoElementSelector struct {
 }
 
 func (*PseudoElementSelector) isSimpleSelector() {}
+func (p *PseudoElementSelector) matches(el dom.ElementNode) bool {
+	return false
+}
 
 // Specificity is the (A, B, C) triple defined by
 // https://drafts.csswg.org/selectors/#specificity-rules.

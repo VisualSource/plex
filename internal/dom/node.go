@@ -127,8 +127,8 @@ func previousSibling(node Node) Node {
 		return nil
 	}
 
-	idx := slices.IndexFunc(children, func(node Node) bool {
-		return node == node
+	idx := slices.IndexFunc(children, func(el Node) bool {
+		return node == el
 	})
 
 	if idx == -1 || idx-1 < 0 {

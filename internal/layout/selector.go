@@ -1,6 +1,7 @@
 package layout
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/VisualSource/plex/internal/css/parser"
@@ -17,9 +18,21 @@ type Selector struct {
 // <selector-list> grammar, returning the parsed list or parser.ErrSyntax. It is
 // the matchGrammar callback handed to parser.ParseAccordingToCssGrammar.
 //
+//	<complex-selector-list> = <complex-selector>#.
+//
 // @see https://drafts.csswg.org/selectors/#grammar
 func parseSelectorGrammar(components []tokenizer.Token) (SelectorList, error) {
-	return parseSelectorList(components)
+	segments := splitTopLevelComma(components)
+
+	out := make(SelectorList, 0, len(segments))
+	for _, seg := range segments {
+		cs, err := parseComplexSelector(seg)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, cs)
+	}
+	return out, nil
 }
 
 // NewSelector parses source as a <selector-list> and, on success, returns a
@@ -42,36 +55,102 @@ func NewSelector(selector string) (*Selector, error) {
 }
 
 func (s *Selector) Matches(node dom.ElementNode, scopingRoots ...any) bool {
-
-	for _, selector := range s.List {
-		for _, compx := range selector.Units {
-
-			// test simple selectors
-			// only one compund selector in complex selecotr -> true
-			//
-
+	for _, complex := range s.List {
+		if matchComplexRTL(complex.Units, node) {
+			return true
 		}
 	}
 
 	return false
 }
 
-//#region grammar
+//#region selector helpers
 
-// parseSelectorList is <complex-selector-list> = <complex-selector>#.
-func parseSelectorList(components []tokenizer.Token) (SelectorList, error) {
-	segments := splitTopLevelComma(components)
-
-	out := make(SelectorList, 0, len(segments))
-	for _, seg := range segments {
-		cs, err := parseComplexSelector(seg)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, cs)
+// matchComplexRTL matches units (a complex selector whose rightmost unit is the
+// subject) against node, right-to-left, per selector-matching.md. It is the
+// recursive core of Selector.Matches: test the rightmost compound, and if more
+// units remain, walk the combinator to a set of candidate elements and recurse
+// on the shorter selector against each.
+func matchComplexRTL(units []ComplexSelectorUnit, node dom.ElementNode) bool {
+	last := units[len(units)-1]
+	if !last.Compound.matches(node) {
+		return false
 	}
-	return out, nil
+
+	if len(units) == 1 {
+		return true
+	}
+
+	// Units[i].Combinator connects unit i to the unit on its left, so peeling the
+	// rightmost unit gathers candidates via last.Combinator.
+	rest := units[:len(units)-1]
+	for _, cand := range combinatorCandidates(last.Combinator, node) {
+		if matchComplexRTL(rest, cand) {
+			return true
+		}
+	}
+
+	return false
 }
+
+// combinatorCandidates returns the elements that combinator c relates node to,
+// against which the shorter selector is matched. Element nodes are distinguished
+// by whether the dom.Node also satisfies dom.ElementNode.
+func combinatorCandidates(c Combinator, node dom.ElementNode) []dom.ElementNode {
+	switch c {
+	case CombinatorChild: // '>' — the parent, if it is an element
+		if p, ok := node.Parent().(dom.ElementNode); ok {
+			return []dom.ElementNode{p}
+		}
+	case CombinatorDescendant: // ' ' — every ancestor element
+		var out []dom.ElementNode
+		for p := node.Parent(); p != nil; p = p.Parent() {
+			if e, ok := p.(dom.ElementNode); ok {
+				out = append(out, e)
+			}
+		}
+		return out
+	case CombinatorNextSibling: // '+' — the immediately preceding element sibling
+		if sibs := precedingElementSiblings(node); len(sibs) > 0 {
+			return sibs[:1]
+		}
+	case CombinatorSubsequentSibling: // '~' — every preceding element sibling
+		return precedingElementSiblings(node)
+	case CombinatorColumn: // '||' — phase 2; not yet supported
+		// TODO(phase2): column combinator requires table column-group logic.
+	}
+
+	return nil
+}
+
+// precedingElementSiblings returns node's preceding element siblings, nearest
+// first (index 0 is the immediately preceding element sibling). Non-element
+// nodes (text, comments) are skipped.
+func precedingElementSiblings(node dom.ElementNode) []dom.ElementNode {
+	parent := node.Parent()
+	if parent == nil {
+		return nil
+	}
+
+	children := parent.Children()
+	idx := slices.IndexFunc(children, func(n dom.Node) bool { return n == dom.Node(node) })
+	if idx <= 0 {
+		return nil
+	}
+
+	var out []dom.ElementNode
+	for i := idx - 1; i >= 0; i-- {
+		if e, ok := children[i].(dom.ElementNode); ok {
+			out = append(out, e)
+		}
+	}
+
+	return out
+}
+
+//#endregion
+
+//#region grammar
 
 // splitTopLevelComma splits a component-value list on bare comma tokens. This is
 // safe at the top level because commas inside [...] / (...) are already grouped
