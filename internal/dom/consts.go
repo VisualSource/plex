@@ -14,6 +14,42 @@ const (
 	NamespaceXMLNS  Namespace = "http://www.w3.org/2000/xmlns/"
 )
 
+func PrefixToNamespace(prefix string) Namespace {
+	switch prefix {
+	case "svg":
+		return NamespaceSVG
+	case "math":
+		return NamespaceMathML
+	case "xlink":
+		return NamespaceXLink
+	case "xmlns":
+		return NamespaceXMLNS
+	case "xml":
+		return NamespaceXML
+	default:
+		return NamespaceHTML
+	}
+}
+
+func NamespaceToPrefix(namespace Namespace) string {
+	switch namespace {
+	case NamespaceHTML:
+		return "html"
+	case NamespaceMathML:
+		return "math"
+	case NamespaceSVG:
+		return "svg"
+	case NamespaceXLink:
+		return "xlink"
+	case NamespaceXML:
+		return "xml"
+	case NamespaceXMLNS:
+		return "xmlns"
+	default:
+		return ""
+	}
+}
+
 type QuirksMode string
 
 const (

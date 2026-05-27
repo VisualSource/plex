@@ -5,6 +5,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
@@ -124,32 +125,58 @@ func (p *CssParser) restoreMark() {
 //#region Entry Points
 
 // @see https://drafts.csswg.org/css-syntax/#parse-grammar
-func (p *CssParser) ParseAccordingToCssGrammarStream(stream io.Reader) ([]any, error) {
+func ParseAccordingToCssGrammar[T any](input string, matchGrammar func([]tokenizer.Token) (T, error)) (T, error) {
+	p := NewCssParser()
 
-	_, err := p.ParseListOfComponentValues(stream)
+	components, err := p.ParseListOfComponentValues(strings.NewReader(input))
 	if err != nil {
-		return nil, err
+		return *new(T), err
 	}
 
-	//TODO: match
+	return matchGrammar(components)
+}
 
-	return nil, nil
+type ParseResult[T any] struct {
+	Value T
+	Err   error
+}
+
+func isOnlyWhitespace(input string) bool {
+	for _, r := range input {
+		if !unicode.IsSpace(r) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#parse-comma-list
-func (p *CssParser) ParseListAccordingToCssGrammarStream(stream io.Reader) ([]any, error) {
+func ParseListAccordingToCssGrammar[T any](input string, matchGrammar func([]tokenizer.Token) (T, error)) ([]ParseResult[T], error) {
+	p := NewCssParser()
 
-	//Whitespace check
+	if isOnlyWhitespace(input) {
+		return make([]ParseResult[T], 0), nil
+	}
 
-	final := make([]any, 0)
-	_, err := p.ParseCommaListOfComponentValues(stream)
+	list := make([]ParseResult[T], 0)
+	values, err := p.ParseCommaListOfComponentValues(strings.NewReader(input))
 	if err != nil {
 		return nil, err
 	}
 
-	//TODO: replace grammar
+	for i := range values {
+		result, err := matchGrammar(values[i])
 
-	return final, nil
+		var v ParseResult[T] = ParseResult[T]{
+			Value: result,
+			Err:   err,
+		}
+
+		list = append(list, v)
+	}
+
+	return list, nil
 }
 
 // intended to be the normal parser entry point, for parsing stylesheets.
@@ -416,7 +443,7 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 	}
 
 	atRule := &Rule{
-		Name: getTokenValueAsString(nameToken),
+		Name: GetTokenValueAsString(nameToken),
 	}
 
 	for {
@@ -695,7 +722,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 		}
 	}
 
-	if lastIdx != -1 && secondLastIdx != -1 && isDelim(decl.Value[secondLastIdx], '!') && isIdent(decl.Value[lastIdx], "important", true) {
+	if lastIdx != -1 && secondLastIdx != -1 && IsDelim(decl.Value[secondLastIdx], '!') && IsIdent(decl.Value[lastIdx], "important", true) {
 		decl.Value = slices.Delete(decl.Value, secondLastIdx, lastIdx+1)
 		decl.Important = true
 	}
@@ -719,7 +746,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 			}
 			return nil, nil
 		}
-	case isIdent(decl.Name, "unicode-range", true):
+	case IsIdent(decl.Name, "unicode-range", true):
 		tokens, err := p.consumeUnicodeRangeValue(p.valueSourceSegment(decl))
 		if err != nil {
 			return nil, err
@@ -891,7 +918,7 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 
 	startPos, _ := fnT.Range()
 	fn := &Function{
-		Name:  getTokenValueAsString(fnT),
+		Name:  GetTokenValueAsString(fnT),
 		Start: startPos,
 	}
 

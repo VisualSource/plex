@@ -106,6 +106,22 @@ func (e Element) GetAttributeNS(namespace Namespace, localname string) *Attribut
 
 	return nil
 }
+func (e Element) Classes() utils.StringOption {
+	attr := e.GetAttribute("class")
+	if attr != nil {
+		return utils.Some(attr.Value)
+	}
+
+	return utils.None[string]()
+}
+func (e Element) Id() utils.StringOption {
+	attr := e.GetAttribute("id")
+	if attr != nil {
+		return utils.Some(attr.Value)
+	}
+
+	return utils.None[string]()
+}
 func (e Element) HasAttribute(key string) bool {
 	attr := e.GetAttribute(key)
 	return attr != nil

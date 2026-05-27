@@ -35,6 +35,8 @@ type ElementNode interface {
 	SetAttributeNode(node *Attribute)
 	HasAttribute(key string) bool
 	Attributes() []*Attribute
+	Id() utils.StringOption
+	Classes() utils.StringOption
 }
 
 type Attribute struct {
@@ -125,8 +127,8 @@ func previousSibling(node Node) Node {
 		return nil
 	}
 
-	idx := slices.IndexFunc(children, func(node Node) bool {
-		return node == node
+	idx := slices.IndexFunc(children, func(el Node) bool {
+		return node == el
 	})
 
 	if idx == -1 || idx-1 < 0 {
