@@ -21,36 +21,33 @@ type Selector struct {
 //	<complex-selector-list> = <complex-selector>#.
 //
 // @see https://drafts.csswg.org/selectors/#grammar
-func parseSelectorGrammar(components []tokenizer.Token) (SelectorList, error) {
-	segments := splitTopLevelComma(components)
-
-	out := make(SelectorList, 0, len(segments))
-	for _, seg := range segments {
-		cs, err := parseComplexSelector(seg)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, cs)
-	}
-	return out, nil
-}
 
 // NewSelector parses source as a <selector-list> and, on success, returns a
 // Selector carrying the parsed list and its (max) specificity.
 //
 // @see https://www.w3.org/TR/selectors-4/#parse-selector
 func NewSelector(selector string) (*Selector, error) {
-	list, err := parser.ParseAccordingToCssGrammar(selector, parseSelectorGrammar)
+	list, err := parser.ParseListAccordingToCssGrammar(selector, parseComplexSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	s := &Selector{List: list}
-	for _, complex := range list {
+	scl := make(SelectorList, 0)
+	s := &Selector{List: scl}
+
+	for _, i := range list {
+		if i.Err != nil {
+			continue
+		}
+
+		complex := i.Value
+
+		scl = append(scl, complex)
 		if v := complex.Specificity().Value(); v > s.Specificity {
 			s.Specificity = v
 		}
 	}
+
 	return s, nil
 }
 
