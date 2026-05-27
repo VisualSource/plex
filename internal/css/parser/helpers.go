@@ -6,7 +6,7 @@ import (
 	"github.com/VisualSource/plex/internal/css/tokenizer"
 )
 
-func isDelim(token tokenizer.Token, value rune) bool {
+func IsDelim(token tokenizer.Token, value rune) bool {
 	if token.IsToken() != tokenizer.TokenId_Delim {
 		return false
 	}
@@ -19,7 +19,7 @@ func isDelim(token tokenizer.Token, value rune) bool {
 	return iv.Value == value
 }
 
-func isIdent(token tokenizer.Token, value string, insensitive bool) bool {
+func IsIdent(token tokenizer.Token, value string, insensitive bool) bool {
 	if token.IsToken() != tokenizer.TokenId_Ident {
 		return false
 	}
@@ -84,7 +84,7 @@ var bracketMap map[tokenizer.TokenId]tokenizer.TokenId = map[tokenizer.TokenId]t
 	tokenizer.TokenId_BracketSquareOpen: tokenizer.TokenId_BracketSquareClose,
 }
 
-func getTokenValueAsString(v tokenizer.Token) string {
+func GetTokenValueAsString(v tokenizer.Token) string {
 	if v, ok := v.(*tokenizer.MultiCharacterToken); ok {
 		return v.Value
 	}
