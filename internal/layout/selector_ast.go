@@ -97,11 +97,11 @@ type TypeSelector struct {
 
 func (*TypeSelector) isSimpleSelector() {}
 func (s *TypeSelector) matches(el dom.ElementNode) bool {
-	if s.Universal {
+	if s.HasNamespace && s.Prefix == dom.NamespaceToPrefix(el.Namespace()) {
 		return true
 	}
 
-	if s.HasNamespace && s.Prefix == dom.NamespaceToPrefix(el.Namespace()) {
+	if s.Universal {
 		return true
 	}
 

@@ -1,45 +1,64 @@
 package layout
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 
 	"github.com/VisualSource/plex/internal/css/parser"
+	"github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/dom"
+	"github.com/Zyko0/go-sdl3/sdl"
 )
+
+type PropertyMap map[string]any
+
+func (p PropertyMap) MustGetColor(key string) sdl.FColor {
+	color, ok := p[key].(sdl.FColor)
+	if !ok {
+		panic("was expecting a color value")
+	}
+
+	return color
+}
+
+type SelectorCache map[*parser.Rule]*Selector
 
 type MatchedRule struct {
 	Specificity int
 	Rule        *parser.Rule
 	Origin      int
 }
-
 type StyledNode struct {
 	node            dom.Node
 	specifiedValues map[string]any
 	children        []*StyledNode
 }
 
-func NewStyleTree(el dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache map[*parser.Rule]*Selector) (*StyledNode, error) {
+func NewStyleTree(el dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache SelectorCache, parentPropertyMap PropertyMap) (*StyledNode, error) {
 	if selectorCache == nil {
-		selectorCache = make(map[*parser.Rule]*Selector)
+		selectorCache = make(SelectorCache)
 	}
+
+	props := specifiedValues(el, stylesheets, selectorCache, parentPropertyMap)
 
 	children := make([]*StyledNode, 0)
 	for _, child := range el.Children() {
 		if n, ok := child.(dom.ElementNode); ok {
-			tree, err := NewStyleTree(n, stylesheets, selectorCache)
+			tree, err := NewStyleTree(n, stylesheets, selectorCache, props)
 
 			if err != nil {
 				continue
 			}
 
 			children = append(children, tree)
+		} else if _, ok := child.(*dom.Text); ok {
+
+			//TODO: handle passing text nodes styles
 
 		}
 	}
 
-	props := specifiedValues(el, stylesheets, selectorCache)
 	node := &StyledNode{
 		node:            el,
 		children:        children,
@@ -49,7 +68,7 @@ func NewStyleTree(el dom.ElementNode, stylesheets []*parser.Stylesheet, selector
 	return node, nil
 }
 
-func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *parser.Rule, selectorCache map[*parser.Rule]*Selector) *MatchedRule {
+func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *parser.Rule, selectorCache SelectorCache) *MatchedRule {
 	selector, ok := selectorCache[rule]
 	if !ok {
 		sel, err := NewSelectorFromTokens(rule.Prelude)
@@ -58,6 +77,7 @@ func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *parser.Rule, se
 		}
 
 		selectorCache[rule] = sel
+		selector = sel
 	}
 
 	if selector.Matches(node) {
@@ -71,7 +91,7 @@ func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *parser.Rule, se
 	return nil
 }
 
-func matchRules(node dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache map[*parser.Rule]*Selector) []*MatchedRule {
+func matchRules(node dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache SelectorCache) []*MatchedRule {
 
 	matched := make([]*MatchedRule, 0)
 
@@ -87,31 +107,60 @@ func matchRules(node dom.ElementNode, stylesheets []*parser.Stylesheet, selector
 	return matched
 }
 
-func specifiedValues(node dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache map[*parser.Rule]*Selector) map[string]any {
-	property := make(map[string]any)
+func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, decl *parser.Declaration) map[string]any {
+	switch decl.Name.IsToken() {
+	case tokenizer.TokenId_Ident:
+		key := parser.GetTokenValueAsString(decl.Name)
+		switch key {
+		case "color":
+			// inherit,initial,revert,unset,currentColor
+			// fn,hex,named,
+
+			propertyMap[key] = parseColor(decl.Value)
+
+		case "background-color":
+		case "border":
+
+		default:
+			propertyMap[key] = ""
+		}
+	}
+
+	return propertyMap
+}
+
+func specifiedValues(node dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache SelectorCache, parentPropertyMap PropertyMap) PropertyMap {
+	property := make(PropertyMap)
 
 	rules := matchRules(node, stylesheets, selectorCache)
 
-	slices.SortFunc(rules, func(a, b *MatchedRule) int {
-		if a.Origin < b.Origin {
-			return -1
-		}
-
-		return a.Specificity - b.Specificity
+	slices.SortStableFunc(rules, func(a, b *MatchedRule) int {
+		return cmp.Or(
+			cmp.Compare(a.Origin, b.Origin),
+			cmp.Compare(a.Specificity, b.Specificity),
+		)
 	})
 
 	for _, rule := range rules {
 		for _, dec := range rule.Rule.Declarations.Value {
-			// apply props
+			property = parseDeclaration(property, parentPropertyMap, dec)
 		}
 	}
 
 	style := node.GetAttribute("style")
 	if style != nil {
 		p := parser.NewCssParser()
-		_, err := p.ParseBlocksContents(strings.NewReader(style.Value))
-		if err == nil {
-			// should only get declaration lists
+		values, err := p.ParseBlocksContents(strings.NewReader(style.Value))
+		if err == nil && len(values) > 0 {
+			// should only be a single declaration list and no rules
+			// as it should only be parsing something like style="color: green; background-color:gray;"
+
+			list, ok := values[0].(*parser.DeclarationList)
+			if ok {
+				for _, dec := range list.Value {
+					property = parseDeclaration(property, parentPropertyMap, dec)
+				}
+			}
 		}
 	}
 
