@@ -32,8 +32,7 @@ func NewSelector(selector string) (*Selector, error) {
 		return nil, err
 	}
 
-	scl := make(SelectorList, 0)
-	s := &Selector{List: scl}
+	s := &Selector{List: make(SelectorList, 0)}
 
 	for _, i := range list {
 		if i.Err != nil {
@@ -42,7 +41,35 @@ func NewSelector(selector string) (*Selector, error) {
 
 		complex := i.Value
 
-		scl = append(scl, complex)
+		s.List = append(s.List, complex)
+		if v := complex.Specificity().Value(); v > s.Specificity {
+			s.Specificity = v
+		}
+	}
+
+	return s, nil
+}
+
+func NewSelectorFromTokens(tokens []tokenizer.Token) (*Selector, error) {
+	var segments [][]tokenizer.Token
+	var current []tokenizer.Token
+	for _, tok := range tokens {
+		if tok.IsToken() == tokenizer.TokenId_Comma {
+			segments = append(segments, current)
+			current = nil
+		} else {
+			current = append(current, tok)
+		}
+	}
+	segments = append(segments, current)
+
+	s := &Selector{List: make(SelectorList, 0)}
+	for _, seg := range segments {
+		complex, err := parseComplexSelector(seg)
+		if err != nil {
+			continue
+		}
+		s.List = append(s.List, complex)
 		if v := complex.Specificity().Value(); v > s.Specificity {
 			s.Specificity = v
 		}

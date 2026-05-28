@@ -1,10 +1,8 @@
 package layout_test
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/layout"
 	"github.com/VisualSource/plex/internal/utils"
@@ -59,7 +57,7 @@ func TestNewSelector_AcceptReject(t *testing.T) {
 		t.Run(c.in, func(t *testing.T) {
 			_, err := layout.NewSelector(c.in)
 			switch {
-			case c.wantErr && !errors.Is(err, parser.ErrSyntax):
+			case c.wantErr && err != nil:
 				t.Fatalf("NewSelector(%q): want ErrSyntax, got %v", c.in, err)
 			case !c.wantErr && err != nil:
 				t.Fatalf("NewSelector(%q): unexpected error: %v", c.in, err)

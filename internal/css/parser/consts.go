@@ -18,6 +18,7 @@ const (
 type Stylesheet struct {
 	Rules    []*Rule
 	Location utils.StringOption
+	Origin   int
 }
 
 type Rule struct {
