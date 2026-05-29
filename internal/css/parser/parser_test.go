@@ -1,4 +1,4 @@
-package parser_test
+package css_parser_test
 
 import (
 	"encoding/json"
@@ -23,20 +23,20 @@ func Test_ParseStylesheet(t *testing.T) {
 		name := fmt.Sprintf("test %d", i)
 
 		t.Run(name, func(t *testing.T) {
-			p := parser.NewCssParser()
+			p := css_parser.NewCssParser()
 
 			node, isNode := testCase.expected.(*node)
 			expectError := isNode && node.nodeType == "error"
 
 			result, err := p.ParseStylesheet(strings.NewReader(testCase.input), utils.None[string]())
 			if err != nil {
-				if expectError && errors.Is(err, parser.ErrSyntax) {
+				if expectError && errors.Is(err, css_parser.ErrSyntax) {
 					return
 				}
 				t.Fatalf("failed to parse value: %s", err)
 			}
 
-			rules := []tokenizer.Token{}
+			rules := []css_tokenizer.Token{}
 			for _, rule := range result.Rules {
 				rules = append(rules, rule)
 			}
@@ -53,14 +53,14 @@ func Test_ParseBlocksContents(t *testing.T) {
 		name := fmt.Sprintf("test %d", i)
 
 		t.Run(name, func(t *testing.T) {
-			p := parser.NewCssParser()
+			p := css_parser.NewCssParser()
 
 			node, isNode := testCase.expected.(*node)
 			expectError := isNode && node.nodeType == "error"
 
 			result, err := p.ParseBlocksContents(strings.NewReader(testCase.input))
 			if err != nil {
-				if expectError && errors.Is(err, parser.ErrSyntax) {
+				if expectError && errors.Is(err, css_parser.ErrSyntax) {
 					return
 				}
 				t.Fatalf("failed to parse value: %s", err)
@@ -78,20 +78,20 @@ func Test_ParseRule(t *testing.T) {
 		name := fmt.Sprintf("test %d", i)
 
 		t.Run(name, func(t *testing.T) {
-			p := parser.NewCssParser()
+			p := css_parser.NewCssParser()
 
 			node, isNode := testCase.expected.(*node)
 			expectError := isNode && node.nodeType == "error"
 
 			result, err := p.ParseRule(strings.NewReader(testCase.input))
 			if err != nil {
-				if expectError && errors.Is(err, parser.ErrSyntax) {
+				if expectError && errors.Is(err, css_parser.ErrSyntax) {
 					return
 				}
 				t.Fatalf("failed to parse value: %s", err)
 			}
 
-			validateTest(t, testCase, []tokenizer.Token{result})
+			validateTest(t, testCase, []css_tokenizer.Token{result})
 		})
 	}
 }
@@ -103,20 +103,20 @@ func Test_ParseDeclaration(t *testing.T) {
 		name := fmt.Sprintf("test %d", i)
 
 		t.Run(name, func(t *testing.T) {
-			p := parser.NewCssParser()
+			p := css_parser.NewCssParser()
 
 			node, isNode := testCase.expected.(*node)
 			expectError := isNode && node.nodeType == "error"
 
 			result, err := p.ParseDeclaration(strings.NewReader(testCase.input))
 			if err != nil {
-				if expectError && errors.Is(err, parser.ErrSyntax) {
+				if expectError && errors.Is(err, css_parser.ErrSyntax) {
 					return
 				}
 				t.Fatalf("failed to parse value: %s", err)
 			}
 
-			validateTest(t, testCase, []tokenizer.Token{result})
+			validateTest(t, testCase, []css_tokenizer.Token{result})
 		})
 	}
 }
@@ -128,20 +128,20 @@ func Test_ParseComponentValue(t *testing.T) {
 		name := fmt.Sprintf("test %d", i)
 
 		t.Run(name, func(t *testing.T) {
-			p := parser.NewCssParser()
+			p := css_parser.NewCssParser()
 
 			node, isNode := testCase.expected.(*node)
 			expectError := isNode && node.nodeType == "error"
 
 			result, err := p.ParseComponentValue(strings.NewReader(testCase.input))
 			if err != nil {
-				if expectError && errors.Is(err, parser.ErrSyntax) {
+				if expectError && errors.Is(err, css_parser.ErrSyntax) {
 					return
 				}
 				t.Fatalf("failed to parse value: %s", err)
 			}
 
-			validateTest(t, testCase, []tokenizer.Token{result})
+			validateTest(t, testCase, []css_tokenizer.Token{result})
 		})
 	}
 }
@@ -153,14 +153,14 @@ func Test_ParseListOfComponentValues(t *testing.T) {
 		name := fmt.Sprintf("test %d", i)
 
 		t.Run(name, func(t *testing.T) {
-			p := parser.NewCssParser()
+			p := css_parser.NewCssParser()
 
 			node, isNode := testCase.expected.(*node)
 			expectError := isNode && node.nodeType == "error"
 
 			result, err := p.ParseListOfComponentValues(strings.NewReader(testCase.input))
 			if err != nil {
-				if expectError && errors.Is(err, parser.ErrSyntax) {
+				if expectError && errors.Is(err, css_parser.ErrSyntax) {
 					return
 				}
 				t.Fatalf("failed to parse value: %s", err)
@@ -178,7 +178,7 @@ func Test_ParseCommaListOfComponentValues(t *testing.T) {
 		name := fmt.Sprintf("test %d", i)
 
 		t.Run(name, func(t *testing.T) {
-			p := parser.NewCssParser()
+			p := css_parser.NewCssParser()
 
 			result, err := p.ParseCommaListOfComponentValues(strings.NewReader(testCase.input))
 			if err != nil {
@@ -242,7 +242,7 @@ func toExpected(v any) expectedAST {
 	return out
 }
 
-func validateTest(t *testing.T, testCase testCase, result []tokenizer.Token) {
+func validateTest(t *testing.T, testCase testCase, result []css_tokenizer.Token) {
 	t.Helper()
 	matchSequence(t, "", testCase.expected, result)
 }
@@ -250,7 +250,7 @@ func validateTest(t *testing.T, testCase testCase, result []tokenizer.Token) {
 // validateCommaList compares an expected list-of-lists fixture against the
 // 2D output of ParseCommaListOfComponentValues. Each top-level entry in the
 // fixture is one comma-separated group of component values.
-func validateCommaList(t *testing.T, testCase testCase, result [][]tokenizer.Token) {
+func validateCommaList(t *testing.T, testCase testCase, result [][]css_tokenizer.Token) {
 	t.Helper()
 	groups, ok := testCase.expected.([]expectedAST)
 	if !ok {
@@ -273,7 +273,7 @@ func mismatch(t *testing.T, path string, want, got any) {
 // matchSequence compares an expectedAST that may be either a list (compared
 // element-by-element to actual) or a single value (in which case actual must
 // have exactly one token, compared via matchToken).
-func matchSequence(t *testing.T, path string, expected expectedAST, actual []tokenizer.Token) {
+func matchSequence(t *testing.T, path string, expected expectedAST, actual []css_tokenizer.Token) {
 	t.Helper()
 	actual = flattenDeclLists(actual)
 	if list, ok := expected.([]expectedAST); ok {
@@ -297,15 +297,15 @@ func matchSequence(t *testing.T, path string, expected expectedAST, actual []tok
 // *NestedDeclarations) into individual *Declaration items, so that the parser's
 // spec-faithful grouped output can be compared against the W3C JSON fixtures'
 // flat representation.
-func flattenDeclLists(in []tokenizer.Token) []tokenizer.Token {
-	out := make([]tokenizer.Token, 0, len(in))
+func flattenDeclLists(in []css_tokenizer.Token) []css_tokenizer.Token {
+	out := make([]css_tokenizer.Token, 0, len(in))
 	for _, t := range in {
 		switch v := t.(type) {
-		case *parser.DeclarationList:
+		case *css_parser.DeclarationList:
 			for _, d := range v.Value {
 				out = append(out, d)
 			}
-		case *parser.NestedDeclarations:
+		case *css_parser.NestedDeclarations:
 			if v.Value != nil {
 				for _, d := range v.Value.Value {
 					out = append(out, d)
@@ -318,11 +318,11 @@ func flattenDeclLists(in []tokenizer.Token) []tokenizer.Token {
 	return out
 }
 
-func matchToken(t *testing.T, path string, expected expectedAST, actual tokenizer.Token) {
+func matchToken(t *testing.T, path string, expected expectedAST, actual css_tokenizer.Token) {
 	t.Helper()
 	switch exp := expected.(type) {
 	case nil:
-		if _, ok := actual.(*tokenizer.EOFToken); !ok {
+		if _, ok := actual.(*css_tokenizer.EOFToken); !ok {
 			mismatch(t, path, nil, actual)
 		}
 	case string:
@@ -338,36 +338,36 @@ func matchToken(t *testing.T, path string, expected expectedAST, actual tokenize
 
 // matchStringToken handles leaf string expecteds: whitespace, colon/semicolon/
 // comma, and single-rune delim tokens.
-func matchStringToken(t *testing.T, path, s string, actual tokenizer.Token) {
+func matchStringToken(t *testing.T, path, s string, actual css_tokenizer.Token) {
 	t.Helper()
 	switch s {
 	case " ":
-		if actual.IsToken() != tokenizer.TokenId_Whitespace {
+		if actual.IsToken() != css_tokenizer.TokenId_Whitespace {
 			mismatch(t, path, "whitespace", actual)
 		}
 		return
 	case ":":
-		if actual.IsToken() != tokenizer.TokenId_Colon {
+		if actual.IsToken() != css_tokenizer.TokenId_Colon {
 			mismatch(t, path, ":", actual)
 		}
 		return
 	case ";":
-		if actual.IsToken() != tokenizer.TokenId_Semicolon {
+		if actual.IsToken() != css_tokenizer.TokenId_Semicolon {
 			mismatch(t, path, ";", actual)
 		}
 		return
 	case ",":
-		if actual.IsToken() != tokenizer.TokenId_Comma {
+		if actual.IsToken() != css_tokenizer.TokenId_Comma {
 			mismatch(t, path, ",", actual)
 		}
 		return
 	case "<!--":
-		if actual.IsToken() != tokenizer.TokenId_CDO {
+		if actual.IsToken() != css_tokenizer.TokenId_CDO {
 			mismatch(t, path, "<!--", actual)
 		}
 		return
 	case "-->":
-		if actual.IsToken() != tokenizer.TokenId_CDC {
+		if actual.IsToken() != css_tokenizer.TokenId_CDC {
 			mismatch(t, path, "-->", actual)
 		}
 		return
@@ -378,31 +378,31 @@ func matchStringToken(t *testing.T, path, s string, actual tokenizer.Token) {
 		t.Errorf("%s: unsupported multi-rune string expected %q", path, s)
 		return
 	}
-	d, ok := actual.(*tokenizer.SingleCharacterToken)
-	if !ok || d.Type != tokenizer.TokenId_Delim || d.Value != runes[0] {
+	d, ok := actual.(*css_tokenizer.SingleCharacterToken)
+	if !ok || d.Type != css_tokenizer.TokenId_Delim || d.Value != runes[0] {
 		mismatch(t, path, s, actual)
 	}
 }
 
-func matchNode(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchNode(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
 	switch exp.nodeType {
 	case "ident":
-		matchMulti(t, path, exp, actual, tokenizer.TokenId_Ident)
+		matchMulti(t, path, exp, actual, css_tokenizer.TokenId_Ident)
 	case "at-keyword":
-		matchMulti(t, path, exp, actual, tokenizer.TokenId_AtKeyword)
+		matchMulti(t, path, exp, actual, css_tokenizer.TokenId_AtKeyword)
 	case "string":
-		matchMulti(t, path, exp, actual, tokenizer.TokenId_String)
+		matchMulti(t, path, exp, actual, css_tokenizer.TokenId_String)
 	case "url":
-		matchMulti(t, path, exp, actual, tokenizer.TokenId_Url)
+		matchMulti(t, path, exp, actual, css_tokenizer.TokenId_Url)
 	case "hash":
 		matchHash(t, path, exp, actual)
 	case "number":
-		matchNumeric(t, path, exp, actual, tokenizer.TokenId_Number)
+		matchNumeric(t, path, exp, actual, css_tokenizer.TokenId_Number)
 	case "percentage":
-		matchNumeric(t, path, exp, actual, tokenizer.TokenId_Percentage)
+		matchNumeric(t, path, exp, actual, css_tokenizer.TokenId_Percentage)
 	case "dimension":
-		matchNumeric(t, path, exp, actual, tokenizer.TokenId_Dimension)
+		matchNumeric(t, path, exp, actual, css_tokenizer.TokenId_Dimension)
 	case "function":
 		matchFunction(t, path, exp, actual)
 	case "{}", "[]", "()":
@@ -429,19 +429,19 @@ func matchNode(t *testing.T, path string, exp *node, actual tokenizer.Token) {
 // "extra-input") are not tokens in the modern spec; if any survive in a
 // fixture this matcher flags them so stale entries are loud rather than
 // silently accepted.
-func matchError(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchError(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
 	if len(exp.args) < 1 {
 		t.Errorf("%s: error node missing kind", path)
 		return
 	}
 	kind, _ := exp.args[0].(string)
-	want, ok := map[string]tokenizer.TokenId{
-		"bad-string": tokenizer.TokenId_BadString,
-		"bad-url":    tokenizer.TokenId_BadUrl,
-		"}":          tokenizer.TokenId_BracketCurlyClose,
-		"]":          tokenizer.TokenId_BracketSquareClose,
-		")":          tokenizer.TokenId_BracketParamClose,
+	want, ok := map[string]css_tokenizer.TokenId{
+		"bad-string": css_tokenizer.TokenId_BadString,
+		"bad-url":    css_tokenizer.TokenId_BadUrl,
+		"}":          css_tokenizer.TokenId_BracketCurlyClose,
+		"]":          css_tokenizer.TokenId_BracketSquareClose,
+		")":          css_tokenizer.TokenId_BracketParamClose,
 	}[kind]
 	if !ok {
 		t.Errorf("%s: error variant %q is not a token in the 2026 spec — fixture is stale", path, kind)
@@ -452,9 +452,9 @@ func matchError(t *testing.T, path string, exp *node, actual tokenizer.Token) {
 	}
 }
 
-func matchMulti(t *testing.T, path string, exp *node, actual tokenizer.Token, want tokenizer.TokenId) {
+func matchMulti(t *testing.T, path string, exp *node, actual css_tokenizer.Token, want css_tokenizer.TokenId) {
 	t.Helper()
-	tok, ok := actual.(*tokenizer.MultiCharacterToken)
+	tok, ok := actual.(*css_tokenizer.MultiCharacterToken)
 	if !ok || tok.Type != want {
 		mismatch(t, path, exp, actual)
 		return
@@ -469,10 +469,10 @@ func matchMulti(t *testing.T, path string, exp *node, actual tokenizer.Token, wa
 	}
 }
 
-func matchHash(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchHash(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
-	tok, ok := actual.(*tokenizer.MultiCharacterToken)
-	if !ok || tok.Type != tokenizer.TokenId_Hash {
+	tok, ok := actual.(*css_tokenizer.MultiCharacterToken)
+	if !ok || tok.Type != css_tokenizer.TokenId_Hash {
 		mismatch(t, path, exp, actual)
 		return
 	}
@@ -488,9 +488,9 @@ func matchHash(t *testing.T, path string, exp *node, actual tokenizer.Token) {
 	}
 }
 
-func matchNumeric(t *testing.T, path string, exp *node, actual tokenizer.Token, want tokenizer.TokenId) {
+func matchNumeric(t *testing.T, path string, exp *node, actual css_tokenizer.Token, want css_tokenizer.TokenId) {
 	t.Helper()
-	tok, ok := actual.(*tokenizer.NumericToken)
+	tok, ok := actual.(*css_tokenizer.NumericToken)
 	if !ok || tok.Type != want {
 		mismatch(t, path, exp, actual)
 		return
@@ -506,7 +506,7 @@ func matchNumeric(t *testing.T, path string, exp *node, actual tokenizer.Token, 
 	if f, _ := exp.args[2].(string); tok.Flag != f {
 		mismatch(t, path+".flag", f, tok.Flag)
 	}
-	if want == tokenizer.TokenId_Dimension {
+	if want == css_tokenizer.TokenId_Dimension {
 		if len(exp.args) < 4 {
 			t.Errorf("%s: dimension node missing unit", path)
 			return
@@ -517,9 +517,9 @@ func matchNumeric(t *testing.T, path string, exp *node, actual tokenizer.Token, 
 	}
 }
 
-func matchFunction(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchFunction(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
-	fn, ok := actual.(*parser.Function)
+	fn, ok := actual.(*css_parser.Function)
 	if !ok {
 		mismatch(t, path, exp, actual)
 		return
@@ -536,17 +536,17 @@ func matchFunction(t *testing.T, path string, exp *node, actual tokenizer.Token)
 	matchSequence(t, path+".value", expectedAST(body), fn.Value)
 }
 
-func matchBlock(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchBlock(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
-	blk, ok := actual.(*parser.SimpleBlock)
+	blk, ok := actual.(*css_parser.SimpleBlock)
 	if !ok {
 		mismatch(t, path, exp, actual)
 		return
 	}
-	wantOpen := map[string]tokenizer.TokenId{
-		"{}": tokenizer.TokenId_BracketCurlyOpen,
-		"[]": tokenizer.TokenId_BracketSquareOpen,
-		"()": tokenizer.TokenId_BracketParamOpen,
+	wantOpen := map[string]css_tokenizer.TokenId{
+		"{}": css_tokenizer.TokenId_BracketCurlyOpen,
+		"[]": css_tokenizer.TokenId_BracketSquareOpen,
+		"()": css_tokenizer.TokenId_BracketParamOpen,
 	}[exp.nodeType]
 	if blk.StartDelim == nil || blk.StartDelim.IsToken() != wantOpen {
 		mismatch(t, path+".startDelim", exp.nodeType, blk.StartDelim)
@@ -556,9 +556,9 @@ func matchBlock(t *testing.T, path string, exp *node, actual tokenizer.Token) {
 	matchSequence(t, path+".value", expectedAST(body), blk.Value)
 }
 
-func matchDeclaration(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchDeclaration(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
-	decl, ok := actual.(*parser.Declaration)
+	decl, ok := actual.(*css_parser.Declaration)
 	if !ok {
 		mismatch(t, path, exp, actual)
 		return
@@ -576,9 +576,9 @@ func matchDeclaration(t *testing.T, path string, exp *node, actual tokenizer.Tok
 	}
 }
 
-func matchAtRule(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchAtRule(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
-	rule, ok := actual.(*parser.Rule)
+	rule, ok := actual.(*css_parser.Rule)
 	if !ok || rule.Name == "" {
 		mismatch(t, path, exp, actual)
 		return
@@ -600,9 +600,9 @@ func matchAtRule(t *testing.T, path string, exp *node, actual tokenizer.Token) {
 	matchRuleBlock(t, path+".block", exp.args[2], rule)
 }
 
-func matchQualifiedRule(t *testing.T, path string, exp *node, actual tokenizer.Token) {
+func matchQualifiedRule(t *testing.T, path string, exp *node, actual css_tokenizer.Token) {
 	t.Helper()
-	rule, ok := actual.(*parser.Rule)
+	rule, ok := actual.(*css_parser.Rule)
 	if !ok || rule.Name != "" {
 		mismatch(t, path, exp, actual)
 		return
@@ -619,9 +619,9 @@ func matchQualifiedRule(t *testing.T, path string, exp *node, actual tokenizer.T
 // content. The CSS WG fixtures put declarations and child rules in the same
 // list; the parser splits them into Declarations and ChildRules, so we merge
 // before comparing.
-func matchRuleBlock(t *testing.T, path string, expected expectedAST, rule *parser.Rule) {
+func matchRuleBlock(t *testing.T, path string, expected expectedAST, rule *css_parser.Rule) {
 	t.Helper()
-	merged := make([]tokenizer.Token, 0)
+	merged := make([]css_tokenizer.Token, 0)
 	if rule.Declarations != nil {
 		for _, d := range rule.Declarations.Value {
 			merged = append(merged, d)
@@ -631,11 +631,11 @@ func matchRuleBlock(t *testing.T, path string, expected expectedAST, rule *parse
 	matchSequence(t, path, expected, merged)
 }
 
-func getTokenValueAsStringTest(v tokenizer.Token) string {
-	if m, ok := v.(*tokenizer.MultiCharacterToken); ok {
+func getTokenValueAsStringTest(v css_tokenizer.Token) string {
+	if m, ok := v.(*css_tokenizer.MultiCharacterToken); ok {
 		return m.Value
 	}
-	if m, ok := v.(tokenizer.MultiCharacterToken); ok {
+	if m, ok := v.(css_tokenizer.MultiCharacterToken); ok {
 		return m.Value
 	}
 	return ""

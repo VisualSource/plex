@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/VisualSource/plex/internal/css/parser"
-	"github.com/VisualSource/plex/internal/css/tokenizer"
+	css_parser "github.com/VisualSource/plex/internal/css/parser"
+	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/layout/selector"
 	"github.com/Zyko0/go-sdl3/sdl"
@@ -32,11 +32,11 @@ func (p PropertyMap) MustGetString(key string) string {
 	return color
 }
 
-type SelectorCache map[*parser.Rule]*selector.Selector
+type SelectorCache map[*css_parser.Rule]*selector.Selector
 
 type MatchedRule struct {
 	Specificity int
-	Rule        *parser.Rule
+	Rule        *css_parser.Rule
 	Origin      int
 }
 type StyledNode struct {
@@ -45,7 +45,7 @@ type StyledNode struct {
 	children        []*StyledNode
 }
 
-func NewStyleTree(el dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache SelectorCache, parentPropertyMap PropertyMap) (*StyledNode, error) {
+func NewStyleTree(el dom.ElementNode, stylesheets []*css_parser.Stylesheet, selectorCache SelectorCache, parentPropertyMap PropertyMap) (*StyledNode, error) {
 	if selectorCache == nil {
 		selectorCache = make(SelectorCache)
 	}
@@ -88,7 +88,7 @@ func NewStyleTree(el dom.ElementNode, stylesheets []*parser.Stylesheet, selector
 	return node, nil
 }
 
-func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *parser.Rule, selectorCache SelectorCache) *MatchedRule {
+func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *css_parser.Rule, selectorCache SelectorCache) *MatchedRule {
 	sele, ok := selectorCache[rule]
 	if !ok {
 		sel, err := selector.NewSelectorFromTokens(rule.Prelude)
@@ -111,7 +111,7 @@ func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *parser.Rule, se
 	return nil
 }
 
-func matchRules(node dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache SelectorCache) []*MatchedRule {
+func matchRules(node dom.ElementNode, stylesheets []*css_parser.Stylesheet, selectorCache SelectorCache) []*MatchedRule {
 
 	matched := make([]*MatchedRule, 0)
 
@@ -127,13 +127,13 @@ func matchRules(node dom.ElementNode, stylesheets []*parser.Stylesheet, selector
 	return matched
 }
 
-func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, decl *parser.Declaration) map[string]any {
+func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, decl *css_parser.Declaration) map[string]any {
 
 	//background, border, margin, padding, width, height, display, and position
 
 	switch decl.Name.IsToken() {
-	case tokenizer.TokenId_Ident:
-		key := parser.GetTokenValueAsString(decl.Name)
+	case css_tokenizer.TokenId_Ident:
+		key := css_parser.GetTokenValueAsString(decl.Name)
 		switch key {
 		//#region shorthands
 		case "background": // explist inherit
@@ -163,7 +163,7 @@ func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, de
 	return propertyMap
 }
 
-func specifiedValues(node dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache SelectorCache, parentPropertyMap PropertyMap) PropertyMap {
+func specifiedValues(node dom.ElementNode, stylesheets []*css_parser.Stylesheet, selectorCache SelectorCache, parentPropertyMap PropertyMap) PropertyMap {
 	property := make(PropertyMap)
 
 	property = inheritProperties(property, parentPropertyMap)
@@ -185,13 +185,13 @@ func specifiedValues(node dom.ElementNode, stylesheets []*parser.Stylesheet, sel
 
 	style := node.GetAttribute("style")
 	if style != nil {
-		p := parser.NewCssParser()
+		p := css_parser.NewCssParser()
 		values, err := p.ParseBlocksContents(strings.NewReader(style.Value))
 		if err == nil && len(values) > 0 {
 			// should only be a single declaration list and no rules
 			// as it should only be parsing something like style="color: green; background-color:gray;"
 
-			list, ok := values[0].(*parser.DeclarationList)
+			list, ok := values[0].(*css_parser.DeclarationList)
 			if ok {
 				for _, dec := range list.Value {
 					property = parseDeclaration(property, parentPropertyMap, dec)

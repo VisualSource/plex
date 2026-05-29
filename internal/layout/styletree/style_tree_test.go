@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/VisualSource/plex/internal/css/parser"
+	css_parser "github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/layout/styletree"
 	"github.com/VisualSource/plex/internal/utils"
@@ -30,16 +30,16 @@ func TestNewStyleTree(t *testing.T) {
 
 }
 
-func createStylesheet(t *testing.T, input string) []*parser.Stylesheet {
+func createStylesheet(t *testing.T, input string) []*css_parser.Stylesheet {
 	t.Helper()
-	p := parser.NewCssParser()
+	p := css_parser.NewCssParser()
 
 	stylesheet, err := p.ParseStylesheet(strings.NewReader(input), utils.None[string]())
 	if err != nil {
 		panic("Failed to parse stylesheet")
 	}
 
-	list := make([]*parser.Stylesheet, 0)
+	list := make([]*css_parser.Stylesheet, 0)
 	list = append(list, stylesheet)
 
 	return list

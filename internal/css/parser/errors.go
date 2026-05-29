@@ -1,4 +1,4 @@
-package parser
+package css_parser
 
 import "errors"
 

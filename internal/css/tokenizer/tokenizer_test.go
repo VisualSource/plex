@@ -1,4 +1,4 @@
-package tokenizer_test
+package css_tokenizer_test
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/VisualSource/plex/internal/css/tokenizer"
+	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/kr/pretty"
 )
 
@@ -26,9 +26,9 @@ func TestCssParser(t *testing.T) {
 		for i, tt := range tests {
 			testname := fmt.Sprintf("[%s]: test %d", filename, i)
 			t.Run(testname, func(t *testing.T) {
-				parser := tokenizer.NewCssTokenizer(strings.NewReader(tt.Source), false)
+				parser := css_tokenizer.NewCssTokenizer(strings.NewReader(tt.Source), false)
 
-				tokens := make([]tokenizer.Token, 0)
+				tokens := make([]css_tokenizer.Token, 0)
 				for {
 					token, err := parser.ConsumeToken()
 					if err != nil {
@@ -36,7 +36,7 @@ func TestCssParser(t *testing.T) {
 						break
 					}
 
-					if token.IsToken() == tokenizer.TokenId_EOF {
+					if token.IsToken() == css_tokenizer.TokenId_EOF {
 						break
 					}
 					tokens = append(tokens, token)
@@ -104,7 +104,7 @@ func loadTestFiles(t *testing.T) map[string][]testCase {
 	return tests
 }
 
-func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
+func validateTest(t *testing.T, result []css_tokenizer.Token, tt testCase) {
 
 	for i, expected := range tt.Tokens {
 		if len(result) <= i {
@@ -117,8 +117,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 		}
 
 		switch result[i].IsToken() {
-		case tokenizer.TokenId_AtKeyword:
-			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+		case css_tokenizer.TokenId_AtKeyword:
+			if tok, ok := (result[i].(*css_tokenizer.MultiCharacterToken)); ok {
 				exp := expected.Structured["value"].(string)
 				if tok.Value != exp {
 					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
@@ -126,8 +126,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a multi character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_Delim:
-			if tok, ok := (result[i].(*tokenizer.SingleCharacterToken)); ok {
+		case css_tokenizer.TokenId_Delim:
+			if tok, ok := (result[i].(*css_tokenizer.SingleCharacterToken)); ok {
 				exp := []rune(expected.Structured["value"].(string))[0]
 
 				if tok.Value != exp {
@@ -136,8 +136,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a single character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_Dimension:
-			if tok, ok := (result[i].(*tokenizer.NumericToken)); ok {
+		case css_tokenizer.TokenId_Dimension:
+			if tok, ok := (result[i].(*css_tokenizer.NumericToken)); ok {
 				v := expected.Structured["value"].(float64)
 				ttv := expected.Structured["type"].(string)
 				u := expected.Structured["unit"].(string)
@@ -148,8 +148,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a multi character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_FunctionToken:
-			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+		case css_tokenizer.TokenId_FunctionToken:
+			if tok, ok := (result[i].(*css_tokenizer.MultiCharacterToken)); ok {
 				exp := expected.Structured["value"].(string)
 				if tok.Value != exp {
 					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
@@ -157,8 +157,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a multi character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_Hash:
-			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+		case css_tokenizer.TokenId_Hash:
+			if tok, ok := (result[i].(*css_tokenizer.MultiCharacterToken)); ok {
 				exp := expected.Structured["value"].(string)
 				id := expected.Structured["type"].(string)
 				if !(tok.Value == exp && tok.Flag == id) {
@@ -167,8 +167,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a multi character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_Number:
-			if tok, ok := (result[i].(*tokenizer.NumericToken)); ok {
+		case css_tokenizer.TokenId_Number:
+			if tok, ok := (result[i].(*css_tokenizer.NumericToken)); ok {
 				v := expected.Structured["value"].(float64)
 				ttv := expected.Structured["type"].(string)
 
@@ -178,8 +178,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a multi character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_String:
-			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+		case css_tokenizer.TokenId_String:
+			if tok, ok := (result[i].(*css_tokenizer.MultiCharacterToken)); ok {
 				exp := expected.Structured["value"].(string)
 				if tok.Value != exp {
 					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
@@ -187,8 +187,8 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 			} else {
 				t.Fatalf("current token is not a multi character token got %#v", result[i])
 			}
-		case tokenizer.TokenId_Url:
-			if tok, ok := (result[i].(*tokenizer.MultiCharacterToken)); ok {
+		case css_tokenizer.TokenId_Url:
+			if tok, ok := (result[i].(*css_tokenizer.MultiCharacterToken)); ok {
 				exp := expected.Structured["value"].(string)
 				if tok.Value != exp {
 					t.Fatalf("was expecting a value of '%s' but was given '%s'", exp, tok.Value)
@@ -201,55 +201,55 @@ func validateTest(t *testing.T, result []tokenizer.Token, tt testCase) {
 
 }
 
-func tokenAsText(id tokenizer.TokenId) string {
+func tokenAsText(id css_tokenizer.TokenId) string {
 	switch id {
-	case tokenizer.TokenId_BracketCurlyClose:
+	case css_tokenizer.TokenId_BracketCurlyClose:
 		return "}-token"
-	case tokenizer.TokenId_BracketCurlyOpen:
+	case css_tokenizer.TokenId_BracketCurlyOpen:
 		return "{-token"
-	case tokenizer.TokenId_BracketSquareOpen:
+	case css_tokenizer.TokenId_BracketSquareOpen:
 		return "[-token"
-	case tokenizer.TokenId_BracketSquareClose:
+	case css_tokenizer.TokenId_BracketSquareClose:
 		return "]-token"
-	case tokenizer.TokenId_AtKeyword:
+	case css_tokenizer.TokenId_AtKeyword:
 		return "at-keyword-token"
-	case tokenizer.TokenId_Whitespace:
+	case css_tokenizer.TokenId_Whitespace:
 		return "whitespace-token"
-	case tokenizer.TokenId_Delim:
+	case css_tokenizer.TokenId_Delim:
 		return "delim-token"
-	case tokenizer.TokenId_Ident:
+	case css_tokenizer.TokenId_Ident:
 		return "ident-token"
-	case tokenizer.TokenId_FunctionToken:
+	case css_tokenizer.TokenId_FunctionToken:
 		return "function-token"
-	case tokenizer.TokenId_Hash:
+	case css_tokenizer.TokenId_Hash:
 		return "hash-token"
-	case tokenizer.TokenId_String:
+	case css_tokenizer.TokenId_String:
 		return "string-token"
-	case tokenizer.TokenId_BadString:
+	case css_tokenizer.TokenId_BadString:
 		return "bad-string-token"
-	case tokenizer.TokenId_Url:
+	case css_tokenizer.TokenId_Url:
 		return "url-token"
-	case tokenizer.TokenId_BadUrl:
+	case css_tokenizer.TokenId_BadUrl:
 		return "bad-url-token"
-	case tokenizer.TokenId_Number:
+	case css_tokenizer.TokenId_Number:
 		return "number-token"
-	case tokenizer.TokenId_Percentage:
+	case css_tokenizer.TokenId_Percentage:
 		return "percentage-token"
-	case tokenizer.TokenId_Dimension:
+	case css_tokenizer.TokenId_Dimension:
 		return "dimension-token"
-	case tokenizer.TokenId_CDO:
+	case css_tokenizer.TokenId_CDO:
 		return "cdo-token"
-	case tokenizer.TokenId_CDC:
+	case css_tokenizer.TokenId_CDC:
 		return "cdc-token"
-	case tokenizer.TokenId_Colon:
+	case css_tokenizer.TokenId_Colon:
 		return "colon-token"
-	case tokenizer.TokenId_Semicolon:
+	case css_tokenizer.TokenId_Semicolon:
 		return "semicolon"
-	case tokenizer.TokenId_Comma:
+	case css_tokenizer.TokenId_Comma:
 		return "comma"
-	case tokenizer.TokenId_BracketParamOpen:
+	case css_tokenizer.TokenId_BracketParamOpen:
 		return "(-token"
-	case tokenizer.TokenId_BracketParamClose:
+	case css_tokenizer.TokenId_BracketParamClose:
 		return ")-token"
 	default:
 		return "UNKNOWN"
@@ -257,56 +257,56 @@ func tokenAsText(id tokenizer.TokenId) string {
 
 }
 
-func isToken(value string, id tokenizer.TokenId) bool {
+func isToken(value string, id css_tokenizer.TokenId) bool {
 	switch value {
 	case "}-token":
-		return id == tokenizer.TokenId_BracketCurlyClose
+		return id == css_tokenizer.TokenId_BracketCurlyClose
 	case "{-token":
-		return id == tokenizer.TokenId_BracketCurlyOpen
+		return id == css_tokenizer.TokenId_BracketCurlyOpen
 	case "[-token":
-		return id == tokenizer.TokenId_BracketSquareOpen
+		return id == css_tokenizer.TokenId_BracketSquareOpen
 	case "]-token":
-		return id == tokenizer.TokenId_BracketSquareClose
+		return id == css_tokenizer.TokenId_BracketSquareClose
 	case "at-keyword-token":
-		return id == tokenizer.TokenId_AtKeyword
+		return id == css_tokenizer.TokenId_AtKeyword
 	case "whitespace-token":
-		return id == tokenizer.TokenId_Whitespace
+		return id == css_tokenizer.TokenId_Whitespace
 	case "delim-token":
-		return id == tokenizer.TokenId_Delim
+		return id == css_tokenizer.TokenId_Delim
 	case "ident-token":
-		return id == tokenizer.TokenId_Ident
+		return id == css_tokenizer.TokenId_Ident
 	case "function-token":
-		return id == tokenizer.TokenId_FunctionToken
+		return id == css_tokenizer.TokenId_FunctionToken
 	case "hash-token":
-		return id == tokenizer.TokenId_Hash
+		return id == css_tokenizer.TokenId_Hash
 	case "string-token":
-		return id == tokenizer.TokenId_String
+		return id == css_tokenizer.TokenId_String
 	case "bad-string-token":
-		return id == tokenizer.TokenId_BadString
+		return id == css_tokenizer.TokenId_BadString
 	case "url-token":
-		return id == tokenizer.TokenId_Url
+		return id == css_tokenizer.TokenId_Url
 	case "bad-url-token":
-		return id == tokenizer.TokenId_BadUrl
+		return id == css_tokenizer.TokenId_BadUrl
 	case "number-token":
-		return id == tokenizer.TokenId_Number
+		return id == css_tokenizer.TokenId_Number
 	case "percentage-token":
-		return id == tokenizer.TokenId_Percentage
+		return id == css_tokenizer.TokenId_Percentage
 	case "dimension-token":
-		return id == tokenizer.TokenId_Dimension
+		return id == css_tokenizer.TokenId_Dimension
 	case "CDO-token":
-		return id == tokenizer.TokenId_CDO
+		return id == css_tokenizer.TokenId_CDO
 	case "CDC-token":
-		return id == tokenizer.TokenId_CDC
+		return id == css_tokenizer.TokenId_CDC
 	case "colon-token":
-		return id == tokenizer.TokenId_Colon
+		return id == css_tokenizer.TokenId_Colon
 	case "semicolon-token":
-		return id == tokenizer.TokenId_Semicolon
+		return id == css_tokenizer.TokenId_Semicolon
 	case "comma-token":
-		return id == tokenizer.TokenId_Comma
+		return id == css_tokenizer.TokenId_Comma
 	case "(-token":
-		return id == tokenizer.TokenId_BracketParamOpen
+		return id == css_tokenizer.TokenId_BracketParamOpen
 	case ")-token":
-		return id == tokenizer.TokenId_BracketParamClose
+		return id == css_tokenizer.TokenId_BracketParamClose
 	default:
 		return false
 	}

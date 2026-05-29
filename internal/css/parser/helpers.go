@@ -1,17 +1,17 @@
-package parser
+package css_parser
 
 import (
 	"strings"
 
-	"github.com/VisualSource/plex/internal/css/tokenizer"
+	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
 )
 
-func IsDelim(token tokenizer.Token, value rune) bool {
-	if token == nil || token.IsToken() != tokenizer.TokenId_Delim {
+func IsDelim(token css_tokenizer.Token, value rune) bool {
+	if token == nil || token.IsToken() != css_tokenizer.TokenId_Delim {
 		return false
 	}
 
-	iv, ok := token.(*tokenizer.SingleCharacterToken)
+	iv, ok := token.(*css_tokenizer.SingleCharacterToken)
 	if !ok {
 		return false
 	}
@@ -19,12 +19,12 @@ func IsDelim(token tokenizer.Token, value rune) bool {
 	return iv.Value == value
 }
 
-func IsIdent(token tokenizer.Token, value string, insensitive bool) bool {
-	if token == nil || token.IsToken() != tokenizer.TokenId_Ident {
+func IsIdent(token css_tokenizer.Token, value string, insensitive bool) bool {
+	if token == nil || token.IsToken() != css_tokenizer.TokenId_Ident {
 		return false
 	}
 
-	iv, ok := token.(*tokenizer.MultiCharacterToken)
+	iv, ok := token.(*css_tokenizer.MultiCharacterToken)
 	if !ok {
 		return false
 	}
@@ -35,26 +35,26 @@ func IsIdent(token tokenizer.Token, value string, insensitive bool) bool {
 	return iv.Value == value
 }
 
-func isCustomPropertyName(e tokenizer.Token) bool {
-	if ident, ok := e.(*tokenizer.MultiCharacterToken); ok {
+func isCustomPropertyName(e css_tokenizer.Token) bool {
+	if ident, ok := e.(*css_tokenizer.MultiCharacterToken); ok {
 		return strings.HasPrefix(ident.Value, "--")
 	}
 
 	return false
 }
 
-func isNotWhitespace(e tokenizer.Token) bool {
-	return e.IsToken() != tokenizer.TokenId_Whitespace
+func isNotWhitespace(e css_tokenizer.Token) bool {
+	return e.IsToken() != css_tokenizer.TokenId_Whitespace
 }
 
 // preludeLooksLikeCustomPropertyDecl reports whether the first two
 // non-whitespace prelude values are an ident-token whose value starts with
 // "--" followed by a colon-token. Used by consumeQualifiedRule to recognise
 // preludes that would otherwise be misparsed as a custom-property declaration.
-func preludeLooksLikeCustomPropertyDecl(prelude []tokenizer.Token) bool {
-	var first, second tokenizer.Token
+func preludeLooksLikeCustomPropertyDecl(prelude []css_tokenizer.Token) bool {
+	var first, second css_tokenizer.Token
 	for _, v := range prelude {
-		if v.IsToken() == tokenizer.TokenId_Whitespace {
+		if v.IsToken() == css_tokenizer.TokenId_Whitespace {
 			continue
 		}
 		if first == nil {
@@ -67,25 +67,25 @@ func preludeLooksLikeCustomPropertyDecl(prelude []tokenizer.Token) bool {
 	if first == nil || second == nil {
 		return false
 	}
-	return first.IsToken() == tokenizer.TokenId_Ident &&
+	return first.IsToken() == css_tokenizer.TokenId_Ident &&
 		isCustomPropertyName(first) &&
-		second.IsToken() == tokenizer.TokenId_Colon
+		second.IsToken() == css_tokenizer.TokenId_Colon
 }
-func isSimpleBlockWithCurlyOpen(e tokenizer.Token) bool {
+func isSimpleBlockWithCurlyOpen(e css_tokenizer.Token) bool {
 	if block, ok := e.(*SimpleBlock); ok {
-		return block.StartDelim.IsToken() == tokenizer.TokenId_BracketCurlyOpen
+		return block.StartDelim.IsToken() == css_tokenizer.TokenId_BracketCurlyOpen
 	}
 	return false
 }
 
-var bracketMap map[tokenizer.TokenId]tokenizer.TokenId = map[tokenizer.TokenId]tokenizer.TokenId{
-	tokenizer.TokenId_BracketCurlyOpen:  tokenizer.TokenId_BracketCurlyClose,
-	tokenizer.TokenId_BracketParamOpen:  tokenizer.TokenId_BracketParamClose,
-	tokenizer.TokenId_BracketSquareOpen: tokenizer.TokenId_BracketSquareClose,
+var bracketMap map[css_tokenizer.TokenId]css_tokenizer.TokenId = map[css_tokenizer.TokenId]css_tokenizer.TokenId{
+	css_tokenizer.TokenId_BracketCurlyOpen:  css_tokenizer.TokenId_BracketCurlyClose,
+	css_tokenizer.TokenId_BracketParamOpen:  css_tokenizer.TokenId_BracketParamClose,
+	css_tokenizer.TokenId_BracketSquareOpen: css_tokenizer.TokenId_BracketSquareClose,
 }
 
-func GetTokenValueAsString(v tokenizer.Token) string {
-	if v, ok := v.(*tokenizer.MultiCharacterToken); ok {
+func GetTokenValueAsString(v css_tokenizer.Token) string {
+	if v, ok := v.(*css_tokenizer.MultiCharacterToken); ok {
 		return v.Value
 	}
 	return ""

@@ -1,4 +1,4 @@
-package tokenizer
+package css_tokenizer
 
 type TokenId uint
 

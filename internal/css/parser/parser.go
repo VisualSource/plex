@@ -1,4 +1,4 @@
-package parser
+package css_parser
 
 import (
 	"errors"
@@ -7,14 +7,14 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/VisualSource/plex/internal/css/tokenizer"
+	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
 )
 
 type CssParser struct {
-	tok    *tokenizer.CssTokenizer
-	tokens []tokenizer.Token
-	marks  [][]tokenizer.Token
+	tok    *css_tokenizer.CssTokenizer
+	tokens []css_tokenizer.Token
+	marks  [][]css_tokenizer.Token
 }
 
 func NewCssParser() *CssParser {
@@ -29,7 +29,7 @@ func (p *CssParser) isEmpty() (bool, error) {
 		return false, err
 	}
 
-	if token.IsToken() == tokenizer.TokenId_EOF {
+	if token.IsToken() == css_tokenizer.TokenId_EOF {
 		return true, nil
 	}
 
@@ -44,7 +44,7 @@ func (p *CssParser) discardWhitespace() error {
 			return err
 		}
 
-		if token.IsToken() == tokenizer.TokenId_Whitespace {
+		if token.IsToken() == css_tokenizer.TokenId_Whitespace {
 			continue
 		}
 
@@ -55,9 +55,9 @@ func (p *CssParser) discardWhitespace() error {
 	return nil
 }
 
-func (p *CssParser) consumeToken() (tokenizer.Token, error) {
+func (p *CssParser) consumeToken() (css_tokenizer.Token, error) {
 	var (
-		token tokenizer.Token
+		token css_tokenizer.Token
 		err   error
 	)
 	if len(p.tokens) != 0 {
@@ -75,7 +75,7 @@ func (p *CssParser) consumeToken() (tokenizer.Token, error) {
 	}
 	return token, nil
 }
-func (p *CssParser) reconsumeToken(token tokenizer.Token) {
+func (p *CssParser) reconsumeToken(token css_tokenizer.Token) {
 	if n := len(p.marks); n != 0 {
 		buf := p.marks[n-1]
 		if m := len(buf); m != 0 && buf[m-1] == token {
@@ -125,7 +125,7 @@ func (p *CssParser) restoreMark() {
 //#region Entry Points
 
 // @see https://drafts.csswg.org/css-syntax/#parse-grammar
-func ParseAccordingToCssGrammar[T any](input string, matchGrammar func([]tokenizer.Token) (T, error)) (T, error) {
+func ParseAccordingToCssGrammar[T any](input string, matchGrammar func([]css_tokenizer.Token) (T, error)) (T, error) {
 	p := NewCssParser()
 
 	components, err := p.ParseListOfComponentValues(strings.NewReader(input))
@@ -152,7 +152,7 @@ func isOnlyWhitespace(input string) bool {
 }
 
 // @see https://www.w3.org/TR/css-syntax-3/#parse-comma-list
-func ParseListAccordingToCssGrammar[T any](input string, matchGrammar func([]tokenizer.Token) (T, error)) ([]ParseResult[T], error) {
+func ParseListAccordingToCssGrammar[T any](input string, matchGrammar func([]css_tokenizer.Token) (T, error)) ([]ParseResult[T], error) {
 	p := NewCssParser()
 
 	if isOnlyWhitespace(input) {
@@ -183,7 +183,7 @@ func ParseListAccordingToCssGrammar[T any](input string, matchGrammar func([]tok
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-stylesheet
 func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption) (*Stylesheet, error) {
-	p.tok = tokenizer.NewCssTokenizer(input, false) // TODO: look into using shared tokenizer
+	p.tok = css_tokenizer.NewCssTokenizer(input, false) // TODO: look into using shared css_tokenizer
 	stylesheet := &Stylesheet{
 		Location: location,
 	}
@@ -202,7 +202,7 @@ func (p *CssParser) ParseStylesheet(input io.Reader, location utils.StringOption
 //
 // https://drafts.csswg.org/css-syntax/#parse-stylesheet-contents
 func (p *CssParser) ParseStylesheetContents(stream io.Reader) ([]*Rule, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream, false)
+	p.tok = css_tokenizer.NewCssTokenizer(stream, false)
 	return p.consumeStylesheetContents()
 }
 
@@ -210,8 +210,8 @@ func (p *CssParser) ParseStylesheetContents(stream io.Reader) ([]*Rule, error) {
 // and APIs such as the CSSStyleDeclaration cssText attribute.
 //
 // https://drafts.csswg.org/css-syntax/#parse-block-contents
-func (p *CssParser) ParseBlocksContents(stream io.Reader) ([]tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream, false)
+func (p *CssParser) ParseBlocksContents(stream io.Reader) ([]css_tokenizer.Token, error) {
+	p.tok = css_tokenizer.NewCssTokenizer(stream, false)
 	return p.consumeBlocksContents()
 }
 
@@ -220,7 +220,7 @@ func (p *CssParser) ParseBlocksContents(stream io.Reader) ([]tokenizer.Token, er
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-rule
 func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream, false)
+	p.tok = css_tokenizer.NewCssTokenizer(stream, false)
 
 	if err := p.discardWhitespace(); err != nil {
 		return nil, err
@@ -233,9 +233,9 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 	}
 
 	switch token.IsToken() {
-	case tokenizer.TokenId_EOF:
+	case css_tokenizer.TokenId_EOF:
 		return nil, ErrSyntax
-	case tokenizer.TokenId_AtKeyword:
+	case css_tokenizer.TokenId_AtKeyword:
 		p.reconsumeToken(token)
 		atRule, err := p.consumeAtRule(false)
 		if err != nil {
@@ -275,7 +275,7 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 		return nil, err
 	}
 
-	if token.IsToken() == tokenizer.TokenId_EOF {
+	if token.IsToken() == css_tokenizer.TokenId_EOF {
 		return rule, nil
 	}
 
@@ -286,7 +286,7 @@ func (p *CssParser) ParseRule(stream io.Reader) (*Rule, error) {
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-declaration
 func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream, false)
+	p.tok = css_tokenizer.NewCssTokenizer(stream, false)
 
 	if err := p.discardWhitespace(); err != nil {
 		return nil, err
@@ -307,8 +307,8 @@ func (p *CssParser) ParseDeclaration(stream io.Reader) (*Declaration, error) {
 // is for things that need to consume a single value, like the parsing rules for attr().
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-component-value
-func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream, false)
+func (p *CssParser) ParseComponentValue(stream io.Reader) (css_tokenizer.Token, error) {
+	p.tok = css_tokenizer.NewCssTokenizer(stream, false)
 
 	if err := p.discardWhitespace(); err != nil {
 		return nil, err
@@ -348,26 +348,26 @@ func (p *CssParser) ParseComponentValue(stream io.Reader) (tokenizer.Token, erro
 // or for parsing a stand-alone selector [SELECT] or list of Media Queries [MEDIAQ], as in Selectors API or the media HTML attribute.
 //
 // @see https://drafts.csswg.org/css-syntax/#parse-list-of-component-values
-func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream, false)
+func (p *CssParser) ParseListOfComponentValues(stream io.Reader) ([]css_tokenizer.Token, error) {
+	p.tok = css_tokenizer.NewCssTokenizer(stream, false)
 
-	return p.consumeListOfComponentValues(utils.None[tokenizer.TokenId](), false)
+	return p.consumeListOfComponentValues(utils.None[css_tokenizer.TokenId](), false)
 }
 
 // @see https://drafts.csswg.org/css-syntax/#parse-comma-separated-list-of-component-values
-func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]tokenizer.Token, error) {
-	p.tok = tokenizer.NewCssTokenizer(stream, false)
+func (p *CssParser) ParseCommaListOfComponentValues(stream io.Reader) ([][]css_tokenizer.Token, error) {
+	p.tok = css_tokenizer.NewCssTokenizer(stream, false)
 
-	groups := make([][]tokenizer.Token, 0)
+	groups := make([][]css_tokenizer.Token, 0)
 
-	delim := utils.Some(tokenizer.TokenId_Comma)
+	delim := utils.Some(css_tokenizer.TokenId_Comma)
 	for {
 		token, err := p.consumeToken()
 		if err != nil {
 			return nil, err
 		}
 
-		if token.IsToken() == tokenizer.TokenId_EOF {
+		if token.IsToken() == css_tokenizer.TokenId_EOF {
 			break
 		}
 
@@ -402,11 +402,11 @@ func (p *CssParser) consumeStylesheetContents() ([]*Rule, error) {
 		}
 
 		switch token.IsToken() {
-		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_CDC, tokenizer.TokenId_CDO:
+		case css_tokenizer.TokenId_Whitespace, css_tokenizer.TokenId_CDC, css_tokenizer.TokenId_CDO:
 			continue
-		case tokenizer.TokenId_EOF:
+		case css_tokenizer.TokenId_EOF:
 			return rules, nil
-		case tokenizer.TokenId_AtKeyword:
+		case css_tokenizer.TokenId_AtKeyword:
 			p.reconsumeToken(token)
 
 			atRule, err := p.consumeAtRule(false)
@@ -438,7 +438,7 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 		return nil, err
 	}
 
-	if nameToken.IsToken() != tokenizer.TokenId_AtKeyword {
+	if nameToken.IsToken() != css_tokenizer.TokenId_AtKeyword {
 		return nil, errors.New("was expecting a at keyword token")
 	}
 
@@ -453,12 +453,12 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 		}
 
 		switch token.IsToken() {
-		case tokenizer.TokenId_Semicolon, tokenizer.TokenId_EOF:
+		case css_tokenizer.TokenId_Semicolon, css_tokenizer.TokenId_EOF:
 			if !p.ruleIsValid(atRule) {
 				return nil, nil
 			}
 			return atRule, nil
-		case tokenizer.TokenId_BracketCurlyClose:
+		case css_tokenizer.TokenId_BracketCurlyClose:
 			if nested {
 				p.reconsumeToken(token)
 				if p.ruleIsValid(atRule) {
@@ -468,7 +468,7 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 			}
 
 			atRule.Prelude = append(atRule.Prelude, token)
-		case tokenizer.TokenId_BracketCurlyOpen:
+		case css_tokenizer.TokenId_BracketCurlyOpen:
 			p.reconsumeToken(token)
 			block, err := p.consumeBlock()
 			if err != nil {
@@ -495,7 +495,7 @@ func (p *CssParser) consumeAtRule(nested bool) (*Rule, error) {
 }
 
 // @see https://drafts.csswg.org/css-syntax/#consume-qualified-rule
-func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Rule, error) {
+func (p *CssParser) consumeQualifiedRule(stop css_tokenizer.Token, nested bool) (*Rule, error) {
 	qr := &Rule{}
 
 	for {
@@ -509,9 +509,9 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 		}
 
 		switch {
-		case token.IsToken() == tokenizer.TokenId_EOF:
+		case token.IsToken() == css_tokenizer.TokenId_EOF:
 			return nil, nil
-		case token.IsToken() == tokenizer.TokenId_BracketCurlyClose:
+		case token.IsToken() == css_tokenizer.TokenId_BracketCurlyClose:
 			if nested {
 				p.reconsumeToken(token)
 				return nil, nil
@@ -519,7 +519,7 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 
 			qr.Prelude = append(qr.Prelude, token)
 
-		case token.IsToken() == tokenizer.TokenId_BracketCurlyOpen:
+		case token.IsToken() == css_tokenizer.TokenId_BracketCurlyOpen:
 			if preludeLooksLikeCustomPropertyDecl(qr.Prelude) {
 				if nested {
 					if err := p.consumeRemnantsOfBadDeclaration(true); err != nil {
@@ -571,13 +571,13 @@ func (p *CssParser) consumeQualifiedRule(stop tokenizer.Token, nested bool) (*Ru
 }
 
 // @see https://drafts.csswg.org/css-syntax/#consume-block
-func (p *CssParser) consumeBlock() ([]tokenizer.Token, error) {
+func (p *CssParser) consumeBlock() ([]css_tokenizer.Token, error) {
 	token, err := p.consumeToken()
 	if err != nil {
 		return nil, err
 	}
 
-	if token.IsToken() != tokenizer.TokenId_BracketCurlyOpen {
+	if token.IsToken() != css_tokenizer.TokenId_BracketCurlyOpen {
 		return nil, errors.New("was expecting a '{' token")
 	}
 
@@ -594,8 +594,8 @@ func (p *CssParser) consumeBlock() ([]tokenizer.Token, error) {
 }
 
 // @see https://drafts.csswg.org/css-syntax/#consume-block-contents
-func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
-	var rules []tokenizer.Token
+func (p *CssParser) consumeBlocksContents() ([]css_tokenizer.Token, error) {
+	var rules []css_tokenizer.Token
 	var decls []*Declaration
 
 	flushDecls := func() {
@@ -613,13 +613,13 @@ func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 		}
 
 		switch token.IsToken() {
-		case tokenizer.TokenId_Whitespace, tokenizer.TokenId_Semicolon:
+		case css_tokenizer.TokenId_Whitespace, css_tokenizer.TokenId_Semicolon:
 			continue
-		case tokenizer.TokenId_EOF, tokenizer.TokenId_BracketCurlyClose:
+		case css_tokenizer.TokenId_EOF, css_tokenizer.TokenId_BracketCurlyClose:
 			p.reconsumeToken(token)
 			flushDecls()
 			return rules, nil
-		case tokenizer.TokenId_AtKeyword:
+		case css_tokenizer.TokenId_AtKeyword:
 			p.reconsumeToken(token)
 			flushDecls()
 
@@ -649,7 +649,7 @@ func (p *CssParser) consumeBlocksContents() ([]tokenizer.Token, error) {
 
 			p.restoreMark()
 
-			qr, err := p.consumeQualifiedRule(tokenizer.NewDataToken(tokenizer.TokenId_Semicolon), true)
+			qr, err := p.consumeQualifiedRule(css_tokenizer.NewDataToken(css_tokenizer.TokenId_Semicolon), true)
 			switch {
 			case errors.Is(err, ErrInvalidRule):
 				flushDecls()
@@ -674,7 +674,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 		return nil, err
 	}
 
-	if token.IsToken() != tokenizer.TokenId_Ident {
+	if token.IsToken() != css_tokenizer.TokenId_Ident {
 		p.reconsumeToken(token)
 		err = p.consumeRemnantsOfBadDeclaration(nested)
 		return nil, err
@@ -693,7 +693,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 		return nil, err
 	}
 
-	if token.IsToken() != tokenizer.TokenId_Colon {
+	if token.IsToken() != css_tokenizer.TokenId_Colon {
 		p.reconsumeToken(token)
 		return nil, p.consumeRemnantsOfBadDeclaration(nested)
 	}
@@ -702,7 +702,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 		return nil, err
 	}
 
-	decls, err := p.consumeListOfComponentValues(utils.Some(tokenizer.TokenId_Semicolon), nested)
+	decls, err := p.consumeListOfComponentValues(utils.Some(css_tokenizer.TokenId_Semicolon), nested)
 	if err != nil {
 		return nil, err
 	}
@@ -711,7 +711,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 
 	lastIdx, secondLastIdx := -1, -1
 	for i := len(decl.Value) - 1; i >= 0; i-- {
-		if decl.Value[i].IsToken() == tokenizer.TokenId_Whitespace {
+		if decl.Value[i].IsToken() == css_tokenizer.TokenId_Whitespace {
 			continue
 		}
 		if lastIdx == -1 {
@@ -727,7 +727,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 		decl.Important = true
 	}
 
-	for len(decl.Value) > 0 && decl.Value[len(decl.Value)-1].IsToken() == tokenizer.TokenId_Whitespace {
+	for len(decl.Value) > 0 && decl.Value[len(decl.Value)-1].IsToken() == css_tokenizer.TokenId_Whitespace {
 		decl.Value = slices.Delete(decl.Value, len(decl.Value)-1, len(decl.Value))
 	}
 
@@ -737,7 +737,7 @@ func (p *CssParser) consumeDeclaration(nested bool) (*Declaration, error) {
 	case slices.ContainsFunc(decl.Value, isSimpleBlockWithCurlyOpen):
 		seenCurly := false
 		for _, v := range decl.Value {
-			if v.IsToken() == tokenizer.TokenId_Whitespace {
+			if v.IsToken() == css_tokenizer.TokenId_Whitespace {
 				continue
 			}
 			if !seenCurly && isSimpleBlockWithCurlyOpen(v) {
@@ -785,9 +785,9 @@ func (p *CssParser) consumeRemnantsOfBadDeclaration(nested bool) error {
 		}
 
 		switch token.IsToken() {
-		case tokenizer.TokenId_EOF, tokenizer.TokenId_Semicolon:
+		case css_tokenizer.TokenId_EOF, css_tokenizer.TokenId_Semicolon:
 			return nil
-		case tokenizer.TokenId_BracketCurlyClose:
+		case css_tokenizer.TokenId_BracketCurlyClose:
 			if nested {
 				p.reconsumeToken(token)
 				return nil
@@ -802,8 +802,8 @@ func (p *CssParser) consumeRemnantsOfBadDeclaration(nested bool) error {
 }
 
 // @see https://drafts.csswg.org/css-syntax/#consume-list-of-components
-func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.TokenId], nested bool) ([]tokenizer.Token, error) {
-	values := make([]tokenizer.Token, 0)
+func (p *CssParser) consumeListOfComponentValues(stop utils.Option[css_tokenizer.TokenId], nested bool) ([]css_tokenizer.Token, error) {
+	values := make([]css_tokenizer.Token, 0)
 
 	for {
 		token, err := p.consumeToken()
@@ -817,9 +817,9 @@ func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.Tok
 		}
 
 		switch token.IsToken() {
-		case tokenizer.TokenId_EOF:
+		case css_tokenizer.TokenId_EOF:
 			return values, nil
-		case tokenizer.TokenId_BracketCurlyClose:
+		case css_tokenizer.TokenId_BracketCurlyClose:
 			if nested {
 				p.reconsumeToken(token)
 				return values, nil
@@ -841,17 +841,17 @@ func (p *CssParser) consumeListOfComponentValues(stop utils.Option[tokenizer.Tok
 }
 
 // @see https://drafts.csswg.org/css-syntax/#consume-component-value
-func (p *CssParser) consumeComponentValue() (tokenizer.Token, error) {
+func (p *CssParser) consumeComponentValue() (css_tokenizer.Token, error) {
 	token, err := p.consumeToken()
 	if err != nil {
 		return nil, err
 	}
 
 	switch token.IsToken() {
-	case tokenizer.TokenId_BracketSquareOpen, tokenizer.TokenId_BracketCurlyOpen, tokenizer.TokenId_BracketParamOpen:
+	case css_tokenizer.TokenId_BracketSquareOpen, css_tokenizer.TokenId_BracketCurlyOpen, css_tokenizer.TokenId_BracketParamOpen:
 		p.reconsumeToken(token)
 		return p.consumeSimpleBlock()
-	case tokenizer.TokenId_FunctionToken:
+	case css_tokenizer.TokenId_FunctionToken:
 		p.reconsumeToken(token)
 		return p.consumeFunction()
 	default:
@@ -867,7 +867,7 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 	}
 
 	switch startToken.IsToken() {
-	case tokenizer.TokenId_BracketCurlyOpen, tokenizer.TokenId_BracketSquareOpen, tokenizer.TokenId_BracketParamOpen:
+	case css_tokenizer.TokenId_BracketCurlyOpen, css_tokenizer.TokenId_BracketSquareOpen, css_tokenizer.TokenId_BracketParamOpen:
 		break
 	default:
 		return nil, errors.New("was expecting a '{','(', or '[' token")
@@ -887,7 +887,7 @@ func (p *CssParser) consumeSimpleBlock() (*SimpleBlock, error) {
 			return nil, err
 		}
 
-		if token.IsToken() == tokenizer.TokenId_EOF || token.IsToken() == endToken {
+		if token.IsToken() == css_tokenizer.TokenId_EOF || token.IsToken() == endToken {
 			_, block.End = token.Range()
 			return block, nil
 		}
@@ -912,7 +912,7 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 		return nil, err
 	}
 
-	if fnT.IsToken() != tokenizer.TokenId_FunctionToken {
+	if fnT.IsToken() != css_tokenizer.TokenId_FunctionToken {
 		return nil, errors.New("was expecting a function token")
 	}
 
@@ -929,7 +929,7 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 		}
 
 		switch token.IsToken() {
-		case tokenizer.TokenId_BracketParamClose, tokenizer.TokenId_EOF:
+		case css_tokenizer.TokenId_BracketParamClose, css_tokenizer.TokenId_EOF:
 			_, fn.End = token.Range()
 			return fn, nil
 		default:
@@ -945,11 +945,11 @@ func (p *CssParser) consumeFunction() (*Function, error) {
 }
 
 // @see https://drafts.csswg.org/css-syntax/#consume-unicode-range-value
-func (p *CssParser) consumeUnicodeRangeValue(input string) ([]tokenizer.Token, error) {
+func (p *CssParser) consumeUnicodeRangeValue(input string) ([]css_tokenizer.Token, error) {
 	prev := p.tok
-	p.tok = tokenizer.NewCssTokenizer(strings.NewReader(input), true)
+	p.tok = css_tokenizer.NewCssTokenizer(strings.NewReader(input), true)
 	defer func() { p.tok = prev }()
-	return p.consumeListOfComponentValues(utils.None[tokenizer.TokenId](), false)
+	return p.consumeListOfComponentValues(utils.None[css_tokenizer.TokenId](), false)
 }
 
 //#endregion

@@ -27,7 +27,7 @@ type Selector struct {
 //
 // @see https://www.w3.org/TR/selectors-4/#parse-selector
 func NewSelector(selector string) (*Selector, error) {
-	list, err := parser.ParseListAccordingToCssGrammar(selector, parseComplexSelector)
+	list, err := css_parser.ParseListAccordingToCssGrammar(selector, parseComplexSelector)
 	if err != nil {
 		return nil, err
 	}
@@ -50,11 +50,11 @@ func NewSelector(selector string) (*Selector, error) {
 	return s, nil
 }
 
-func NewSelectorFromTokens(tokens []tokenizer.Token) (*Selector, error) {
-	var segments [][]tokenizer.Token
-	var current []tokenizer.Token
+func NewSelectorFromTokens(tokens []css_tokenizer.Token) (*Selector, error) {
+	var segments [][]css_tokenizer.Token
+	var current []css_tokenizer.Token
 	for _, tok := range tokens {
-		if tok.IsToken() == tokenizer.TokenId_Comma {
+		if tok.IsToken() == css_tokenizer.TokenId_Comma {
 			segments = append(segments, current)
 			current = nil
 		} else {
@@ -180,13 +180,13 @@ func precedingElementSiblings(node dom.ElementNode) []dom.ElementNode {
 // safe at the top level because commas inside [...] / (...) are already grouped
 // into SimpleBlock / Function values by consumeComponentValue. An empty input
 // yields a single empty segment (which parseComplexSelector rejects).
-func splitTopLevelComma(toks []tokenizer.Token) [][]tokenizer.Token {
-	groups := make([][]tokenizer.Token, 0, 1)
-	cur := make([]tokenizer.Token, 0)
+func splitTopLevelComma(toks []css_tokenizer.Token) [][]css_tokenizer.Token {
+	groups := make([][]css_tokenizer.Token, 0, 1)
+	cur := make([]css_tokenizer.Token, 0)
 	for _, t := range toks {
-		if t.IsToken() == tokenizer.TokenId_Comma {
+		if t.IsToken() == css_tokenizer.TokenId_Comma {
 			groups = append(groups, cur)
-			cur = make([]tokenizer.Token, 0)
+			cur = make([]css_tokenizer.Token, 0)
 			continue
 		}
 		cur = append(cur, t)
@@ -198,11 +198,11 @@ func splitTopLevelComma(toks []tokenizer.Token) [][]tokenizer.Token {
 //
 // Whitespace separating two units with no explicit combinator is the descendant
 // combinator; whitespace adjacent to an explicit combinator is insignificant.
-func parseComplexSelector(seg []tokenizer.Token) (*ComplexSelector, error) {
+func parseComplexSelector(seg []css_tokenizer.Token) (*ComplexSelector, error) {
 	r := newTokenReader(seg)
 	r.skipWhitespace()
 	if r.atEnd() {
-		return nil, parser.ErrSyntax
+		return nil, css_parser.ErrSyntax
 	}
 
 	cs := &ComplexSelector{}
@@ -227,7 +227,7 @@ func parseComplexSelector(seg []tokenizer.Token) (*ComplexSelector, error) {
 		case hadWS:
 			comb = CombinatorDescendant
 		default:
-			return nil, parser.ErrSyntax
+			return nil, css_parser.ErrSyntax
 		}
 
 		r.skipWhitespace()
@@ -247,16 +247,16 @@ func parseComplexSelector(seg []tokenizer.Token) (*ComplexSelector, error) {
 func tryParseCombinator(r *tokenReader) (Combinator, bool) {
 	t := r.peek()
 	switch {
-	case parser.IsDelim(t, '>'):
+	case css_parser.IsDelim(t, '>'):
 		r.next()
 		return CombinatorChild, true
-	case parser.IsDelim(t, '+'):
+	case css_parser.IsDelim(t, '+'):
 		r.next()
 		return CombinatorNextSibling, true
-	case parser.IsDelim(t, '~'):
+	case css_parser.IsDelim(t, '~'):
 		r.next()
 		return CombinatorSubsequentSibling, true
-	case parser.IsDelim(t, '|') && parser.IsDelim(r.peekN(1), '|'):
+	case css_parser.IsDelim(t, '|') && css_parser.IsDelim(r.peekN(1), '|'):
 		r.next()
 		r.next()
 		return CombinatorColumn, true
@@ -318,7 +318,7 @@ func parseCompoundSelector(r *tokenReader) (*CompoundSelector, error) {
 	}
 
 	if !matched {
-		return nil, parser.ErrSyntax
+		return nil, css_parser.ErrSyntax
 	}
 	return c, nil
 }
@@ -337,12 +337,12 @@ func tryParseTypeSelector(r *tokenReader) (*TypeSelector, bool, error) {
 			ts.LocalName = name
 			return ts, true, nil
 		}
-		if parser.IsDelim(r.peek(), '*') {
+		if css_parser.IsDelim(r.peek(), '*') {
 			r.next()
 			ts.Universal = true
 			return ts, true, nil
 		}
-		return nil, false, parser.ErrSyntax
+		return nil, false, css_parser.ErrSyntax
 	}
 
 	if name, ok := identValue(r.peek()); ok {
@@ -350,7 +350,7 @@ func tryParseTypeSelector(r *tokenReader) (*TypeSelector, bool, error) {
 		ts.LocalName = name
 		return ts, true, nil
 	}
-	if parser.IsDelim(r.peek(), '*') {
+	if css_parser.IsDelim(r.peek(), '*') {
 		r.next()
 		ts.Universal = true
 		return ts, true, nil
@@ -368,18 +368,18 @@ func tryParseNsPrefix(r *tokenReader) (string, bool) {
 	start := r.mark()
 
 	if name, ok := identValue(r.peek()); ok {
-		if parser.IsDelim(r.peekN(1), '|') && nsNameFollows(r.peekN(2)) {
+		if css_parser.IsDelim(r.peekN(1), '|') && nsNameFollows(r.peekN(2)) {
 			r.next() // ident
 			r.next() // '|'
 			return name, true
 		}
-	} else if parser.IsDelim(r.peek(), '*') {
-		if parser.IsDelim(r.peekN(1), '|') && nsNameFollows(r.peekN(2)) {
+	} else if css_parser.IsDelim(r.peek(), '*') {
+		if css_parser.IsDelim(r.peekN(1), '|') && nsNameFollows(r.peekN(2)) {
 			r.next() // '*'
 			r.next() // '|'
 			return "*", true
 		}
-	} else if parser.IsDelim(r.peek(), '|') && nsNameFollows(r.peekN(1)) {
+	} else if css_parser.IsDelim(r.peek(), '|') && nsNameFollows(r.peekN(1)) {
 		r.next() // '|'
 		return "", true
 	}
@@ -388,11 +388,11 @@ func tryParseNsPrefix(r *tokenReader) (string, bool) {
 	return "", false
 }
 
-func nsNameFollows(t tokenizer.Token) bool {
+func nsNameFollows(t css_tokenizer.Token) bool {
 	if t == nil {
 		return false
 	}
-	return t.IsToken() == tokenizer.TokenId_Ident || parser.IsDelim(t, '*')
+	return t.IsToken() == css_tokenizer.TokenId_Ident ||css_parser.IsDelim(t, '*')
 }
 
 // tryParseSubclassSelector is
@@ -404,33 +404,33 @@ func tryParseSubclassSelector(r *tokenReader) (SimpleSelector, bool, error) {
 	}
 
 	switch {
-	case t.IsToken() == tokenizer.TokenId_Hash:
-		h, ok := t.(*tokenizer.MultiCharacterToken)
+	case t.IsToken() == css_tokenizer.TokenId_Hash:
+		h, ok := t.(*css_tokenizer.MultiCharacterToken)
 		if !ok || h.Flag != "id" { // only id-typed hashes are id selectors
-			return nil, false, parser.ErrSyntax
+			return nil, false, css_parser.ErrSyntax
 		}
 		r.next()
 		return &IdSelector{Name: h.Value}, true, nil
 
-	case parser.IsDelim(t, '.'):
+	case css_parser.IsDelim(t, '.'):
 		r.next()
 		name, ok := identValue(r.peek())
 		if !ok {
-			return nil, false, parser.ErrSyntax
+			return nil, false, css_parser.ErrSyntax
 		}
 		r.next()
 		return &ClassSelector{Name: name}, true, nil
 
-	case t.IsToken() == tokenizer.TokenId_Colon:
+	case t.IsToken() == css_tokenizer.TokenId_Colon:
 		// '::' introduces a pseudo-element, handled by parseCompoundSelector.
-		if next := r.peekN(1); next != nil && next.IsToken() == tokenizer.TokenId_Colon {
+		if next := r.peekN(1); next != nil && next.IsToken() == css_tokenizer.TokenId_Colon {
 			return nil, false, nil
 		}
 		return tryParsePseudoClass(r)
 	}
 
-	if b, ok := t.(*parser.SimpleBlock); ok && b.StartDelim != nil &&
-		b.StartDelim.IsToken() == tokenizer.TokenId_BracketSquareOpen {
+	if b, ok := t.(*css_parser.SimpleBlock); ok && b.StartDelim != nil &&
+		b.StartDelim.IsToken() == css_tokenizer.TokenId_BracketSquareOpen {
 		r.next()
 		attr, err := parseAttributeSelector(b)
 		if err != nil {
@@ -445,7 +445,7 @@ func tryParseSubclassSelector(r *tokenReader) (SimpleSelector, bool, error) {
 // parseAttributeSelector parses the contents of a '[...]' SimpleBlock as
 //
 //	'[' <wq-name> ']' | '[' <wq-name> <attr-matcher> [ <string> | <ident> ] <attr-modifier>? ']'
-func parseAttributeSelector(block *parser.SimpleBlock) (*AttributeSelector, error) {
+func parseAttributeSelector(block *css_parser.SimpleBlock) (*AttributeSelector, error) {
 	r := newTokenReader(block.Value)
 	r.skipWhitespace()
 
@@ -458,7 +458,7 @@ func parseAttributeSelector(block *parser.SimpleBlock) (*AttributeSelector, erro
 
 	name, ok := identValue(r.peek())
 	if !ok {
-		return nil, parser.ErrSyntax
+		return nil, css_parser.ErrSyntax
 	}
 	r.next()
 	attr.LocalName = name
@@ -478,9 +478,9 @@ func parseAttributeSelector(block *parser.SimpleBlock) (*AttributeSelector, erro
 	r.skipWhitespace()
 
 	// value: <string-token> | <ident-token>
-	v, ok := r.peek().(*tokenizer.MultiCharacterToken)
-	if !ok || (v.Type != tokenizer.TokenId_String && v.Type != tokenizer.TokenId_Ident) {
-		return nil, parser.ErrSyntax
+	v, ok := r.peek().(*css_tokenizer.MultiCharacterToken)
+	if !ok || (v.Type != css_tokenizer.TokenId_String && v.Type != css_tokenizer.TokenId_Ident) {
+		return nil, css_parser.ErrSyntax
 	}
 	attr.Value = v.Value
 	r.next()
@@ -494,14 +494,14 @@ func parseAttributeSelector(block *parser.SimpleBlock) (*AttributeSelector, erro
 		case strings.EqualFold(mod, "s"):
 			attr.Modifier = AttrModCaseSensitive
 		default:
-			return nil, parser.ErrSyntax
+			return nil, css_parser.ErrSyntax
 		}
 		r.next()
 		r.skipWhitespace()
 	}
 
 	if !r.atEnd() {
-		return nil, parser.ErrSyntax
+		return nil,css_parser.ErrSyntax
 	}
 	return attr, nil
 }
@@ -510,24 +510,24 @@ func parseAttributeSelector(block *parser.SimpleBlock) (*AttributeSelector, erro
 func parseAttrMatcher(r *tokenReader) (AttrMatcher, error) {
 	matcher := AttrEquals
 	switch {
-	case parser.IsDelim(r.peek(), '~'):
+	case css_parser.IsDelim(r.peek(), '~'):
 		matcher = AttrIncludes
 		r.next()
-	case parser.IsDelim(r.peek(), '|'):
+	case css_parser.IsDelim(r.peek(), '|'):
 		matcher = AttrDashMatch
 		r.next()
-	case parser.IsDelim(r.peek(), '^'):
+	case css_parser.IsDelim(r.peek(), '^'):
 		matcher = AttrPrefix
 		r.next()
-	case parser.IsDelim(r.peek(), '$'):
+	case css_parser.IsDelim(r.peek(), '$'):
 		matcher = AttrSuffix
 		r.next()
-	case parser.IsDelim(r.peek(), '*'):
+	case css_parser.IsDelim(r.peek(), '*'):
 		matcher = AttrSubstring
 		r.next()
 	}
-	if !parser.IsDelim(r.peek(), '=') {
-		return 0, parser.ErrSyntax
+	if !css_parser.IsDelim(r.peek(), '=') {
+		return 0, css_parser.ErrSyntax
 	}
 	r.next()
 	return matcher, nil
@@ -537,17 +537,17 @@ func parseAttrMatcher(r *tokenReader) (AttrMatcher, error) {
 // pseudo-elements (:before, :after, :first-line, :first-letter).
 func tryParsePseudoElement(r *tokenReader) (*PseudoElementSelector, bool, error) {
 	t := r.peek()
-	if t == nil || t.IsToken() != tokenizer.TokenId_Colon {
+	if t == nil || t.IsToken() != css_tokenizer.TokenId_Colon {
 		return nil, false, nil
 	}
 
 	// '::' modern pseudo-element
-	if next := r.peekN(1); next != nil && next.IsToken() == tokenizer.TokenId_Colon {
+	if next := r.peekN(1); next != nil && next.IsToken() == css_tokenizer.TokenId_Colon {
 		r.next() // ':'
 		r.next() // ':'
 		name, ok := identValue(r.peek())
 		if !ok {
-			return nil, false, parser.ErrSyntax
+			return nil, false, css_parser.ErrSyntax
 		}
 		r.next()
 		return &PseudoElementSelector{Name: strings.ToLower(name)}, true, nil
@@ -568,11 +568,11 @@ func tryParsePseudoElement(r *tokenReader) (*PseudoElementSelector, bool, error)
 // An+B parsing in phase 1).
 func tryParsePseudoClass(r *tokenReader) (SimpleSelector, bool, error) {
 	t := r.peek()
-	if t == nil || t.IsToken() != tokenizer.TokenId_Colon {
+	if t == nil || t.IsToken() != css_tokenizer.TokenId_Colon {
 		return nil, false, nil
 	}
 	// never claim '::' (pseudo-element)
-	if next := r.peekN(1); next != nil && next.IsToken() == tokenizer.TokenId_Colon {
+	if next := r.peekN(1); next != nil && next.IsToken() == css_tokenizer.TokenId_Colon {
 		return nil, false, nil
 	}
 
@@ -588,7 +588,7 @@ func tryParsePseudoClass(r *tokenReader) (SimpleSelector, bool, error) {
 		return &PseudoClassSelector{Name: strings.ToLower(name)}, true, nil
 	}
 
-	if fn, ok := next.(*parser.Function); ok {
+	if fn, ok := next.(*css_parser.Function); ok {
 		r.next() // ':'
 		r.next() // function
 		return &PseudoClassSelector{
@@ -598,7 +598,7 @@ func tryParsePseudoClass(r *tokenReader) (SimpleSelector, bool, error) {
 		}, true, nil
 	}
 
-	return nil, false, parser.ErrSyntax
+	return nil, false, css_parser.ErrSyntax
 }
 
 func isLegacyPseudoElement(name string) bool {
@@ -612,9 +612,9 @@ func isLegacyPseudoElement(name string) bool {
 // identValue returns the value of an <ident-token>, or ("", false) for any other
 // token (including nil). It composes parser.GetTokenValueAsString rather than
 // reimplementing it.
-func identValue(t tokenizer.Token) (string, bool) {
-	if t != nil && t.IsToken() == tokenizer.TokenId_Ident {
-		return parser.GetTokenValueAsString(t), true
+func identValue(t css_tokenizer.Token) (string, bool) {
+	if t != nil && t.IsToken() == css_tokenizer.TokenId_Ident {
+		return css_parser.GetTokenValueAsString(t), true
 	}
 	return "", false
 }

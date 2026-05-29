@@ -5,7 +5,7 @@ import (
 	"github.com/Zyko0/go-sdl3/sdl"
 )
 
-func parseColor([]tokenizer.Token) sdl.FColor {
+func parseColor([]css_tokenizer.Token) sdl.FColor {
 
 	return sdl.FColor{}
 }

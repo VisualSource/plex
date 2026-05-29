@@ -226,7 +226,7 @@ func (a *AttributeSelector) matches(el dom.ElementNode) bool {
 type PseudoClassSelector struct {
 	Name       string            // lower-cased, e.g. "hover", "not", "nth-child"
 	Functional bool              // true if it was ':name(...)'
-	RawArgs    []tokenizer.Token // raw inner component values when Functional
+	RawArgs    []css_tokenizer.Token // raw inner component values when Functional
 }
 
 func (*PseudoClassSelector) isSimpleSelector() {}
