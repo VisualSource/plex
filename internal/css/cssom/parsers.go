@@ -3,6 +3,7 @@ package cssom
 import (
 	"errors"
 
+	css_parser "github.com/VisualSource/plex/internal/css/parser"
 	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/Zyko0/go-sdl3/sdl"
 )
@@ -68,9 +69,41 @@ display =
 	inline-flex   |
 	inline-grid
 */
-func parseDisplay(tokens []css_tokenizer.Token) (string, error) {
 
-	return "", errors.New("unknown value")
+type Display struct {
+	Outer string
+	Inner string
+}
+
+func parseDisplay(tokens []css_tokenizer.Token) (Display, error) {
+	if len(tokens) < 1 {
+		return Display{}, errors.New("invalid property")
+	}
+
+	first := css_parser.GetTokenValueAsString(tokens[0])
+
+	switch first {
+	case "inline-block", "inline-table", "inline-flex", "inline-grid":
+		if (len(tokens)) != 1 {
+			return Display{}, errors.New("syntax error")
+		}
+
+		return Display{
+			Outer: "block",
+			Inner: "flow",
+		}, nil
+
+	case "none", "contents":
+		if (len(tokens)) != 1 {
+			return Display{}, errors.New("syntax error")
+		}
+
+		return Display{
+			Outer: first,
+		}, nil
+	default:
+		return Display{}, errors.New("syntax error")
+	}
 }
 
 /*
