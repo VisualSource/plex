@@ -145,6 +145,7 @@ func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, de
 		case "width":
 		case "hight":
 		case "display":
+
 		case "position":
 
 		case "color":

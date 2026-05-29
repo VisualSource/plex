@@ -3,8 +3,8 @@ package selector_test
 import (
 	"testing"
 
+	"github.com/VisualSource/plex/internal/css/selector"
 	"github.com/VisualSource/plex/internal/dom"
-	"github.com/VisualSource/plex/internal/layout/selector"
 	"github.com/VisualSource/plex/internal/utils"
 )
 
