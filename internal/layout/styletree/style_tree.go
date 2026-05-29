@@ -1,4 +1,4 @@
-package layout
+package styletree
 
 import (
 	"cmp"
@@ -8,6 +8,7 @@ import (
 	"github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/dom"
+	"github.com/VisualSource/plex/internal/layout/selector"
 	"github.com/Zyko0/go-sdl3/sdl"
 )
 
@@ -22,7 +23,16 @@ func (p PropertyMap) MustGetColor(key string) sdl.FColor {
 	return color
 }
 
-type SelectorCache map[*parser.Rule]*Selector
+func (p PropertyMap) MustGetString(key string) string {
+	color, ok := p[key].(string)
+	if !ok {
+		panic("was expecting a string value")
+	}
+
+	return color
+}
+
+type SelectorCache map[*parser.Rule]*selector.Selector
 
 type MatchedRule struct {
 	Specificity int
@@ -42,12 +52,22 @@ func NewStyleTree(el dom.ElementNode, stylesheets []*parser.Stylesheet, selector
 
 	props := specifiedValues(el, stylesheets, selectorCache, parentPropertyMap)
 
+	display, hasDisplay := props["display"]
+
+	if hasDisplay && display.(string) != "none" {
+		return nil, nil
+	}
+
 	children := make([]*StyledNode, 0)
 	for _, child := range el.Children() {
 		if n, ok := child.(dom.ElementNode); ok {
 			tree, err := NewStyleTree(n, stylesheets, selectorCache, props)
 
 			if err != nil {
+				continue
+			}
+
+			if tree == nil {
 				continue
 			}
 
@@ -69,20 +89,20 @@ func NewStyleTree(el dom.ElementNode, stylesheets []*parser.Stylesheet, selector
 }
 
 func matchRule(node dom.ElementNode, stylesheetOrigin int, rule *parser.Rule, selectorCache SelectorCache) *MatchedRule {
-	selector, ok := selectorCache[rule]
+	sele, ok := selectorCache[rule]
 	if !ok {
-		sel, err := NewSelectorFromTokens(rule.Prelude)
+		sel, err := selector.NewSelectorFromTokens(rule.Prelude)
 		if err != nil {
 			return nil
 		}
 
 		selectorCache[rule] = sel
-		selector = sel
+		sele = sel
 	}
 
-	if selector.Matches(node) {
+	if sele.Matches(node) {
 		return &MatchedRule{
-			Specificity: selector.Specificity,
+			Specificity: sele.Specificity,
 			Rule:        rule,
 			Origin:      stylesheetOrigin,
 		}
@@ -108,10 +128,25 @@ func matchRules(node dom.ElementNode, stylesheets []*parser.Stylesheet, selector
 }
 
 func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, decl *parser.Declaration) map[string]any {
+
+	//background, border, margin, padding, width, height, display, and position
+
 	switch decl.Name.IsToken() {
 	case tokenizer.TokenId_Ident:
 		key := parser.GetTokenValueAsString(decl.Name)
 		switch key {
+		//#region shorthands
+		case "background": // explist inherit
+		case "border": // explist inherit
+		case "padding": // explist inherit
+		case "margin": //explist inherit
+
+		//#endregion
+		case "width":
+		case "hight":
+		case "display":
+		case "position":
+
 		case "color":
 			// inherit,initial,revert,unset,currentColor
 			// fn,hex,named,
@@ -119,7 +154,6 @@ func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, de
 			propertyMap[key] = parseColor(decl.Value)
 
 		case "background-color":
-		case "border":
 
 		default:
 			propertyMap[key] = ""
@@ -131,6 +165,8 @@ func parseDeclaration(propertyMap PropertyMap, parentPropertyMap PropertyMap, de
 
 func specifiedValues(node dom.ElementNode, stylesheets []*parser.Stylesheet, selectorCache SelectorCache, parentPropertyMap PropertyMap) PropertyMap {
 	property := make(PropertyMap)
+
+	property = inheritProperties(property, parentPropertyMap)
 
 	rules := matchRules(node, stylesheets, selectorCache)
 

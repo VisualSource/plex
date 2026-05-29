@@ -1,10 +1,10 @@
-package layout_test
+package selector_test
 
 import (
 	"testing"
 
 	"github.com/VisualSource/plex/internal/dom"
-	"github.com/VisualSource/plex/internal/layout"
+	"github.com/VisualSource/plex/internal/layout/selector"
 	"github.com/VisualSource/plex/internal/utils"
 )
 
@@ -55,7 +55,7 @@ func TestNewSelector_AcceptReject(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.in, func(t *testing.T) {
-			_, err := layout.NewSelector(c.in)
+			_, err := selector.NewSelector(c.in)
 			switch {
 			case c.wantErr && err != nil:
 				t.Fatalf("NewSelector(%q): want ErrSyntax, got %v", c.in, err)
@@ -67,7 +67,7 @@ func TestNewSelector_AcceptReject(t *testing.T) {
 }
 
 func TestNewSelector_Structure(t *testing.T) {
-	sel, err := layout.NewSelector("ul.menu > li#x")
+	sel, err := selector.NewSelector("ul.menu > li#x")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,10 +79,10 @@ func TestNewSelector_Structure(t *testing.T) {
 	if len(cs.Units) != 2 {
 		t.Fatalf("units = %d, want 2", len(cs.Units))
 	}
-	if cs.Units[0].Combinator != layout.CombinatorNone {
+	if cs.Units[0].Combinator != selector.CombinatorNone {
 		t.Fatalf("unit[0] combinator = %v, want None", cs.Units[0].Combinator)
 	}
-	if cs.Units[1].Combinator != layout.CombinatorChild {
+	if cs.Units[1].Combinator != selector.CombinatorChild {
 		t.Fatalf("unit[1] combinator = %v, want Child", cs.Units[1].Combinator)
 	}
 	if got := cs.Units[0].Compound.Type; got == nil || got.LocalName != "ul" {
@@ -93,7 +93,7 @@ func TestNewSelector_Structure(t *testing.T) {
 	}
 
 	// ul.menu => c=1,b=1 ; li#x => c=1,a=1 ; total a=1,b=1,c=2
-	want := layout.Specificity{A: 1, B: 1, C: 2}
+	want := selector.Specificity{A: 1, B: 1, C: 2}
 	if got := cs.Specificity(); got != want {
 		t.Fatalf("specificity = %+v, want %+v", got, want)
 	}
@@ -104,18 +104,18 @@ func TestNewSelector_Structure(t *testing.T) {
 
 func TestNewSelector_SpecificityMaxOverList(t *testing.T) {
 	// "div, #id" -> max( c=1 , a=1 ) = a=1
-	sel, err := layout.NewSelector("div, #id")
+	sel, err := selector.NewSelector("div, #id")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if want := (layout.Specificity{A: 1}).Value(); sel.Specificity != want {
+	if want := (selector.Specificity{A: 1}).Value(); sel.Specificity != want {
 		t.Fatalf("Selector.Specificity = %d, want %d", sel.Specificity, want)
 	}
 }
 
-func firstCompound(t *testing.T, in string) *layout.CompoundSelector {
+func firstCompound(t *testing.T, in string) *selector.CompoundSelector {
 	t.Helper()
-	sel, err := layout.NewSelector(in)
+	sel, err := selector.NewSelector(in)
 	if err != nil {
 		t.Fatalf("NewSelector(%q): unexpected error: %v", in, err)
 	}
@@ -125,19 +125,19 @@ func firstCompound(t *testing.T, in string) *layout.CompoundSelector {
 func TestParseAttributeSelector(t *testing.T) {
 	cases := []struct {
 		in       string
-		matcher  layout.AttrMatcher
+		matcher  selector.AttrMatcher
 		value    string
-		modifier layout.AttrModifier
+		modifier selector.AttrModifier
 	}{
-		{"[href]", layout.AttrPresence, "", layout.AttrModNone},
-		{`[href="x"]`, layout.AttrEquals, "x", layout.AttrModNone},
-		{`[rel~="next"]`, layout.AttrIncludes, "next", layout.AttrModNone},
-		{"[lang|=en]", layout.AttrDashMatch, "en", layout.AttrModNone},
-		{`[href^="https"]`, layout.AttrPrefix, "https", layout.AttrModNone},
-		{`[src$=".png"]`, layout.AttrSuffix, ".png", layout.AttrModNone},
-		{`[title*="x"]`, layout.AttrSubstring, "x", layout.AttrModNone},
-		{`[href="X" i]`, layout.AttrEquals, "X", layout.AttrModCaseInsensitive},
-		{`[href="X" s]`, layout.AttrEquals, "X", layout.AttrModCaseSensitive},
+		{"[href]", selector.AttrPresence, "", selector.AttrModNone},
+		{`[href="x"]`, selector.AttrEquals, "x", selector.AttrModNone},
+		{`[rel~="next"]`, selector.AttrIncludes, "next", selector.AttrModNone},
+		{"[lang|=en]", selector.AttrDashMatch, "en", selector.AttrModNone},
+		{`[href^="https"]`, selector.AttrPrefix, "https", selector.AttrModNone},
+		{`[src$=".png"]`, selector.AttrSuffix, ".png", selector.AttrModNone},
+		{`[title*="x"]`, selector.AttrSubstring, "x", selector.AttrModNone},
+		{`[href="X" i]`, selector.AttrEquals, "X", selector.AttrModCaseInsensitive},
+		{`[href="X" s]`, selector.AttrEquals, "X", selector.AttrModCaseSensitive},
 	}
 
 	for _, c := range cases {
@@ -146,7 +146,7 @@ func TestParseAttributeSelector(t *testing.T) {
 			if len(comp.Subclass) != 1 {
 				t.Fatalf("subclass count = %d, want 1", len(comp.Subclass))
 			}
-			attr, ok := comp.Subclass[0].(*layout.AttributeSelector)
+			attr, ok := comp.Subclass[0].(*selector.AttributeSelector)
 			if !ok {
 				t.Fatalf("subclass[0] = %T, want *AttributeSelector", comp.Subclass[0])
 			}
@@ -169,7 +169,7 @@ func TestParsePseudo(t *testing.T) {
 	if len(comp.Subclass) != 1 {
 		t.Fatalf(":hover subclass count = %d, want 1", len(comp.Subclass))
 	}
-	if pc, ok := comp.Subclass[0].(*layout.PseudoClassSelector); !ok || pc.Name != "hover" || pc.Functional {
+	if pc, ok := comp.Subclass[0].(*selector.PseudoClassSelector); !ok || pc.Name != "hover" || pc.Functional {
 		t.Fatalf(":hover = %+v", comp.Subclass[0])
 	}
 
@@ -178,19 +178,19 @@ func TestParsePseudo(t *testing.T) {
 	if len(comp.Pseudos) != 1 {
 		t.Fatalf(":before pseudos count = %d, want 1", len(comp.Pseudos))
 	}
-	if pe, ok := comp.Pseudos[0].(*layout.PseudoElementSelector); !ok || pe.Name != "before" || !pe.Legacy {
+	if pe, ok := comp.Pseudos[0].(*selector.PseudoElementSelector); !ok || pe.Name != "before" || !pe.Legacy {
 		t.Fatalf(":before = %+v", comp.Pseudos[0])
 	}
 
 	// ::before -> modern pseudo-element
 	comp = firstCompound(t, "::before")
-	if pe, ok := comp.Pseudos[0].(*layout.PseudoElementSelector); !ok || pe.Name != "before" || pe.Legacy {
+	if pe, ok := comp.Pseudos[0].(*selector.PseudoElementSelector); !ok || pe.Name != "before" || pe.Legacy {
 		t.Fatalf("::before = %+v", comp.Pseudos[0])
 	}
 
 	// :not(.x) -> functional pseudo-class with raw args
 	comp = firstCompound(t, ":not(.x)")
-	pc, ok := comp.Subclass[0].(*layout.PseudoClassSelector)
+	pc, ok := comp.Subclass[0].(*selector.PseudoClassSelector)
 	if !ok || pc.Name != "not" || !pc.Functional {
 		t.Fatalf(":not(.x) = %+v", comp.Subclass[0])
 	}
@@ -226,7 +226,7 @@ func appendKids(parent dom.ElementNode, kids ...dom.Node) dom.ElementNode {
 // mustMatch parses sel and reports whether it matches node.
 func mustMatch(t *testing.T, sel string, node dom.ElementNode) bool {
 	t.Helper()
-	s, err := layout.NewSelector(sel)
+	s, err := selector.NewSelector(sel)
 	if err != nil {
 		t.Fatalf("NewSelector(%q): unexpected error: %v", sel, err)
 	}

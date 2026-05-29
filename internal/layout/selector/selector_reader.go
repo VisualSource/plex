@@ -1,4 +1,4 @@
-package layout
+package selector
 
 import "github.com/VisualSource/plex/internal/css/tokenizer"
 

@@ -1,4 +1,4 @@
-package layout_test
+package styletree_test
 
 import (
 	"strings"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/dom"
-	"github.com/VisualSource/plex/internal/layout"
+	"github.com/VisualSource/plex/internal/layout/styletree"
 	"github.com/VisualSource/plex/internal/utils"
 	"github.com/kr/pretty"
 )
@@ -21,7 +21,7 @@ func TestNewStyleTree(t *testing.T) {
 		createElement("main"),
 	)
 
-	styleTree, err := layout.NewStyleTree(el, stylesheets, nil, nil)
+	styleTree, err := styletree.NewStyleTree(el, stylesheets, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to parse styleTree %s", err)
 	}
