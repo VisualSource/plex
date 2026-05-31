@@ -23,6 +23,26 @@ func (t PropertyMap) GetPropAsString(prop string) utils.Option[string] {
 	return utils.None[string]()
 }
 
+func (t PropertyMap) GetPropAsDisplay(prop string) utils.Option[cssom.Display] {
+	if value, ok := t[prop]; ok {
+		if decValue, ok := value.Value.(cssom.Display); ok {
+			return utils.Some(decValue)
+		}
+	}
+
+	return utils.None[cssom.Display]()
+}
+
+func (t PropertyMap) GetPropAsSize(prop string) utils.Option[cssom.Size] {
+	if value, ok := t[prop]; ok {
+		if decValue, ok := value.Value.(cssom.Size); ok {
+			return utils.Some(decValue)
+		}
+	}
+
+	return utils.None[cssom.Size]()
+}
+
 type StyledNode struct {
 	Element         dom.Node
 	SpecifiedValues PropertyMap

@@ -215,29 +215,38 @@ func parseDeclaration(properties DeclarationBlock, declaration *css_parser.Decla
 	case "margin":
 	case "padding":
 
+	case "border-left-width", "border-right-width":
+		size, err := parseSize(declaration.Value)
+		if err != nil {
+			break
+		}
+
+		properties[name] = &Declaration{
+			Important: declaration.Important,
+			CssText:   declaration.OriginalText,
+			Value:     size,
+		}
 	case "margin-top", "margin-right", "margin-bottom", "margin-left":
-		items := nonWS(declaration.Value)
-		if len(items) == 1 {
-			value, ok := items[0].(*css_tokenizer.NumericToken)
-			if ok {
-				properties[name] = &Declaration{
-					Important: declaration.Important,
-					CssText:   declaration.OriginalText,
-					Value:     value,
-				}
-			}
+		size, err := parseSize(declaration.Value)
+		if err != nil {
+			break
+		}
+
+		properties[name] = &Declaration{
+			Important: declaration.Important,
+			CssText:   declaration.OriginalText,
+			Value:     size,
 		}
 	case "padding-top", "padding-right", "padding-bottom", "padding-left":
-		items := nonWS(declaration.Value)
-		if len(items) == 1 {
-			value, ok := items[0].(*css_tokenizer.NumericToken)
-			if ok {
-				properties[name] = &Declaration{
-					Important: declaration.Important,
-					CssText:   declaration.OriginalText,
-					Value:     value,
-				}
-			}
+		size, err := parseSize(declaration.Value)
+		if err != nil {
+			break
+		}
+
+		properties[name] = &Declaration{
+			Important: declaration.Important,
+			CssText:   declaration.OriginalText,
+			Value:     size,
 		}
 	case "position":
 
