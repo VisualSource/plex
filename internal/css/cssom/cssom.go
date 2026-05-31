@@ -1,55 +1,86 @@
 package cssom
 
 import (
-	"errors"
-
 	css_parser "github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/css/selector"
+	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
+	"github.com/Zyko0/go-sdl3/sdl"
 )
 
 type Cssom struct {
-	Rules []Rule
+	Stylesheets []*Stylesheet
 }
 
 func NewCssom(stylesheets []*css_parser.Stylesheet) *Cssom {
 
-	rules := make([]Rule, 0)
+	styles := make([]*Stylesheet, 0)
 	for _, stylesheet := range stylesheets {
-		for _, rule := range stylesheet.Rules {
-			rule, err := parseRule(rule)
-			if err == nil {
-				rules = append(rules, rule)
-			}
-		}
+		styles = append(styles, parseStylesheet(stylesheet))
 	}
 
 	return &Cssom{
-		Rules: rules,
+		Stylesheets: styles,
 	}
+}
+
+type Stylesheet struct {
+	Rules    []Rule
+	Location utils.StringOption
+	Origin   int
+}
+
+func parseStylesheet(stylesheet *css_parser.Stylesheet) *Stylesheet {
+	sheet := &Stylesheet{
+		Location: stylesheet.Location,
+		Origin:   stylesheet.Origin,
+		Rules:    make([]Rule, 0),
+	}
+
+	for _, rule := range stylesheet.Rules {
+		rule, err := parseRule(rule, sheet)
+		if err == nil {
+			sheet.Rules = append(sheet.Rules, rule)
+		}
+	}
+
+	return sheet
 }
 
 type Rule interface{}
 
 type StyleRule struct {
-	Origin       int
-	Selector     selector.Selector
+	Selector     *selector.Selector
 	Declarations DeclarationBlock
+	Stylesheet   *Stylesheet
 }
 
-func parseRule(rule *css_parser.Rule) (Rule, error) {
+func parseRule(rule *css_parser.Rule, stylesheet *Stylesheet) (Rule, error) {
+	if rule.Name != "" {
+		//TODO: handle @ rules
+		return nil, ErrUnsupportedProperty
+	}
 
-	_, err := parseDeclarationList(rule.Declarations)
+	sel, err := selector.NewSelectorFromTokens(rule.Prelude)
 	if err != nil {
 		return nil, err
 	}
 
-	return &StyleRule{}, nil
+	value, err := ParseDeclarationList(rule.Declarations)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StyleRule{
+		Selector:     sel,
+		Declarations: value,
+		Stylesheet:   stylesheet,
+	}, nil
 }
 
 type DeclarationBlock map[string]*Declaration
 
-func parseDeclarationList(list *css_parser.DeclarationList) (DeclarationBlock, error) {
+func ParseDeclarationList(list *css_parser.DeclarationList) (DeclarationBlock, error) {
 	properties := make(DeclarationBlock)
 
 	for _, declaration := range list.Value {
@@ -65,36 +96,148 @@ type Declaration struct {
 	Value     any
 }
 
-var ErrUnsupportedProperty = errors.New("unsupported property")
+func (d *Declaration) IsStringValue(value string) bool {
+	if v, ok := d.Value.(string); ok && v == value {
+		return true
+	}
+
+	return false
+}
+
+func (d *Declaration) MustColor() sdl.Color {
+	v, ok := d.Value.(sdl.Color)
+	if !ok {
+		panic("unable to get value as color")
+	}
+
+	return v
+}
+
+func (d *Declaration) MustString() string {
+	v, ok := d.Value.(string)
+	if !ok {
+		panic("unable to get value as string")
+	}
+	return v
+}
+
+func (d *Declaration) MustNumber() *css_tokenizer.NumericToken {
+	v, ok := d.Value.(*css_tokenizer.NumericToken)
+	if !ok {
+		panic("unable to get value as a number")
+	}
+	return v
+}
 
 func parseDeclaration(properties DeclarationBlock, declaration *css_parser.Declaration) DeclarationBlock {
 	name := css_parser.GetTokenValueAsString(declaration.Name)
 
 	switch name {
-	case "background":
-		// inherits
 
-	case "border":
-		// inherits
-
-	case "padding":
-		// inherits
-
-	case "margin":
-		//inherits
-
-	case "margin-inline", "margin-block":
-
-	case "margin-left", "margin-right", "margin-top", "margin-bottom", "margin-block-end", "margin-block-start", "margin-inline-end", "margin-inline-start":
-		value, err := parseMargin(declaration.Value)
-		if err != nil {
-			break
+	//#region inherit
+	case "font": // shorthand
+	case "font-family":
+	case "font-size":
+		items := nonWS(declaration.Value)
+		if len(items) == 1 {
+			value, ok := items[0].(*css_tokenizer.NumericToken)
+			if ok {
+				properties[name] = &Declaration{
+					Important: declaration.Important,
+					CssText:   declaration.OriginalText,
+					Value:     value,
+				}
+			}
 		}
 
-		properties[name] = &Declaration{
-			Important: declaration.Important,
-			CssText:   declaration.OriginalText,
-			Value:     value,
+	case "font-style":
+	case "font-variant":
+	case "font-weight":
+		items := nonWS(declaration.Value)
+		if len(items) == 1 {
+			value, ok := items[0].(*css_tokenizer.NumericToken) // weights 100-900
+			if ok && value.Flag == "integer" && value.Value >= 1 && value.Value < 1000 {
+				properties[name] = &Declaration{
+					Important: declaration.Important,
+					CssText:   declaration.OriginalText,
+					Value:     value,
+				}
+			}
+		}
+	case "font-size-adjust":
+	case "font-stretch":
+
+	case "letter-spacing":
+	case "line-height":
+		items := nonWS(declaration.Value)
+		if len(items) == 1 {
+			value, ok := items[0].(*css_tokenizer.NumericToken) // weights 100-900
+			if ok {
+				properties[name] = &Declaration{
+					Important: declaration.Important,
+					CssText:   declaration.OriginalText,
+					Value:     value,
+				}
+			}
+		}
+	case "text-align":
+	case "text-indent":
+	case "text-shadow":
+	case "text-transform":
+	case "white-space":
+	case "word-break":
+	case "word-spacing":
+	case "overflow-wrap":
+	case "word-wrap":
+	case "direction":
+	case "unicode-bidi":
+
+	case "list-style": // shothand
+	case "list-style-image":
+	case "list-style-position":
+	case "list-style-type":
+
+	case "border-collapse":
+	case "border-spacing":
+	case "caption-side":
+	case "empty-cells":
+	case "cursor":
+	case "visibility":
+	case "quotes":
+	case "orphans":
+	case "widows":
+	case "page-break-inside":
+
+	//#endregion
+
+	case "background":
+	case "border":
+	case "margin":
+	case "padding":
+
+	case "margin-top", "margin-right", "margin-bottom", "margin-left":
+		items := nonWS(declaration.Value)
+		if len(items) == 1 {
+			value, ok := items[0].(*css_tokenizer.NumericToken)
+			if ok {
+				properties[name] = &Declaration{
+					Important: declaration.Important,
+					CssText:   declaration.OriginalText,
+					Value:     value,
+				}
+			}
+		}
+	case "padding-top", "padding-right", "padding-bottom", "padding-left":
+		items := nonWS(declaration.Value)
+		if len(items) == 1 {
+			value, ok := items[0].(*css_tokenizer.NumericToken)
+			if ok {
+				properties[name] = &Declaration{
+					Important: declaration.Important,
+					CssText:   declaration.OriginalText,
+					Value:     value,
+				}
+			}
 		}
 	case "position":
 
