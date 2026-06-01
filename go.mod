@@ -17,10 +17,13 @@ require (
 
 require (
 	codeberg.org/chavacava/garif v0.2.1 // indirect
+	gioui.org v0.10.0 // indirect
+	gioui.org/shader v1.0.8 // indirect
 	github.com/Zyko0/go-sdl3 v0.1.1 // indirect
 	github.com/Zyko0/purego-gen v0.0.0-20250727121216-3bcd331a1e0c // indirect
 	github.com/alfatraining/structtag v1.0.0 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/go-text/typesetting v0.3.4 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
@@ -29,6 +32,9 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
+	golang.org/x/exp/shiny v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
+	golang.org/x/image v0.38.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 )
 
 require (

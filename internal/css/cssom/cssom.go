@@ -1,11 +1,12 @@
 package cssom
 
 import (
+	"image/color"
+
 	css_parser "github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/css/selector"
 	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
 	"github.com/VisualSource/plex/internal/utils"
-	"github.com/Zyko0/go-sdl3/sdl"
 )
 
 type Cssom struct {
@@ -104,8 +105,8 @@ func (d *Declaration) IsStringValue(value string) bool {
 	return false
 }
 
-func (d *Declaration) MustColor() sdl.Color {
-	v, ok := d.Value.(sdl.Color)
+func (d *Declaration) MustColor() color.NRGBA {
+	v, ok := d.Value.(color.NRGBA)
 	if !ok {
 		panic("unable to get value as color")
 	}

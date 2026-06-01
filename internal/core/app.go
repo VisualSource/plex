@@ -2,69 +2,101 @@ package core
 
 import (
 	"context"
+	"image"
+	"image/color"
 	"log/slog"
+	"time"
 
-	"github.com/Zyko0/go-sdl3/bin/binimg"
-	"github.com/Zyko0/go-sdl3/bin/binsdl"
-	"github.com/Zyko0/go-sdl3/bin/binttf"
-	"github.com/Zyko0/go-sdl3/sdl"
-	"github.com/Zyko0/go-sdl3/ttf"
+	"gioui.org/app"
+	"gioui.org/layout"
+	"gioui.org/op"
+	"gioui.org/op/clip"
+	"gioui.org/op/paint"
+	"github.com/VisualSource/plex/internal/layouts/widgets"
 )
 
-func StartPlex(logger *slog.Logger) error {
-	defer binsdl.Load().Unload()
-	defer binttf.Load().Unload()
-	defer binimg.Load().Unload()
-	defer sdl.Quit()
+var (
+	background = color.NRGBA{R: 0xC0, G: 0xC0, B: 0xC0, A: 0xFF}
+	red        = color.NRGBA{R: 0xC0, G: 0x40, B: 0x40, A: 0xFF}
+	green      = color.NRGBA{R: 0x40, G: 0xC0, B: 0x40, A: 0xFF}
+	blue       = color.NRGBA{R: 0x40, G: 0x40, B: 0xC0, A: 0xFF}
+)
 
-	ctx := context.Background()
+func ColorBox(gtx layout.Context, size image.Point, color color.NRGBA) layout.Dimensions {
+	defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
+	paint.ColorOp{Color: color}.Add(gtx.Ops)
+	paint.PaintOp{}.Add(gtx.Ops)
+	return layout.Dimensions{Size: size}
+}
 
-	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
-		return err
-	}
-	if err := ttf.Init(); err != nil {
-		return err
-	}
+func stacked(gtx layout.Context) layout.Dimensions {
+	return layout.Stack{}.Layout(gtx,
+		// Force widget to the same size as the second.
+		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
+			// This will have a minimum constraint of 100x100.
+			return ColorBox(gtx, gtx.Constraints.Min, red)
+		}),
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			return ColorBox(gtx, image.Pt(100, 30), green)
+		}),
+		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
+			return ColorBox(gtx, image.Pt(30, 100), blue)
+		}),
+	)
+}
 
-	window, renderer, err := sdl.CreateWindowAndRenderer("Plex", 800, 480, sdl.WINDOW_RESIZABLE)
-	if err != nil {
-		return err
-	}
+func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) error {
+	startTime := time.Now()
+	tree := renderHtml(`
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Document</title>
+	</head>
+	<body>
+		
+	</body>
+	</html>
+	`, `
+	body { height: 100px; width: 100px; background-color: red; }
+	head { display: none; }
+	`)
 
-	defer renderer.Destroy()
-	defer window.Destroy()
+	elapsed := time.Since(startTime)
 
-	renderer.SetDrawColor(255, 255, 255, 255)
+	logger.DebugContext(ctx, "html -> css -> cssom -> styletree -> layout: time", slog.String("time", elapsed.String()))
 
-	logger.DebugContext(ctx, "SDL", slog.String("version", sdl.GetVersion().String()))
+	var ops op.Ops
+	for {
+		switch e := window.Event().(type) {
+		case app.DestroyEvent:
+			return e.Err
+		case app.FrameEvent:
+			gtx := app.NewContext(&ops, e)
 
-	sdl.RunLoop(func() error {
-		var event sdl.Event
+			widgets.RenderTree(gtx, tree)
 
-		for sdl.PollEvent(&event) {
-			switch event.Type {
-			case sdl.EVENT_QUIT:
-				return sdl.EndLoop
-			}
+			// draw header
+
+			//draw main window
+
+			// background job
+			// 	fetch file
+			//	 process html
+			//    	-> JOB: fetch and parse css
+			//    	-> JOB: fetch and parse script
+			//           -> compile script
+			//           -> start script engine
+			//    	-> style tree
+			//     -> layout
+			//         -> pass layout to render process
+			//-> painting
+
+			//TODO: render ui from html
+
+			e.Frame(gtx.Ops)
 		}
-
-		renderer.DebugText(50, 50, "Hello, From SDL3")
-
-		// background job
-		// 	fetch file
-		//	 process html
-		//    	-> JOB: fetch and parse css
-		//    	-> JOB: fetch and parse script
-		//           -> compile script
-		//           -> start script engine
-		//    	-> style tree
-		//     -> layout
-		//         -> pass layout to render process
-		//-> painting
-
-		renderer.Present()
-		return nil
-	})
-
-	return nil
+	}
 }
