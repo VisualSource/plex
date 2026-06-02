@@ -10,21 +10,30 @@ import (
 	"github.com/VisualSource/plex/internal/layouts"
 )
 
-func RenderTree(gtx layout.Context, box layouts.Box) {
-	rect := clip.Rect{
-		Min: image.Pt(int(box.Dimensions.Content.X), int(box.Dimensions.Content.Y)),
-		Max: image.Pt(int(box.Dimensions.Content.W), int(box.Dimensions.Content.H)),
+func RenderTree(gtx layout.Context, box *layouts.Box) {
+
+	bb := box.Dimensions.BorderBox()
+
+	x0 := bb.X
+	y0 := bb.Y
+
+	x1 := bb.X + bb.W
+	y1 := bb.Y + bb.H
+
+	min := image.Pt(int(x0), int(y0))
+	max := image.Pt(int(x1), int(y1))
+
+	clip.Rect{
+		Min: min,
+		Max: max,
 	}.Push(gtx.Ops)
 
-	bgColor := box.Style.SpecifiedValues.GetPropColor("background-color")
-	if bgColor.IsSome() {
+	if bgColor := box.Style.SpecifiedValues.GetPropColor("background-color"); bgColor.IsSome() {
 		paint.ColorOp{Color: color.NRGBA{R: 0xff, A: 0xFF}}.Add(gtx.Ops)
 		paint.PaintOp{}.Add(gtx.Ops)
 	}
 
-	rect.Pop()
-
-	for _, child := range box.Children {
+	/*for _, child := range box.Children {
 		RenderTree(gtx, child)
-	}
+	}*/
 }

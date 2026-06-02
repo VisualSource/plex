@@ -21,10 +21,10 @@ type Dimensions struct {
 
 func (d *Dimensions) PaddingBox() Rect {
 	return Rect{
-		H: d.Content.H + d.Padding.Top + d.Padding.Bottom,
-		W: d.Content.W + d.Padding.Left + d.Padding.Right,
 		X: d.Content.X - d.Padding.Left,
 		Y: d.Content.Y - d.Padding.Top,
+		W: d.Content.W + d.Padding.Left + d.Padding.Right,
+		H: d.Content.H + d.Padding.Top + d.Padding.Bottom,
 	}
 }
 func (d *Dimensions) BorderBox() Rect {
@@ -70,20 +70,20 @@ type Box struct {
 	OuterType  OuterBoxType
 	InnerType  InnerBoxType
 	Style      *styletree.StyledNode
-	Children   []Box
+	Children   []*Box
 }
 
 func (b *Box) getInlineContainer() *Box {
 	switch b.OuterType {
 	case OuterBoxType_Block:
-		if len(b.Children) > 1 && b.Children[len(b.Children)-1].Anonymous {
-			return &b.Children[len(b.Children)-1]
+		if len(b.Children) >= 1 && b.Children[len(b.Children)-1].Anonymous {
+			return b.Children[len(b.Children)-1]
 		} else {
 			box := NewAnonymousBox()
 
 			b.Children = append(b.Children, box)
 
-			return &box
+			return box
 		}
 	default:
 		return b
@@ -245,7 +245,7 @@ func (b *Box) calculatePosition(parent *Dimensions) {
 		b.Dimensions.Padding.Top = values[field_PaddingTop]
 		b.Dimensions.Padding.Bottom = values[field_PaddingBottom]
 
-		b.Dimensions.Content.X += parent.Content.X + b.Dimensions.Margin.Left + b.Dimensions.Border.Left + b.Dimensions.Padding.Left
+		b.Dimensions.Content.X = parent.Content.X + b.Dimensions.Margin.Left + b.Dimensions.Border.Left + b.Dimensions.Padding.Left
 		b.Dimensions.Content.Y = parent.Content.H + parent.Content.Y + b.Dimensions.Margin.Top + b.Dimensions.Border.Top + b.Dimensions.Padding.Top
 
 	}
@@ -285,11 +285,11 @@ func (b *Box) calculateChildDimensions() {
 	}
 }
 
-func NewAnonymousBox() Box {
-	return Box{
+func NewAnonymousBox() *Box {
+	return &Box{
 		Anonymous: true,
 		OuterType: OuterBoxType_Block,
 		InnerType: InnerBoxType_Flow,
-		Children:  make([]Box, 0),
+		Children:  make([]*Box, 0),
 	}
 }

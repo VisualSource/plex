@@ -4,9 +4,14 @@ import (
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 )
 
-func NewLayoutTree(node *styletree.StyledNode) Box {
+func NewLayoutTree(node *styletree.StyledNode, width, height float32) *Box {
 
-	dim := &Dimensions{}
+	dim := &Dimensions{
+		Content: Rect{
+			H: height,
+			W: width,
+		},
+	}
 
 	box := buildLayoutTree(node)
 	box.calculateDimensions(dim)
@@ -14,15 +19,15 @@ func NewLayoutTree(node *styletree.StyledNode) Box {
 	return box
 }
 
-func buildLayoutTree(node *styletree.StyledNode) Box {
+func buildLayoutTree(node *styletree.StyledNode) *Box {
 
 	outer, inner := getDisplayValue(node.SpecifiedValues.GetPropAsDisplay("display"))
 
-	box := Box{
+	box := &Box{
 		Style:     node,
 		OuterType: outer,
 		InnerType: inner,
-		Children:  make([]Box, 0),
+		Children:  make([]*Box, 0),
 	}
 
 	for _, child := range node.Children {

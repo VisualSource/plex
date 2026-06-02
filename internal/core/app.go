@@ -47,8 +47,7 @@ func stacked(gtx layout.Context) layout.Dimensions {
 
 func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) error {
 	startTime := time.Now()
-	tree := renderHtml(`
-	<!DOCTYPE html>
+	tree := renderHtml(`<!DOCTYPE html>
 	<html lang="en">
 	<head>
 		<meta charset="UTF-8">
@@ -60,9 +59,9 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 	</body>
 	</html>
 	`, `
-	body { height: 100px; width: 100px; background-color: red; }
+	html { display: block; width: 100px; height: 100px; background-color: green; }
 	head { display: none; }
-	`)
+	`, 854, 480)
 
 	elapsed := time.Since(startTime)
 
@@ -73,6 +72,9 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 		switch e := window.Event().(type) {
 		case app.DestroyEvent:
 			return e.Err
+
+		case app.ConfigEvent:
+
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
