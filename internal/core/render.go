@@ -12,7 +12,7 @@ import (
 	"github.com/VisualSource/plex/internal/utils"
 )
 
-func renderHtml(html string, style string, width, height float32) *layouts.Box {
+func renderHtml(html string, style string, width, height float64) *layouts.Box {
 
 	hp := html_parser.NewHtmlParser(strings.NewReader(html))
 	doc, err := hp.Parse()

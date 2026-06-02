@@ -2,48 +2,13 @@ package core
 
 import (
 	"context"
-	"image"
-	"image/color"
 	"log/slog"
 	"time"
 
 	"gioui.org/app"
-	"gioui.org/layout"
 	"gioui.org/op"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
 	"github.com/VisualSource/plex/internal/layouts/widgets"
 )
-
-var (
-	background = color.NRGBA{R: 0xC0, G: 0xC0, B: 0xC0, A: 0xFF}
-	red        = color.NRGBA{R: 0xC0, G: 0x40, B: 0x40, A: 0xFF}
-	green      = color.NRGBA{R: 0x40, G: 0xC0, B: 0x40, A: 0xFF}
-	blue       = color.NRGBA{R: 0x40, G: 0x40, B: 0xC0, A: 0xFF}
-)
-
-func ColorBox(gtx layout.Context, size image.Point, color color.NRGBA) layout.Dimensions {
-	defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
-	paint.ColorOp{Color: color}.Add(gtx.Ops)
-	paint.PaintOp{}.Add(gtx.Ops)
-	return layout.Dimensions{Size: size}
-}
-
-func stacked(gtx layout.Context) layout.Dimensions {
-	return layout.Stack{}.Layout(gtx,
-		// Force widget to the same size as the second.
-		layout.Expanded(func(gtx layout.Context) layout.Dimensions {
-			// This will have a minimum constraint of 100x100.
-			return ColorBox(gtx, gtx.Constraints.Min, red)
-		}),
-		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			return ColorBox(gtx, image.Pt(100, 30), green)
-		}),
-		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
-			return ColorBox(gtx, image.Pt(30, 100), blue)
-		}),
-	)
-}
 
 func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) error {
 	startTime := time.Now()
@@ -55,12 +20,34 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 		<title>Document</title>
 	</head>
 	<body>
-		
+		<div class="a">
+			<div class="b">
+				<div class="c">
+				<div class="d">
+					<div class="e">
+					<div class="f">
+						<div class="g">
+						</div>
+					</div>
+					</div>
+				</div>
+				</div>
+			</div>
+		</div>
 	</body>
 	</html>
 	`, `
-	html { display: block; width: 100px; height: 100px; background-color: green; }
-	head { display: none; }
+	div { display: block; padding-left: 12px; padding-right: 12px; padding-top; 12px; padding-bottom: 12px; }
+	head { display: none; background-color: gray; }
+	html { display: block; background-color: maroon; }
+	body { display: block; background-color: coral; }
+	.a { background-color: #ff0000; }
+	.b { background-color: #ffa500; }
+	.c { background-color: #ffff00; }
+	.d { background-color: #008000; }
+	.e { background-color: #0000ff; }
+	.f { background-color: #4b0082; }
+	.g { background-color: #800080; }
 	`, 854, 480)
 
 	elapsed := time.Since(startTime)

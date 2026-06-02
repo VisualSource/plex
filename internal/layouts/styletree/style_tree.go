@@ -64,7 +64,7 @@ func NewStyleTree(el dom.ElementNode, css *cssom.Cssom, parentPropertyMap Proper
 
 	props := specifiedValues(el, css, parentPropertyMap)
 
-	if v, ok := props["display"]; ok && v.IsStringValue("none") {
+	if v, ok := props["display"].Value.(cssom.Display); ok && v.Outer == "none" {
 		return nil, nil
 	}
 

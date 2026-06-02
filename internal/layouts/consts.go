@@ -7,11 +7,11 @@ import (
 )
 
 type Edge struct {
-	Top, Left, Right, Bottom float32
+	Top, Left, Right, Bottom float64
 }
 
 type Rect struct {
-	H, W, X, Y float32
+	H, W, X, Y float64
 }
 
 type Dimensions struct {
@@ -124,9 +124,9 @@ func (b *Box) calculateWidth(parent *Dimensions) {
 			b.Style.SpecifiedValues.GetPropAsSize("width"),
 		}
 
-		var total float32
+		var total float64
 
-		values := make([]float32, 7)
+		values := make([]float64, 7)
 		autodFields := make([]bool, 7)
 		for i, item := range sizes {
 			if item.IsNone() {
@@ -142,11 +142,11 @@ func (b *Box) calculateWidth(parent *Dimensions) {
 			case cssom.SizeKindLP:
 				switch size.LP.Unit {
 				case "px":
-					total += float32(size.LP.Value)
+					total += size.LP.Value
 
-					values[i] = float32(size.LP.Value)
+					values[i] = size.LP.Value
 				case "%":
-					v := parent.Content.W * float32(size.LP.Value/100)
+					v := parent.Content.W * size.LP.Value / 100
 					total += v
 					values[i] = v
 				}
@@ -209,7 +209,7 @@ func (b *Box) calculatePosition(parent *Dimensions) {
 			b.Style.SpecifiedValues.GetPropAsSize("padding-bottom"),
 		}
 
-		values := make([]float32, 6)
+		values := make([]float64, 6)
 		autodFields := make([]bool, 6)
 		for i, item := range sizes {
 			if item.IsNone() {
@@ -227,9 +227,9 @@ func (b *Box) calculatePosition(parent *Dimensions) {
 				case "px":
 					//total += float32(size.LP.Value)
 
-					values[i] = float32(size.LP.Value)
+					values[i] = size.LP.Value
 				case "%":
-					v := parent.Content.H * float32(size.LP.Value/100)
+					v := parent.Content.H * size.LP.Value / 100
 					//total += v
 					values[i] = v
 				}
@@ -259,16 +259,16 @@ func (b *Box) calculateHeight(parent *Dimensions) {
 		if heightSize.IsNone() {
 			break
 		}
-		var height float32
+		var height float64
 		size := heightSize.Value
 		switch size.Kind {
 		case cssom.SizeKindKeyword:
 		case cssom.SizeKindLP:
 			switch size.LP.Unit {
 			case "px":
-				height = float32(size.LP.Value)
+				height = size.LP.Value
 			case "%":
-				height = parent.Content.H * float32(size.LP.Value/100)
+				height = parent.Content.H * size.LP.Value / 100
 			}
 		}
 

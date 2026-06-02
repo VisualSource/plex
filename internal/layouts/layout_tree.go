@@ -4,7 +4,7 @@ import (
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 )
 
-func NewLayoutTree(node *styletree.StyledNode, width, height float32) *Box {
+func NewLayoutTree(node *styletree.StyledNode, width, height float64) *Box {
 
 	dim := &Dimensions{
 		Content: Rect{
