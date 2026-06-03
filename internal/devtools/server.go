@@ -103,6 +103,8 @@ func handleConnection(logger *slog.Logger, ctx context.Context, conn net.Conn) {
 		return
 	}
 
+	logger.DebugContext(ctx, "new connection", slog.String("remote", conn.RemoteAddr().String()))
+
 	for {
 		message, err := readPacket(reader)
 		if err != nil {
