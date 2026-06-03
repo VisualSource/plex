@@ -10,7 +10,7 @@ import (
 	"github.com/VisualSource/plex/internal/layouts/widgets"
 )
 
-func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) error {
+func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, remoteDebuggingPort int) error {
 	startTime := time.Now()
 	tree := renderHtml(`<!DOCTYPE html>
 	<html lang="en">
