@@ -54,6 +54,9 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 
 	logger.DebugContext(ctx, "html -> css -> cssom -> styletree -> layout: time", slog.String("time", elapsed.String()))
 
+	width := 584
+	height := 480
+
 	var ops op.Ops
 	for {
 		switch e := window.Event().(type) {
@@ -61,12 +64,14 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 			return e.Err
 
 		case app.ConfigEvent:
-			// todo on resize event a resize event are rerender styletree (apply styles in media queries) -> layout tree
-
 			size := e.Config.Size
+			if height != size.Y || width != size.X {
+				logger.DebugContext(ctx, "resize", slog.Int("width", size.X), slog.Int("height", size.Y))
+				height = size.Y
+				width = size.X
 
-			logger.DebugContext(ctx, "resize", slog.Int("width", size.X), slog.Int("height", size.Y))
-
+				// todo on resize event a resize event are rerender styletree (apply styles in media queries) -> layout tree
+			}
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
