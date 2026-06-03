@@ -92,10 +92,10 @@ func (b *Box) getInlineContainer() *Box {
 
 func (b *Box) calculateDimensions(dimensions *Dimensions) {
 	b.calculateWidth(dimensions)
-	b.calculatePosition(dimensions)
-	b.calculateChildDimensions()
+	//b.calculatePosition(dimensions)
+	//b.calculateChildDimensions()
 
-	b.calculateHeight(dimensions)
+	//b.calculateHeight(dimensions)
 }
 
 const (
@@ -107,6 +107,30 @@ const (
 	field_PaddingRight
 	field_Width
 )
+
+func resloveSize(item *utils.Option[cssom.Size], parent *Dimensions) (bool, float64, bool) {
+	if item.IsNone() {
+		return true, 0, false
+	}
+	size := item.Value
+	switch size.Kind {
+	case cssom.SizeKindKeyword:
+		if size.Keyword == "auto" {
+			return false, 0, true
+		}
+
+	case cssom.SizeKindLP:
+		switch size.LP.Unit {
+		case "px":
+			return false, size.LP.Value, false
+		case "%":
+			return false, parent.Content.W * (size.LP.Value / 100), false
+
+		}
+	}
+
+	return true, 0, false
+}
 
 func (b *Box) calculateWidth(parent *Dimensions) {
 	switch b.OuterType {
@@ -129,28 +153,18 @@ func (b *Box) calculateWidth(parent *Dimensions) {
 		values := make([]float64, 7)
 		autodFields := make([]bool, 7)
 		for i, item := range sizes {
-			if item.IsNone() {
+			isEmpty, value, isAuto := resloveSize(&item, parent)
+			if isEmpty {
 				continue
 			}
-			size := item.Value
-			switch size.Kind {
-			case cssom.SizeKindKeyword:
-				if size.Keyword == "auto" {
-					autodFields[i] = true
-				}
 
-			case cssom.SizeKindLP:
-				switch size.LP.Unit {
-				case "px":
-					total += size.LP.Value
-
-					values[i] = size.LP.Value
-				case "%":
-					v := parent.Content.W * size.LP.Value / 100
-					total += v
-					values[i] = v
-				}
+			if isAuto {
+				autodFields[i] = true
+				continue
 			}
+
+			values[i] = value
+			total += value
 		}
 
 		underflow := parent.Content.W - total

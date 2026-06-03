@@ -61,6 +61,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 			return e.Err
 
 		case app.ConfigEvent:
+			// todo on resize event a resize event are rerender styletree (apply styles in media queries) -> layout tree
 
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)

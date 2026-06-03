@@ -251,7 +251,7 @@ func parseDeclaration(properties DeclarationBlock, declaration *css_parser.Decla
 		}
 	case "position":
 
-	case "height", "width":
+	case "height", "width", "max-width", "max-height", "min-height", "min-width":
 		size, err := parseSize(declaration.Value)
 		if err != nil {
 			break
