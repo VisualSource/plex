@@ -1,6 +1,7 @@
 package layouts
 
 import (
+	"github.com/VisualSource/plex/internal/css/cssom"
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 )
 
@@ -8,7 +9,7 @@ func NewLayoutTree(node *styletree.StyledNode, width, height float64) *Box {
 
 	dim := &Dimensions{
 		Content: Rect{
-			H: height,
+			H: 0, //height, //TODO: need stacking context or something
 			W: width,
 		},
 	}
@@ -21,7 +22,7 @@ func NewLayoutTree(node *styletree.StyledNode, width, height float64) *Box {
 
 func buildLayoutTree(node *styletree.StyledNode) *Box {
 
-	outer, inner := getDisplayValue(node.SpecifiedValues.GetPropAsDisplay("display"))
+	outer, inner := getDisplayValue(styletree.GetProp[cssom.Display](node.SpecifiedValues, "display"))
 
 	box := &Box{
 		Style:     node,
@@ -31,7 +32,7 @@ func buildLayoutTree(node *styletree.StyledNode) *Box {
 	}
 
 	for _, child := range node.Children {
-		outer, _ := getDisplayValue(child.SpecifiedValues.GetPropAsDisplay("display"))
+		outer, _ := getDisplayValue(styletree.GetProp[cssom.Display](child.SpecifiedValues, "display"))
 
 		switch outer {
 		case OuterBoxType_Block:

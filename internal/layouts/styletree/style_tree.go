@@ -2,7 +2,6 @@ package styletree
 
 import (
 	"cmp"
-	"image/color"
 	"slices"
 	"strings"
 
@@ -15,43 +14,24 @@ import (
 
 type PropertyMap map[string]*cssom.Declaration
 
-func (t PropertyMap) GetPropColor(prop string) utils.Option[color.NRGBA] {
-	if value, ok := t[prop]; ok {
-		if decValue, ok := value.Value.(color.NRGBA); ok {
+func GetProp[T comparable](propMap PropertyMap, prop string) utils.Option[T] {
+	if value, ok := propMap[prop]; ok {
+		if decValue, ok := value.Value.(T); ok {
 			return utils.Some(decValue)
 		}
 	}
 
-	return utils.None[color.NRGBA]()
+	return utils.None[T]()
 }
 
-func (t PropertyMap) GetPropAsString(prop string) utils.Option[string] {
-	if value, ok := t[prop]; ok {
-		if decValue, ok := value.Value.(string); ok {
-			return utils.Some(decValue)
+func GetPropOrDefault[T any](propMap PropertyMap, prop string, def T) T {
+	if pv, ok := propMap[prop]; ok {
+		if value, ok := pv.Value.(T); ok {
+			return value
 		}
+
 	}
-	return utils.None[string]()
-}
-
-func (t PropertyMap) GetPropAsDisplay(prop string) utils.Option[cssom.Display] {
-	if value, ok := t[prop]; ok {
-		if decValue, ok := value.Value.(cssom.Display); ok {
-			return utils.Some(decValue)
-		}
-	}
-
-	return utils.None[cssom.Display]()
-}
-
-func (t PropertyMap) GetPropAsSize(prop string) utils.Option[cssom.Size] {
-	if value, ok := t[prop]; ok {
-		if decValue, ok := value.Value.(cssom.Size); ok {
-			return utils.Some(decValue)
-		}
-	}
-
-	return utils.None[cssom.Size]()
+	return def
 }
 
 type StyledNode struct {

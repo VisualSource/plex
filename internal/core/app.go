@@ -23,21 +23,21 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 		<div class="a">
 			<div class="b">
 				<div class="c">
-				<div class="d">
-					<div class="e">
-					<div class="f">
-						<div class="g">
+					<div class="d">
+						<div class="e">
+						<div class="f">
+							<div class="g">
+							</div>
+						</div>
 						</div>
 					</div>
-					</div>
-				</div>
 				</div>
 			</div>
 		</div>
 	</body>
 	</html>
 	`, `
-	div { display: block; padding-left: 12px; padding-right: 12px; padding-top; 12px; padding-bottom: 12px; }
+	div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
 	head { display: none; background-color: gray; }
 	html { display: block; background-color: maroon; }
 	body { display: block; background-color: coral; }
@@ -62,6 +62,10 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window) err
 
 		case app.ConfigEvent:
 			// todo on resize event a resize event are rerender styletree (apply styles in media queries) -> layout tree
+
+			size := e.Config.Size
+
+			logger.DebugContext(ctx, "resize", slog.Int("width", size.X), slog.Int("height", size.Y))
 
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)

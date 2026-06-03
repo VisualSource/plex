@@ -3,7 +3,6 @@ package layouts
 import (
 	"github.com/VisualSource/plex/internal/css/cssom"
 	"github.com/VisualSource/plex/internal/layouts/styletree"
-	"github.com/VisualSource/plex/internal/utils"
 )
 
 type Edge struct {
@@ -92,10 +91,10 @@ func (b *Box) getInlineContainer() *Box {
 
 func (b *Box) calculateDimensions(dimensions *Dimensions) {
 	b.calculateWidth(dimensions)
-	//b.calculatePosition(dimensions)
-	//b.calculateChildDimensions()
+	b.calculatePosition(dimensions)
+	b.calculateChildDimensions()
 
-	//b.calculateHeight(dimensions)
+	b.calculateHeight(dimensions)
 }
 
 const (
@@ -108,58 +107,62 @@ const (
 	field_Width
 )
 
-func resloveSize(item *utils.Option[cssom.Size], parent *Dimensions) (bool, float64, bool) {
-	if item.IsNone() {
-		return true, 0, false
-	}
-	size := item.Value
+func resolveSize(size *cssom.Size, parentInlineSize float64) (float64, bool) {
 	switch size.Kind {
 	case cssom.SizeKindKeyword:
 		if size.Keyword == "auto" {
-			return false, 0, true
+			return 0, true
 		}
-
 	case cssom.SizeKindLP:
 		switch size.LP.Unit {
 		case "px":
-			return false, size.LP.Value, false
+			return size.LP.Value, false
 		case "%":
-			return false, parent.Content.W * (size.LP.Value / 100), false
-
+			return parentInlineSize * (size.LP.Value / 100), false
 		}
 	}
 
-	return true, 0, false
+	return 0, false
+}
+
+var defaultZero = cssom.Size{
+	Kind: cssom.SizeKindLP,
+	LP: &cssom.LengthPercentage{
+		Value: 0,
+		Unit:  "px",
+	},
+}
+var defaultAuto = cssom.Size{
+	Kind:    cssom.SizeKindKeyword,
+	Keyword: "auto",
 }
 
 func (b *Box) calculateWidth(parent *Dimensions) {
+	mb := parent.MarginBox()
+
 	switch b.OuterType {
 	case OuterBoxType_Block:
-		sizes := []utils.Option[cssom.Size]{
-			b.Style.SpecifiedValues.GetPropAsSize("margin-left"),
-			b.Style.SpecifiedValues.GetPropAsSize("margin-right"),
+		sizes := [7]cssom.Size{
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-left", defaultZero),  // initial 0
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-right", defaultZero), // initial0
 
-			b.Style.SpecifiedValues.GetPropAsSize("border-left-width"),
-			b.Style.SpecifiedValues.GetPropAsSize("border-right-width"),
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-left-width", defaultZero),  // resolve border-left-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-right-width", defaultZero), // resolve border-right-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
 
-			b.Style.SpecifiedValues.GetPropAsSize("padding-left"),
-			b.Style.SpecifiedValues.GetPropAsSize("padding-right"),
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-left", defaultZero),  // initial 0
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-right", defaultZero), // initial 0
 
-			b.Style.SpecifiedValues.GetPropAsSize("width"),
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "width", defaultAuto), // initial  auto, should set before hand in styletree building?
 		}
 
 		var total float64
-
 		values := make([]float64, 7)
-		autodFields := make([]bool, 7)
+		autoFields := make([]bool, 7)
 		for i, item := range sizes {
-			isEmpty, value, isAuto := resloveSize(&item, parent)
-			if isEmpty {
-				continue
-			}
+			value, isAuto := resolveSize(&item, mb.W)
 
 			if isAuto {
-				autodFields[i] = true
+				autoFields[i] = true
 				continue
 			}
 
@@ -167,27 +170,34 @@ func (b *Box) calculateWidth(parent *Dimensions) {
 			total += value
 		}
 
+		//#region resolve auto
 		underflow := parent.Content.W - total
 
 		switch {
-		case !autodFields[field_Width] && !autodFields[field_MarginLeft] && !autodFields[field_MarginRight]:
+		case !autoFields[field_Width] && !autoFields[field_MarginLeft] && !autoFields[field_MarginRight]:
 			values[field_MarginRight] += underflow
-		case !autodFields[field_Width] && !autodFields[field_MarginLeft] && autodFields[field_MarginRight]:
+
+		case !autoFields[field_Width] && !autoFields[field_MarginLeft] && autoFields[field_MarginRight]:
 			values[field_MarginRight] = underflow
-		case !autodFields[field_Width] && autodFields[field_MarginLeft] && !autodFields[field_MarginRight]:
+		case !autoFields[field_Width] && autoFields[field_MarginLeft] && !autoFields[field_MarginRight]:
 			values[field_MarginLeft] = underflow
-		case autodFields[field_Width]:
+		case autoFields[field_Width]:
 			if underflow >= 0.0 {
 				values[field_Width] = underflow
 			} else {
 				values[field_Width] = 0
 				values[field_MarginRight] += underflow
 			}
-
-		case !autodFields[field_Width] && autodFields[field_MarginLeft] && autodFields[field_MarginRight]:
+		case !autoFields[field_Width] && autoFields[field_MarginLeft] && autoFields[field_MarginRight]:
 			values[field_MarginLeft] = underflow / 2.0
 			values[field_MarginRight] = underflow / 2.0
 		}
+
+		//#endregion
+
+		// TODO: apply min/max width clamping
+		//TODO: apply intrinsic keywords max-content/min-content
+		//TODO: apply aspect ratio
 
 		b.Dimensions.Content.W = values[field_Width]
 		b.Dimensions.Padding.Left = values[field_PaddingLeft]
@@ -209,45 +219,32 @@ const (
 )
 
 func (b *Box) calculatePosition(parent *Dimensions) {
-
+	mb := parent.MarginBox()
 	switch b.OuterType {
+	//@see  http://www.w3.org/TR/CSS2/visudet.html#normal-block
 	case OuterBoxType_Block:
-		sizes := []utils.Option[cssom.Size]{
-			b.Style.SpecifiedValues.GetPropAsSize("margin-top"),
-			b.Style.SpecifiedValues.GetPropAsSize("margin-bottom"),
+		sizes := [6]cssom.Size{
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-top", defaultZero),
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-bottom", defaultZero),
 
-			b.Style.SpecifiedValues.GetPropAsSize("border-top-width"),
-			b.Style.SpecifiedValues.GetPropAsSize("border-bottom-width"),
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-top-width", defaultZero),    // resolve border-top-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-bottom-width", defaultZero), // resolve border-bottom-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
 
-			b.Style.SpecifiedValues.GetPropAsSize("padding-top"),
-			b.Style.SpecifiedValues.GetPropAsSize("padding-bottom"),
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-top", defaultZero),
+			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-bottom", defaultZero),
 		}
 
 		values := make([]float64, 6)
-		autodFields := make([]bool, 6)
+		autoFields := make([]bool, 6)
 		for i, item := range sizes {
-			if item.IsNone() {
+			value, isAuto := resolveSize(&item, mb.H)
+
+			if isAuto {
+				autoFields[i] = true
 				continue
 			}
-			size := item.Value
-			switch size.Kind {
-			case cssom.SizeKindKeyword:
-				if size.Keyword == "auto" {
-					autodFields[i] = true
-				}
 
-			case cssom.SizeKindLP:
-				switch size.LP.Unit {
-				case "px":
-					//total += float32(size.LP.Value)
-
-					values[i] = size.LP.Value
-				case "%":
-					v := parent.Content.H * size.LP.Value / 100
-					//total += v
-					values[i] = v
-				}
-			}
+			values[i] = value
 		}
 
 		b.Dimensions.Margin.Top = values[field_MarginTop]
@@ -268,22 +265,15 @@ func (b *Box) calculatePosition(parent *Dimensions) {
 func (b *Box) calculateHeight(parent *Dimensions) {
 	switch b.OuterType {
 	case OuterBoxType_Block:
-		heightSize := b.Style.SpecifiedValues.GetPropAsSize("height")
-
+		heightSize := styletree.GetProp[cssom.Size](b.Style.SpecifiedValues, "height")
 		if heightSize.IsNone() {
 			break
 		}
-		var height float64
-		size := heightSize.Value
-		switch size.Kind {
-		case cssom.SizeKindKeyword:
-		case cssom.SizeKindLP:
-			switch size.LP.Unit {
-			case "px":
-				height = size.LP.Value
-			case "%":
-				height = parent.Content.H * size.LP.Value / 100
-			}
+
+		mb := parent.MarginBox()
+		height, isAuto := resolveSize(heightSize.Value, mb.H)
+		if isAuto {
+			break
 		}
 
 		b.Dimensions.Content.H = height
