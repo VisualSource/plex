@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"io"
 	"strconv"
 )
 
@@ -21,7 +22,8 @@ func readPacket(reader *bufio.Reader) (map[string]any, error) {
 	}
 
 	payload := make([]byte, len)
-	_, err = reader.Read(payload)
+
+	_, err = io.ReadFull(reader, payload)
 	if err != nil {
 		return nil, err
 	}
