@@ -3,16 +3,21 @@ package core
 import (
 	"context"
 	"log/slog"
-	"time"
+	"strings"
 
 	"gioui.org/app"
 	"gioui.org/op"
-	"github.com/VisualSource/plex/internal/layouts/widgets"
 )
 
 func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, remoteDebuggingPort int) error {
-	startTime := time.Now()
-	tree := renderHtml(`<!DOCTYPE html>
+	width := 720
+	height := 480
+
+	mainFrame := NewFrame(logger, ctx)
+	mainFrame.width = width
+	mainFrame.height = height
+
+	if err := mainFrame.Load(strings.NewReader(`<!DOCTYPE html>
 	<html lang="en">
 	<head>
 		<meta charset="UTF-8">
@@ -36,26 +41,9 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 		</div>
 	</body>
 	</html>
-	`, `
-	div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
-	head { display: none; background-color: gray; }
-	html { display: block; background-color: maroon; }
-	body { display: block; background-color: coral; }
-	.a { background-color: #ff0000; }
-	.b { background-color: #ffa500; }
-	.c { background-color: #ffff00; }
-	.d { background-color: #008000; }
-	.e { background-color: #0000ff; }
-	.f { background-color: #4b0082; }
-	.g { background-color: #800080; }
-	`, 854, 480)
-
-	elapsed := time.Since(startTime)
-
-	logger.DebugContext(ctx, "html -> css -> cssom -> styletree -> layout: time", slog.String("time", elapsed.String()))
-
-	width := 584
-	height := 480
+	`)); err != nil {
+		return err
+	}
 
 	var ops op.Ops
 	for {
@@ -70,12 +58,13 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 				height = size.Y
 				width = size.X
 
+				mainFrame.Resize(width, height)
 				// todo on resize event a resize event are rerender styletree (apply styles in media queries) -> layout tree
 			}
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
-			widgets.RenderTree(gtx, tree)
+			mainFrame.Render(gtx)
 
 			// draw header
 

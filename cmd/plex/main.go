@@ -41,7 +41,7 @@ func main() {
 		window := new(app.Window)
 
 		window.Option(app.Title("Plex"))
-		window.Option(app.Size(unit.Dp(854), unit.Dp(480)))
+		window.Option(app.Size(unit.Dp(720), unit.Dp(480)))
 
 		if err := core.StartPlex(ctx, logger, window, *iRemoteDebuggingPortFlag); err != nil {
 			logger.ErrorContext(ctx, "window error", slog.Any("error", err))

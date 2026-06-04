@@ -12,7 +12,9 @@
             "program": "${workspaceFolder}/cmd/plex/main.go",
             "args": [
                 "--logLevel",
-                "DEBUG"
+                "DEBUG",
+                "--remoteDebuggingPort",
+                "6000"
             ],
             "env": {}
         }

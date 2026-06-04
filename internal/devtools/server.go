@@ -11,7 +11,6 @@ import (
 
 func StartRemoteDebuggingServer(logger *slog.Logger, ctx context.Context, port int) error {
 	config := net.ListenConfig{}
-
 	listener, err := config.Listen(ctx, "tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return err
@@ -42,13 +41,14 @@ func handleConnection(logger *slog.Logger, ctx context.Context, conn net.Conn) {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 
-	if err := writePacket(writer, map[string]any{
+	err := writePacket(writer, map[string]any{
 		"from":            "root",
 		"applicationType": "browser",
 		"traits": map[string]bool{
 			"networkMonitor": false,
 		},
-	}); err != nil {
+	})
+	if err != nil {
 		logger.ErrorContext(ctx, "packet write error", slog.String("error", err.Error()))
 		return
 	}
@@ -59,24 +59,83 @@ func handleConnection(logger *slog.Logger, ctx context.Context, conn net.Conn) {
 		message, err := readPacket(reader)
 		if err != nil {
 			logger.ErrorContext(ctx, "packet read error", slog.String("error", err.Error()))
-			continue
+			return
 		}
 
-		logger.DebugContext(ctx, "(server) packet", slog.Any("packet", message))
+		logger.DebugContext(ctx, "read packet", slog.Any("packet", message))
 
-		switch message["to"] {
+		switch message["to"].(string) {
 		case "root":
-
+			switch message["type"].(string) {
+			case "connect":
+				if err := writePacket(writer, map[string]any{
+					"from": "root",
+				}); err != nil {
+					logger.ErrorContext(ctx, "packet write error", slog.String("error", err.Error()))
+					return
+				}
+			case "getRoot":
+				if err := writePacket(writer, map[string]any{
+					"from":            "root",
+					"selected":        0,
+					"preferenceActor": "plex.conn0.pref",
+					"deviceActor":     "plex.conn0.device1",
+					"tabs": []map[string]any{
+						{
+							"actor": "plex.conn0.tabDescriptor1",
+							"title": "Plex",
+							"url":   "about:blank",
+						},
+					},
+				}); err != nil {
+					logger.ErrorContext(ctx, "packet write error", slog.String("error", err.Error()))
+					return
+				}
+			case "listTabs":
+				if err := writePacket(writer, map[string]any{
+					"from":     "root",
+					"selected": 0,
+					"tabs": []map[string]any{
+						{
+							"actor": "plex.conn0.tabDescriptor1",
+							"title": "Plex",
+							"url":   "about:blank",
+						},
+					},
+				}); err != nil {
+					logger.ErrorContext(ctx, "packet write error", slog.String("error", err.Error()))
+					return
+				}
+			}
+		case "plex.conn0.device1":
+			switch message["type"].(string) {
+			case "getDescription":
+				if err := writePacket(writer, map[string]any{
+					"from": "plex.conn0.device1",
+					"value": map[string]any{
+						"apptype":   "browser",
+						"name":      "Plex",
+						"vender":    "Plex",
+						"brandName": "Plex",
+						"version":   "0.1.0",
+						"channel":   "release",
+						"os":        "Linux",
+					},
+				}); err != nil {
+					logger.ErrorContext(ctx, "packet write error", slog.String("error", err.Error()))
+				}
+			}
 		default:
-			if err := writePacket(writer, map[string]any{
+			err := writePacket(writer, map[string]any{
 				"from":    message["to"],
 				"error":   "unrecognizedPacketType",
 				"message": "unable to process request",
-			}); err != nil {
+			})
+			if err != nil {
 				logger.ErrorContext(ctx, "packet write error", slog.String("error", err.Error()))
 				return
 			}
-
+			logger.DebugContext(ctx, "sent packet")
 		}
 
 	}

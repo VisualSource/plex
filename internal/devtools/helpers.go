@@ -12,7 +12,7 @@ func readPacket(reader *bufio.Reader) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	len, err := strconv.Atoi(string(lenBytes))
+	len, err := strconv.Atoi(string(lenBytes[:len(lenBytes)-1])) // strip : from request
 	if err != nil {
 		return nil, err
 	}
@@ -52,5 +52,5 @@ func writePacket(writer *bufio.Writer, data map[string]any) error {
 		return err
 	}
 
-	return nil
+	return writer.Flush()
 }

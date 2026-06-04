@@ -24,7 +24,7 @@ func RenderTree(gtx layout.Context, box *layouts.Box) {
 
 	rect := clip.Rect{
 		Min: image.Pt(int(bb.X), int(bb.Y)),
-		Max: image.Pt(int(bb.W), int(bb.H)),
+		Max: image.Pt(int(bb.X+bb.W), int(bb.Y+bb.H)),
 	}.Push(gtx.Ops)
 
 	if bgColor := styletree.GetProp[color.NRGBA](box.Style.SpecifiedValues, "background-color"); bgColor.IsSome() {

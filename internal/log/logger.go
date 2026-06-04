@@ -28,7 +28,7 @@ func New(opts ...Option) *slog.Logger {
 
 	logger := slog.New(
 		NewSpanContextHandler(
-			slog.NewJSONHandler(config.writer, &slog.HandlerOptions{
+			slog.NewTextHandler(config.writer, &slog.HandlerOptions{
 				AddSource: config.addSource,
 				Level:     logLevel,
 			}),
