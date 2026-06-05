@@ -25,6 +25,10 @@ func NewCssom(stylesheets []*css_parser.Stylesheet) *Cssom {
 	}
 }
 
+func (c *Cssom) AppendStylesheet(stylesheet *Stylesheet) {
+	c.Stylesheets = append(c.Stylesheets, stylesheet)
+}
+
 type Stylesheet struct {
 	Rules    []Rule
 	Location utils.StringOption

@@ -24,10 +24,10 @@ import (
 	"github.com/VisualSource/plex/internal/utils"
 )
 
+type FrameConfig struct{}
+
 type Frame struct {
 	width, height int
-
-	ctx context.Context
 
 	logger *slog.Logger
 
@@ -41,10 +41,10 @@ type Frame struct {
 	cssParser *css_parser.CssParser
 }
 
-func NewFrame(logger *slog.Logger, ctx context.Context) *Frame {
+func NewFrame(logger *slog.Logger) *Frame {
 	return &Frame{
-		ctx:       ctx,
 		logger:    logger,
+		cssom:     &cssom.Cssom{},
 		cssParser: css_parser.NewCssParser(),
 	}
 }
@@ -64,7 +64,7 @@ func parseCss(reader io.Reader) (*cssom.Stylesheet, error) {
 	return cssomSheet, nil
 }
 
-func (f *Frame) LoadRemote(url url.URL, allowResolveResourceLocal bool) error {
+func (f *Frame) LoadRemote(url url.URL, allowRelativeFileImport bool) error {
 	switch url.Scheme {
 	case "file":
 		if !filepath.IsAbs(url.Path) {
@@ -94,12 +94,18 @@ func (f *Frame) LoadRemote(url url.URL, allowResolveResourceLocal bool) error {
 }
 
 type Metadata struct {
-	Title    string
-	BaseUrl  string
-	NoScript bool
+	Title              string
+	BaseUrl            *url.URL
+	NoScript           bool
+	Favicon            string
+	RelativeFileImport bool
 }
 
-func (m *Metadata) ParseURL(value string) (*url.URL, error) {
+func (m *Metadata) ParsePath(value string) (*url.URL, error) {
+	if m.BaseUrl != nil && m.BaseUrl.Scheme == "file" {
+
+	}
+
 	uri, err := url.Parse(value)
 	if err != nil {
 		return nil, err
@@ -112,9 +118,66 @@ func (m *Metadata) ParseURL(value string) (*url.URL, error) {
 	return uri, nil
 }
 
+func fetchResource[T any](ctx context.Context, client *http.Client, url *url.URL, handler func(io.Reader) (T, error), allowRelativeFileImport bool) (T, error) {
+	var zero T
+
+	switch url.Scheme {
+	case "file":
+		if !allowRelativeFileImport {
+			return zero, errors.New("not allowed to load local resource")
+		}
+
+		file, err := os.OpenFile(url.Path, os.O_RDONLY, 0666 /* read/write access for everyone */)
+		if err != nil {
+			return zero, err
+		}
+		defer file.Close()
+
+		result, err := handler(file)
+		if err != nil {
+			return zero, err
+		}
+
+		return result, nil
+	case "http", "https":
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
+		if err != nil {
+			return zero, nil
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return zero, err
+		}
+		defer resp.Body.Close()
+
+		result, err := handler(resp.Body)
+		if err != nil {
+			return zero, err
+		}
+
+		return result, nil
+	default:
+		return zero, errors.ErrUnsupported
+	}
+}
+
+func getTextContent(node dom.ElementNode) string {
+	children := node.Children()
+	if len(children) == 0 {
+		return ""
+	}
+
+	if text, ok := children[0].(*dom.Text); ok {
+		return text.Data
+	}
+
+	return ""
+}
+
 func (f *Frame) Load(stream io.Reader) error {
 
-	ctx, _ := context.WithCancel(f.ctx)
+	ctx, _ := context.WithCancel(context.Background())
 	metadata := &Metadata{}
 
 	hp := html_parser.NewHtmlParser(stream)
@@ -148,28 +211,27 @@ func (f *Frame) Load(stream io.Reader) error {
 			srcAttribute := node.GetAttribute("src")
 
 			if srcAttribute != nil {
-				uri, err := metadata.ParseURL(srcAttribute.Value)
+				uri, err := metadata.ParsePath(srcAttribute.Value)
 				if err != nil {
 					continue
 				}
 
 				wg.Go(func() {
-					req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)
+					_, err := fetchResource(ctx, client, uri, func(r io.Reader) (any, error) {
+						return nil, nil
+					}, metadata.RelativeFileImport)
 					if err != nil {
 						return
 					}
-
-					resp, err := client.Do(req)
-					if err != nil {
-						return
-					}
-					defer resp.Body.Close()
 
 					//TODO: parse and compile script
 
 				})
 			} else {
-				scriptText := node.Children()[0].(*dom.Text)
+				scriptText := getTextContent(node)
+				if scriptText == "" {
+					continue
+				}
 
 				wg.Go(func() {
 					select {
@@ -184,7 +246,10 @@ func (f *Frame) Load(stream io.Reader) error {
 		case "style":
 			node := contentItem.(dom.ElementNode)
 
-			styleText := node.Children()[0].(*dom.Text).Data
+			styleText := getTextContent(node)
+			if styleText == "" {
+				continue
+			}
 
 			wg.Go(func() {
 				select {
@@ -192,8 +257,6 @@ func (f *Frame) Load(stream io.Reader) error {
 				default:
 					sheet, err := parseCss(strings.NewReader(styleText))
 					if err != nil {
-
-						f.logger.ErrorContext(f.ctx, "failed to parse stylesheet", slog.String("error", err.Error()))
 						return
 					}
 
@@ -210,33 +273,23 @@ func (f *Frame) Load(stream io.Reader) error {
 					if href == nil {
 						continue
 					}
-					uri, err := metadata.ParseURL(href.Value)
+					uri, err := metadata.ParsePath(href.Value)
 					if err != nil {
 						continue
 					}
 
 					wg.Go(func() {
-						req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)
+						result, err := fetchResource(ctx, client, uri, parseCss, metadata.RelativeFileImport)
 						if err != nil {
+
 							return
 						}
 
-						resp, err := client.Do(req)
-						if err != nil {
-							return
-						}
-						defer resp.Body.Close()
-
-						sheet, err := parseCss(resp.Body)
-						if err != nil {
-
-							f.logger.ErrorContext(f.ctx, "failed to make http request", slog.String("error", err.Error()))
-							return
-						}
-
-						stylesheetsChan <- sheet
+						stylesheetsChan <- result
 
 					})
+				case "icon":
+
 				}
 			}
 		case "meta":
@@ -245,8 +298,8 @@ func (f *Frame) Load(stream io.Reader) error {
 				continue
 			}
 			seenTitle = true
-			title := contentItem.Children()[0].(*dom.Text)
-			metadata.Title = title.Data
+			metadata.Title = getTextContent(contentItem.(dom.ElementNode))
+
 		default:
 			f.logger.WarnContext(ctx, "unhandled tag", slog.String("tag", contentItem.Tag()))
 		}
