@@ -57,6 +57,10 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 	}
 }
 
+func (p *HtmlParser) SetScriptingMode(mode ScriptingMode) {
+	p.scriptingMode = mode
+}
+
 func (p *HtmlParser) SetSpeculativeParser(parser *SpeculativeHTMLParser) {
 	p.speculativeParser = parser
 }

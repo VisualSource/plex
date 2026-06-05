@@ -37,7 +37,7 @@ type Frame struct {
 	paint  *styletree.StyledNode
 	layout *layouts.Box
 
-	// used by script engine to parse stuff
+	// used by script engine to parse selectors and other stuff
 	cssParser *css_parser.CssParser
 }
 
@@ -49,9 +49,22 @@ func NewFrame(logger *slog.Logger, ctx context.Context) *Frame {
 	}
 }
 
-func (f *Frame) LoadRemote(url url.URL) error {
+func parseCss(reader io.Reader) (*cssom.Stylesheet, error) {
+	p := css_parser.NewCssParser()
+	sheet, err := p.ParseStylesheet(reader, utils.None[string]())
+	if err != nil {
 
-	var wg sync.WaitGroup
+		return nil, err
+	}
+
+	cssomSheet := cssom.ParseStylesheet(sheet)
+
+	//TODO: load linked stylesheet via @import
+
+	return cssomSheet, nil
+}
+
+func (f *Frame) LoadRemote(url url.URL, allowResolveResourceLocal bool) error {
 	switch url.Scheme {
 	case "file":
 		if !filepath.IsAbs(url.Path) {
@@ -64,153 +77,182 @@ func (f *Frame) LoadRemote(url url.URL) error {
 		}
 		defer file.Close()
 
-		hp := html_parser.NewHtmlParser(file)
+		return f.Load(file)
 
-		doc, err := hp.Parse()
-		if err != nil {
-			return err
-		}
-		f.document = doc
-		// pull out script,css and other metadata
-
-		content, err := selector.QuerySelectorAll(doc, "script,style,link,meta,title")
-		if err != nil {
-			return err
-		}
-
-		seenTitle := false
-		pageTitle := url.Path
-
-		list := make([]*css_parser.Stylesheet, 0)
-
-		client := &http.Client{}
-
-		for _, item := range content {
-			switch item.Tag() {
-			case "script":
-				wg.Go(func() {
-					//TODO: parse, and compile
-				})
-			case "style":
-				wg.Go(func() {
-					style := item.Children()[0].(*dom.Text)
-					sheet, err := f.cssParser.ParseStylesheet(strings.NewReader(style.Data), utils.None[string]())
-					if err != nil {
-						f.logger.ErrorContext(f.ctx, "failed to parse stylesheet", slog.String("error", err.Error()))
-						return
-					}
-					list = append(list, sheet)
-				})
-			case "link":
-				node := item.(dom.ElementNode)
-
-				target := node.GetAttribute("rel")
-
-				if target != nil {
-					switch target.Value {
-					case "stylesheet":
-						href := node.GetAttribute("href")
-						if href == nil {
-							continue
-						}
-						path, err := url.Parse(href.Value)
-						if err != nil {
-							f.logger.ErrorContext(f.ctx, "failed to parse url", slog.String("error", err.Error()))
-							continue
-						}
-
-						wg.Go(func() {
-							resp, err := client.Get(path.RequestURI())
-							if err != nil {
-								f.logger.ErrorContext(f.ctx, "failed to make http request", slog.String("error", err.Error()))
-								return
-							}
-							defer resp.Body.Close()
-
-							cssp := css_parser.NewCssParser()
-
-							st, err := cssp.ParseStylesheet(resp.Body, utils.Some(path.RequestURI()))
-							if err != nil {
-								f.logger.ErrorContext(f.ctx, "failed to make http request", slog.String("error", err.Error()))
-								return
-							}
-
-							list = append(list, st)
-						})
-					}
-				}
-			case "meta":
-			case "title":
-				if seenTitle {
-					continue
-				}
-				seenTitle = true
-				title := item.Children()[0].(*dom.Text)
-				pageTitle = title.Data
-			}
-		}
-
-		f.cssom = cssom.NewCssom(list)
 	case "https", "http":
-		return errors.ErrUnsupported
+		resp, err := http.Get(url.String())
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		return f.Load(resp.Body)
 	default:
-		return errors.New("unable to load file!")
+		return errors.ErrUnsupported
 	}
 
-	wg.Wait()
+}
 
-	return nil
+type Metadata struct {
+	Title    string
+	BaseUrl  string
+	NoScript bool
+}
+
+func (m *Metadata) ParseURL(value string) (*url.URL, error) {
+	uri, err := url.Parse(value)
+	if err != nil {
+		return nil, err
+	}
+
+	if !uri.IsAbs() {
+		// TODO resolve against baseurl
+	}
+
+	return uri, nil
 }
 
 func (f *Frame) Load(stream io.Reader) error {
-	htmlParser := html_parser.NewHtmlParser(stream)
-	doc, err := htmlParser.Parse()
+
+	ctx, _ := context.WithCancel(f.ctx)
+	metadata := &Metadata{}
+
+	hp := html_parser.NewHtmlParser(stream)
+
+	doc, err := hp.Parse()
 	if err != nil {
 		return err
 	}
-
 	f.document = doc
 
-	// TODO:
-	// scripts and css should be load via speclive html parser
-	// just parse for now
-	userAgentStylesheet, err := f.cssParser.ParseStylesheet(strings.NewReader( // TODO: move this some where else
-		`div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
-	head { display: none; background-color: gray; }
-	html { display: block; background-color: maroon; }
-	body { display: block; background-color: coral; }
-	.a { background-color: #ff0000; }
-	.b { background-color: #ffa500; }
-	.c { background-color: #ffff00; }
-	.d { background-color: #008000; }
-	.e { background-color: #0000ff; }
-	.f { background-color: #4b0082; }
-	.g { background-color: #800080; }
-	`), utils.Some("userAgent"))
+	externalContent, err := selector.QuerySelectorAll(doc, "script,style,link,meta,title,base")
 	if err != nil {
 		return err
 	}
 
-	f.cssom = cssom.NewCssom([]*css_parser.Stylesheet{userAgentStylesheet})
+	seenTitle := false
 
-	var root dom.ElementNode
-	for _, child := range doc.Children() {
-		if el, ok := child.(dom.ElementNode); ok {
-			root = el
-			break
+	stylesheetsChan := make(chan *cssom.Stylesheet, 0)
+	client := &http.Client{}
+	var wg sync.WaitGroup
+
+	for _, contentItem := range externalContent {
+		switch contentItem.Tag() {
+		case "script":
+			if !metadata.NoScript {
+				continue
+			}
+
+			node := contentItem.(dom.ElementNode)
+
+			srcAttribute := node.GetAttribute("src")
+
+			if srcAttribute != nil {
+				uri, err := metadata.ParseURL(srcAttribute.Value)
+				if err != nil {
+					continue
+				}
+
+				wg.Go(func() {
+					req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)
+					if err != nil {
+						return
+					}
+
+					resp, err := client.Do(req)
+					if err != nil {
+						return
+					}
+					defer resp.Body.Close()
+
+					//TODO: parse and compile script
+
+				})
+			} else {
+				scriptText := node.Children()[0].(*dom.Text)
+
+				wg.Go(func() {
+					select {
+					case <-ctx.Done():
+
+					default:
+						//TODO: parse and compile script
+
+					}
+				})
+			}
+		case "style":
+			node := contentItem.(dom.ElementNode)
+
+			styleText := node.Children()[0].(*dom.Text).Data
+
+			wg.Go(func() {
+				select {
+				case <-ctx.Done():
+				default:
+					sheet, err := parseCss(strings.NewReader(styleText))
+					if err != nil {
+
+						f.logger.ErrorContext(f.ctx, "failed to parse stylesheet", slog.String("error", err.Error()))
+						return
+					}
+
+					stylesheetsChan <- sheet
+				}
+			})
+		case "link":
+			node := contentItem.(dom.ElementNode)
+
+			if rel := node.GetAttribute("rel"); rel != nil {
+				switch rel.Value {
+				case "stylesheet":
+					href := node.GetAttribute("href")
+					if href == nil {
+						continue
+					}
+					uri, err := metadata.ParseURL(href.Value)
+					if err != nil {
+						continue
+					}
+
+					wg.Go(func() {
+						req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil)
+						if err != nil {
+							return
+						}
+
+						resp, err := client.Do(req)
+						if err != nil {
+							return
+						}
+						defer resp.Body.Close()
+
+						sheet, err := parseCss(resp.Body)
+						if err != nil {
+
+							f.logger.ErrorContext(f.ctx, "failed to make http request", slog.String("error", err.Error()))
+							return
+						}
+
+						stylesheetsChan <- sheet
+
+					})
+				}
+			}
+		case "meta":
+		case "title":
+			if seenTitle {
+				continue
+			}
+			seenTitle = true
+			title := contentItem.Children()[0].(*dom.Text)
+			metadata.Title = title.Data
+		default:
+			f.logger.WarnContext(ctx, "unhandled tag", slog.String("tag", contentItem.Tag()))
 		}
 	}
 
-	if root != nil {
-		t, err := styletree.NewStyleTree(root, f.cssom, nil)
-		if err != nil {
-			return err
-		}
-
-		f.paint = t
-
-		f.layout = layouts.NewLayoutTree(f.paint, float64(f.width), float64(f.height))
-	}
+	wg.Wait()
 
 	return nil
 }
@@ -229,3 +271,20 @@ func (f *Frame) Resize(width, height int) {
 
 	//TODO update styletree and layout
 }
+
+/*
+
+	`div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
+	head { display: none; background-color: gray; }
+	html { display: block; background-color: maroon; }
+	body { display: block; background-color: coral; }
+	.a { background-color: #ff0000; }
+	.b { background-color: #ffa500; }
+	.c { background-color: #ffff00; }
+	.d { background-color: #008000; }
+	.e { background-color: #0000ff; }
+	.f { background-color: #4b0082; }
+	.g { background-color: #800080; }
+	`
+
+*/

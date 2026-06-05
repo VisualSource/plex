@@ -17,7 +17,7 @@ func NewCssom(stylesheets []*css_parser.Stylesheet) *Cssom {
 
 	styles := make([]*Stylesheet, 0)
 	for _, stylesheet := range stylesheets {
-		styles = append(styles, parseStylesheet(stylesheet))
+		styles = append(styles, ParseStylesheet(stylesheet))
 	}
 
 	return &Cssom{
@@ -31,7 +31,7 @@ type Stylesheet struct {
 	Origin   int
 }
 
-func parseStylesheet(stylesheet *css_parser.Stylesheet) *Stylesheet {
+func ParseStylesheet(stylesheet *css_parser.Stylesheet) *Stylesheet {
 	sheet := &Stylesheet{
 		Location: stylesheet.Location,
 		Origin:   stylesheet.Origin,
