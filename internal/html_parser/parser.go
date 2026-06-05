@@ -57,6 +57,10 @@ func NewHtmlParser(stream io.Reader) *HtmlParser {
 	}
 }
 
+func (p *HtmlParser) SetSpeculativeParser(parser *SpeculativeHTMLParser) {
+	p.speculativeParser = parser
+}
+
 // https://html.spec.whatwg.org/multipage/parsing.html#parsing-html-fragments
 func ParseHTMLFragment(node dom.ElementNode, input string, allowDeclarativeShadowRoots utils.BoolOption, scriptingMode utils.Option[ScriptingMode]) ([]dom.Node, error) {
 	mode := utils.ValueOf(scriptingMode.Value, mode_Inert)
