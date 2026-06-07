@@ -23,6 +23,21 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>Document</title>
+		<style>
+			div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
+			head { display: none; background-color: gray; }
+			html { display: block; background-color: maroon; }
+			body { display: block; background-color: coral; }
+			.a { background-color: #ff0000; }
+			.b { background-color: #ffa500; }
+			.c { background-color: #ffff00; }
+			.d { background-color: #008000; }
+			.e { background-color: #0000ff; }
+			.f { background-color: #4b0082; }
+			.g { background-color: #800080; }
+			button { display: block; height: 50px; width: 50px; background-color: maroon; }
+			button:hover { background-color: blue; }
+		</style>
 	</head>
 	<body>
 		<div class="a">
@@ -39,6 +54,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 				</div>
 			</div>
 		</div>
+		<button>A</button>
 	</body>
 	</html>
 	`)); err != nil {
@@ -58,31 +74,14 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 				height = size.Y
 				width = size.X
 
-				mainFrame.Resize(width, height)
-				// todo on resize event a resize event are rerender styletree (apply styles in media queries) -> layout tree
+				if err := mainFrame.Resize(width, height); err != nil {
+					logger.ErrorContext(ctx, "failed to resize", slog.String("error", err.Error()))
+				}
 			}
 		case app.FrameEvent:
 			gtx := app.NewContext(&ops, e)
 
 			mainFrame.Render(gtx)
-
-			// draw header
-
-			//draw main window
-
-			// background job
-			// 	fetch file
-			//	 process html
-			//    	-> JOB: fetch and parse css
-			//    	-> JOB: fetch and parse script
-			//           -> compile script
-			//           -> start script engine
-			//    	-> style tree
-			//     -> layout
-			//         -> pass layout to render process
-			//-> painting
-
-			//TODO: render ui from html
 
 			e.Frame(gtx.Ops)
 		}

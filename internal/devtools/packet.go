@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log/slog"
 	"strconv"
 )
 
-func readPacket(reader *bufio.Reader) (map[string]any, error) {
+type Payload map[string]any
+
+func readPacket(reader *bufio.Reader) (Payload, error) {
 	lenBytes, err := reader.ReadSlice(':')
 	if err != nil {
 		return nil, err
@@ -28,7 +31,7 @@ func readPacket(reader *bufio.Reader) (map[string]any, error) {
 		return nil, err
 	}
 
-	var data map[string]any
+	var data Payload
 	if err := json.Unmarshal(payload, &data); err != nil {
 
 		return nil, err
@@ -36,7 +39,9 @@ func readPacket(reader *bufio.Reader) (map[string]any, error) {
 	return data, nil
 }
 
-func writePacket(writer *bufio.Writer, data map[string]any) error {
+func writePacket(logger *slog.Logger, writer *bufio.Writer, data Payload) error {
+	logger.Debug("sent", slog.Any("packet", data))
+
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		return err

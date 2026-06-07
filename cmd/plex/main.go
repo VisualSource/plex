@@ -22,7 +22,7 @@ func main() {
 	// Logger configuration
 	logger := log.New(
 		log.WithLevel(*sLogLevelFlag),
-		log.WithSource(),
+		//log.WithSource(),
 	)
 
 	ctx, cancel := context.WithCancel(context.Background())

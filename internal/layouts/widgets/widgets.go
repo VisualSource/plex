@@ -1,26 +1,28 @@
 package widgets
 
 import (
-	"image"
-	"image/color"
-
 	"gioui.org/layout"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
 	"github.com/VisualSource/plex/internal/layouts"
-	"github.com/VisualSource/plex/internal/layouts/styletree"
 )
 
-func ColorBox(gtx layout.Context, size image.Point, color color.NRGBA) layout.Dimensions {
-	defer clip.Rect{Max: size}.Push(gtx.Ops).Pop()
-	paint.ColorOp{Color: color}.Add(gtx.Ops)
-	paint.PaintOp{}.Add(gtx.Ops)
-	return layout.Dimensions{Size: size}
+type WidgetState struct {
+	button *Button
 }
 
-func RenderTree(gtx layout.Context, box *layouts.Box) {
+func RenderTree(gtx layout.Context, box *layouts.Box, state *WidgetState) {
 
-	bb := box.Dimensions.BorderBox()
+	switch box.Style.Element.Tag() {
+	case "button":
+		if state.button == nil {
+			state.button = &Button{}
+		}
+
+		state.button.Layout(gtx, box)
+	default:
+		RenderBox(gtx, box)
+	}
+
+	/*bb := box.Dimensions.BorderBox()
 
 	rect := clip.Rect{
 		Min: image.Pt(int(bb.X), int(bb.Y)),
@@ -32,9 +34,9 @@ func RenderTree(gtx layout.Context, box *layouts.Box) {
 		paint.PaintOp{}.Add(gtx.Ops)
 	}
 
-	rect.Pop()
+	rect.Pop()*/
 
 	for _, child := range box.Children {
-		RenderTree(gtx, child)
+		RenderTree(gtx, child, state)
 	}
 }

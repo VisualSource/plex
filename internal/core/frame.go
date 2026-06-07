@@ -21,7 +21,6 @@ import (
 	"github.com/VisualSource/plex/internal/layouts"
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 	"github.com/VisualSource/plex/internal/layouts/widgets"
-	"github.com/VisualSource/plex/internal/utils"
 )
 
 type FrameConfig struct{}
@@ -39,29 +38,22 @@ type Frame struct {
 
 	// used by script engine to parse selectors and other stuff
 	cssParser *css_parser.CssParser
+
+	rw sync.RWMutex
+
+	ctx context.Context
+
+	state *widgets.WidgetState
 }
 
-func NewFrame(logger *slog.Logger) *Frame {
+func NewFrame(logger *slog.Logger, ctx context.Context) *Frame {
 	return &Frame{
+		ctx:       ctx,
 		logger:    logger,
 		cssom:     &cssom.Cssom{},
+		state:     &widgets.WidgetState{},
 		cssParser: css_parser.NewCssParser(),
 	}
-}
-
-func parseCss(reader io.Reader) (*cssom.Stylesheet, error) {
-	p := css_parser.NewCssParser()
-	sheet, err := p.ParseStylesheet(reader, utils.None[string]())
-	if err != nil {
-
-		return nil, err
-	}
-
-	cssomSheet := cssom.ParseStylesheet(sheet)
-
-	//TODO: load linked stylesheet via @import
-
-	return cssomSheet, nil
 }
 
 func (f *Frame) LoadRemote(url url.URL, allowRelativeFileImport bool) error {
@@ -95,6 +87,7 @@ func (f *Frame) LoadRemote(url url.URL, allowRelativeFileImport bool) error {
 
 type Metadata struct {
 	Title              string
+	Source             string
 	BaseUrl            *url.URL
 	NoScript           bool
 	Favicon            string
@@ -102,82 +95,17 @@ type Metadata struct {
 }
 
 func (m *Metadata) ParsePath(value string) (*url.URL, error) {
-	if m.BaseUrl != nil && m.BaseUrl.Scheme == "file" {
-
-	}
+	//Need to handle resloving relative paths useing baseURL
 
 	uri, err := url.Parse(value)
 	if err != nil {
 		return nil, err
 	}
 
-	if !uri.IsAbs() {
-		// TODO resolve against baseurl
-	}
-
 	return uri, nil
 }
 
-func fetchResource[T any](ctx context.Context, client *http.Client, url *url.URL, handler func(io.Reader) (T, error), allowRelativeFileImport bool) (T, error) {
-	var zero T
-
-	switch url.Scheme {
-	case "file":
-		if !allowRelativeFileImport {
-			return zero, errors.New("not allowed to load local resource")
-		}
-
-		file, err := os.OpenFile(url.Path, os.O_RDONLY, 0666 /* read/write access for everyone */)
-		if err != nil {
-			return zero, err
-		}
-		defer file.Close()
-
-		result, err := handler(file)
-		if err != nil {
-			return zero, err
-		}
-
-		return result, nil
-	case "http", "https":
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), nil)
-		if err != nil {
-			return zero, nil
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return zero, err
-		}
-		defer resp.Body.Close()
-
-		result, err := handler(resp.Body)
-		if err != nil {
-			return zero, err
-		}
-
-		return result, nil
-	default:
-		return zero, errors.ErrUnsupported
-	}
-}
-
-func getTextContent(node dom.ElementNode) string {
-	children := node.Children()
-	if len(children) == 0 {
-		return ""
-	}
-
-	if text, ok := children[0].(*dom.Text); ok {
-		return text.Data
-	}
-
-	return ""
-}
-
 func (f *Frame) Load(stream io.Reader) error {
-
-	ctx, _ := context.WithCancel(context.Background())
 	metadata := &Metadata{}
 
 	hp := html_parser.NewHtmlParser(stream)
@@ -195,9 +123,11 @@ func (f *Frame) Load(stream io.Reader) error {
 
 	seenTitle := false
 
-	stylesheetsChan := make(chan *cssom.Stylesheet, 0)
 	client := &http.Client{}
-	var wg sync.WaitGroup
+	var (
+		wg sync.WaitGroup
+		mu sync.Mutex
+	)
 
 	for _, contentItem := range externalContent {
 		switch contentItem.Tag() {
@@ -217,7 +147,7 @@ func (f *Frame) Load(stream io.Reader) error {
 				}
 
 				wg.Go(func() {
-					_, err := fetchResource(ctx, client, uri, func(r io.Reader) (any, error) {
+					_, err := fetchResource(f.ctx, client, uri, func(r io.Reader) (any, error) {
 						return nil, nil
 					}, metadata.RelativeFileImport)
 					if err != nil {
@@ -235,7 +165,7 @@ func (f *Frame) Load(stream io.Reader) error {
 
 				wg.Go(func() {
 					select {
-					case <-ctx.Done():
+					case <-f.ctx.Done():
 
 					default:
 						//TODO: parse and compile script
@@ -252,16 +182,15 @@ func (f *Frame) Load(stream io.Reader) error {
 			}
 
 			wg.Go(func() {
-				select {
-				case <-ctx.Done():
-				default:
-					sheet, err := parseCss(strings.NewReader(styleText))
-					if err != nil {
-						return
-					}
 
-					stylesheetsChan <- sheet
+				sheet, err := parseCss(strings.NewReader(styleText))
+				if err != nil {
+					return
 				}
+
+				mu.Lock()
+				f.cssom.AppendStylesheet(sheet)
+				mu.Unlock()
 			})
 		case "link":
 			node := contentItem.(dom.ElementNode)
@@ -279,14 +208,14 @@ func (f *Frame) Load(stream io.Reader) error {
 					}
 
 					wg.Go(func() {
-						result, err := fetchResource(ctx, client, uri, parseCss, metadata.RelativeFileImport)
+						result, err := fetchResource(f.ctx, client, uri, parseCss, metadata.RelativeFileImport)
 						if err != nil {
 
 							return
 						}
-
-						stylesheetsChan <- result
-
+						mu.Lock()
+						f.cssom.AppendStylesheet(result)
+						mu.Unlock()
 					})
 				case "icon":
 
@@ -301,11 +230,24 @@ func (f *Frame) Load(stream io.Reader) error {
 			metadata.Title = getTextContent(contentItem.(dom.ElementNode))
 
 		default:
-			f.logger.WarnContext(ctx, "unhandled tag", slog.String("tag", contentItem.Tag()))
+			f.logger.WarnContext(f.ctx, "unhandled tag", slog.String("tag", contentItem.Tag()))
 		}
 	}
 
 	wg.Wait()
+
+	root, err := selector.QuerySelector(f.document, "html")
+	if err != nil {
+		return err
+	}
+
+	tree, err := styletree.NewStyleTree(root.(dom.ElementNode), f.cssom, nil)
+	if err != nil {
+		return err
+	}
+
+	f.paint = tree
+	f.layout = layouts.NewLayoutTree(f.paint, float64(f.width), float64(f.height))
 
 	return nil
 }
@@ -315,29 +257,27 @@ func (f *Frame) Render(gtx layout.Context) {
 		return
 	}
 
-	widgets.RenderTree(gtx, f.layout)
+	widgets.RenderTree(gtx, f.layout, f.state)
 }
-func (f *Frame) Resize(width, height int) {
+func (f *Frame) Resize(width, height int) error {
 	f.width = width
 	f.height = height
 	//TODO: should not have to though away all of the styletree and layout
 
-	//TODO update styletree and layout
+	root, err := selector.QuerySelector(f.document, "html")
+	if err != nil {
+		return err
+	}
+
+	tree, err := styletree.NewStyleTree(root.(dom.ElementNode), f.cssom, nil)
+	if err != nil {
+		return err
+	}
+
+	ly := layouts.NewLayoutTree(tree, float64(width), float64(height))
+
+	f.paint = tree
+	f.layout = ly
+
+	return nil
 }
-
-/*
-
-	`div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
-	head { display: none; background-color: gray; }
-	html { display: block; background-color: maroon; }
-	body { display: block; background-color: coral; }
-	.a { background-color: #ff0000; }
-	.b { background-color: #ffa500; }
-	.c { background-color: #ffff00; }
-	.d { background-color: #008000; }
-	.e { background-color: #0000ff; }
-	.f { background-color: #4b0082; }
-	.g { background-color: #800080; }
-	`
-
-*/

@@ -1,12 +1,12 @@
 Work:
-[] speculative parser
+✔ speculative parser @done(26-06-07 16:44)
 
 [] layout
     [] inline
     [] text
     [] inputs
     [] buttons
-    [] resizing
+    ✔ resizing @done(26-06-07 16:44)
 [] scripts
    [] ast
    [] compiler
