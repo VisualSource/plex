@@ -27,7 +27,7 @@ func drawSquare(ops *op.Ops, size image.Rectangle, color color.NRGBA) layout.Dim
 func (b *Button) Layout(gtx layout.Context, box *layouts.Box) layout.Dimensions {
 	bb := box.Dimensions.BorderBox()
 
-	size := image.Rect(int(bb.X), int(bb.Y), int(bb.X+bb.W), int(bb.Y+bb.H))
+	size := image.Rect(0, 0, int(bb.W), int(bb.H))
 
 	// Confine the area for pointer events.
 	area := clip.Rect(size).Push(gtx.Ops)

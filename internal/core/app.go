@@ -37,7 +37,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 			.g { background-color: #800080; }
 			button { display: block; height: 50px; width: 50px; background-color: maroon; }
 			button:hover { background-color: blue; }
-			input { display: block; height: 40px; width: auto; background-color: green; }
+			input { display: block; height: 40px; width: 100px; background-color: green; }
 		</style>
 	</head>
 	<body>

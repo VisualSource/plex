@@ -256,8 +256,8 @@ func (b *Box) calculatePosition(parent *Dimensions) {
 		b.Dimensions.Padding.Top = values[field_PaddingTop]
 		b.Dimensions.Padding.Bottom = values[field_PaddingBottom]
 
-		b.Dimensions.Content.X = parent.Content.X + b.Dimensions.Margin.Left + b.Dimensions.Border.Left + b.Dimensions.Padding.Left
-		b.Dimensions.Content.Y = parent.Content.H + parent.Content.Y + b.Dimensions.Margin.Top + b.Dimensions.Border.Top + b.Dimensions.Padding.Top
+		b.Dimensions.Content.X = b.Dimensions.Margin.Left + b.Dimensions.Border.Left + b.Dimensions.Padding.Left
+		b.Dimensions.Content.Y = parent.Content.H + b.Dimensions.Margin.Top + b.Dimensions.Border.Top + b.Dimensions.Padding.Top
 
 	}
 }

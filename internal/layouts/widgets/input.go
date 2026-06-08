@@ -39,8 +39,7 @@ func NewTextInput() *TextInput {
 
 func (i *TextInput) Layout(gtx layout.Context, box *layouts.Box) layout.Dimensions {
 	bb := box.Dimensions.BorderBox()
-
-	size := image.Rect(int(bb.X), int(bb.Y), int(bb.X+bb.W), int(bb.Y+bb.H))
+	size := image.Pt(int(bb.W), int(bb.H))
 
 	for {
 		_, ok := i.editor.Update(gtx)
@@ -59,7 +58,7 @@ func (i *TextInput) Layout(gtx layout.Context, box *layouts.Box) layout.Dimensio
 		fgC = *bgColor.Value
 	}
 
-	defer clip.Rect{Max: size.Max, Min: size.Min}.Push(gtx.Ops).Pop()
+	defer clip.Rect{Min: image.Pt(0, 0), Max: size}.Push(gtx.Ops).Pop()
 	paint.ColorOp{Color: bgC}.Add(gtx.Ops)
 	paint.PaintOp{}.Add(gtx.Ops)
 
@@ -71,7 +70,14 @@ func (i *TextInput) Layout(gtx layout.Context, box *layouts.Box) layout.Dimensio
 	paint.ColorOp{Color: color.NRGBA{B: 0x80, A: 0xAA}}.Add(gtx.Ops)
 	selectionColor := selectionColorMacro.Stop()
 
+	defer op.Offset(image.Pt(
+		int(box.Dimensions.Border.Left+box.Dimensions.Padding.Left),
+		int(box.Dimensions.Border.Top+box.Dimensions.Padding.Top),
+	)).Push(gtx.Ops).Pop()
+
+	gtx.Constraints = layout.Exact(image.Pt(int(box.Dimensions.Content.W), int(box.Dimensions.Content.H)))
+
 	i.editor.Layout(gtx, i.shaper, i.font, unit.Sp(16), textColor, selectionColor)
 
-	return layout.Dimensions{Size: size.Size()}
+	return layout.Dimensions{Size: size}
 }

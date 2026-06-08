@@ -15,8 +15,8 @@ func RenderBox(gtx layout.Context, box *layouts.Box) layout.Dimensions {
 	bb := box.Dimensions.BorderBox()
 
 	area := clip.Rect{
-		Min: image.Pt(int(bb.X), int(bb.Y)),
-		Max: image.Pt(int(bb.X+bb.W), int(bb.Y+bb.H)),
+		Min: image.Pt(0, 0),
+		Max: image.Pt(int(bb.W), int(bb.H)),
 	}
 
 	defer area.Push(gtx.Ops).Pop()
