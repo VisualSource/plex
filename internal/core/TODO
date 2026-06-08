@@ -5,7 +5,7 @@ Work:
     [] inline
     [] text
     [] inputs
-    [] buttons
+    ✔ buttons @done(26-06-08 11:52)
     ✔ resizing @done(26-06-07 16:44)
 [] scripts
    [] ast

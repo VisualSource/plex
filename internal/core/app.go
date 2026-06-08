@@ -37,6 +37,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 			.g { background-color: #800080; }
 			button { display: block; height: 50px; width: 50px; background-color: maroon; }
 			button:hover { background-color: blue; }
+			input { display: block; height: 40px; width: auto; background-color: green; }
 		</style>
 	</head>
 	<body>
@@ -55,6 +56,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 			</div>
 		</div>
 		<button>A</button>
+		<input/>
 	</body>
 	</html>
 	`)); err != nil {
@@ -62,6 +64,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 	}
 
 	var ops op.Ops
+
 	for {
 		switch e := window.Event().(type) {
 		case app.DestroyEvent:
