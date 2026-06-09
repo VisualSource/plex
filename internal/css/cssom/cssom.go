@@ -143,16 +143,15 @@ func parseDeclaration(properties DeclarationBlock, declaration *css_parser.Decla
 	case "font": // shorthand
 	case "font-family":
 	case "font-size":
-		items := nonWS(declaration.Value)
-		if len(items) == 1 {
-			value, ok := items[0].(*css_tokenizer.NumericToken)
-			if ok {
-				properties[name] = &Declaration{
-					Important: declaration.Important,
-					CssText:   declaration.OriginalText,
-					Value:     value,
-				}
-			}
+		size, err := parseSize(declaration.Value)
+		if err != nil {
+			break
+		}
+
+		properties[name] = &Declaration{
+			Important: declaration.Important,
+			CssText:   declaration.OriginalText,
+			Value:     size,
 		}
 
 	case "font-style":

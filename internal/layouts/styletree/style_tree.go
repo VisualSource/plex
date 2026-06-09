@@ -24,8 +24,12 @@ func GetProp[T comparable](propMap PropertyMap, prop string) utils.Option[T] {
 	return utils.None[T]()
 }
 
-func GetPropOrDefault[T any](propMap PropertyMap, prop string, def T) T {
-	if pv, ok := propMap[prop]; ok {
+func GetPropOrDefault[T any](style *StyledNode, prop string, def T) T {
+	if style == nil {
+		return def
+	}
+
+	if pv, ok := style.SpecifiedValues[prop]; ok {
 		if value, ok := pv.Value.(T); ok {
 			return value
 		}

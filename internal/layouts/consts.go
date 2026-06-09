@@ -1,10 +1,29 @@
 package layouts
 
 import (
+	"strings"
+
+	"gioui.org/font"
+	"gioui.org/text"
 	"github.com/VisualSource/plex/internal/css/cssom"
 	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/layouts/styletree"
+	"github.com/VisualSource/plex/internal/utils"
+	"golang.org/x/image/math/fixed"
 )
+
+// Context carries layout-time dependencies that aren't part of the box tree itself.
+type Context struct {
+	Shaper *text.Shaper
+}
+
+// DefaultTextFont is the font used both for measurement (layout) and rendering.
+// Reading font-family/weight/style from CSS is deferred.
+var DefaultTextFont = font.Font{
+	Typeface: "Times New Roman, Georgia, serif",
+	Style:    font.Regular,
+	Weight:   font.Normal,
+}
 
 type Edge struct {
 	Top, Left, Right, Bottom float64
@@ -90,14 +109,14 @@ func (b *Box) getInlineContainer() *Box {
 	}
 }
 
-func (b *Box) calculateDimensions(dimensions *Dimensions) {
+func (b *Box) calculateDimensions(dimensions *Dimensions, ctx *Context) {
 	b.calculateWidth(dimensions)
 	b.calculatePosition(dimensions)
 
 	if b.isInlineContext() {
-		b.calculateInlineChildDimensions()
+		b.calculateInlineChildDimensions(ctx)
 	} else {
-		b.calculateChildDimensions()
+		b.calculateChildDimensions(ctx)
 	}
 
 	b.calculateHeight(dimensions)
@@ -143,8 +162,18 @@ var defaultAuto = cssom.Size{
 	Keyword: "auto",
 }
 
+// DefaultFontSize is the px font-size used when CSS doesn't specify one. Layout
+// (measureText) and render (renderText) must use the same value, otherwise
+// the inline content box and the painted glyphs disagree.
+const DefaultFontSize = 16.0
+
+var defaultFontSizeProp = cssom.Size{
+	Kind: cssom.SizeKindLP,
+	LP:   &cssom.LengthPercentage{Value: DefaultFontSize, Unit: "px"},
+}
+
 func resolveOrZero(prop string, node *styletree.StyledNode, parentSize float64) float64 {
-	data := styletree.GetPropOrDefault(node.SpecifiedValues, prop, defaultZero)
+	data := styletree.GetPropOrDefault(node, prop, defaultZero)
 
 	value, _ := resolveSize(&data, parentSize)
 
@@ -167,16 +196,16 @@ func (b *Box) calculateWidth(parent *Dimensions) {
 
 	case OuterBoxType_Block:
 		sizes := [7]cssom.Size{
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-left", defaultZero),  // initial 0
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-right", defaultZero), // initial0
+			styletree.GetPropOrDefault(b.Style, "margin-left", defaultZero),  // initial 0
+			styletree.GetPropOrDefault(b.Style, "margin-right", defaultZero), // initial0
 
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-left-width", defaultZero),  // resolve border-left-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-right-width", defaultZero), // resolve border-right-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
+			styletree.GetPropOrDefault(b.Style, "border-left-width", defaultZero),  // resolve border-left-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
+			styletree.GetPropOrDefault(b.Style, "border-right-width", defaultZero), // resolve border-right-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
 
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-left", defaultZero),  // initial 0
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-right", defaultZero), // initial 0
+			styletree.GetPropOrDefault(b.Style, "padding-left", defaultZero),  // initial 0
+			styletree.GetPropOrDefault(b.Style, "padding-right", defaultZero), // initial 0
 
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "width", defaultAuto), // initial  auto, should set before hand in styletree building?
+			styletree.GetPropOrDefault(b.Style, "width", defaultAuto), // initial  auto, should set before hand in styletree building?
 		}
 
 		var total float64
@@ -257,14 +286,14 @@ func (b *Box) calculatePosition(parent *Dimensions) {
 	//@see  http://www.w3.org/TR/CSS2/visudet.html#normal-block
 	case OuterBoxType_Block:
 		sizes := [6]cssom.Size{
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-top", defaultZero),
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-bottom", defaultZero),
+			styletree.GetPropOrDefault(b.Style, "margin-top", defaultZero),
+			styletree.GetPropOrDefault(b.Style, "margin-bottom", defaultZero),
 
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-top-width", defaultZero),    // resolve border-top-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "border-bottom-width", defaultZero), // resolve border-bottom-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
+			styletree.GetPropOrDefault(b.Style, "border-top-width", defaultZero),    // resolve border-top-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
+			styletree.GetPropOrDefault(b.Style, "border-bottom-width", defaultZero), // resolve border-bottom-style on none|hidden compute value as zero else use value. initial value is medium which is 3px
 
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-top", defaultZero),
-			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "padding-bottom", defaultZero),
+			styletree.GetPropOrDefault(b.Style, "padding-top", defaultZero),
+			styletree.GetPropOrDefault(b.Style, "padding-bottom", defaultZero),
 		}
 
 		values := make([]float64, 6)
@@ -298,7 +327,12 @@ func (b *Box) calculatePosition(parent *Dimensions) {
 func (b *Box) calculateHeight(parent *Dimensions) {
 	switch b.OuterType {
 	case OuterBoxType_Block:
-		heightSize := styletree.GetProp[cssom.Size](b.Style.SpecifiedValues, "height")
+
+		var heightSize utils.Option[cssom.Size] = utils.None[cssom.Size]()
+		if !b.Anonymous {
+			heightSize = styletree.GetProp[cssom.Size](b.Style.SpecifiedValues, "height")
+		}
+
 		if heightSize.IsNone() {
 			break
 		}
@@ -313,11 +347,29 @@ func (b *Box) calculateHeight(parent *Dimensions) {
 	}
 }
 
-func (b *Box) calculateInlineChildDimensions() {
-	var lineX, lineY, lineHeight float64
+// calculateInlineChildDimensions positions inline children inside an inline
+// formatting context. For a block parent it wraps children into line boxes
+// constrained by parent Content.W. For an inline parent it lays children on a
+// single line and sets the parent's own Content.W/Content.H from the layout.
+func (b *Box) calculateInlineChildDimensions(ctx *Context) {
+	isInlineParent := b.OuterType == OuterBoxType_Inline
+
+	var lineX, lineY, lineHeight, maxLineW float64
 
 	for _, child := range b.Children {
-		child.measureInlineSize()
+		// Resolve CSS box properties (padding/border/margin) on the child.
+		// The existing inline branches in calculateWidth/calculatePosition
+		// handle the inline-specific subset.
+		child.calculateWidth(&b.Dimensions)
+		child.calculatePosition(&b.Dimensions)
+
+		// Measure intrinsic size. Text shapes via the Shaper; inline elements
+		// recurse into their own inline children, which sets their Content.W/H.
+		if _, isText := child.Style.Element.(*dom.Text); isText {
+			child.measureText(ctx)
+		} else {
+			child.calculateInlineChildDimensions(ctx)
+		}
 
 		marginW := child.Dimensions.Margin.Left + child.Dimensions.Margin.Right +
 			child.Dimensions.Border.Left + child.Dimensions.Border.Right +
@@ -330,7 +382,8 @@ func (b *Box) calculateInlineChildDimensions() {
 		childW := child.Dimensions.Content.W + marginW
 		childH := child.Dimensions.Content.H + marginH
 
-		if lineX+childW > b.Dimensions.Content.W && lineX > 0 {
+		// Only a block parent wraps; an inline parent lets its caller wrap.
+		if !isInlineParent && lineX+childW > b.Dimensions.Content.W && lineX > 0 {
 			lineY += lineHeight
 			lineX = 0
 			lineHeight = 0
@@ -342,45 +395,90 @@ func (b *Box) calculateInlineChildDimensions() {
 			child.Dimensions.Border.Top + child.Dimensions.Padding.Top
 
 		lineX += childW
+		if lineX > maxLineW {
+			maxLineW = lineX
+		}
 		if childH > lineHeight {
 			lineHeight = childH
 		}
 	}
 
-	b.Dimensions.Content.H += lineY + lineHeight
-
+	if isInlineParent {
+		b.Dimensions.Content.W = maxLineW
+		b.Dimensions.Content.H = lineHeight
+	} else {
+		b.Dimensions.Content.H += lineY + lineHeight
+	}
 }
 
-func (b *Box) measureInlineSize() {
-	fontSize := 16.0
-	if fs := styletree.GetPropOrDefault(b.Style.SpecifiedValues, "font-size", defaultZero); fs.Kind == cssom.SizeKindLP {
+// measureText shapes the text content and sets Content.W/Content.H from real
+// glyph metrics. Layout and render must agree on font and size for the
+// background of any wrapping inline element to coincide with the painted glyphs.
+func (b *Box) measureText(ctx *Context) {
+	textNode, ok := b.Style.Element.(*dom.Text)
+	if !ok {
+		return
+	}
+
+	fontSize := DefaultFontSize
+	if fs := styletree.GetPropOrDefault(b.Style, "font-size", defaultFontSizeProp); fs.Kind == cssom.SizeKindLP && fs.LP.Value > 0 {
 		fontSize = fs.LP.Value
 	}
 
-	if textNode, ok := b.Style.Element.(*dom.Text); ok {
-		// Stub: estimate width as characters × 60% of font size
-		b.Dimensions.Content.W = float64(len([]rune(textNode.Data))) * fontSize * 0.6
+	txt := strings.TrimSpace(textNode.Data)
+	if txt == "" || ctx == nil || ctx.Shaper == nil {
+		b.Dimensions.Content.W = 0
 		b.Dimensions.Content.H = fontSize
 		return
 	}
 
-	// Inline element with children: sum child widths, max child heights
-	var totalW, maxH float64
-	for _, child := range b.Children {
-		child.measureInlineSize()
-		totalW += child.Dimensions.Content.W
-		if child.Dimensions.Content.H > maxH {
-			maxH = child.Dimensions.Content.H
+	// MaxWidth=0 is treated literally as a 0-wide wrap by the Gio shaper, so
+	// pass a large value to allow the natural line width to be measured. Real
+	// CSS line-breaking against the containing block width is deferred.
+	const measureMaxWidth = 1 << 30
+	ctx.Shaper.LayoutString(text.Parameters{
+		Font:     DefaultTextFont,
+		PxPerEm:  fixed.I(int(fontSize)),
+		MaxWidth: measureMaxWidth,
+	}, txt)
+
+	var maxX, maxAscent, maxDescent fixed.Int26_6
+	lineCount := 0
+	for {
+		g, ok := ctx.Shaper.NextGlyph()
+		if !ok {
+			break
+		}
+		end := g.X + g.Advance
+		if end > maxX {
+			maxX = end
+		}
+		if g.Ascent > maxAscent {
+			maxAscent = g.Ascent
+		}
+		if g.Descent > maxDescent {
+			maxDescent = g.Descent
+		}
+		if g.Flags&text.FlagLineBreak != 0 {
+			lineCount++
 		}
 	}
-	b.Dimensions.Content.W = totalW
-	b.Dimensions.Content.H = maxH
+	if lineCount == 0 {
+		lineCount = 1
+	}
+
+	lineH := float64(maxAscent+maxDescent) / 64
+	if lineH == 0 {
+		lineH = fontSize
+	}
+	b.Dimensions.Content.W = float64(maxX) / 64
+	b.Dimensions.Content.H = lineH * float64(lineCount)
 }
 
-func (b *Box) calculateChildDimensions() {
+func (b *Box) calculateChildDimensions(ctx *Context) {
 	for _, child := range b.Children {
 
-		child.calculateDimensions(&b.Dimensions)
+		child.calculateDimensions(&b.Dimensions, ctx)
 
 		mb := child.Dimensions.MarginBox()
 		b.Dimensions.Content.H += mb.H
@@ -398,9 +496,11 @@ func (b *Box) isInlineContext() bool {
 
 func NewAnonymousBox() *Box {
 	return &Box{
+
 		Anonymous: true,
 		OuterType: OuterBoxType_Block,
 		InnerType: InnerBoxType_Flow,
-		Children:  make([]*Box, 0),
+
+		Children: make([]*Box, 0),
 	}
 }

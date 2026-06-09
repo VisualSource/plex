@@ -27,7 +27,7 @@ func TestBuildLayoutTree(t *testing.T) {
 		createElement("main"),
 	))
 
-	box := layouts.NewLayoutTree(styleNode, 100, 0)
+	box := layouts.NewLayoutTree(styleNode, &layouts.Context{}, 100, 0)
 
 	t.Log(pretty.Sprintf("%# v", box))
 }

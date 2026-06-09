@@ -1,15 +1,5 @@
 package styletree
 
-import (
-	css_tokenizer "github.com/VisualSource/plex/internal/css/tokenizer"
-	"github.com/Zyko0/go-sdl3/sdl"
-)
-
-func parseColor([]css_tokenizer.Token) sdl.FColor {
-
-	return sdl.FColor{}
-}
-
 func inheritProperties(propertyMap PropertyMap, parentPropertyMap PropertyMap) PropertyMap {
 
 	for key, value := range parentPropertyMap {

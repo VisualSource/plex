@@ -24,6 +24,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>Document</title>
 		<style>
+			* { font-size: 22px; }
 			div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
 			head { display: none; background-color: gray; }
 			html { display: block; background-color: maroon; }
@@ -35,7 +36,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 			.e { background-color: #0000ff; }
 			.f { background-color: #4b0082; }
 			.g { background-color: #800080; }
-			span { display: inline; }
+			span { display: inline; background-color: gray; }
 			button { display: block; height: 50px; width: 50px; background-color: maroon; }
 			button:hover { background-color: blue; }
 			input { display: block; height: 40px; width: 100px; background-color: green; }
@@ -59,7 +60,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 		<button>A</button>
 		<input/>
 		<div>
-			Text Bebefore <span>Some Text here</span>
+			Text Before <span>Some Text here</span>
 		</div>
 	</body>
 	</html>

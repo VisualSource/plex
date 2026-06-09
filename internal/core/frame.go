@@ -12,7 +12,9 @@ import (
 	"strings"
 	"sync"
 
+	"gioui.org/font/gofont"
 	"gioui.org/layout"
+	"gioui.org/text"
 	"github.com/VisualSource/plex/internal/css/cssom"
 	css_parser "github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/css/selector"
@@ -43,15 +45,18 @@ type Frame struct {
 
 	ctx context.Context
 
-	state *widgets.WidgetState
+	shaper *text.Shaper
+	state  *widgets.WidgetState
 }
 
 func NewFrame(logger *slog.Logger, ctx context.Context) *Frame {
+	shaper := text.NewShaper(text.WithCollection(gofont.Collection()))
 	return &Frame{
 		ctx:       ctx,
 		logger:    logger,
 		cssom:     &cssom.Cssom{},
-		state:     &widgets.WidgetState{},
+		shaper:    shaper,
+		state:     widgets.NewWidgetState(shaper),
 		cssParser: css_parser.NewCssParser(),
 	}
 }
@@ -247,7 +252,7 @@ func (f *Frame) Load(stream io.Reader) error {
 	}
 
 	f.paint = tree
-	f.layout = layouts.NewLayoutTree(f.paint, float64(f.width), float64(f.height))
+	f.layout = layouts.NewLayoutTree(f.paint, &layouts.Context{Shaper: f.shaper}, float64(f.width), float64(f.height))
 
 	return nil
 }
@@ -274,7 +279,7 @@ func (f *Frame) Resize(width, height int) error {
 		return err
 	}
 
-	ly := layouts.NewLayoutTree(tree, float64(width), float64(height))
+	ly := layouts.NewLayoutTree(tree, &layouts.Context{Shaper: f.shaper}, float64(width), float64(height))
 
 	f.paint = tree
 	f.layout = ly

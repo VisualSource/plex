@@ -6,7 +6,7 @@ import (
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 )
 
-func NewLayoutTree(node *styletree.StyledNode, width, height float64) *Box {
+func NewLayoutTree(node *styletree.StyledNode, ctx *Context, width, height float64) *Box {
 
 	dim := &Dimensions{
 		Content: Rect{
@@ -16,7 +16,7 @@ func NewLayoutTree(node *styletree.StyledNode, width, height float64) *Box {
 	}
 
 	box := buildLayoutTree(node)
-	box.calculateDimensions(dim)
+	box.calculateDimensions(dim, ctx)
 
 	return box
 }
@@ -33,7 +33,7 @@ func buildLayoutTree(node *styletree.StyledNode) *Box {
 	}
 
 	for _, child := range node.Children {
-		if _, isText := node.Element.(*dom.Text); isText {
+		if _, isText := child.Element.(*dom.Text); isText {
 			textBox := &Box{
 				Style:     child,
 				OuterType: OuterBoxType_Inline,
