@@ -6,7 +6,7 @@ func toAst(tokens []Token) ([]AstNode, error) {
 	nodes := make([]AstNode, 0)
 	pos := 0
 
-	for i := 0; i < len(tokens); i++ {
+	for pos < len(tokens) {
 
 	}
 
@@ -14,8 +14,10 @@ func toAst(tokens []Token) ([]AstNode, error) {
 	// ifStatement
 	// VariableDeclaration
 	// VariableAssignment
-
+	// FunctionDeclaration
+	// StructDeclaration
 	// whileStatement
+	// TernaryStatement
 	// Scope
 	//
 	// Expression
