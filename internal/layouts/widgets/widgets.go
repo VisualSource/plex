@@ -10,8 +10,11 @@ import (
 )
 
 type WidgetState struct {
-	button *Button
-	input  *TextInput
+	widgets map[dom.Node]LayoutWidget
+}
+
+type LayoutWidget interface {
+	Layout(gtx layout.Context, box *layouts.Box) layout.Dimensions
 }
 
 func RenderTree(gtx layout.Context, box *layouts.Box, state *WidgetState) {
@@ -21,26 +24,33 @@ func RenderTree(gtx layout.Context, box *layouts.Box, state *WidgetState) {
 
 	switch box.Style.Element.Tag() {
 	case "button":
-		if state.button == nil {
-			state.button = &Button{}
+		if btn, ok := state.widgets[box.Style.Element]; ok {
+			btn.Layout(gtx, box)
+		} else {
+			btn := &Button{}
+			state.widgets[box.Style.Element] = btn
+			btn.Layout(gtx, box)
 		}
 
-		state.button.Layout(gtx, box)
 	case "input":
-		typeAttr := box.Style.Element.(dom.ElementNode).GetAttribute("type")
-		if typeAttr != nil {
-			switch typeAttr.Value {
-			case "text":
-				if state.input == nil {
-					state.input = NewTextInput()
-				}
-				state.input.Layout(gtx, box)
+		if input, ok := state.widgets[box.Style.Element]; ok {
+			input.Layout(gtx, box)
+		} else if elNode, ok := box.Style.Element.(dom.ElementNode); ok {
+			typeAttr := elNode.GetAttribute("type")
+
+			switch {
+			case typeAttr != nil && typeAttr.Value == "hidden":
+			case typeAttr != nil && typeAttr.Value == "password":
+				input := NewTextInput()
+				input.editor.Mask = '*'
+
+				state.widgets[elNode] = input
+				input.Layout(gtx, box)
+			default:
+				input := NewTextInput()
+				state.widgets[elNode] = input
+				input.Layout(gtx, box)
 			}
-		} else {
-			if state.input == nil {
-				state.input = NewTextInput()
-			}
-			state.input.Layout(gtx, box)
 		}
 	default:
 		RenderBox(gtx, box)

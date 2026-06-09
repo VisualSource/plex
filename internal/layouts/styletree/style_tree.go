@@ -62,10 +62,14 @@ func NewStyleTree(el dom.ElementNode, css *cssom.Cssom, parentPropertyMap Proper
 			}
 
 			children = append(children, tree)
-		} else if _, ok := child.(*dom.Text); ok {
+		} else if child, ok := child.(*dom.Text); ok {
+			textNode := &StyledNode{
+				Element:         child,
+				Children:        make([]*StyledNode, 0),
+				SpecifiedValues: inheritProperties(make(PropertyMap), props),
+			}
 
-			//TODO: handle passing text nodes styles
-
+			children = append(children, textNode)
 		}
 	}
 

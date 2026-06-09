@@ -2,6 +2,7 @@ package layouts
 
 import (
 	"github.com/VisualSource/plex/internal/css/cssom"
+	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 )
 
@@ -32,6 +33,19 @@ func buildLayoutTree(node *styletree.StyledNode) *Box {
 	}
 
 	for _, child := range node.Children {
+		if _, isText := node.Element.(*dom.Text); isText {
+			textBox := &Box{
+				Style:     child,
+				OuterType: OuterBoxType_Inline,
+				InnerType: InnerBoxType_Flow,
+				Children:  make([]*Box, 0),
+			}
+			container := box.getInlineContainer()
+			container.Children = append(container.Children, textBox)
+
+			continue
+		}
+
 		outer, _ := getDisplayValue(styletree.GetProp[cssom.Display](child.SpecifiedValues, "display"))
 
 		switch outer {

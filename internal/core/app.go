@@ -35,6 +35,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 			.e { background-color: #0000ff; }
 			.f { background-color: #4b0082; }
 			.g { background-color: #800080; }
+			span { display: inline; }
 			button { display: block; height: 50px; width: 50px; background-color: maroon; }
 			button:hover { background-color: blue; }
 			input { display: block; height: 40px; width: 100px; background-color: green; }
@@ -57,6 +58,9 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 		</div>
 		<button>A</button>
 		<input/>
+		<div>
+			Text Bebefore <span>Some Text here</span>
+		</div>
 	</body>
 	</html>
 	`)); err != nil {

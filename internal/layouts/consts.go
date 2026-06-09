@@ -2,6 +2,7 @@ package layouts
 
 import (
 	"github.com/VisualSource/plex/internal/css/cssom"
+	"github.com/VisualSource/plex/internal/dom"
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 )
 
@@ -92,7 +93,12 @@ func (b *Box) getInlineContainer() *Box {
 func (b *Box) calculateDimensions(dimensions *Dimensions) {
 	b.calculateWidth(dimensions)
 	b.calculatePosition(dimensions)
-	b.calculateChildDimensions()
+
+	if b.isInlineContext() {
+		b.calculateInlineChildDimensions()
+	} else {
+		b.calculateChildDimensions()
+	}
 
 	b.calculateHeight(dimensions)
 }
@@ -137,10 +143,28 @@ var defaultAuto = cssom.Size{
 	Keyword: "auto",
 }
 
+func resolveOrZero(prop string, node *styletree.StyledNode, parentSize float64) float64 {
+	data := styletree.GetPropOrDefault(node.SpecifiedValues, prop, defaultZero)
+
+	value, _ := resolveSize(&data, parentSize)
+
+	return value
+}
+
 func (b *Box) calculateWidth(parent *Dimensions) {
 	mb := parent.MarginBox()
 
 	switch b.OuterType {
+	case OuterBoxType_Inline:
+
+		// inline boxes don't stretch — margins, borders, padding are all resolved,
+		// but width comes from content (set by measureInlineSize, called by parent)
+		b.Dimensions.Padding.Left = resolveOrZero("padding-left", b.Style, mb.W)
+		b.Dimensions.Padding.Right = resolveOrZero("padding-right", b.Style, mb.W)
+		b.Dimensions.Border.Left = resolveOrZero("border-left-width", b.Style, mb.W)
+		b.Dimensions.Border.Right = resolveOrZero("border-right-width", b.Style, mb.W)
+		b.Dimensions.Margin.Left = resolveOrZero("margin-left", b.Style, mb.W)
+
 	case OuterBoxType_Block:
 		sizes := [7]cssom.Size{
 			styletree.GetPropOrDefault(b.Style.SpecifiedValues, "margin-left", defaultZero),  // initial 0
@@ -221,6 +245,15 @@ const (
 func (b *Box) calculatePosition(parent *Dimensions) {
 	mb := parent.MarginBox()
 	switch b.OuterType {
+	case OuterBoxType_Inline:
+		// margin-top/bottom have no effect on inline elements (CSS spec)
+
+		// Position is set by the parent's line box algorithm, not here.
+		// Only resolve vertical spacing.
+		b.Dimensions.Border.Top = resolveOrZero("border-top-width", b.Style, mb.H)
+		b.Dimensions.Border.Bottom = resolveOrZero("border-bottom-width", b.Style, mb.H)
+		b.Dimensions.Padding.Top = resolveOrZero("padding-top", b.Style, mb.H)
+		b.Dimensions.Padding.Bottom = resolveOrZero("padding-bottom", b.Style, mb.H)
 	//@see  http://www.w3.org/TR/CSS2/visudet.html#normal-block
 	case OuterBoxType_Block:
 		sizes := [6]cssom.Size{
@@ -280,13 +313,87 @@ func (b *Box) calculateHeight(parent *Dimensions) {
 	}
 }
 
+func (b *Box) calculateInlineChildDimensions() {
+	var lineX, lineY, lineHeight float64
+
+	for _, child := range b.Children {
+		child.measureInlineSize()
+
+		marginW := child.Dimensions.Margin.Left + child.Dimensions.Margin.Right +
+			child.Dimensions.Border.Left + child.Dimensions.Border.Right +
+			child.Dimensions.Padding.Left + child.Dimensions.Padding.Right
+
+		marginH := child.Dimensions.Margin.Top + child.Dimensions.Margin.Bottom +
+			child.Dimensions.Border.Top + child.Dimensions.Border.Bottom +
+			child.Dimensions.Padding.Top + child.Dimensions.Padding.Bottom
+
+		childW := child.Dimensions.Content.W + marginW
+		childH := child.Dimensions.Content.H + marginH
+
+		if lineX+childW > b.Dimensions.Content.W && lineX > 0 {
+			lineY += lineHeight
+			lineX = 0
+			lineHeight = 0
+		}
+
+		child.Dimensions.Content.X = lineX + child.Dimensions.Margin.Left +
+			child.Dimensions.Border.Left + child.Dimensions.Padding.Left
+		child.Dimensions.Content.Y = lineY + child.Dimensions.Margin.Top +
+			child.Dimensions.Border.Top + child.Dimensions.Padding.Top
+
+		lineX += childW
+		if childH > lineHeight {
+			lineHeight = childH
+		}
+	}
+
+	b.Dimensions.Content.H += lineY + lineHeight
+
+}
+
+func (b *Box) measureInlineSize() {
+	fontSize := 16.0
+	if fs := styletree.GetPropOrDefault(b.Style.SpecifiedValues, "font-size", defaultZero); fs.Kind == cssom.SizeKindLP {
+		fontSize = fs.LP.Value
+	}
+
+	if textNode, ok := b.Style.Element.(*dom.Text); ok {
+		// Stub: estimate width as characters × 60% of font size
+		b.Dimensions.Content.W = float64(len([]rune(textNode.Data))) * fontSize * 0.6
+		b.Dimensions.Content.H = fontSize
+		return
+	}
+
+	// Inline element with children: sum child widths, max child heights
+	var totalW, maxH float64
+	for _, child := range b.Children {
+		child.measureInlineSize()
+		totalW += child.Dimensions.Content.W
+		if child.Dimensions.Content.H > maxH {
+			maxH = child.Dimensions.Content.H
+		}
+	}
+	b.Dimensions.Content.W = totalW
+	b.Dimensions.Content.H = maxH
+}
+
 func (b *Box) calculateChildDimensions() {
 	for _, child := range b.Children {
+
 		child.calculateDimensions(&b.Dimensions)
 
 		mb := child.Dimensions.MarginBox()
 		b.Dimensions.Content.H += mb.H
 	}
+}
+
+func (b *Box) isInlineContext() bool {
+	for _, child := range b.Children {
+		if child.OuterType == OuterBoxType_Inline {
+			return true
+		}
+	}
+	return false
 }
 
 func NewAnonymousBox() *Box {

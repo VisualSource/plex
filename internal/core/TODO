@@ -4,7 +4,7 @@ Work:
 [] layout
     [] inline
     [] text
-    [] inputs
+    ✔ inputs @done(26-06-08 19:24)
     ✔ buttons @done(26-06-08 11:52)
     ✔ resizing @done(26-06-07 16:44)
 [] scripts
