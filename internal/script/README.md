@@ -2,27 +2,33 @@
 
 <keyword> import|from|struct|if|else|while|let|mut|fn|null
 
-struct <ident> {
-    <ident>: <type>;
-}
+<structDefinition> = <keyword:export>? <keyword:struct> <ident> <scope>
+    <ident> <token:':'> <type> <token:';'>*
+</scope>
 
-if {
+<condition> = <expression> (<token:'||'>|<token:'&&'> <expression>)*
 
-} else if  {
+<ifStatement> = <keyword:if> <condition> </scope> <keyword:else> (</scope>) | (<ifStatement>) 
 
-} else {
+<ternaryStatement> = <expr> <token:'?'> <expr> <token:':'> <expr>
 
-}
+<literal> = <string>|<number>|<bool>
 
-<expr> ? <expr> : <expr>
+<functionParams> = <token:'('> (<ident> <token:':'> <type> (<token:'='> <literal>)? (<token:','> <ident> <token:':'> <type>)*  )* <token:')'>
+<functionDefinition> = <keyword:export>? <keyword:fn> <ident> <functionParams>  (<token:'->'> <type>)? </scope>
+<arrowFunction> = <functionParams> (<token:':' <type>)? <token:'=>'> (</scope> | <expression> )
 
-fn <ident>(){
+<whileStatement> = <keyword:while> <condition> </scope>
 
-}
+<op> = <expression> (<token:'/'>|<token:'*'>|<token:'+'>|<token:"-">|<token:'%'>|<token:'>'>|<token;'<'>) <expression>
 
-let <ident> = () => {}
+<expression> = <literal> | <op>
 
-while {}
+<variableDefinition> = <keyword:let> <keyword:mut>? (<token:':'> <type>)? = <expression> <token:';'>
+
+<functionCall> = <ident> <token:'('> <expression>* <token:')'>
+<importStatement> = <keyword:import> <token:'{'> (<ident> (<token:','> <ident>)* )? <token:'}'> <keyword:from> <string> <token:';'>
+
 
 let <ident> = 1;
 let <ident>: <type> = <literal>;

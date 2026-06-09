@@ -61,72 +61,80 @@ var delimMap = map[rune]TokenType{
 	'<':  TokenType_LessThen,
 }
 
+type Position struct {
+	Col int64
+	Row int64
+}
+
+func NewPosition(col, row int64) Position {
+	return Position{Col: col, Row: row}
+}
+
 type Token interface {
 	IsToken() TokenType
-	Range() (int64, int64)
+	Range() (Position, Position)
 }
 
 type DataToken struct {
-	Type TokenType
-	row  int64
-	col  int64
+	Type       TokenType
+	Start, End Position
 }
 
-func NewDataToken(token TokenType, row int64, col int64) *DataToken {
+func NewDataToken(token TokenType, start, end Position) *DataToken {
 	return &DataToken{
-		Type: token,
-		row:  row,
-		col:  col,
+		Type:  token,
+		Start: start,
+		End:   end,
 	}
 }
 
 func (d DataToken) IsToken() TokenType {
 	return d.Type
 }
-func (d DataToken) Range() (int64, int64) {
-	return d.row, d.col
+func (d DataToken) Range() (Position, Position) {
+	return d.Start, d.End
 }
 
 type ValueToken struct {
 	ttype TokenType
-	row   int64
-	col   int64
 	Value string
+	Start Position
+	End   Position
 }
 
-func NewNumberToken(value string, row int64, col int64) *ValueToken {
+func NewNumberToken(value string, start, end Position) *ValueToken {
 	return &ValueToken{
 		ttype: TokenType_Number,
-		row:   row,
-		col:   col,
+		Start: start,
+		End:   end,
 		Value: value,
 	}
 }
 
-func NewIdentToken(value string, row int64, col int64) *ValueToken {
+func NewIdentToken(value string, start, end Position) *ValueToken {
 	return &ValueToken{
 		ttype: TokenType_Ident,
-		row:   row,
-		col:   col,
+		Start: start,
+		End:   end,
 		Value: value,
 	}
 }
 
-func NewKeywordToken(value string, row int64, col int64) *ValueToken {
+func NewKeywordToken(value string, start, end Position) *ValueToken {
 	return &ValueToken{
 		ttype: TokenType_Keyword,
 		Value: value,
-		row:   row,
-		col:   col,
+		Start: start,
+		End:   end,
 	}
 }
 
-func NewStringToken(value string, row int64, col int64) *ValueToken {
+func NewStringToken(value string, start, end Position) *ValueToken {
 	return &ValueToken{
 		ttype: TokenType_String,
 		Value: value,
-		row:   row,
-		col:   col,
+		Start: start,
+		End:   end,
 	}
 }
 
@@ -134,6 +142,6 @@ func (s ValueToken) IsToken() TokenType {
 	return s.ttype
 }
 
-func (s ValueToken) Range() (int64, int64) {
-	return s.row, s.col
+func (s ValueToken) Range() (Position, Position) {
+	return s.Start, s.End
 }

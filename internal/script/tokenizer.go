@@ -68,6 +68,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			t.consumeString()
 
 		case '/':
+			start := NewPosition(t.row, t.col)
 			next, err := t.stream.Peek(1)
 			if err != nil && err != io.EOF {
 				return nil, err
@@ -92,9 +93,10 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				continue
 			}
 
-			t.tokens = append(t.tokens, NewDataToken(delimMap[char], t.row, t.col))
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
 
 		case '-', '+', '.':
+			start := NewPosition(t.row, t.col)
 			next, err := t.stream.Peek(1)
 			if err != nil && err != io.EOF {
 				return nil, err
@@ -122,12 +124,13 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 					tt = TokenType_Decrement
 				}
 
-				t.tokens = append(t.tokens, NewDataToken(tt, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(tt, start, NewPosition(t.row, t.col)))
 				continue
 			}
 
-			t.tokens = append(t.tokens, NewDataToken(delimMap[char], t.row, t.col))
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
 		case '=':
+			start := NewPosition(t.row, t.col)
 			next, err := t.stream.Peek(1)
 			if err != nil && err != io.EOF {
 				return nil, err
@@ -140,7 +143,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TokenType_FatArrow, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_FatArrow, start, NewPosition(t.row, t.col)))
 				continue
 			case next[0] == '+':
 
@@ -148,25 +151,28 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TokenType_EqualEqual, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_EqualEqual, start, NewPosition(t.row, t.col)))
 				continue
 			}
-			t.tokens = append(t.tokens, NewDataToken(delimMap[char], t.row, t.col))
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
 		case '>':
+			start := NewPosition(t.row, t.col)
 			isNext, err := t.isNext('=')
 			if err != nil {
 				return nil, err
 			}
 			if isNext {
+
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TokenType_GreaterThenOrEqaul, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_GreaterThenOrEqaul, start, NewPosition(t.row, t.col)))
 				continue
 			}
-			t.tokens = append(t.tokens, NewDataToken(delimMap[char], t.row, t.col))
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
 		case '<':
+			start := NewPosition(t.row, t.col)
 			isNext, err := t.isNext('=')
 			if err != nil {
 				return nil, err
@@ -176,12 +182,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TokenType_LessThenOrEqual, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_LessThenOrEqual, start, NewPosition(t.row, t.col)))
 				continue
 			}
-			t.tokens = append(t.tokens, NewDataToken(delimMap[char], t.row, t.col))
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
 		case '(', ')', ';', '*', '%', '?', ':', ',', '[', ']', '{', '}':
-			t.tokens = append(t.tokens, NewDataToken(delimMap[char], t.row, t.col))
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], NewPosition(t.row, t.col), NewPosition(t.row, t.col)))
 
 		case '|':
 			next, err := t.isNext('|')
@@ -189,11 +195,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				return nil, err
 			}
 			if next {
+				start := NewPosition(t.col, t.row)
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TokenType_OR, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_OR, start, NewPosition(t.row, t.col)))
 				continue
 			}
 
@@ -204,11 +211,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				return nil, err
 			}
 			if next {
+				start := NewPosition(t.col, t.row)
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TokenType_AND, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_AND, start, NewPosition(t.row, t.col)))
 				continue
 			}
 
@@ -219,11 +227,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				return nil, err
 			}
 			if next {
+				start := NewPosition(t.col, t.row)
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
 				}
 				t.row++
-				t.tokens = append(t.tokens, NewDataToken(TokenType_NotEqual, t.row, t.col))
+				t.tokens = append(t.tokens, NewDataToken(TokenType_NotEqual, start, NewPosition(t.row, t.col)))
 				continue
 			}
 
@@ -369,7 +378,7 @@ loop:
 }
 
 func (t *Tokenizer) consumeIdent() error {
-
+	start := NewPosition(t.col, t.row)
 	ident := strings.Builder{}
 
 	for {
@@ -396,14 +405,15 @@ func (t *Tokenizer) consumeIdent() error {
 	}
 
 	value := ident.String()
+	end := NewPosition(t.col, t.row)
 
 	switch value {
 	case "import", "from", "while", "if", "else", "struct", "fn", "mut":
-		t.tokens = append(t.tokens, NewIdentToken(value, t.row, t.col))
+		t.tokens = append(t.tokens, NewIdentToken(value, start, end))
 	case "null", "int", "int64", "int32", "int16", "int8", "uint", "u64", "u32", "u16", "u8", "bool":
-		t.tokens = append(t.tokens, NewIdentToken(value, t.row, t.col))
+		t.tokens = append(t.tokens, NewIdentToken(value, start, end))
 	default:
-		t.tokens = append(t.tokens, NewIdentToken(value, t.row, t.col))
+		t.tokens = append(t.tokens, NewIdentToken(value, start, end))
 	}
 
 	return nil
@@ -436,6 +446,7 @@ func (t *Tokenizer) consumeDigits(rep *strings.Builder) error {
 }
 
 func (t *Tokenizer) consumeNumber() error {
+	start := NewPosition(t.col, t.row)
 	seenDot := false
 	value := strings.Builder{}
 
@@ -522,12 +533,14 @@ func (t *Tokenizer) consumeNumber() error {
 	}
 	//#endregion
 
-	t.tokens = append(t.tokens, NewNumberToken(value.String(), t.row, t.col))
+	end := NewPosition(t.col, t.row)
+	t.tokens = append(t.tokens, NewNumberToken(value.String(), start, end))
 
 	return nil
 }
 
 func (t *Tokenizer) consumeString() error {
+	start := NewPosition(t.col, t.row)
 	s, _, err := t.stream.ReadRune()
 	if err != nil && err != io.EOF {
 		return err
@@ -574,7 +587,9 @@ lo:
 		value.WriteRune(c)
 	}
 
-	t.tokens = append(t.tokens, NewStringToken(value.String(), t.row, t.col))
+	end := NewPosition(t.col, t.row)
+
+	t.tokens = append(t.tokens, NewStringToken(value.String(), start, end))
 
 	return nil
 }
