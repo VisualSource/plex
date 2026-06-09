@@ -1,12 +1,20 @@
 package script
 
-type AstNode interface{}
-
-func toAst(tokens []Token) ([]AstNode, error) {
-	nodes := make([]AstNode, 0)
+func toAst(tokens []Token) (*Program, error) {
+	program := &Program{}
 	pos := 0
 
 	for pos < len(tokens) {
+		crr := tokens[pos]
+
+		switch crr.IsToken() {
+		case TokenType_Keyword:
+
+		case TokenType_Number, TokenType_String, TokenType_Ident:
+
+		default:
+
+		}
 
 	}
 
@@ -23,5 +31,5 @@ func toAst(tokens []Token) ([]AstNode, error) {
 	// Expression
 	// Unary ->  - 1, + 1
 
-	return nodes, nil
+	return program, nil
 }
