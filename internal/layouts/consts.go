@@ -1,8 +1,6 @@
 package layouts
 
 import (
-	"strings"
-
 	"gioui.org/font"
 	"gioui.org/text"
 	"github.com/VisualSource/plex/internal/css/cssom"
@@ -90,6 +88,10 @@ type Box struct {
 	InnerType  InnerBoxType
 	Style      *styletree.StyledNode
 	Children   []*Box
+	// TextContent is the post-whitespace-processing string used by both
+	// measureText and renderText for text boxes. Only meaningful when
+	// Style.Element is *dom.Text.
+	TextContent string
 }
 
 func (b *Box) getInlineContainer() *Box {
@@ -415,8 +417,7 @@ func (b *Box) calculateInlineChildDimensions(ctx *Context) {
 // glyph metrics. Layout and render must agree on font and size for the
 // background of any wrapping inline element to coincide with the painted glyphs.
 func (b *Box) measureText(ctx *Context) {
-	textNode, ok := b.Style.Element.(*dom.Text)
-	if !ok {
+	if _, ok := b.Style.Element.(*dom.Text); !ok {
 		return
 	}
 
@@ -425,7 +426,7 @@ func (b *Box) measureText(ctx *Context) {
 		fontSize = fs.LP.Value
 	}
 
-	txt := strings.TrimSpace(textNode.Data)
+	txt := b.TextContent
 	if txt == "" || ctx == nil || ctx.Shaper == nil {
 		b.Dimensions.Content.W = 0
 		b.Dimensions.Content.H = fontSize

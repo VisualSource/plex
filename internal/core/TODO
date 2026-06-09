@@ -1,9 +1,9 @@
 Work:
 ✔ speculative parser @done(26-06-07 16:44)
 
-[] layout
-    [] inline
-    [] text
+✔ layout @done(26-06-09 10:32)
+    ✔ inline @done(26-06-09 10:32)
+    ✔ text @done(26-06-09 10:32)
     ✔ inputs @done(26-06-08 19:24)
     ✔ buttons @done(26-06-08 11:52)
     ✔ resizing @done(26-06-07 16:44)

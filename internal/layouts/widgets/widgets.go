@@ -3,7 +3,6 @@ package widgets
 import (
 	"image"
 	"image/color"
-	"strings"
 
 	"gioui.org/layout"
 	"gioui.org/op"
@@ -128,7 +127,7 @@ func renderText(gtx layout.Context, box *layouts.Box, state *WidgetState) {
 		state.lt,
 		layouts.DefaultTextFont,
 		spSize,
-		strings.TrimSpace(box.Style.Element.(*dom.Text).Data),
+		box.TextContent,
 		textColor,
 	)
 }
