@@ -26,7 +26,45 @@ func (v *VariableDeclaration) Range() (Position, Position) {
 type BinaryExpression struct {
 	Start, End  Position
 	Left, Right AstNode
-	Operator    string
+	Operator    TokenType
+}
+
+func (b *BinaryExpression) Range() (Position, Position) {
+	return b.Start, b.End
+}
+
+type NumberLiteral struct {
+	Start, End Position
+	Value      string
+}
+
+func (m *NumberLiteral) Range() (Position, Position) {
+	return m.Start, m.End
+}
+
+func NewNumberLiteral(value string, start, end Position) *NumberLiteral {
+	return &NumberLiteral{
+		Value: value,
+		End:   end,
+		Start: start,
+	}
+}
+
+type Identifier struct {
+	Start, End Position
+	Value      string
+}
+
+func (i *Identifier) Range() (Position, Position) {
+	return i.Start, i.End
+}
+
+func NewIdentifier(value string, start, end Position) *Identifier {
+	return &Identifier{
+		Value: value,
+		Start: start,
+		End:   end,
+	}
 }
 
 type Scope struct {
@@ -53,4 +91,20 @@ type FunctionCall struct {
 
 type UnaryExpression struct {
 	Start, End Position
+	Operator   TokenType
+	Operand    AstNode
+}
+
+func (u *UnaryExpression) Range() (Position, Position) {
+	return u.Start, u.End
+}
+
+type AssignmentExpression struct {
+	Start, End Position
+	Name       string
+	Value      AstNode
+}
+
+func (a *AssignmentExpression) Range() (Position, Position) {
+	return a.Start, a.End
 }

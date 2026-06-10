@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 1: Grammar Rules → Parse Functions</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e2e4ef;
+    --muted: #8b8fa8;
+    --accent: #7c6ff7;
+    --accent-dim: #3d3a6e;
+    --green: #4eca8b;
+    --green-dim: #1d3d2e;
+    --red: #f07178;
+    --red-dim: #3d1f22;
+    --yellow: #ffd580;
+    --yellow-dim: #3d3218;
+    --code-bg: #141720;
+    --code-border: #252836;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.75;
+    padding: 0 1rem 4rem;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 0 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .lesson-tag {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 2.5rem 0 0.75rem;
+    color: var(--text);
+  }
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--accent);
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.04em;
+  }
+
+  p { margin-bottom: 1rem; }
+
+  a { color: var(--accent); text-decoration: underline; }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  code {
+    font-family: 'Courier New', monospace;
+    font-size: 0.875em;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 3px;
+    padding: 0.1em 0.35em;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  .kw { color: #c792ea; }
+  .fn { color: #82aaff; }
+  .type { color: #ffcb6b; }
+  .str { color: #c3e88d; }
+  .cmt { color: #546e7a; font-style: italic; }
+  .num { color: #f78c6c; }
+  .op { color: var(--muted); }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-dim);
+    border-radius: 0 6px 6px 0;
+    padding: 1rem 1.25rem;
+    margin: 1.5rem 0;
+  }
+
+  .callout.insight {
+    border-color: var(--green);
+    background: var(--green-dim);
+  }
+
+  .callout.warning {
+    border-color: var(--yellow);
+    background: var(--yellow-dim);
+  }
+
+  .callout-title {
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 0.4rem;
+  }
+
+  .callout.insight .callout-title { color: var(--green); }
+  .callout.warning .callout-title { color: var(--yellow); }
+
+  .grammar-box {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin: 1rem 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    line-height: 2;
+  }
+
+  .rule-name { color: var(--yellow); }
+  .rule-arrow { color: var(--muted); }
+  .rule-terminal { color: var(--green); }
+  .rule-nonterminal { color: #82aaff; }
+  .rule-optional { color: var(--muted); }
+  .rule-or { color: var(--red); }
+
+  .quiz {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+  }
+
+  .quiz h2 {
+    margin-top: 0;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-family: 'Courier New', monospace;
+  }
+
+  .question {
+    margin: 1.25rem 0 0.75rem;
+    font-weight: 700;
+  }
+
+  .options { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .option {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.65rem 1rem;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    color: var(--text);
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .option:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .option.correct { border-color: var(--green) !important; background: var(--green-dim) !important; }
+  .option.wrong { border-color: var(--red) !important; background: var(--red-dim) !important; }
+
+  .feedback {
+    display: none;
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+
+  .feedback.show { display: block; }
+  .feedback.correct { background: var(--green-dim); color: var(--green); }
+  .feedback.wrong { background: var(--red-dim); color: var(--red); }
+
+  .nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+
+  .citation {
+    font-size: 0.8rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+    padding-top: 1rem;
+  }
+
+  .citation a { color: var(--muted); }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 2rem;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 10%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.3s;
+  }
+
+  .teacher-note {
+    margin-top: 3rem;
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+
+  .teacher-note strong { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <header>
+    <div class="lesson-tag">Lesson 1 &middot; Compiler Construction &middot; Parsing</div>
+    <h1>Grammar Rules → Parse Functions</h1>
+    <p class="subtitle">The single idea that makes recursive descent work</p>
+  </header>
+
+  <h2>The Big Idea</h2>
+
+  <p>Recursive descent parsing has one core mechanic. Once you see it, every parser makes sense:</p>
+
+  <div class="callout insight">
+    <div class="callout-title">The Core Insight</div>
+    <strong>Every grammar rule becomes a function. Every function returns an AST node.</strong>
+    The parser is just these functions calling each other — often recursively, hence the name.
+  </div>
+
+  <p>Your tokenizer already broke source text into a flat list of tokens. The parser's job is to give that list <em>structure</em> — to discover that <code>fn</code> starts a function, that <code>{</code>...<code>}</code> forms a block, that <code>1 + 2 * 3</code> has a specific nesting. The grammar is the map; the parse functions are the territory.</p>
+
+  <h2>Grammar Notation (BNF)</h2>
+
+  <p>Grammars are usually written in <a href="https://en.wikipedia.org/wiki/Backus%E2%80%93Naur_form" target="_blank">BNF</a> or a variant. Here's what the notation means:</p>
+
+  <div class="grammar-box">
+    <span class="rule-name">rule</span> <span class="rule-arrow">::=</span> <span class="rule-nonterminal">part</span> <span class="rule-optional">|</span> <span class="rule-terminal">"literal"</span><br>
+    <span class="rule-optional">( ... )?</span>  &nbsp; optional<br>
+    <span class="rule-optional">( ... )*</span>  &nbsp; zero or more<br>
+    <span class="rule-optional">( ... )+</span>  &nbsp; one or more<br>
+    <span class="rule-or">|</span>  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; alternatives
+  </div>
+
+  <p>Here's a tiny grammar for a plex expression that only handles literals and additions:</p>
+
+  <div class="grammar-box">
+    <span class="rule-name">expression</span> <span class="rule-arrow">::=</span> <span class="rule-nonterminal">term</span> ( <span class="rule-terminal">"+"</span> <span class="rule-nonterminal">term</span> )*<br>
+    <span class="rule-name">term</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-arrow">::=</span> <span class="rule-terminal">NUMBER</span> <span class="rule-or">|</span> <span class="rule-terminal">IDENT</span> <span class="rule-or">|</span> <span class="rule-terminal">"("</span> <span class="rule-nonterminal">expression</span> <span class="rule-terminal">")"</span>
+  </div>
+
+  <p>Two grammar rules → two Go functions. That's the whole translation.</p>
+
+  <h2>The Parser Skeleton</h2>
+
+  <p>Before writing the rules, we need a <strong>parser struct</strong> that holds the token list and a cursor telling us where we are:</p>
+
+  <pre><code><span class="kw">type</span> <span class="type">Parser</span> <span class="kw">struct</span> {
+    tokens []<span class="type">Token</span>
+    pos    <span class="type">int</span>
+}
+
+<span class="cmt">// peek at the current token without consuming it</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">peek</span>() <span class="type">Token</span> {
+    <span class="kw">if</span> p.pos >= len(p.tokens) {
+        <span class="kw">return</span> <span class="fn">NewDataToken</span>(<span class="type">TokenType_EOF</span>, <span class="type">Position</span>{}, <span class="type">Position</span>{})
+    }
+    <span class="kw">return</span> p.tokens[p.pos]
+}
+
+<span class="cmt">// consume the current token and advance</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">advance</span>() <span class="type">Token</span> {
+    t := p.<span class="fn">peek</span>()
+    p.pos++
+    <span class="kw">return</span> t
+}
+
+<span class="cmt">// advance only if the current token matches; error otherwise</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">expect</span>(tt <span class="type">TokenType</span>) (<span class="type">Token</span>, <span class="type">error</span>) {
+    <span class="kw">if</span> p.<span class="fn">peek</span>().<span class="fn">IsToken</span>() != tt {
+        <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"expected %v, got %v"</span>, tt, p.<span class="fn">peek</span>().<span class="fn">IsToken</span>())
+    }
+    <span class="kw">return</span> p.<span class="fn">advance</span>(), <span class="kw">nil</span>
+}</code></pre>
+
+  <div class="callout">
+    <div class="callout-title">Why peek + advance?</div>
+    Recursive descent needs <em>one token of lookahead</em> — you look at the next token to decide <em>which rule to apply</em>, then consume it. This pattern (<code>peek</code> to decide, <code>advance</code> to consume) is the heartbeat of every recursive descent parser. See <a href="https://craftinginterpreters.com/parsing-expressions.html" target="_blank">Crafting Interpreters §6</a>.
+  </div>
+
+  <h2>Grammar Rules Become Functions</h2>
+
+  <p>Now translate the grammar literally. Each rule is a Go function that returns <code>(AstNode, error)</code>:</p>
+
+  <pre><code><span class="cmt">// expression ::= term ( "+" term )*</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseExpression</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    left, err := p.<span class="fn">parseTerm</span>()
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+
+    <span class="kw">for</span> p.<span class="fn">peek</span>().<span class="fn">IsToken</span>() == <span class="type">TokenType_Plus</span> {
+        op := p.<span class="fn">advance</span>()  <span class="cmt">// consume the "+"</span>
+        right, err := p.<span class="fn">parseTerm</span>()
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="kw">nil</span>, err
+        }
+        start, _ := left.<span class="fn">Range</span>()
+        _, end := right.<span class="fn">Range</span>()
+        left = &<span class="type">BinaryExpression</span>{
+            Start:    start,
+            End:      end,
+            Left:     left,
+            Right:    right,
+            Operator: op.(<span class="type">*ValueToken</span>).Value,
+        }
+    }
+
+    <span class="kw">return</span> left, <span class="kw">nil</span>
+}
+
+<span class="cmt">// term ::= NUMBER | IDENT | "(" expression ")"</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseTerm</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    t := p.<span class="fn">peek</span>()
+    <span class="kw">switch</span> t.<span class="fn">IsToken</span>() {
+
+    <span class="kw">case</span> <span class="type">TokenType_Number</span>:
+        tok := p.<span class="fn">advance</span>().(<span class="type">*ValueToken</span>)
+        <span class="kw">return</span> &<span class="type">NumberLiteral</span>{Start: tok.Start, End: tok.End, Value: tok.Value}, <span class="kw">nil</span>
+
+    <span class="kw">case</span> <span class="type">TokenType_Ident</span>:
+        tok := p.<span class="fn">advance</span>().(<span class="type">*ValueToken</span>)
+        <span class="kw">return</span> &<span class="type">Identifier</span>{Start: tok.Start, End: tok.End, Name: tok.Value}, <span class="kw">nil</span>
+
+    <span class="kw">case</span> <span class="type">TokenType_BracketParamOpen</span>:  <span class="cmt">// "("</span>
+        p.<span class="fn">advance</span>()  <span class="cmt">// consume "("</span>
+        inner, err := p.<span class="fn">parseExpression</span>()  <span class="cmt">// recurse!</span>
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="kw">nil</span>, err
+        }
+        _, err = p.<span class="fn">expect</span>(<span class="type">TokenType_BracketParamClose</span>)  <span class="cmt">// consume ")"</span>
+        <span class="kw">return</span> inner, err
+
+    <span class="kw">default</span>:
+        <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"unexpected token: %v"</span>, t.<span class="fn">IsToken</span>())
+    }
+}</code></pre>
+
+  <div class="callout insight">
+    <div class="callout-title">See the recursion?</div>
+    <code>parseTerm</code> handles <code>"(" expression ")"</code> by calling <code>parseExpression</code> — which will call <code>parseTerm</code> again. This is how arbitrarily deep nesting (<code>((1 + 2))</code>) gets handled with no special code. The call stack <em>is</em> the nesting.
+  </div>
+
+  <h2>What AST Nodes Are Missing</h2>
+
+  <p>The code above references two node types not yet in <code>ast_nodes.go</code>. You'll need to add them:</p>
+
+  <pre><code><span class="kw">type</span> <span class="type">NumberLiteral</span> <span class="kw">struct</span> {
+    Start, End <span class="type">Position</span>
+    Value      <span class="type">string</span>  <span class="cmt">// raw text; convert to float64 at eval time</span>
+}
+<span class="kw">func</span> (n *<span class="type">NumberLiteral</span>) <span class="fn">Range</span>() (<span class="type">Position</span>, <span class="type">Position</span>) { <span class="kw">return</span> n.Start, n.End }
+
+<span class="kw">type</span> <span class="type">Identifier</span> <span class="kw">struct</span> {
+    Start, End <span class="type">Position</span>
+    Name       <span class="type">string</span>
+}
+<span class="kw">func</span> (i *<span class="type">Identifier</span>) <span class="fn">Range</span>() (<span class="type">Position</span>, <span class="type">Position</span>) { <span class="kw">return</span> i.Start, i.End }</code></pre>
+
+  <div class="callout warning">
+    <div class="callout-title">Heads up: BinaryExpression is missing Range()</div>
+    The existing <code>BinaryExpression</code> in <code>ast_nodes.go</code> doesn't implement the <code>AstNode</code> interface yet — it's missing the <code>Range()</code> method. Add it before compiling.
+  </div>
+
+  <hr style="border-color: var(--border); margin: 2.5rem 0;">
+
+  <div class="quiz" id="quiz">
+    <h2>Check Your Understanding</h2>
+
+    <div id="q1">
+      <p class="question">1. You have this grammar rule: <code>ifStmt ::= "if" "(" expression ")" block</code>. What should the Go function signature look like?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this, 'q1', false)">func parseIf(expr AstNode) AstNode</button>
+        <button class="option" onclick="answer(this, 'q1', true)">func (p *Parser) parseIfStmt() (AstNode, error)</button>
+        <button class="option" onclick="answer(this, 'q1', false)">func (p *Parser) parseIfStmt(token Token) AstNode</button>
+      </div>
+      <div class="feedback" id="q1-feedback"></div>
+    </div>
+
+    <div id="q2" style="margin-top: 1.5rem;">
+      <p class="question">2. Inside <code>parseIfStmt</code>, after you've consumed <code>"if"</code> and <code>"("</code>, what's the next call?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this, 'q2', false)">p.advance() to consume the expression tokens one by one</button>
+        <button class="option" onclick="answer(this, 'q2', true)">p.parseExpression() — delegate to the expression rule</button>
+        <button class="option" onclick="answer(this, 'q2', false)">p.expect(TokenType_Ident) to grab the condition variable</button>
+      </div>
+      <div class="feedback" id="q2-feedback"></div>
+    </div>
+
+    <div id="q3" style="margin-top: 1.5rem;">
+      <p class="question">3. What does it mean that <code>parseTerm</code> calls <code>parseExpression</code> which calls <code>parseTerm</code>?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this, 'q3', false)">It's a bug — this will infinite loop</button>
+        <button class="option" onclick="answer(this, 'q3', false)">It means we need to track a visited set to avoid cycles</button>
+        <button class="option" onclick="answer(this, 'q3', true)">It handles nested expressions like (1 + (2 + 3)) naturally via the call stack</button>
+      </div>
+      <div class="feedback" id="q3-feedback"></div>
+    </div>
+  </div>
+
+  <h2>Your Turn: Implement It</h2>
+
+  <p>Your task is to wire this into <a href="../internal/script/ast.go">internal/script/ast.go</a> and <a href="../internal/script/ast_nodes.go">internal/script/ast_nodes.go</a>:</p>
+
+  <ol style="padding-left: 1.5rem; line-height: 2.25;">
+    <li>Add <code>NumberLiteral</code> and <code>Identifier</code> to <code>ast_nodes.go</code></li>
+    <li>Add the <code>Range()</code> method to <code>BinaryExpression</code></li>
+    <li>Create a <code>Parser</code> struct with <code>peek</code>, <code>advance</code>, <code>expect</code></li>
+    <li>Implement <code>parseExpression</code> and <code>parseTerm</code></li>
+    <li>Replace the <code>toAst</code> stub to create a <code>Parser</code> and call <code>parseExpression</code> in a loop</li>
+  </ol>
+
+  <p>Once you can parse <code>1 + 2</code> into a <code>BinaryExpression{Left: NumberLiteral{1}, Right: NumberLiteral{2}}</code>, you've got the core mechanic. Everything else — statements, declarations, blocks — is more rules following the same pattern.</p>
+
+  <div class="citation">
+    <strong>Sources:</strong>
+    <a href="https://craftinginterpreters.com/parsing-expressions.html" target="_blank">Crafting Interpreters §6 — Parsing Expressions</a> &middot;
+    <a href="https://interpreterbook.com/" target="_blank">Writing An Interpreter In Go — Thorsten Ball</a> &middot;
+    <a href="https://en.wikipedia.org/wiki/Recursive_descent_parser" target="_blank">Wikipedia: Recursive Descent Parser</a>
+  </div>
+
+  <div class="teacher-note">
+    <strong>Ask your teacher (me) anything.</strong> If something in this lesson is unclear, paste your question back to the Claude Code session. Good questions to ask: "Why does the grammar rule use * for zero-or-more?", "What happens if peek() returns EOF mid-expression?", "How do I handle operator precedence for * vs +?"
+  </div>
+
+  <div class="nav">
+    <span>Lesson 1 of many</span>
+    <span>Next: <em>Operator Precedence &amp; Pratt Parsing</em></span>
+  </div>
+
+</div>
+
+<script>
+const explanations = {
+  q1: {
+    correct: "Right. Parse functions are always methods on the parser, return AstNode (so the caller can embed them in larger nodes), and return error so parse failures can propagate up.",
+    wrong: "Parse functions need to be methods on *Parser (to access peek/advance/expect) and must return error — parse failures need to propagate up to the caller."
+  },
+  q2: {
+    correct: "Exactly. You never manually advance through expression tokens — you delegate to the rule that knows how to parse expressions. That's the whole point of the grammar→function mapping.",
+    wrong: "This would work for a specific token, but expressions can be arbitrarily complex. You need to call parseExpression() so it handles all that complexity — that's what grammar rules are for."
+  },
+  q3: {
+    correct: "Correct. The call stack itself represents nesting depth. Each recursive call handles one more level of parentheses. It terminates because every branch of parseTerm either calls advance() (consuming a token) or returns an error — so the input shrinks each call.",
+    wrong: "It won't loop forever because every path through parseTerm either consumes a token (via advance) or returns an error. The input always gets shorter, so the recursion always bottoms out."
+  }
+};
+
+let answered = {};
+
+function answer(btn, qid, isCorrect) {
+  if (answered[qid]) return;
+  answered[qid] = true;
+
+  const allBtns = btn.parentElement.querySelectorAll('.option');
+  allBtns.forEach(b => b.style.pointerEvents = 'none');
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+
+  const fb = document.getElementById(qid + '-feedback');
+  fb.textContent = explanations[qid][isCorrect ? 'correct' : 'wrong'];
+  fb.className = 'feedback show ' + (isCorrect ? 'correct' : 'wrong');
+
+  const total = 3;
+  const done = Object.keys(answered).length;
+  document.getElementById('progress').style.width = (10 + (done / total) * 60) + '%';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 2: Operator Precedence</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e2e4ef;
+    --muted: #8b8fa8;
+    --accent: #7c6ff7;
+    --accent-dim: #3d3a6e;
+    --green: #4eca8b;
+    --green-dim: #1d3d2e;
+    --red: #f07178;
+    --red-dim: #3d1f22;
+    --yellow: #ffd580;
+    --yellow-dim: #3d3218;
+    --code-bg: #141720;
+    --code-border: #252836;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia','Times New Roman',serif; background: var(--bg); color: var(--text); line-height: 1.75; padding: 0 1rem 4rem; }
+  .page { max-width: 760px; margin: 0 auto; }
+  header { border-bottom: 1px solid var(--border); padding: 2.5rem 0 1.5rem; margin-bottom: 2.5rem; }
+  .lesson-tag { font-family: 'Courier New',monospace; font-size: 0.75rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.75rem; }
+  h1 { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-bottom: 0.5rem; }
+  .subtitle { color: var(--muted); font-size: 1rem; }
+  h2 { font-size: 1.25rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
+  h3 { font-size: 1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: var(--accent); font-family: 'Courier New',monospace; letter-spacing: 0.04em; }
+  p { margin-bottom: 1rem; }
+  a { color: var(--accent); text-decoration: underline; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; line-height: 1.6; }
+  code { font-family: 'Courier New',monospace; font-size: 0.875em; background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 3px; padding: 0.1em 0.35em; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .type { color: #ffcb6b; } .str { color: #c3e88d; } .cmt { color: #546e7a; font-style: italic; } .num { color: #f78c6c; } .op { color: var(--muted); }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-dim); border-radius: 0 6px 6px 0; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .callout.insight { border-color: var(--green); background: var(--green-dim); }
+  .callout.warning { border-color: var(--yellow); background: var(--yellow-dim); }
+  .callout-title { font-family: 'Courier New',monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 0.4rem; }
+  .callout.insight .callout-title { color: var(--green); } .callout.warning .callout-title { color: var(--yellow); }
+  .grammar-box { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1.25rem 1.5rem; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; line-height: 2.1; }
+  .rule-name { color: var(--yellow); } .rule-arrow { color: var(--muted); } .rule-terminal { color: var(--green); } .rule-nonterminal { color: #82aaff; } .rule-optional { color: var(--muted); } .rule-or { color: var(--red); }
+  .quiz { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; }
+  .quiz h2 { margin-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-family: 'Courier New',monospace; }
+  .question { margin: 1.25rem 0 0.75rem; font-weight: 700; }
+  .options { display: flex; flex-direction: column; gap: 0.5rem; }
+  .option { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.65rem 1rem; cursor: pointer; font-family: 'Courier New',monospace; font-size: 0.875rem; color: var(--text); text-align: left; transition: border-color 0.15s, background 0.15s; }
+  .option:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .option.correct { border-color: var(--green) !important; background: var(--green-dim) !important; }
+  .option.wrong { border-color: var(--red) !important; background: var(--red-dim) !important; }
+  .feedback { display: none; margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+  .feedback.show { display: block; } .feedback.correct { background: var(--green-dim); color: var(--green); } .feedback.wrong { background: var(--red-dim); color: var(--red); }
+  .tree { font-family: 'Courier New',monospace; font-size: 0.9rem; line-height: 1.9; background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1.25rem 1.5rem; margin: 1rem 0; }
+  .tree .node-op { color: var(--accent); } .tree .node-num { color: var(--green); }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.875rem; color: var(--muted); }
+  .citation { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem; padding-top: 1rem; }
+  .citation a { color: var(--muted); }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 2rem; }
+  .progress-fill { height: 100%; width: 20%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+  .teacher-note { margin-top: 3rem; background: var(--surface); border-radius: 8px; padding: 1.25rem 1.5rem; font-size: 0.9rem; color: var(--muted); }
+  .teacher-note strong { color: var(--text); }
+  .level-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; }
+  .level-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 400; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; }
+  .level-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--code-border); }
+  .level-table tr:last-child td { border-bottom: none; }
+  .level-low { color: var(--muted); } .level-high { color: var(--yellow); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <header>
+    <div class="lesson-tag">Lesson 2 &middot; Compiler Construction &middot; Parsing</div>
+    <h1>Operator Precedence</h1>
+    <p class="subtitle">Why <code>1 + 2 * 3</code> is a grammar problem, and how grammar solves it</p>
+  </header>
+
+  <h2>The Problem You Already Have</h2>
+
+  <p>Your current parser handles <code>+</code>. Now add <code>*</code> to <code>parseExpression</code> alongside it. What happens with <code>1 + 2 * 3</code>?</p>
+
+  <div class="tree">
+BinaryExpression (+)<br>
+├── <span class="node-num">NumberLiteral(1)</span><br>
+└── BinaryExpression (*)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="node-num">NumberLiteral(2)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="node-num">NumberLiteral(3)</span>
+  </div>
+
+  <p>That's <strong>wrong</strong>. <code>*</code> binds tighter than <code>+</code>, so the correct tree is:</p>
+
+  <div class="tree">
+BinaryExpression (+)<br>
+├── <span class="node-num">NumberLiteral(1)</span><br>
+└── BinaryExpression (*)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="node-num">NumberLiteral(2)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="node-num">NumberLiteral(3)</span>
+  </div>
+
+  <p>Wait — those are the same tree. But what if we add both operators flat in <code>parseExpression</code>? The parser reads left-to-right, so <code>1 + 2 * 3</code> becomes <code>(1 + 2) * 3 = 9</code> instead of <code>1 + (2 * 3) = 7</code>. The grammar needs to encode precedence.</p>
+
+  <h2>The Solution: Stratify By Precedence Level</h2>
+
+  <p>The insight is that <strong>lower-precedence operators sit higher in the grammar</strong>. A rule can only delegate <em>downward</em> to higher-precedence rules, so higher-precedence operators always bind first.</p>
+
+  <div class="callout insight">
+    <div class="callout-title">The Rule</div>
+    A grammar rule handles <em>its own</em> operators, then delegates to the rule <em>one level higher</em> in precedence for its operands. Lower precedence = higher up the grammar chain. Higher precedence = deeper in the call stack = binds tighter.
+  </div>
+
+  <p>Here's plex's full expression grammar, ordered from lowest to highest precedence:</p>
+
+  <div class="grammar-box">
+    <span class="rule-name">expression</span> <span class="rule-arrow">::=</span> <span class="rule-nonterminal">assignment</span><br>
+    <span class="rule-name">assignment</span> <span class="rule-arrow">::=</span> <span class="rule-nonterminal">IDENT</span> <span class="rule-terminal">"="</span> <span class="rule-nonterminal">expression</span> <span class="rule-or">|</span> <span class="rule-nonterminal">ternary</span><br>
+    <span class="rule-name">ternary</span> &nbsp;&nbsp;&nbsp;<span class="rule-arrow">::=</span> <span class="rule-nonterminal">logicOr</span> ( <span class="rule-terminal">"?"</span> <span class="rule-nonterminal">expression</span> <span class="rule-terminal">":"</span> <span class="rule-nonterminal">expression</span> )?<br>
+    <span class="rule-name">logicOr</span> &nbsp;&nbsp;<span class="rule-arrow">::=</span> <span class="rule-nonterminal">logicAnd</span> ( <span class="rule-terminal">"||"</span> <span class="rule-nonterminal">logicAnd</span> )*<br>
+    <span class="rule-name">logicAnd</span> &nbsp;<span class="rule-arrow">::=</span> <span class="rule-nonterminal">equality</span> ( <span class="rule-terminal">"&amp;&amp;"</span> <span class="rule-nonterminal">equality</span> )*<br>
+    <span class="rule-name">equality</span> &nbsp;<span class="rule-arrow">::=</span> <span class="rule-nonterminal">comparison</span> ( ( <span class="rule-terminal">"=="</span> <span class="rule-or">|</span> <span class="rule-terminal">"!="</span> ) <span class="rule-nonterminal">comparison</span> )*<br>
+    <span class="rule-name">comparison</span> <span class="rule-arrow">::=</span> <span class="rule-nonterminal">term</span> ( ( <span class="rule-terminal">"&lt;"</span> <span class="rule-or">|</span> <span class="rule-terminal">"&gt;"</span> <span class="rule-or">|</span> <span class="rule-terminal">"&lt;="</span> <span class="rule-or">|</span> <span class="rule-terminal">"&gt;="</span> ) <span class="rule-nonterminal">term</span> )*<br>
+    <span class="rule-name">term</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-arrow">::=</span> <span class="rule-nonterminal">factor</span> ( ( <span class="rule-terminal">"+"</span> <span class="rule-or">|</span> <span class="rule-terminal">"-"</span> ) <span class="rule-nonterminal">factor</span> )*<br>
+    <span class="rule-name">factor</span> &nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-arrow">::=</span> <span class="rule-nonterminal">unary</span> ( ( <span class="rule-terminal">"*"</span> <span class="rule-or">|</span> <span class="rule-terminal">"/"</span> <span class="rule-or">|</span> <span class="rule-terminal">"%"</span> ) <span class="rule-nonterminal">unary</span> )*<br>
+    <span class="rule-name">unary</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-arrow">::=</span> ( <span class="rule-terminal">"-"</span> <span class="rule-or">|</span> <span class="rule-terminal">"+"</span> ) <span class="rule-nonterminal">unary</span> <span class="rule-or">|</span> <span class="rule-nonterminal">primary</span><br>
+    <span class="rule-name">primary</span> &nbsp;&nbsp;&nbsp;<span class="rule-arrow">::=</span> <span class="rule-terminal">NUMBER</span> <span class="rule-or">|</span> <span class="rule-terminal">STRING</span> <span class="rule-or">|</span> <span class="rule-terminal">IDENT</span> <span class="rule-or">|</span> <span class="rule-terminal">"("</span> <span class="rule-nonterminal">expression</span> <span class="rule-terminal">")"</span>
+  </div>
+
+  <table class="level-table">
+    <thead><tr><th>Rule</th><th>Operators</th><th>Precedence</th></tr></thead>
+    <tbody>
+      <tr><td>expression / assignment</td><td>=</td><td class="level-low">lowest</td></tr>
+      <tr><td>ternary</td><td>? :</td><td></td></tr>
+      <tr><td>logicOr</td><td>||</td><td></td></tr>
+      <tr><td>logicAnd</td><td>&amp;&amp;</td><td></td></tr>
+      <tr><td>equality</td><td>== !=</td><td></td></tr>
+      <tr><td>comparison</td><td>&lt; &gt; &lt;= &gt;=</td><td></td></tr>
+      <tr><td>term</td><td>+ -</td><td></td></tr>
+      <tr><td>factor</td><td>* / %</td><td></td></tr>
+      <tr><td>unary</td><td>- + (prefix)</td><td></td></tr>
+      <tr><td>primary</td><td>literals, parens</td><td class="level-high">highest</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Tracing Through an Example</h2>
+
+  <p>Let's trace <code>1 + 2 * 3</code> through the stratified grammar to see why it works.</p>
+
+  <p><code>parseExpression</code> → <code>parseTerm</code> (handles <code>+</code>/<code>-</code>). <code>parseTerm</code> calls <code>parseFactor</code> for its left operand. <code>parseFactor</code> sees <code>1</code>, not <code>*</code> or <code>/</code>, so it returns <code>NumberLiteral(1)</code> immediately. Back in <code>parseTerm</code>, peek is <code>+</code> — consume it. Now call <code>parseFactor</code> for the right operand. <code>parseFactor</code> sees <code>2</code>, then peeks <code>*</code> — it loops, consuming <code>2 * 3</code> into <code>BinaryExpression(*)</code>. That node returns to <code>parseTerm</code> as the right side of <code>+</code>. Result:</p>
+
+  <div class="tree">
+BinaryExpression <span class="node-op">(+)</span><br>
+├── <span class="node-num">NumberLiteral(1)</span><br>
+└── BinaryExpression <span class="node-op">(*)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="node-num">NumberLiteral(2)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="node-num">NumberLiteral(3)</span>
+  </div>
+
+  <p>Correct. The call stack enforced the precedence — <code>parseFactor</code> ran deeper so it bound tighter.</p>
+
+  <h2>The Go Implementation</h2>
+
+  <p>Your existing <code>parseExpression</code> becomes <code>parseTerm</code>. Your <code>parseTerm</code> becomes <code>parsePrimary</code>. Then add the missing levels.</p>
+
+  <p>The pattern is mechanical — each level looks almost identical:</p>
+
+  <pre><code><span class="cmt">// factor ::= unary ( ("*" | "/" | "%") unary )*</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseFactor</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    left, err := p.<span class="fn">parseUnary</span>()
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+    <span class="kw">for</span> {
+        tt := p.<span class="fn">peek</span>().<span class="fn">IsToken</span>()
+        <span class="kw">if</span> tt != <span class="type">TokenType_Star</span> && tt != <span class="type">TokenType_Div</span> && tt != <span class="type">TokenType_Mod</span> {
+            <span class="kw">break</span>
+        }
+        op := p.<span class="fn">advance</span>()
+        right, err := p.<span class="fn">parseUnary</span>()
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="kw">nil</span>, err
+        }
+        start, _ := left.<span class="fn">Range</span>()
+        _, end := right.<span class="fn">Range</span>()
+        left = &<span class="type">BinaryExpression</span>{Start: start, End: end, Left: left, Right: right, Operator: op.<span class="fn">IsToken</span>()}
+    }
+    <span class="kw">return</span> left, <span class="kw">nil</span>
+}
+
+<span class="cmt">// unary ::= ("-" | "+") unary | primary</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseUnary</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    tt := p.<span class="fn">peek</span>().<span class="fn">IsToken</span>()
+    <span class="kw">if</span> tt == <span class="type">TokenType_Minus</span> || tt == <span class="type">TokenType_Plus</span> {
+        op := p.<span class="fn">advance</span>()
+        operand, err := p.<span class="fn">parseUnary</span>() <span class="cmt">// right-recursive for chains: --x</span>
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="kw">nil</span>, err
+        }
+        start, _ := op.<span class="fn">Range</span>()
+        _, end := operand.<span class="fn">Range</span>()
+        <span class="kw">return</span> &<span class="type">UnaryExpression</span>{Start: start, End: end, Operator: op.<span class="fn">IsToken</span>(), Operand: operand}, <span class="kw">nil</span>
+    }
+    <span class="kw">return</span> p.<span class="fn">parsePrimary</span>()
+}</code></pre>
+
+  <div class="callout warning">
+    <div class="callout-title">UnaryExpression needs updating</div>
+    The existing <code>UnaryExpression</code> in <code>ast_nodes.go</code> has no fields beyond position. You'll need to add <code>Operator TokenType</code> and <code>Operand AstNode</code> fields, plus a <code>Range()</code> method.
+  </div>
+
+  <h3>Assignment: right-associative</h3>
+
+  <p>Assignment is interesting — <code>a = b = 1</code> should parse as <code>a = (b = 1)</code>, not <code>(a = b) = 1</code>. That means it's <em>right-associative</em>. The grammar handles this naturally: instead of a <code>*</code> loop (left-associative), use a single right-recursive call:</p>
+
+  <pre><code><span class="cmt">// assignment ::= IDENT "=" expression | ternary</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseAssignment</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    <span class="cmt">// try IDENT "=" — look two tokens ahead</span>
+    <span class="kw">if</span> p.<span class="fn">peek</span>().<span class="fn">IsToken</span>() == <span class="type">TokenType_Ident</span> && p.<span class="fn">peekN</span>(<span class="num">1</span>).<span class="fn">IsToken</span>() == <span class="type">TokenType_Equal</span> {
+        name := p.<span class="fn">advance</span>().(<span class="type">*ValueToken</span>)
+        p.<span class="fn">advance</span>() <span class="cmt">// consume "="</span>
+        value, err := p.<span class="fn">parseExpression</span>() <span class="cmt">// right-recursive</span>
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="kw">nil</span>, err
+        }
+        _, end := value.<span class="fn">Range</span>()
+        <span class="kw">return</span> &<span class="type">AssignmentExpression</span>{Start: name.Start, End: end, Name: name.Value, Value: value}, <span class="kw">nil</span>
+    }
+    <span class="kw">return</span> p.<span class="fn">parseTernary</span>()
+}</code></pre>
+
+  <p>You'll also need a <code>peekN(n int)</code> helper that returns the token <code>n</code> positions ahead without consuming anything.</p>
+
+  <hr style="border-color: var(--border); margin: 2.5rem 0;">
+
+  <div class="quiz">
+    <h2>Check Your Understanding</h2>
+
+    <div id="q1">
+      <p class="question">1. In the stratified grammar, which rule calls which?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q1',false)">primary → factor → unary → term → ... → expression</button>
+        <button class="option" onclick="answer(this,'q1',true)">expression → ... → term → factor → unary → primary</button>
+        <button class="option" onclick="answer(this,'q1',false)">They're all at the same level — order doesn't matter</button>
+      </div>
+      <div class="feedback" id="q1-feedback"></div>
+    </div>
+
+    <div id="q2" style="margin-top:1.5rem;">
+      <p class="question">2. <code>-x + y</code> — which operator binds tighter?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q2',false)">+ binds tighter — it comes later left-to-right</button>
+        <button class="option" onclick="answer(this,'q2',true)">The unary - binds tighter — it's at a deeper grammar level</button>
+        <button class="option" onclick="answer(this,'q2',false)">They bind equally; result depends on evaluation order</button>
+      </div>
+      <div class="feedback" id="q2-feedback"></div>
+    </div>
+
+    <div id="q3" style="margin-top:1.5rem;">
+      <p class="question">3. Why does assignment use right-recursion instead of a loop?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q3',false)">Loops would be slower</button>
+        <button class="option" onclick="answer(this,'q3',false)">Because = is not a valid token mid-loop</button>
+        <button class="option" onclick="answer(this,'q3',true)">A loop produces left-associativity; right-recursion produces right-associativity, which is what a = b = 1 requires</button>
+      </div>
+      <div class="feedback" id="q3-feedback"></div>
+    </div>
+  </div>
+
+  <h2>Your Turn: Extend the Parser</h2>
+
+  <p>Rename and wire up the full precedence chain in <a href="../internal/script/parser.go">internal/script/parser.go</a>:</p>
+
+  <ol style="padding-left:1.5rem; line-height:2.25;">
+    <li>Rename your current <code>parseExpression</code> → <code>parseTerm</code> and <code>parseTerm</code> → <code>parsePrimary</code></li>
+    <li>Add <code>parseFactor</code> between them (handles <code>*</code> <code>/</code> <code>%</code>)</li>
+    <li>Add <code>parseUnary</code> above <code>parsePrimary</code> (handles prefix <code>-</code> and <code>+</code>)</li>
+    <li>Add <code>parseComparison</code>, <code>parseEquality</code>, <code>parseLogicAnd</code>, <code>parseLogicOr</code> above <code>parseTerm</code></li>
+    <li>Add <code>parseTernary</code> and <code>parseAssignment</code> at the top</li>
+    <li>Add <code>Operator</code> and <code>Operand</code> fields to <code>UnaryExpression</code>, plus <code>Range()</code></li>
+    <li>Add <code>AssignmentExpression</code> node to <code>ast_nodes.go</code></li>
+    <li>Add a test: <code>1 + 2 * 3</code> should produce a tree where <code>*</code> is deeper than <code>+</code></li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-title">Tip: write the test first</div>
+    Add a test for <code>1 + 2 * 3</code> before implementing. It'll fail (wrong tree), which makes the goal concrete, and passes once you've got the precedence right. This is what the parser test file you already have is for.
+  </div>
+
+  <div class="citation">
+    <strong>Sources:</strong>
+    <a href="https://craftinginterpreters.com/parsing-expressions.html" target="_blank">Crafting Interpreters §6 — Parsing Expressions</a> &middot;
+    <a href="https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html" target="_blank">Matklad — Simple but Powerful Pratt Parsing</a> &middot;
+    <a href="https://interpreterbook.com/" target="_blank">Writing An Interpreter In Go — Thorsten Ball</a>
+  </div>
+
+  <div class="teacher-note">
+    <strong>Ask your teacher (me) anything.</strong> Good follow-up questions: "How does this relate to Pratt parsing?", "What about postfix operators like <code>x++</code>?", "How do I handle function calls like <code>foo(a, b)</code> in the grammar?", "What does left-associative vs right-associative mean for subtraction?"
+  </div>
+
+  <div class="nav">
+    <span><a href="0001-grammar-rules-to-parse-functions.html">← Lesson 1: Grammar Rules → Functions</a></span>
+    <span>Next: <em>Parsing Statements</em></span>
+  </div>
+
+</div>
+<script>
+const explanations = {
+  q1: {
+    correct: "Correct. Parsing always starts at the lowest-precedence rule and delegates downward. The call chain is expression → assignment → ternary → ... → primary. Higher levels in the chain handle lower-precedence operators.",
+    wrong: "It's the opposite: parsing starts at the highest-level (lowest-precedence) rule and calls down toward primary. This ensures low-precedence operators are encountered first and form the outer nodes of the tree."
+  },
+  q2: {
+    correct: "Right. Unary is a deeper grammar level than term (which handles +). parseTerm calls parseFactor, which calls parseUnary — so unary runs later in the call stack and returns first, making it bind tighter.",
+    wrong: "Precedence is determined by grammar depth, not textual order. parseUnary is called deeper in the chain than parseTerm, so it binds its operand before + gets a chance to. -x is fully resolved before + sees it."
+  },
+  q3: {
+    correct: "Exactly. A * loop would make a = b = 1 parse as (a = b) = 1 (left-to-right). The right-recursive call — parseExpression() as the value — makes the right side fully evaluate first, giving a = (b = 1). This matches how assignment works in most languages.",
+    wrong: "It's about associativity. A loop like `for peek() == '=' { ... }` always builds left-leaning trees. Right-recursion (calling parseExpression for the right side) naturally groups right-to-left."
+  }
+};
+
+let answered = {};
+function answer(btn, qid, isCorrect) {
+  if (answered[qid]) return;
+  answered[qid] = true;
+  const allBtns = btn.parentElement.querySelectorAll('.option');
+  allBtns.forEach(b => b.style.pointerEvents = 'none');
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  const fb = document.getElementById(qid + '-feedback');
+  fb.textContent = explanations[qid][isCorrect ? 'correct' : 'wrong'];
+  fb.className = 'feedback show ' + (isCorrect ? 'correct' : 'wrong');
+  const done = Object.keys(answered).length;
+  document.getElementById('progress').style.width = (20 + (done / 3) * 60) + '%';
+}
+</script>
+</body>
+</html>
