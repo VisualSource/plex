@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseExpression(t *testing.T) {
-	tokens := getTokens("1 + 2")
+	tokens := getTokens("1 + 2 * 4")
 
 	parser := script.NewParser(tokens)
 

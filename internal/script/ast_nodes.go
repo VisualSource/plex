@@ -86,7 +86,12 @@ type FunctionDeclaration struct {
 
 type FunctionCall struct {
 	Start, End Position
+	Name       string
 	Args       []AstNode
+}
+
+func (f *FunctionCall) Range() (Position, Position) {
+	return f.Start, f.End
 }
 
 type UnaryExpression struct {
@@ -107,4 +112,15 @@ type AssignmentExpression struct {
 
 func (a *AssignmentExpression) Range() (Position, Position) {
 	return a.Start, a.End
+}
+
+type TernaryExpression struct {
+	Start, End Position
+	Condition  AstNode
+	TrueBlock  AstNode
+	FalseBlock AstNode
+}
+
+func (t *TernaryExpression) Range() (Position, Position) {
+	return t.Start, t.End
 }

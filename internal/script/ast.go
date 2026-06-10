@@ -9,6 +9,7 @@ type Parser struct {
 	pos    int
 }
 
+// #region utils
 func NewParser(tokens []Token) Parser {
 	return Parser{
 		tokens: tokens,
@@ -16,7 +17,7 @@ func NewParser(tokens []Token) Parser {
 }
 
 func (p *Parser) Parse() (AstNode, error) {
-	return p.parseTerm()
+	return p.parseExpression()
 }
 
 func (p *Parser) peek() Token {
@@ -47,7 +48,43 @@ func (p *Parser) expect(tt TokenType) (Token, error) {
 	return p.advance(), nil
 }
 
-// term ::= NUMBER | IDENT | "(" expression ")"
+func (p *Parser) binaryExpr(builder func() (AstNode, error), check func(TokenType) bool) (AstNode, error) {
+	left, err := builder()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		tt := p.peek().IsToken()
+
+		if !check(tt) {
+			break
+		}
+
+		op := p.advance()
+		right, err := builder()
+		if err != nil {
+			return nil, err
+		}
+
+		start, _ := left.Range()
+		_, end := right.Range()
+
+		left = &BinaryExpression{
+			Start:    start,
+			End:      end,
+			Operator: op.IsToken(),
+			Right:    right,
+			Left:     left,
+		}
+	}
+
+	return left, nil
+}
+
+//#endregion
+
+// primary ::= NUMBER | STRING | IDENT | "(" expression ")"
 func (p *Parser) parsePrimary() (AstNode, error) {
 	t := p.peek()
 	switch t.IsToken() {
@@ -59,7 +96,7 @@ func (p *Parser) parsePrimary() (AstNode, error) {
 		return NewIdentifier(tok.Value, tok.Start, tok.End), nil
 	case TokenType_BracketParamOpen:
 		p.advance()
-		inner, err := p.parseTerm()
+		inner, err := p.parseExpression()
 		if err != nil {
 			return nil, err
 		}
@@ -71,69 +108,7 @@ func (p *Parser) parsePrimary() (AstNode, error) {
 	}
 }
 
-// expression := term ( "+" term )*
-func (p *Parser) parseTerm() (AstNode, error) {
-	left, err := p.parsePrimary()
-	if err != nil {
-		return nil, err
-	}
-
-	for p.peek().IsToken() == TokenType_Plus {
-		op := p.advance()
-		right, err := p.parsePrimary()
-		if err != nil {
-			return nil, err
-		}
-
-		start, _ := left.Range()
-		_, end := right.Range()
-
-		left = &BinaryExpression{
-			Start:    start,
-			End:      end,
-			Left:     left,
-			Right:    right,
-			Operator: op.IsToken(),
-		}
-	}
-
-	return left, nil
-}
-
-// factor ::= unary ( ("*" | "/" | "%") unary )*
-func (p *Parser) parseFactor() (AstNode, error) {
-	left, err := p.parseUnary()
-	if err != nil {
-		return nil, err
-	}
-
-	for {
-		tt := p.peek().IsToken()
-
-		if tt != TokenType_Star && tt != TokenType_Div && tt != TokenType_Mod {
-			break
-		}
-
-		op := p.advance()
-		right, err := p.parseUnary()
-		if err != nil {
-			return nil, err
-		}
-
-		start, _ := left.Range()
-		_, end := right.Range()
-
-		left = &BinaryExpression{
-			Start:    start,
-			End:      end,
-			Operator: op.IsToken(),
-		}
-	}
-
-	return left, nil
-}
-
-// unary ::= ("-"|"+") unary | primary
+// unary   ::= ( "-" | "+" ) unary | primary
 func (p *Parser) parseUnary() (AstNode, error) {
 	tt := p.peek().IsToken()
 
@@ -156,6 +131,87 @@ func (p *Parser) parseUnary() (AstNode, error) {
 	}
 
 	return p.parsePrimary()
+}
+
+// factor ::= unary ( ( "*" | "/" | "%" ) unary )*
+func (p *Parser) parseFactor() (AstNode, error) {
+	return p.binaryExpr(p.parseUnary, func(tt TokenType) bool {
+		return tt == TokenType_Star || tt == TokenType_Div || tt == TokenType_Mod
+	})
+}
+
+// term ::= factor ( ( "+" | "-" ) factor )*
+func (p *Parser) parseTerm() (AstNode, error) {
+	return p.binaryExpr(p.parseFactor, func(tt TokenType) bool {
+		return tt == TokenType_Plus || tt == TokenType_Minus
+	})
+}
+
+// comparison ::= term ( ( "<" | ">" | "<=" | ">=" ) term )*
+func (p *Parser) parseComparison() (AstNode, error) {
+	return p.binaryExpr(p.parseTerm, func(tt TokenType) bool {
+		return tt == TokenType_LessThen || tt == TokenType_LessThenOrEqual || tt == TokenType_GreaterThen || tt == TokenType_GreaterThenOrEqaul
+	})
+}
+
+// equality ::= comparison ( ("==" | "!=") comparison )*
+func (p *Parser) parseEquality() (AstNode, error) {
+	return p.binaryExpr(p.parseComparison, func(tt TokenType) bool {
+		return tt == TokenType_EqualEqual || tt == TokenType_NotEqual
+	})
+}
+
+// logicAnd  ::= equality ( "&&" equality )*
+func (p *Parser) parseLogicAnd() (AstNode, error) {
+	return p.binaryExpr(p.parseEquality, func(tt TokenType) bool {
+		return tt == TokenType_AND
+	})
+}
+
+// logicOr   ::= logicAnd ( "||" logicAnd )*
+func (p *Parser) parseLogicOr() (AstNode, error) {
+	return p.binaryExpr(p.parseLogicAnd, func(tt TokenType) bool {
+		return tt == TokenType_OR
+	})
+}
+
+// ternary ::= logicOr ( "?" expression ":" expression )?
+func (p *Parser) parseTernary() (AstNode, error) {
+	left, err := p.parseLogicOr()
+	if err != nil {
+		return nil, err
+	}
+
+	if p.peek().IsToken() == TokenType_Question {
+		p.advance() // eat "?"
+
+		trueBlock, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = p.expect(TokenType_Colon)
+		if err != nil {
+			return nil, err
+		}
+
+		falseBlock, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+
+		start, _ := left.Range()
+		_, end := falseBlock.Range()
+		return &TernaryExpression{
+			Start:      start,
+			End:        end,
+			Condition:  left,
+			FalseBlock: falseBlock,
+			TrueBlock:  trueBlock,
+		}, nil
+	}
+
+	return left, nil
 }
 
 // assignment ::= IDENT "=" expression | ternary
@@ -181,11 +237,51 @@ func (p *Parser) parseAssignment() (AstNode, error) {
 	return p.parseTernary()
 }
 
-func (p *Parser) parseExpression() (AstNode, error) {
+// functionCall ::= IDENT "(" ( <expression> ( "," <expression> ) )? ")"
+func (p *Parser) parseFunctionCall() (AstNode, error) {
+	if p.peek().IsToken() == TokenType_Ident && p.peekN(1).IsToken() == TokenType_BracketParamOpen {
+		name := p.advance().(*ValueToken)
+		p.advance() // eat "("
+
+		args := make([]AstNode, 0)
+
+		for {
+			value, err := p.parseExpression()
+			if err != nil {
+				return nil, err
+			}
+
+			args = append(args, value)
+
+			if p.peek().IsToken() == TokenType_Comma {
+				p.advance()
+				continue
+			} else if p.peek().IsToken() == TokenType_BracketParamClose {
+				break
+			}
+
+			return nil, fmt.Errorf("unexpected token %v", p.peek().IsToken())
+		}
+
+		e, err := p.expect(TokenType_BracketParamOpen)
+		if err != nil {
+			return nil, err
+		}
+
+		_, end := e.Range()
+
+		return &FunctionCall{
+			Start: name.Start,
+			End:   end,
+			Name:  name.Value,
+			Args:  args,
+		}, nil
+	}
+
 	return nil, nil
 }
 
-// ternary ::= expression "?" expression | ternary ":" expression | ternary
-func (p *Parser) parseTernary() (AstNode, error) {
-	return nil, nil
+// expression ::= assignment
+func (p *Parser) parseExpression() (AstNode, error) {
+	return p.parseAssignment()
 }
