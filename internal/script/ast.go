@@ -400,6 +400,8 @@ func (p *Parser) parseStatement() (AstNode, error) {
 		return p.parseWhile()
 	case isKeyword(t, "let"):
 		return p.parseVarDecl()
+	case isKeyword(t, "return"):
+		return p.parseReturnStatement()
 	default:
 		return p.parseExprStmt()
 	}
@@ -450,13 +452,9 @@ func (p *Parser) parseExprStmt() (AstNode, error) {
 	return expr, nil
 }
 
-// ifStmt ::= "if" "(" expression ")" block ( "else" ( ifStmt | block ) )?
+// ifStmt ::= "if" expression block ( "else" ( ifStmt | block ) )?
 func (p *Parser) parseIfStmt() (AstNode, error) {
 	start, _ := p.advance().Range()
-
-	if _, err := p.expect(TokenType_BracketParamOpen); err != nil {
-		return nil, err
-	}
 
 	condition, err := p.parseExpression()
 	if err != nil {
@@ -817,7 +815,7 @@ func (p *Parser) parseStructImpl() (AstNode, error) {
 	methods := make([]AstNode, 0)
 	for {
 		next := p.peek()
-		if next.IsToken() == TokenType_BracketCulryClose {
+		if next.IsToken() == TokenType_BracketCulryClose || next.IsToken() == TokenType_EOF {
 			break
 		}
 
@@ -840,6 +838,30 @@ func (p *Parser) parseStructImpl() (AstNode, error) {
 		End:     end,
 		Name:    ident.(*ValueToken).Value,
 		Methods: methods,
+	}, nil
+}
+
+// returnStatement ::= "return" ( exprStmt | ";" )
+func (p *Parser) parseReturnStatement() (AstNode, error) {
+	start, end := p.advance().Range()
+
+	var expr AstNode
+	if p.peek().IsToken() != TokenType_Semicolon {
+		stmt, err := p.parseExprStmt()
+		if err != nil {
+			return nil, err
+		}
+
+		expr = stmt
+		_, end = expr.Range()
+	} else {
+		_, end = p.advance().Range()
+	}
+
+	return &ReturnStatement{
+		Start: start,
+		End:   end,
+		Value: expr,
 	}, nil
 }
 

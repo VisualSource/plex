@@ -223,3 +223,12 @@ type StructImplStatement struct {
 func (s *StructImplStatement) Range() (Position, Position) {
 	return s.Start, s.End
 }
+
+type ReturnStatement struct {
+	Start, End Position
+	Value      AstNode
+}
+
+func (r *ReturnStatement) Range() (Position, Position) {
+	return r.Start, r.End
+}

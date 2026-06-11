@@ -207,11 +207,11 @@ func commonPrefix(a, b string) string {
 // diffAst returns "" if got matches want after normalisation; otherwise it
 // returns a unified diff suitable for t.Errorf. Want appears as the baseline
 // (lines prefixed with "-"); got as the change ("+").
-func diffAst(got script.AstNode, want string) string {
+func diffAst(got script.AstNode, want string) (string, string, string) {
 	g := normalize(formatAst(got))
 	w := normalize(want)
 	if g == w {
-		return ""
+		return "", w, g
 	}
-	return cmp.Diff(w, g)
+	return cmp.Diff(w, g), w, g
 }

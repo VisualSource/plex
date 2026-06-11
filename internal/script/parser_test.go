@@ -219,6 +219,62 @@ func TestParser_Parse(t *testing.T) {
 											Stmts
 			`,
 		},
+		{
+			name:  "if signle",
+			input: `if true {}`,
+			want: `
+				Program
+					Stmts
+						IfStatement
+							Condition
+								Identifier(true)
+							Body
+								Block
+									Stmts
+							Else
+			`,
+		},
+		{
+			name:  "if with else",
+			input: `if true {} else {}`,
+			want: `
+				Program
+					Stmts
+						IfStatement
+							Condition
+								Identifier(true)
+							Body
+								Block
+									Stmts
+							Else
+								Block
+									Stmts
+			`,
+		},
+		{
+			name:  "if with else if",
+			input: `if true {} else if false {} else {}`,
+			want: `
+				Program
+					Stmts
+						IfStatement
+							Condition
+								Identifier(true)
+							Body
+								Block
+									Stmts
+							Else
+								IfStatement
+									Condition
+										Identifier(false)
+									Body
+										Block
+											Stmts
+									Else
+										Block
+											Stmts
+			`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -230,11 +286,12 @@ func TestParser_Parse(t *testing.T) {
 				}
 				return
 			}
+
 			if tt.wantErr {
 				t.Fatal("Parse() succeeded unexpectedly")
 			}
-			if diff := diffAst(got, tt.want); diff != "" {
-				t.Errorf("Parse() mismatch (-want +got):\n%s", diff)
+			if diff, nw, ng := diffAst(got, tt.want); diff != "" {
+				t.Errorf("Parse() mismatch (-want +got):\n%s\n\nWant\n%s\n\nGot:\n%s", diff, nw, ng)
 			}
 		})
 	}
