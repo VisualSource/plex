@@ -1,65 +1,243 @@
 package script_test
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/VisualSource/plex/internal/script"
 )
 
-func TestOperatorPrecedence(t *testing.T) {
-	tokens := getTokens("1 + 2 * 4")
-
-	parser := script.NewParser(tokens)
-
-	node, err := parser.Parse()
-	if err != nil {
-		t.Fatal(err)
+func TestParser_Parse(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:  "operator precedence",
+			input: "1 + 2 * 4;",
+			want: `
+				Program
+					Stmts
+						BinaryExpression
+							Left
+								NumberLiteral(1)
+							Operator(+)
+							Right
+								BinaryExpression
+									Left
+										NumberLiteral(2)
+									Operator(*)
+									Right
+										NumberLiteral(4)
+			`,
+		},
+		{
+			name:  "function call",
+			input: "someFunction(1,2);",
+			want: `
+				Program
+					Stmts
+						FunctionCall
+							Callee
+								Identifier(someFunction)
+							Args
+								NumberLiteral(1)
+								NumberLiteral(2)
+			`,
+		},
+		{
+			name:  "method access",
+			input: "someObject.helloWorld;",
+			want: `
+				Program
+					Stmts
+						MemberAccess
+							Object
+								Identifier(someObject)
+							Field(helloWorld)
+			`,
+		},
+		{
+			name:  "function def: empty",
+			input: `fn hello(){}`,
+			want: `
+				Program
+					Stmts
+						FunctionDeclaration
+							Name(hello)
+							Params
+							ReturnType
+							Body
+								Block
+									Stmts
+			`,
+		},
+		{
+			name:  "function def: single",
+			input: `fn hello(param: string){}`,
+			want: `
+				Program
+					Stmts
+						FunctionDeclaration
+							Name(hello)
+							Params
+								Parameter
+									Name(param)
+									Type
+										Type
+											Name(string)
+							ReturnType
+							Body
+								Block
+									Stmts
+			`,
+		},
+		{
+			name:  "function def",
+			input: `fn hello(param: string, other: int){}`,
+			want: `
+				Program
+					Stmts
+						FunctionDeclaration
+							Name(hello)
+							Params
+								Parameter
+									Name(param)
+									Type
+										Type
+											Name(string)
+								Parameter
+									Name(other)
+									Type
+										Type
+											Name(int)
+							ReturnType
+							Body
+								Block
+									Stmts
+			`,
+		},
+		{
+			name:  "struct def: no fields",
+			input: "struct Hello { }",
+			want: `
+				Program
+					Stmts
+						StructStatement
+							Name(Hello)
+							Fields
+			`,
+		},
+		{
+			name: "struct def: with fields",
+			input: `
+				struct Hello {
+					field: string;
+					field2: string;
+				}
+			`,
+			want: `
+				Program
+					Stmts
+						StructStatement
+							Name(Hello)
+							Fields
+								Parameter
+									Name(field)
+									Type
+										Type
+											Name(string)
+								Parameter
+									Name(field2)
+									Type
+										Type
+											Name(string)
+			`,
+		},
+		{
+			name:  "struct impl: empty",
+			input: `impl Hello {}`,
+			want: `
+				Program
+					Stmts
+						StructImplStatement
+							Name(Hello)
+							Methods
+			`,
+		},
+		{
+			name: "struct impl: single",
+			input: `
+				impl Hello {
+					fn say(){}
+				}
+			`,
+			want: `
+				Program
+					Stmts
+						StructImplStatement
+							Name(Hello)
+							Methods
+								FunctionDeclaration
+									Name(say)
+									Params
+									ReturnType
+									Body
+										Block
+											Stmts
+			`,
+		},
+		{
+			name: "struct impl: multi",
+			input: `
+				impl Hello {
+					fn say(){}
+					fn act(){}
+				}
+			`,
+			want: `
+				Program
+					Stmts
+						StructImplStatement
+							Name(Hello)
+							Methods
+								FunctionDeclaration
+									Name(say)
+									Params
+									ReturnType
+									Body
+										Block
+											Stmts
+								FunctionDeclaration
+									Name(act)
+									Params
+									ReturnType
+									Body
+										Block
+											Stmts
+			`,
+		},
 	}
-
-	result, err := json.MarshalIndent(node, "", "  ")
-	if err != nil {
-		t.Fatal(err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := script.NewParser(getTokens(tt.input))
+			got, gotErr := p.Parse()
+			if gotErr != nil {
+				if !tt.wantErr {
+					t.Errorf("Parse() failed: %v", gotErr)
+				}
+				return
+			}
+			if tt.wantErr {
+				t.Fatal("Parse() succeeded unexpectedly")
+			}
+			if diff := diffAst(got, tt.want); diff != "" {
+				t.Errorf("Parse() mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
-
-	t.Logf("%s", result)
-}
-
-func TestPostfixCall(t *testing.T) {
-	tokens := getTokens("someFunction(1,2)")
-
-	parser := script.NewParser(tokens)
-
-	node, err := parser.Parse()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := json.MarshalIndent(node, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Logf("%s", result)
-}
-
-func TestPostfixMethodAccess(t *testing.T) {
-	tokens := getTokens("someObject.helloWorld")
-
-	parser := script.NewParser(tokens)
-
-	node, err := parser.Parse()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := json.MarshalIndent(node, "", "  ")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Logf("%s", result)
 }
 
 func getTokens(input string) []script.Token {

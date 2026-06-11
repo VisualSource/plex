@@ -498,6 +498,10 @@ func (p *Parser) parseParams() ([]AstNode, error) {
 	params := make([]AstNode, 0)
 
 	for {
+		if p.peek().IsToken() != TokenType_Ident && p.peek().IsToken() != TokenType_Keyword {
+			break
+		}
+
 		param, err := p.parseParam()
 		if err != nil {
 			return nil, err
@@ -583,6 +587,10 @@ func (p *Parser) parseFnDecl() (AstNode, error) {
 	start, _ := p.advance().Range()
 	name, err := p.expect(TokenType_Ident)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.expect(TokenType_BracketParamOpen); err != nil {
 		return nil, err
 	}
 
@@ -694,7 +702,7 @@ func (p *Parser) parseWhile() (AstNode, error) {
 	}, nil
 }
 
-// structDecl ::= "struct" IDENT "{" param* "}"
+// structDecl ::= "struct" IDENT "{" ( param ";" )* "}"
 func (p *Parser) parseStruct() (AstNode, error) {
 	keyword := p.advance()
 	start, _ := keyword.Range()
@@ -708,9 +716,23 @@ func (p *Parser) parseStruct() (AstNode, error) {
 		return nil, err
 	}
 
-	fields, err := p.parseParams()
-	if err != nil {
-		return nil, err
+	fields := make([]AstNode, 0)
+
+	for {
+		if p.peek().IsToken() != TokenType_Ident {
+			break
+		}
+
+		param, err := p.parseParam()
+		if err != nil {
+			return nil, err
+		}
+
+		fields = append(fields, param)
+
+		if _, err := p.expect(TokenType_Semicolon); err != nil {
+			return nil, err
+		}
 	}
 
 	tok, err := p.expect(TokenType_BracketCulryClose)

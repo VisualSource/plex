@@ -25,9 +25,10 @@ func (v *VariableDeclaration) Range() (Position, Position) {
 }
 
 type BinaryExpression struct {
-	Start, End  Position
-	Left, Right AstNode
-	Operator    TokenType
+	Start, End Position
+	Left       AstNode
+	Operator   TokenType
+	Right      AstNode
 }
 
 func (b *BinaryExpression) Range() (Position, Position) {
@@ -102,8 +103,8 @@ type FunctionDeclaration struct {
 	Start, End Position
 	Name       string
 	Params     []AstNode
-	Body       AstNode
 	ReturnType AstNode
+	Body       AstNode
 }
 
 func (f *FunctionDeclaration) Range() (Position, Position) {
