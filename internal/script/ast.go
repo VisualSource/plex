@@ -9,15 +9,31 @@ type Parser struct {
 	pos    int
 }
 
+// #region Entry
+
+// program ::= statement* EOF
+func (p *Parser) Parse() (AstNode, error) {
+	program := &Program{}
+
+	for p.peek().IsToken() != TokenType_EOF {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+
+		program.Stmts = append(program.Stmts, stmt)
+	}
+
+	return program, nil
+}
+
+//#endregion
+
 // #region utils
 func NewParser(tokens []Token) Parser {
 	return Parser{
 		tokens: tokens,
 	}
-}
-
-func (p *Parser) Parse() (AstNode, error) {
-	return p.parseExpression()
 }
 
 func (p *Parser) peek() Token {
@@ -84,6 +100,8 @@ func (p *Parser) binaryExpr(builder func() (AstNode, error), check func(TokenTyp
 
 //#endregion
 
+//#region Expressions
+
 // primary ::= NUMBER | STRING | IDENT | "(" expression ")"
 func (p *Parser) parsePrimary() (AstNode, error) {
 	t := p.peek()
@@ -108,7 +126,116 @@ func (p *Parser) parsePrimary() (AstNode, error) {
 	}
 }
 
-// unary   ::= ( "-" | "+" ) unary | primary
+func (p *Parser) parseArguments() ([]AstNode, error) {
+	args := make([]AstNode, 0)
+
+	if p.peek().IsToken() == TokenType_BracketParamClose {
+		return args, nil
+	}
+
+	for {
+		arg, err := p.parseExpression()
+		if err != nil {
+			return nil, err
+		}
+
+		args = append(args, arg)
+		if p.peek().IsToken() != TokenType_Comma {
+			break
+		}
+		p.advance()
+	}
+
+	return args, nil
+}
+
+// postfix ::= primary (  "(" args? ")" | "." IDENT | "[" expr "]" | "++" | "--"  )
+func (p *Parser) parsePostfix() (AstNode, error) {
+	expr, err := p.parsePrimary()
+	if err != nil {
+		return nil, err
+	}
+
+	for {
+		switch p.peek().IsToken() {
+		case TokenType_BracketParamOpen:
+			p.advance()
+			args, err := p.parseArguments()
+			if err != nil {
+				return nil, err
+			}
+
+			close, err := p.expect(TokenType_BracketParamClose)
+			if err != nil {
+				return nil, err
+			}
+
+			start, _ := expr.Range()
+			_, end := close.Range()
+			expr = &FunctionCall{
+				Start:  start,
+				End:    end,
+				Callee: expr,
+				Args:   args,
+			}
+		case TokenType_BracketSquareOpen: // array access "[" <expresion> "]"
+			p.advance()
+
+			obj, err := p.parseExpression()
+			if err != nil {
+				return nil, err
+			}
+
+			close, err := p.expect(TokenType_BracketSquareClose)
+			if err != nil {
+				return nil, err
+			}
+
+			start, _ := expr.Range()
+			_, end := close.Range()
+
+			expr = &ArrayAccess{
+				Start:  start,
+				End:    end,
+				Object: obj,
+				Field:  expr,
+			}
+		case TokenType_Dot:
+			p.advance()
+			field, err := p.expect(TokenType_Ident)
+			if err != nil {
+				return nil, err
+			}
+			start, _ := expr.Range()
+			_, end := field.Range()
+
+			expr = &MemberAccess{
+				Start:  start,
+				End:    end,
+				Object: expr,
+				Field:  field.(*ValueToken).Value,
+			}
+
+		case TokenType_Decrement, TokenType_Incrment:
+			op := p.advance()
+			start, _ := expr.Range()
+			_, end := op.Range()
+
+			expr = &UnaryExpression{
+				Start:    start,
+				End:      end,
+				Operator: op.IsToken(),
+				Operand:  expr,
+				Postfix:  true,
+			}
+		default:
+			return expr, nil
+		}
+	}
+
+}
+
+// unary   ::= ( "-" | "+" ) unary | postfix
 func (p *Parser) parseUnary() (AstNode, error) {
 	tt := p.peek().IsToken()
 
@@ -130,7 +257,7 @@ func (p *Parser) parseUnary() (AstNode, error) {
 		}, nil
 	}
 
-	return p.parsePrimary()
+	return p.parsePostfix()
 }
 
 // factor ::= unary ( ( "*" | "/" | "%" ) unary )*
@@ -237,51 +364,461 @@ func (p *Parser) parseAssignment() (AstNode, error) {
 	return p.parseTernary()
 }
 
-// functionCall ::= IDENT "(" ( <expression> ( "," <expression> ) )? ")"
-func (p *Parser) parseFunctionCall() (AstNode, error) {
-	if p.peek().IsToken() == TokenType_Ident && p.peekN(1).IsToken() == TokenType_BracketParamOpen {
-		name := p.advance().(*ValueToken)
-		p.advance() // eat "("
-
-		args := make([]AstNode, 0)
-
-		for {
-			value, err := p.parseExpression()
-			if err != nil {
-				return nil, err
-			}
-
-			args = append(args, value)
-
-			if p.peek().IsToken() == TokenType_Comma {
-				p.advance()
-				continue
-			} else if p.peek().IsToken() == TokenType_BracketParamClose {
-				break
-			}
-
-			return nil, fmt.Errorf("unexpected token %v", p.peek().IsToken())
-		}
-
-		e, err := p.expect(TokenType_BracketParamOpen)
-		if err != nil {
-			return nil, err
-		}
-
-		_, end := e.Range()
-
-		return &FunctionCall{
-			Start: name.Start,
-			End:   end,
-			Name:  name.Value,
-			Args:  args,
-		}, nil
-	}
-
-	return nil, nil
-}
-
 // expression ::= assignment
 func (p *Parser) parseExpression() (AstNode, error) {
 	return p.parseAssignment()
 }
+
+//#endregion
+
+//#region Stmts
+
+func isKeyword(tt Token, keyword string) bool {
+	if tt.IsToken() == TokenType_Keyword {
+		value := tt.(*ValueToken)
+		return value.Value == keyword
+	}
+	return false
+}
+
+// statement ::= importStmt | varDecl | ifStmt | whileStmt | fnDecl | structDecl | exprStmt
+func (p *Parser) parseStatement() (AstNode, error) {
+	t := p.peek()
+
+	switch {
+	case isKeyword(t, "import"):
+		return p.parseImport()
+	case isKeyword(t, "fn"):
+		return p.parseFnDecl()
+	case isKeyword(t, "struct"):
+		return p.parseStruct()
+	case isKeyword(t, "impl"):
+		return p.parseStructImpl()
+	case isKeyword(t, "if"):
+		return p.parseIfStmt()
+	case isKeyword(t, "while"):
+		return p.parseWhile()
+	case isKeyword(t, "let"):
+		return p.parseVarDecl()
+	default:
+		return p.parseExprStmt()
+	}
+}
+
+// block ::= "{" statement* "}"
+func (p *Parser) parseBlock() (AstNode, error) {
+	open, err := p.expect(TokenType_BracketCurlyOpen)
+	if err != nil {
+		return nil, err
+	}
+
+	start, _ := open.Range()
+	stmts := make([]AstNode, 0)
+
+	for p.peek().IsToken() != TokenType_BracketCulryClose && p.peek().IsToken() != TokenType_EOF {
+		stmt, err := p.parseStatement()
+		if err != nil {
+			return nil, err
+		}
+		stmts = append(stmts, stmt)
+	}
+
+	close, err := p.expect(TokenType_BracketCulryClose)
+	if err != nil {
+		return nil, err
+	}
+	_, end := close.Range()
+
+	return &Block{
+		Start: start,
+		End:   end,
+		Stmts: stmts,
+	}, nil
+}
+
+// exprStmt ::= expression ";"
+func (p *Parser) parseExprStmt() (AstNode, error) {
+	expr, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.expect(TokenType_Semicolon); err != nil {
+		return nil, err
+	}
+
+	return expr, nil
+}
+
+// ifStmt ::= "if" "(" expression ")" block ( "else" ( ifStmt | block ) )?
+func (p *Parser) parseIfStmt() (AstNode, error) {
+	start, _ := p.advance().Range()
+
+	if _, err := p.expect(TokenType_BracketParamOpen); err != nil {
+		return nil, err
+	}
+
+	condition, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	node := &IfStatement{
+		Start:     start,
+		Condition: condition,
+		Body:      body,
+	}
+
+	if isKeyword(p.peek(), "else") {
+		p.advance()
+
+		if isKeyword(p.peek(), "if") {
+			node.Else, err = p.parseIfStmt()
+		} else {
+			node.Else, err = p.parseBlock()
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	_, node.End = node.Body.Range()
+
+	return node, nil
+}
+
+// params ::= param ( "," param )*
+func (p *Parser) parseParams() ([]AstNode, error) {
+	params := make([]AstNode, 0)
+
+	for {
+		param, err := p.parseParam()
+		if err != nil {
+			return nil, err
+		}
+
+		params = append(params, param)
+
+		if p.peek().IsToken() == TokenType_Comma {
+			p.advance()
+		} else {
+			break
+		}
+	}
+
+	return params, nil
+}
+
+// param ::= "mut"? IDENT ":" typeExpr
+func (p *Parser) parseParam() (AstNode, error) {
+	isMut := isKeyword(p.peek(), "mut")
+
+	var start Position
+	if isMut {
+		tok := p.advance()
+		start, _ = tok.Range()
+	}
+
+	ident, err := p.expect(TokenType_Ident)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isMut {
+		start, _ = ident.Range()
+	}
+
+	if _, err = p.expect(TokenType_Colon); err != nil {
+		return nil, err
+	}
+
+	t, err := p.parseTypeExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	_, end := t.Range()
+
+	return &Parameter{
+		Start: start,
+		End:   end,
+		Name:  ident.(*ValueToken).Value,
+		Type:  t,
+		Mut:   isMut,
+	}, nil
+}
+
+// typeExpr ::= IDENT ( "[" "]" )?
+func (p *Parser) parseTypeExpr() (AstNode, error) {
+	token, err := p.expect(TokenType_Ident)
+	if err != nil {
+		return nil, err
+	}
+	start, end := token.Range()
+
+	t := &Type{
+		Start: start,
+		End:   end,
+		Name:  token.(*ValueToken).Value,
+	}
+
+	if p.peek().IsToken() == TokenType_BracketSquareOpen && p.peekN(1).IsToken() == TokenType_BracketSquareClose {
+		p.advance()
+		last := p.advance()
+		t.IsArray = true
+		_, t.End = last.Range()
+	}
+
+	return t, nil
+}
+
+// fnDecl ::= "fn" IDENT "(" params? ")" (":" typeExpr)? block
+func (p *Parser) parseFnDecl() (AstNode, error) {
+	start, _ := p.advance().Range()
+	name, err := p.expect(TokenType_Ident)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := p.parseParams()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.expect(TokenType_BracketParamClose); err != nil {
+		return nil, err
+	}
+
+	var returnType AstNode
+	if p.peek().IsToken() == TokenType_Colon {
+		p.advance()
+		returnType, err = p.parseTypeExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	body, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	_, end := body.Range()
+
+	return &FunctionDeclaration{
+		Start:      start,
+		End:        end,
+		Name:       name.(*ValueToken).Value,
+		Params:     params,
+		ReturnType: returnType,
+		Body:       body,
+	}, nil
+}
+
+// importStmt ::= "import" IDENT "from" STRING ";"
+func (p *Parser) parseImport() (AstNode, error) {
+	imp := p.advance()
+	start, _ := imp.Range()
+
+	imports := make([]string, 0)
+
+	for {
+		if p.peek().IsToken() != TokenType_Ident {
+			return nil, fmt.Errorf("was expecting a ident")
+		}
+
+		ident := p.advance()
+
+		imports = append(imports, ident.(*ValueToken).Value)
+
+		if p.peek().IsToken() == TokenType_Comma {
+			p.advance()
+		} else {
+			break
+		}
+	}
+
+	if !isKeyword(p.peek(), "from") {
+		return nil, fmt.Errorf("was expecting keyword 'from'")
+	}
+	p.advance()
+
+	location, err := p.expect(TokenType_String)
+	if err != nil {
+		return nil, err
+	}
+
+	tok, err := p.expect(TokenType_Semicolon)
+	if err != nil {
+		return nil, err
+	}
+
+	_, end := tok.Range()
+
+	return &ImportStatement{
+		Start:   start,
+		End:     end,
+		Source:  location.(*ValueToken).Value,
+		Imports: imports,
+	}, nil
+}
+
+// whileStmt ::= "while" "(" expression ")" block
+func (p *Parser) parseWhile() (AstNode, error) {
+	keyword := p.advance()
+	start, _ := keyword.Range()
+
+	expr, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := p.parseBlock()
+	if err != nil {
+		return nil, err
+	}
+
+	_, end := block.Range()
+
+	return &WhileStatement{
+		Start:     start,
+		End:       end,
+		Condition: expr,
+		Body:      block,
+	}, nil
+}
+
+// structDecl ::= "struct" IDENT "{" param* "}"
+func (p *Parser) parseStruct() (AstNode, error) {
+	keyword := p.advance()
+	start, _ := keyword.Range()
+
+	ident, err := p.expect(TokenType_Ident)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.expect(TokenType_BracketCurlyOpen); err != nil {
+		return nil, err
+	}
+
+	fields, err := p.parseParams()
+	if err != nil {
+		return nil, err
+	}
+
+	tok, err := p.expect(TokenType_BracketCulryClose)
+	if err != nil {
+		return nil, err
+	}
+	_, end := tok.Range()
+
+	return &StructStatement{
+		Start:  start,
+		End:    end,
+		Name:   ident.(*ValueToken).Value,
+		Fields: fields,
+	}, nil
+}
+
+// varDecl ::= "mut"? IDENT ":" typeExpr "=" expression ";"
+func (p *Parser) parseVarDecl() (AstNode, error) {
+	keyword := p.advance()
+	start, _ := keyword.Range()
+
+	isMut := isKeyword(p.peek(), "mut")
+	if isMut {
+		p.advance()
+	}
+
+	ident, err := p.expect(TokenType_Ident)
+	if err != nil {
+		return nil, err
+	}
+
+	var varType AstNode
+	if p.peek().IsToken() == TokenType_Colon {
+		if _, err := p.expect(TokenType_Colon); err != nil {
+			return nil, err
+		}
+
+		varType, err = p.parseTypeExpr()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := p.expect(TokenType_Equal); err != nil {
+		return nil, err
+	}
+
+	expr, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	tok, err := p.expect(TokenType_Semicolon)
+	if err != nil {
+		return nil, err
+	}
+	_, end := tok.Range()
+
+	return &VariableDeclaration{
+		Start: start,
+		End:   end,
+		Type:  varType,
+		Name:  ident.(*ValueToken).Value,
+		Init:  expr,
+	}, nil
+}
+
+// structImpl ::= "impl" IDENT "{" fnDecl* "}"
+func (p *Parser) parseStructImpl() (AstNode, error) {
+	keyword := p.advance()
+	start, _ := keyword.Range()
+
+	ident, err := p.expect(TokenType_Ident)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := p.expect(TokenType_BracketCurlyOpen); err != nil {
+		return nil, err
+	}
+
+	methods := make([]AstNode, 0)
+	for {
+		next := p.peek()
+		if next.IsToken() == TokenType_BracketCulryClose {
+			break
+		}
+
+		method, err := p.parseFnDecl()
+		if err != nil {
+			return nil, err
+		}
+
+		methods = append(methods, method)
+	}
+
+	tok, err := p.expect(TokenType_BracketCulryClose)
+	if err != nil {
+		return nil, err
+	}
+	_, end := tok.Range()
+
+	return &StructImplStatement{
+		Start:   start,
+		End:     end,
+		Name:    ident.(*ValueToken).Value,
+		Methods: methods,
+	}, nil
+}
+
+//#endregion

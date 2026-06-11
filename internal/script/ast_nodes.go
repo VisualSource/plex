@@ -15,7 +15,8 @@ func (p *Program) Range() (Position, Position) {
 
 type VariableDeclaration struct {
 	Start, End Position
-	Ident      string
+	Name       string
+	Type       AstNode
 	Init       AstNode
 }
 
@@ -67,26 +68,51 @@ func NewIdentifier(value string, start, end Position) *Identifier {
 	}
 }
 
-type Scope struct {
+type Type struct {
 	Start, End Position
-	Type       rune
+	Name       string
+	IsArray    bool
+}
+
+func (t *Type) Range() (Position, Position) {
+	return t.Start, t.End
+}
+
+type Block struct {
+	Start, End Position
 	Stmts      []AstNode
+}
+
+func (b *Block) Range() (Position, Position) {
+	return b.Start, b.End
 }
 
 type Parameter struct {
 	Start, End Position
+	Name       string
+	Type       AstNode
+	Mut        bool
+}
+
+func (p *Parameter) Range() (Position, Position) {
+	return p.Start, p.End
 }
 
 type FunctionDeclaration struct {
 	Start, End Position
-	Params     []Parameter
-	Body       Scope
+	Name       string
+	Params     []AstNode
+	Body       AstNode
 	ReturnType AstNode
+}
+
+func (f *FunctionDeclaration) Range() (Position, Position) {
+	return f.Start, f.End
 }
 
 type FunctionCall struct {
 	Start, End Position
-	Name       string
+	Callee     AstNode
 	Args       []AstNode
 }
 
@@ -94,10 +120,31 @@ func (f *FunctionCall) Range() (Position, Position) {
 	return f.Start, f.End
 }
 
+type MemberAccess struct {
+	Start, End Position
+	Object     AstNode
+	Field      string
+}
+
+func (n *MemberAccess) Range() (Position, Position) {
+	return n.Start, n.End
+}
+
 type UnaryExpression struct {
 	Start, End Position
 	Operator   TokenType
 	Operand    AstNode
+	Postfix    bool
+}
+
+type ArrayAccess struct {
+	Start, End Position
+	Object     AstNode
+	Field      AstNode
+}
+
+func (a *ArrayAccess) Range() (Position, Position) {
+	return a.Start, a.End
 }
 
 func (u *UnaryExpression) Range() (Position, Position) {
@@ -123,4 +170,55 @@ type TernaryExpression struct {
 
 func (t *TernaryExpression) Range() (Position, Position) {
 	return t.Start, t.End
+}
+
+type IfStatement struct {
+	Start, End Position
+	Condition  AstNode
+	Body       AstNode
+	Else       AstNode
+}
+
+func (i *IfStatement) Range() (Position, Position) {
+	return i.Start, i.End
+}
+
+type ImportStatement struct {
+	Start, End Position
+	Source     string
+	Imports    []string
+}
+
+func (i *ImportStatement) Range() (Position, Position) {
+	return i.Start, i.End
+}
+
+type WhileStatement struct {
+	Start, End Position
+	Condition  AstNode
+	Body       AstNode
+}
+
+func (w *WhileStatement) Range() (Position, Position) {
+	return w.Start, w.End
+}
+
+type StructStatement struct {
+	Start, End Position
+	Name       string
+	Fields     []AstNode
+}
+
+func (s *StructStatement) Range() (Position, Position) {
+	return s.Start, s.End
+}
+
+type StructImplStatement struct {
+	Start, End Position
+	Name       string
+	Methods    []AstNode
+}
+
+func (s *StructImplStatement) Range() (Position, Position) {
+	return s.Start, s.End
 }

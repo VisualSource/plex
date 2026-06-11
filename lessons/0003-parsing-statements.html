@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 3: Parsing Statements</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a; --text: #e2e4ef;
+    --muted: #8b8fa8; --accent: #7c6ff7; --accent-dim: #3d3a6e;
+    --green: #4eca8b; --green-dim: #1d3d2e; --red: #f07178; --red-dim: #3d1f22;
+    --yellow: #ffd580; --yellow-dim: #3d3218; --code-bg: #141720; --code-border: #252836;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia','Times New Roman',serif; background: var(--bg); color: var(--text); line-height: 1.75; padding: 0 1rem 4rem; }
+  .page { max-width: 760px; margin: 0 auto; }
+  header { border-bottom: 1px solid var(--border); padding: 2.5rem 0 1.5rem; margin-bottom: 2.5rem; }
+  .lesson-tag { font-family: 'Courier New',monospace; font-size: 0.75rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.75rem; }
+  h1 { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-bottom: 0.5rem; }
+  .subtitle { color: var(--muted); font-size: 1rem; }
+  h2 { font-size: 1.25rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
+  h3 { font-size: 1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: var(--accent); font-family: 'Courier New',monospace; }
+  p { margin-bottom: 1rem; }
+  a { color: var(--accent); text-decoration: underline; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; line-height: 1.6; }
+  code { font-family: 'Courier New',monospace; font-size: 0.875em; background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 3px; padding: 0.1em 0.35em; }
+  pre code { background: none; border: none; padding: 0; }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .type { color: #ffcb6b; } .str { color: #c3e88d; } .cmt { color: #546e7a; font-style: italic; } .num { color: #f78c6c; }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-dim); border-radius: 0 6px 6px 0; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .callout.insight { border-color: var(--green); background: var(--green-dim); }
+  .callout.warning { border-color: var(--yellow); background: var(--yellow-dim); }
+  .callout-title { font-family: 'Courier New',monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 0.4rem; }
+  .callout.insight .callout-title { color: var(--green); } .callout.warning .callout-title { color: var(--yellow); }
+  .grammar-box { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1.25rem 1.5rem; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; line-height: 2.1; }
+  .rule-name { color: var(--yellow); } .rule-arrow { color: var(--muted); } .rule-terminal { color: var(--green); } .rule-nonterminal { color: #82aaff; } .rule-or { color: var(--red); }
+  .quiz { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; }
+  .quiz h2 { margin-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-family: 'Courier New',monospace; }
+  .question { margin: 1.25rem 0 0.75rem; font-weight: 700; }
+  .options { display: flex; flex-direction: column; gap: 0.5rem; }
+  .option { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.65rem 1rem; cursor: pointer; font-family: 'Courier New',monospace; font-size: 0.875rem; color: var(--text); text-align: left; transition: border-color 0.15s, background 0.15s; }
+  .option:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .option.correct { border-color: var(--green) !important; background: var(--green-dim) !important; }
+  .option.wrong { border-color: var(--red) !important; background: var(--red-dim) !important; }
+  .feedback { display: none; margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+  .feedback.show { display: block; } .feedback.correct { background: var(--green-dim); color: var(--green); } .feedback.wrong { background: var(--red-dim); color: var(--red); }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.875rem; color: var(--muted); }
+  .citation { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem; padding-top: 1rem; }
+  .citation a { color: var(--muted); }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 2rem; }
+  .progress-fill { height: 100%; width: 30%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+  .teacher-note { margin-top: 3rem; background: var(--surface); border-radius: 8px; padding: 1.25rem 1.5rem; font-size: 0.9rem; color: var(--muted); }
+  .teacher-note strong { color: var(--text); }
+  .dispatch-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; }
+  .dispatch-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 400; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; }
+  .dispatch-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--code-border); vertical-align: top; }
+  .dispatch-table tr:last-child td { border-bottom: none; }
+  td.tok { color: var(--green); } td.rule { color: #82aaff; }
+  .bug-box { border: 1px solid var(--red); background: var(--red-dim); border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .bug-title { font-family: 'Courier New',monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--red); margin-bottom: 0.4rem; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <header>
+    <div class="lesson-tag">Lesson 3 &middot; Compiler Construction &middot; Parsing</div>
+    <h1>Parsing Statements</h1>
+    <p class="subtitle">Dispatching on keywords, building the Program node, and one bug to fix first</p>
+  </header>
+
+  <!-- BUG CALLOUT UP FRONT -->
+  <div class="bug-box">
+    <div class="bug-title">Bug in your current code — fix before continuing</div>
+    <p style="margin-bottom:0.5rem;">In <a href="../internal/script/ast.go">ast.go</a>, <code>parseUnary</code> calls <code>p.parsePostfix()</code> for its operand instead of <code>p.parseUnary()</code>. This means prefix chains like <code>--x</code> or <code>+-x</code> silently break — the second prefix operator is parsed as a binary <code>+</code> against whatever follows.</p>
+    <strong>Fix:</strong> change the recursive call to <code>p.parseUnary()</code>:
+    <pre style="margin-top:0.75rem;"><code><span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseUnary</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    tt := p.<span class="fn">peek</span>().<span class="fn">IsToken</span>()
+    <span class="kw">if</span> tt == <span class="type">TokenType_Minus</span> || tt == <span class="type">TokenType_Plus</span> {
+        op := p.<span class="fn">advance</span>()
+        operand, err := p.<span class="fn">parseUnary</span>() <span class="cmt">// was: p.parsePostfix()</span>
+        ...
+    }
+    <span class="kw">return</span> p.<span class="fn">parsePostfix</span>()
+}</code></pre>
+  </div>
+
+  <h2>Expressions vs. Statements</h2>
+
+  <p>Everything you've built so far — the full precedence chain from <a href="0001-grammar-rules-to-parse-functions.html">Lesson 1</a> — handles <em>expressions</em>: things that produce a value. <code>1 + 2</code>, <code>foo(x)</code>, <code>a ? b : c</code> are all expressions.</p>
+
+  <p><strong>Statements</strong> are different. They <em>do</em> something — declare a variable, call a function and throw away the result, loop, branch. Most statements contain expressions, but are not themselves expressions.</p>
+
+  <div class="callout insight">
+    <div class="callout-title">The Key Difference</div>
+    Expressions are dispatched by <em>content</em> — any token could start an expression, so you try rules in precedence order. Statements are dispatched by <em>leading keyword</em> — <code>peek()</code> immediately tells you which statement you're parsing. This is what makes the statement parser a simple <code>switch</code>.
+  </div>
+
+  <h2>The Statement Grammar</h2>
+
+  <p>Here's the full statement grammar for plex, derived from your tokenizer's keywords:</p>
+
+  <div class="grammar-box">
+    <span class="rule-name">program</span>    <span class="rule-arrow">::=</span> <span class="rule-nonterminal">statement</span>* <span class="rule-terminal">EOF</span><br>
+    <span class="rule-name">statement</span>  <span class="rule-arrow">::=</span> <span class="rule-nonterminal">importStmt</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-or">|</span> <span class="rule-nonterminal">varDecl</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-or">|</span> <span class="rule-nonterminal">ifStmt</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-or">|</span> <span class="rule-nonterminal">whileStmt</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-or">|</span> <span class="rule-nonterminal">fnDecl</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-or">|</span> <span class="rule-nonterminal">structDecl</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="rule-or">|</span> <span class="rule-nonterminal">exprStmt</span><br>
+    <br>
+    <span class="rule-name">exprStmt</span>   <span class="rule-arrow">::=</span> <span class="rule-nonterminal">expression</span> <span class="rule-terminal">";"</span><br>
+    <span class="rule-name">importStmt</span> <span class="rule-arrow">::=</span> <span class="rule-terminal">"import"</span> <span class="rule-terminal">IDENT</span> <span class="rule-terminal">"from"</span> <span class="rule-terminal">STRING</span> <span class="rule-terminal">";"</span><br>
+    <span class="rule-name">varDecl</span>    <span class="rule-arrow">::=</span> <span class="rule-terminal">"mut"</span>? <span class="rule-terminal">IDENT</span> <span class="rule-terminal">":"</span> <span class="rule-nonterminal">typeExpr</span> <span class="rule-terminal">"="</span> <span class="rule-nonterminal">expression</span> <span class="rule-terminal">";"</span><br>
+    <span class="rule-name">ifStmt</span>     <span class="rule-arrow">::=</span> <span class="rule-terminal">"if"</span> <span class="rule-terminal">"("</span> <span class="rule-nonterminal">expression</span> <span class="rule-terminal">")"</span> <span class="rule-nonterminal">block</span> ( <span class="rule-terminal">"else"</span> ( <span class="rule-nonterminal">ifStmt</span> <span class="rule-or">|</span> <span class="rule-nonterminal">block</span> ) )?<br>
+    <span class="rule-name">whileStmt</span>  <span class="rule-arrow">::=</span> <span class="rule-terminal">"while"</span> <span class="rule-terminal">"("</span> <span class="rule-nonterminal">expression</span> <span class="rule-terminal">")"</span> <span class="rule-nonterminal">block</span><br>
+    <span class="rule-name">block</span>      <span class="rule-arrow">::=</span> <span class="rule-terminal">"{"</span> <span class="rule-nonterminal">statement</span>* <span class="rule-terminal">"}"</span><br>
+    <span class="rule-name">fnDecl</span>     <span class="rule-arrow">::=</span> <span class="rule-terminal">"fn"</span> <span class="rule-terminal">IDENT</span> <span class="rule-terminal">"("</span> <span class="rule-nonterminal">params</span>? <span class="rule-terminal">")"</span> ( <span class="rule-terminal">":"</span> <span class="rule-nonterminal">typeExpr</span> )? <span class="rule-nonterminal">block</span><br>
+    <span class="rule-name">params</span>     <span class="rule-arrow">::=</span> <span class="rule-nonterminal">param</span> ( <span class="rule-terminal">","</span> <span class="rule-nonterminal">param</span> )*<br>
+    <span class="rule-name">param</span>      <span class="rule-arrow">::=</span> <span class="rule-terminal">"mut"</span>? <span class="rule-terminal">IDENT</span> <span class="rule-terminal">":"</span> <span class="rule-nonterminal">typeExpr</span><br>
+    <span class="rule-name">structDecl</span> <span class="rule-arrow">::=</span> <span class="rule-terminal">"struct"</span> <span class="rule-terminal">IDENT</span> <span class="rule-terminal">"{"</span> <span class="rule-nonterminal">param</span>* <span class="rule-terminal">"}"</span><br>
+    <span class="rule-name">typeExpr</span>   <span class="rule-arrow">::=</span> <span class="rule-terminal">IDENT</span> ( <span class="rule-terminal">"["</span> <span class="rule-terminal">"]"</span> )?
+  </div>
+
+  <h2>The Dispatch Table</h2>
+
+  <p><code>parseStatement</code> is a <code>switch</code> on the leading token. Every branch delegates to a dedicated parse function:</p>
+
+  <table class="dispatch-table">
+    <thead><tr><th>Leading token</th><th>Calls</th><th>Produces</th></tr></thead>
+    <tbody>
+      <tr><td class="tok">"import"</td><td class="rule">parseImportStmt()</td><td>ImportStatement</td></tr>
+      <tr><td class="tok">"mut" | IDENT + ":"</td><td class="rule">parseVarDecl()</td><td>VariableDeclaration</td></tr>
+      <tr><td class="tok">"if"</td><td class="rule">parseIfStmt()</td><td>IfStatement</td></tr>
+      <tr><td class="tok">"while"</td><td class="rule">parseWhileStmt()</td><td>WhileStatement</td></tr>
+      <tr><td class="tok">"fn"</td><td class="rule">parseFnDecl()</td><td>FunctionDeclaration</td></tr>
+      <tr><td class="tok">"struct"</td><td class="rule">parseStructDecl()</td><td>StructDeclaration</td></tr>
+      <tr><td class="tok">anything else</td><td class="rule">parseExpression() + ";"</td><td>ExpressionStatement</td></tr>
+    </tbody>
+  </table>
+
+  <h2>The Program Loop</h2>
+
+  <p>The root of the parser is now a loop — not a single expression call. <code>Parse()</code> becomes:</p>
+
+  <pre><code><span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">Parse</span>() (*<span class="type">Program</span>, <span class="type">error</span>) {
+    program := &<span class="type">Program</span>{}
+
+    <span class="kw">for</span> p.<span class="fn">peek</span>().<span class="fn">IsToken</span>() != <span class="type">TokenType_EOF</span> {
+        stmt, err := p.<span class="fn">parseStatement</span>()
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="kw">nil</span>, err
+        }
+        program.Stmts = <span class="fn">append</span>(program.Stmts, stmt)
+    }
+
+    <span class="kw">return</span> program, <span class="kw">nil</span>
+}</code></pre>
+
+  <h2>parseStatement: the Dispatcher</h2>
+
+  <pre><code><span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseStatement</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    t := p.<span class="fn">peek</span>().(<span class="type">*ValueToken</span>)
+
+    <span class="kw">switch</span> {
+    <span class="kw">case</span> t.<span class="fn">IsToken</span>() == <span class="type">TokenType_Ident</span> && t.Value == <span class="str">"import"</span>:
+        <span class="kw">return</span> p.<span class="fn">parseImportStmt</span>()
+    <span class="kw">case</span> t.<span class="fn">IsToken</span>() == <span class="type">TokenType_Ident</span> && t.Value == <span class="str">"fn"</span>:
+        <span class="kw">return</span> p.<span class="fn">parseFnDecl</span>()
+    <span class="kw">case</span> t.<span class="fn">IsToken</span>() == <span class="type">TokenType_Ident</span> && t.Value == <span class="str">"struct"</span>:
+        <span class="kw">return</span> p.<span class="fn">parseStructDecl</span>()
+    <span class="kw">case</span> t.<span class="fn">IsToken</span>() == <span class="type">TokenType_Ident</span> && t.Value == <span class="str">"if"</span>:
+        <span class="kw">return</span> p.<span class="fn">parseIfStmt</span>()
+    <span class="kw">case</span> t.<span class="fn">IsToken</span>() == <span class="type">TokenType_Ident</span> && t.Value == <span class="str">"while"</span>:
+        <span class="kw">return</span> p.<span class="fn">parseWhileStmt</span>()
+    <span class="kw">case</span> isVarDeclStart(p):
+        <span class="kw">return</span> p.<span class="fn">parseVarDecl</span>()
+    <span class="kw">default</span>:
+        <span class="kw">return</span> p.<span class="fn">parseExprStmt</span>()
+    }
+}</code></pre>
+
+  <div class="callout warning">
+    <div class="callout-title">Keywords are TokenType_Ident in your tokenizer</div>
+    Looking at your tokenizer, keywords like <code>"if"</code>, <code>"fn"</code>, <code>"while"</code> are emitted as <code>TokenType_Ident</code> with a <code>Value</code> field — not a distinct <code>TokenType_Keyword</code>. So the switch has to check both the type <em>and</em> the value. Consider adding a <code>TokenType_Keyword</code> type and emitting keywords with it — that would let you use a cleaner <code>switch t.IsToken()</code>. But it works either way.
+  </div>
+
+  <h2>Three Statements to Implement</h2>
+
+  <p>The patterns repeat. Here are the three most instructive ones:</p>
+
+  <h3>parseIfStmt — branching + else chaining</h3>
+
+  <pre><code><span class="cmt">// ifStmt ::= "if" "(" expression ")" block ( "else" ( ifStmt | block ) )?</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseIfStmt</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    start, _ := p.<span class="fn">advance</span>().<span class="fn">Range</span>()    <span class="cmt">// consume "if"</span>
+    <span class="kw">if</span> _, err := p.<span class="fn">expect</span>(<span class="type">TokenType_BracketParamOpen</span>); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+    condition, err := p.<span class="fn">parseExpression</span>()
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    <span class="kw">if</span> _, err := p.<span class="fn">expect</span>(<span class="type">TokenType_BracketParamClose</span>); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+    body, err := p.<span class="fn">parseBlock</span>()
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+
+    node := &<span class="type">IfStatement</span>{Start: start, Condition: condition, Body: body}
+
+    <span class="cmt">// optional else branch</span>
+    <span class="kw">if</span> next, ok := p.<span class="fn">peek</span>().(<span class="type">*ValueToken</span>); ok && next.Value == <span class="str">"else"</span> {
+        p.<span class="fn">advance</span>() <span class="cmt">// consume "else"</span>
+        <span class="kw">if</span> isKeyword(p.<span class="fn">peek</span>(), <span class="str">"if"</span>) {
+            node.Else, err = p.<span class="fn">parseIfStmt</span>() <span class="cmt">// else if — recurse!</span>
+        } <span class="kw">else</span> {
+            node.Else, err = p.<span class="fn">parseBlock</span>()
+        }
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    }
+
+    _, node.End = node.Body.<span class="fn">Range</span>()
+    <span class="kw">return</span> node, <span class="kw">nil</span>
+}</code></pre>
+
+  <div class="callout insight">
+    <div class="callout-title">else if is just recursion</div>
+    There's no special <code>else if</code> rule in the grammar. <code>else</code> is followed by <em>either</em> a block or another <code>if</code> statement — and <code>parseIfStmt</code> handles the latter by calling itself. This is how every language with <code>else if</code> works under the hood.
+  </div>
+
+  <h3>parseFnDecl — parameters + return type + body</h3>
+
+  <pre><code><span class="cmt">// fnDecl ::= "fn" IDENT "(" params? ")" (":" typeExpr)? block</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseFnDecl</span>() (<span class="type">AstNode</span>, <span class="type">error</span>) {
+    start, _ := p.<span class="fn">advance</span>().<span class="fn">Range</span>()  <span class="cmt">// consume "fn"</span>
+    name, err := p.<span class="fn">expect</span>(<span class="type">TokenType_Ident</span>)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    <span class="kw">if</span> _, err := p.<span class="fn">expect</span>(<span class="type">TokenType_BracketParamOpen</span>); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+
+    params, err := p.<span class="fn">parseParams</span>()
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+
+    <span class="kw">if</span> _, err := p.<span class="fn">expect</span>(<span class="type">TokenType_BracketParamClose</span>); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+
+    <span class="kw">var</span> returnType <span class="type">AstNode</span>
+    <span class="kw">if</span> p.<span class="fn">peek</span>().<span class="fn">IsToken</span>() == <span class="type">TokenType_Colon</span> {
+        p.<span class="fn">advance</span>() <span class="cmt">// consume ":"</span>
+        returnType, err = p.<span class="fn">parseTypeExpr</span>()
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    }
+
+    body, err := p.<span class="fn">parseBlock</span>()
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    _, end := body.<span class="fn">Range</span>()
+
+    <span class="kw">return</span> &<span class="type">FunctionDeclaration</span>{
+        Start:      start,
+        End:        end,
+        Name:       name.(<span class="type">*ValueToken</span>).Value,
+        Params:     params,
+        ReturnType: returnType,
+        Body:       body,
+    }, <span class="kw">nil</span>
+}</code></pre>
+
+  <h3>parseBlock — statements until "}"</h3>
+
+  <pre><code><span class="cmt">// block ::= "{" statement* "}"</span>
+<span class="kw">func</span> (<span class="fn">p</span> *<span class="type">Parser</span>) <span class="fn">parseBlock</span>() (*<span class="type">Block</span>, <span class="type">error</span>) {
+    open, err := p.<span class="fn">expect</span>(<span class="type">TokenType_BracketCurlyOpen</span>)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    start, _ := open.<span class="fn">Range</span>()
+
+    stmts := []<span class="type">AstNode</span>{}
+    <span class="kw">for</span> p.<span class="fn">peek</span>().<span class="fn">IsToken</span>() != <span class="type">TokenType_BracketCulryClose</span> &&
+        p.<span class="fn">peek</span>().<span class="fn">IsToken</span>() != <span class="type">TokenType_EOF</span> {
+        stmt, err := p.<span class="fn">parseStatement</span>()
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+        stmts = <span class="fn">append</span>(stmts, stmt)
+    }
+
+    close, err := p.<span class="fn">expect</span>(<span class="type">TokenType_BracketCulryClose</span>)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    _, end := close.<span class="fn">Range</span>()
+
+    <span class="kw">return</span> &<span class="type">Block</span>{Start: start, End: end, Stmts: stmts}, <span class="kw">nil</span>
+}</code></pre>
+
+  <div class="callout">
+    <div class="callout-title">Note: Block vs. Scope</div>
+    You have a <code>Scope</code> node in <code>ast_nodes.go</code> already. Rename it to <code>Block</code> (or keep <code>Scope</code> — just be consistent). The key change: <code>Type rune</code> on the existing struct doesn't make sense for a block. Replace it with <code>Stmts []AstNode</code> and add <code>Range()</code>.
+  </div>
+
+  <hr style="border-color: var(--border); margin: 2.5rem 0;">
+
+  <div class="quiz">
+    <h2>Check Your Understanding</h2>
+
+    <div id="q1">
+      <p class="question">1. Why is <code>parseStatement</code> a switch on the leading keyword but <code>parseExpression</code> is a chain of function calls?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q1',false)">Statements are longer, so they need a switch for performance</button>
+        <button class="option" onclick="answer(this,'q1',true)">Statements are uniquely identified by their leading keyword, so one token decides everything. Expressions require precedence resolution, so they use a layered call chain.</button>
+        <button class="option" onclick="answer(this,'q1',false)">Expressions could also use a switch — it's just a stylistic choice</button>
+      </div>
+      <div class="feedback" id="q1-feedback"></div>
+    </div>
+
+    <div id="q2" style="margin-top:1.5rem;">
+      <p class="question">2. How does <code>else if</code> work in the grammar without an explicit <code>else if</code> rule?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q2',false)">The tokenizer emits a special ElseIf token</button>
+        <button class="option" onclick="answer(this,'q2',false)">We look ahead two tokens to check for "else if" as a pair</button>
+        <button class="option" onclick="answer(this,'q2',true)">The "else" branch allows either a block or another ifStmt — parseIfStmt recurses into itself, naturally producing else-if chains</button>
+      </div>
+      <div class="feedback" id="q2-feedback"></div>
+    </div>
+
+    <div id="q3" style="margin-top:1.5rem;">
+      <p class="question">3. <code>parseBlock</code> loops until <code>}</code> or <code>EOF</code>. Why check for EOF too?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q3',true)">If the source is missing a closing "}", peek() would never return "}" and the loop would spin forever consuming EOF tokens</button>
+        <button class="option" onclick="answer(this,'q3',false)">EOF is returned by the tokenizer after "}" so we need to skip it</button>
+        <button class="option" onclick="answer(this,'q3',false)">It's just defensive programming — it can't actually happen</button>
+      </div>
+      <div class="feedback" id="q3-feedback"></div>
+    </div>
+  </div>
+
+  <h2>Your Turn: Implement It</h2>
+
+  <p>Changes span <a href="../internal/script/ast.go">ast.go</a> and <a href="../internal/script/ast_nodes.go">ast_nodes.go</a>:</p>
+
+  <ol style="padding-left:1.5rem; line-height:2.25;">
+    <li>Fix the <code>parseUnary</code> bug (recursive call, not <code>parsePostfix</code>)</li>
+    <li>Change <code>Parse()</code> return type to <code>*Program</code> and loop calling <code>parseStatement</code></li>
+    <li>Add <code>parseStatement</code> dispatcher</li>
+    <li>Add <code>parseBlock</code> (rename/replace the existing <code>Scope</code> node to <code>Block</code>)</li>
+    <li>Add <code>parseIfStmt</code> + <code>IfStatement</code> node</li>
+    <li>Add <code>parseWhileStmt</code> + <code>WhileStatement</code> node</li>
+    <li>Add <code>parseFnDecl</code> — update <code>FunctionDeclaration</code> to add a <code>Name string</code> field</li>
+    <li>Add <code>parseVarDecl</code> — <code>VariableDeclaration</code> node already exists, just needs wiring</li>
+    <li>Add <code>parseImportStmt</code> + <code>ImportStatement</code> node</li>
+    <li>Write a test: parse <code>fn add(a: int, b: int): int { a + b; }</code> and log the JSON</li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-title">Helper: isKeyword</div>
+    You'll want a small helper used in several places:
+    <pre style="margin-top:0.5rem;"><code><span class="kw">func</span> <span class="fn">isKeyword</span>(t <span class="type">Token</span>, value <span class="type">string</span>) <span class="type">bool</span> {
+    vt, ok := t.(<span class="type">*ValueToken</span>)
+    <span class="kw">return</span> ok && vt.<span class="fn">IsToken</span>() == <span class="type">TokenType_Ident</span> && vt.Value == value
+}</code></pre>
+  </div>
+
+  <div class="citation">
+    <strong>Sources:</strong>
+    <a href="https://craftinginterpreters.com/statements-and-state.html" target="_blank">Crafting Interpreters §8 — Statements and State</a> &middot;
+    <a href="https://interpreterbook.com/" target="_blank">Writing An Interpreter In Go — Thorsten Ball, Ch. 2</a>
+  </div>
+
+  <div class="teacher-note">
+    <strong>Ask your teacher (me) anything.</strong> Good follow-up questions: "How do I handle <code>return</code> inside a function body?", "What's a type expression — how do I parse <code>int[]</code>?", "How do I tell a variable declaration from an expression statement when both can start with an identifier?"
+  </div>
+
+  <div class="nav">
+    <span><a href="0002-operator-precedence.html">← Lesson 2: Operator Precedence</a></span>
+    <span>Next: <em>The Tree-Walking Interpreter</em></span>
+  </div>
+
+</div>
+<script>
+const explanations = {
+  q1: {
+    correct: "Exactly. Keyword dispatch is O(1) — one peek tells you everything. Expression parsing can't do that because '+' doesn't tell you what kind of expression you're in; you need to work through the precedence chain to find out.",
+    wrong: "It's about information content, not length. A keyword uniquely identifies the statement type. An operator or literal could appear in many expression contexts — you need the precedence chain to disambiguate."
+  },
+  q2: {
+    correct: "Right. The grammar rule is: else ( ifStmt | block ). parseIfStmt handles the ifStmt branch by calling itself — so 'else if ... else if ... else' chains naturally, each level adding one frame to the call stack.",
+    wrong: "No special token or lookahead needed. The grammar rule 'else ( ifStmt | block )' handles it: if the token after 'else' is 'if', we call parseIfStmt recursively. The call stack becomes the chain."
+  },
+  q3: {
+    correct: "Correct. peek() returns a synthetic EOF token when pos >= len(tokens). Without the EOF guard, a missing '}' would loop forever reading EOF over and over. The EOF check turns infinite loops into clean errors.",
+    wrong: "After consuming all tokens, peek() returns a synthetic EOF token repeatedly — it never advances. Without the EOF guard, a missing closing brace causes an infinite loop rather than a useful error."
+  }
+};
+let answered = {};
+function answer(btn, qid, isCorrect) {
+  if (answered[qid]) return;
+  answered[qid] = true;
+  btn.parentElement.querySelectorAll('.option').forEach(b => b.style.pointerEvents = 'none');
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  const fb = document.getElementById(qid + '-feedback');
+  fb.textContent = explanations[qid][isCorrect ? 'correct' : 'wrong'];
+  fb.className = 'feedback show ' + (isCorrect ? 'correct' : 'wrong');
+  document.getElementById('progress').style.width = (30 + (Object.keys(answered).length / 3) * 55) + '%';
+}
+</script>
+</body>
+</html>
