@@ -43,3 +43,30 @@ func TestEval(t *testing.T) {
 		t.Fatalf("was expecting to get 7 but get %s", v)
 	}
 }
+
+func TestEvalGlobalEnv(t *testing.T) {
+	tokens, err := script.NewTokenizer(strings.NewReader(`
+		struct Point { x: int; y: int; }
+		impl Point {
+			fn sum(self: Point): int {
+				return self.x + self.y;
+			}
+		}
+		let p = Point(1,2);
+		print(str(p.sum()));
+	`)).Tokenize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := script.NewParser(tokens)
+	ast, err := p.Parse()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env := scriptinterpreter.NewGlobalEnv()
+	_, err = scriptinterpreter.Eval(ast, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+}

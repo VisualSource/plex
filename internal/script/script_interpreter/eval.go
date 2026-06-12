@@ -105,10 +105,6 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 
 			_, err = Eval(n.Body, env)
 			if err != nil {
-				if ret, ok := err.(returnSignal); ok {
-					return ret.value, nil
-				}
-
 				return nil, err
 			}
 
@@ -120,32 +116,137 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 		if err != nil {
 			return nil, err
 		}
-		fn, ok := calleeVal.(FunctionValue)
-		if !ok {
-			return nil, fmt.Errorf("not a function")
-		}
 
-		callEnv := NewEnvironment(env)
-		for i, param := range fn.Params {
-			p := param.(*script.Parameter)
-			arg, err := Eval(n.Args[i], env)
+		switch callee := calleeVal.(type) {
+		case StructType:
+			instance := &StructValue{
+				TypeName: callee.Name,
+				Fields:   make(map[string]Value),
+			}
+
+			for i, fieldName := range callee.Fields {
+				arg, err := Eval(n.Args[i], env)
+				if err != nil {
+					return nil, err
+				}
+				instance.Fields[fieldName] = arg
+			}
+			return instance, nil
+		case FunctionValue:
+			if ma, ok := n.Callee.(*script.MemberAccess); ok {
+				obj, err := Eval(ma.Object, env)
+				if err != nil {
+					return nil, err
+				}
+
+				instance, ok := obj.(*StructValue)
+				if ok {
+					typeVal, _ := env.Get(instance.TypeName)
+					st := typeVal.(StructType)
+					method, ok := st.Methods[ma.Field]
+					if !ok {
+						return nil, fmt.Errorf("no method %s", ma.Field)
+					}
+
+					callEnv := NewEnvironment(method.Env)
+
+					for i, param := range method.Params {
+						arg, err := Eval(n.Args[i], env)
+						if err != nil {
+							return nil, err
+						}
+
+						callEnv.Set(param.(*script.Parameter).Name, arg)
+					}
+					callEnv.Set("self", instance) // override arg name self
+
+					_, err := Eval(method.Body, callEnv)
+					if ret, ok := err.(returnSignal); ok {
+						return ret.value, nil
+					}
+					return NullValue{}, err
+				}
+			}
+
+			callEnv := NewEnvironment(callee.Env)
+			for i, param := range callee.Params {
+				p := param.(*script.Parameter)
+				arg, err := Eval(n.Args[i], env)
+				if err != nil {
+					return nil, err
+				}
+				callEnv.Set(p.Name, arg)
+			}
+
+			_, err = Eval(callee.Body, callEnv)
 			if err != nil {
+				if ret, ok := err.(returnSignal); ok {
+					return ret.value, nil
+				}
 				return nil, err
 			}
-			callEnv.Set(p.Name, arg)
+			return NullValue{}, nil
+		case NativeFunction:
+			args := make([]Value, len(n.Args))
+
+			for i, arg := range n.Args {
+				v, err := Eval(arg, env)
+				if err != nil {
+					return nil, err
+				}
+				args[i] = v
+			}
+
+			return callee.Fn(args)
+		default:
+			return nil, fmt.Errorf("not callable")
+		}
+	case *script.StructStatement:
+		fields := make([]string, 0, len(n.Fields))
+		for _, f := range n.Fields {
+			fields = append(fields, f.(*script.Parameter).Name)
 		}
 
-		_, err = Eval(fn.Body, callEnv)
+		env.Set(n.Name, StructType{
+			Name:    n.Name,
+			Fields:  fields,
+			Methods: make(map[string]FunctionValue),
+		})
+		return NullValue{}, nil
+
+	case *script.StructImplStatement:
+		v, ok := env.Get(n.Name)
+		if !ok {
+			return nil, fmt.Errorf("impl: unknown type %s", n.Name)
+		}
+		st, ok := v.(StructType)
+		if !ok {
+			return nil, fmt.Errorf("%s is not a struct type", n.Name)
+		}
+		for _, m := range n.Methods {
+			fn := m.(*script.FunctionDeclaration)
+			st.Methods[fn.Name] = FunctionValue{Params: fn.Params, Body: fn.Body, Env: env}
+		}
+		env.Assign(n.Name, st)
+
+		return NullValue{}, nil
+	case *script.MemberAccess:
+		obj, err := Eval(n.Object, env)
 		if err != nil {
-			if ret, ok := err.(returnSignal); ok {
-				return ret.value, nil
-			}
 			return nil, err
 		}
 
-		return NullValue{}, nil
+		instance, ok := obj.(*StructValue)
+		if !ok {
+			return nil, fmt.Errorf("%s is not a struct", n.Field)
+		}
+		v, ok := instance.Fields[n.Field]
+		if !ok {
+			return nil, fmt.Errorf("no field %s", n.Field)
+		}
+		return v, nil
 	default:
-		return nil, fmt.Errorf("eval: unhandled node %l", node)
+		return nil, fmt.Errorf("eval: unhandled node %T", node)
 	}
 }
 

@@ -1,5 +1,10 @@
 package scriptinterpreter
 
+import (
+	"fmt"
+	"strings"
+)
+
 type Environment struct {
 	vars   map[string]Value
 	parent *Environment
@@ -34,4 +39,31 @@ func (e *Environment) Assign(name string, v Value) bool {
 	}
 
 	return false
+}
+
+func NewGlobalEnv() *Environment {
+	env := NewEnvironment(nil)
+
+	env.Set("print", NativeFunction{
+		Name: "print",
+		Fn: func(args []Value) (Value, error) {
+			parts := make([]string, len(args))
+			for i, a := range args {
+				parts[i] = a.String()
+			}
+
+			fmt.Println(strings.Join(parts, " "))
+			return NullValue{}, nil
+		},
+	})
+
+	env.Set("str", NativeFunction{Name: "str", Fn: func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("str: expected 1 arg")
+		}
+		return StringValue{V: args[0].String()}, nil
+	}})
+
+	return env
+
 }

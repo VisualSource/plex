@@ -34,3 +34,28 @@ type FunctionValue struct {
 
 func (f FunctionValue) Truthy() bool   { return true }
 func (f FunctionValue) String() string { return "<fn>" }
+
+type StructValue struct {
+	TypeName string
+	Fields   map[string]Value
+}
+
+func (s *StructValue) Truthy() bool   { return true }
+func (s *StructValue) String() string { return fmt.Sprintf("%s {...}", s.TypeName) }
+
+type StructType struct {
+	Name    string
+	Fields  []string
+	Methods map[string]FunctionValue
+}
+
+func (s StructType) Truthy() bool   { return true }
+func (s StructType) String() string { return fmt.Sprintf("<type:%s>", s.Name) }
+
+type NativeFunction struct {
+	Name string
+	Fn   func(args []Value) (Value, error)
+}
+
+func (n NativeFunction) Truthy() bool   { return true }
+func (n NativeFunction) String() string { return fmt.Sprintf("<native:%s>", n.Name) }
