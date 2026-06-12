@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 4: The Tree-Walking Interpreter</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a; --text: #e2e4ef;
+    --muted: #8b8fa8; --accent: #7c6ff7; --accent-dim: #3d3a6e;
+    --green: #4eca8b; --green-dim: #1d3d2e; --red: #f07178; --red-dim: #3d1f22;
+    --yellow: #ffd580; --yellow-dim: #3d3218; --code-bg: #141720; --code-border: #252836;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia','Times New Roman',serif; background: var(--bg); color: var(--text); line-height: 1.75; padding: 0 1rem 4rem; }
+  .page { max-width: 760px; margin: 0 auto; }
+  header { border-bottom: 1px solid var(--border); padding: 2.5rem 0 1.5rem; margin-bottom: 2.5rem; }
+  .lesson-tag { font-family: 'Courier New',monospace; font-size: 0.75rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.75rem; }
+  h1 { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-bottom: 0.5rem; }
+  .subtitle { color: var(--muted); font-size: 1rem; }
+  h2 { font-size: 1.25rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
+  h3 { font-size: 1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: var(--accent); font-family: 'Courier New',monospace; }
+  p { margin-bottom: 1rem; }
+  a { color: var(--accent); text-decoration: underline; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; line-height: 1.6; }
+  code { font-family: 'Courier New',monospace; font-size: 0.875em; background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 3px; padding: 0.1em 0.35em; }
+  pre code { background: none; border: none; padding: 0; }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .type { color: #ffcb6b; } .str { color: #c3e88d; } .cmt { color: #546e7a; font-style: italic; } .num { color: #f78c6c; }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-dim); border-radius: 0 6px 6px 0; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .callout.insight { border-color: var(--green); background: var(--green-dim); }
+  .callout.warning { border-color: var(--yellow); background: var(--yellow-dim); }
+  .callout-title { font-family: 'Courier New',monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 0.4rem; }
+  .callout.insight .callout-title { color: var(--green); } .callout.warning .callout-title { color: var(--yellow); }
+  .quiz { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; }
+  .quiz h2 { margin-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-family: 'Courier New',monospace; }
+  .question { margin: 1.25rem 0 0.75rem; font-weight: 700; }
+  .options { display: flex; flex-direction: column; gap: 0.5rem; }
+  .option { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.65rem 1rem; cursor: pointer; font-family: 'Courier New',monospace; font-size: 0.875rem; color: var(--text); text-align: left; transition: border-color 0.15s, background 0.15s; }
+  .option:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .option.correct { border-color: var(--green) !important; background: var(--green-dim) !important; }
+  .option.wrong { border-color: var(--red) !important; background: var(--red-dim) !important; }
+  .feedback { display: none; margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+  .feedback.show { display: block; } .feedback.correct { background: var(--green-dim); color: var(--green); } .feedback.wrong { background: var(--red-dim); color: var(--red); }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.875rem; color: var(--muted); }
+  .citation { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem; padding-top: 1rem; }
+  .citation a { color: var(--muted); }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 2rem; }
+  .progress-fill { height: 100%; width: 40%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+  .teacher-note { margin-top: 3rem; background: var(--surface); border-radius: 8px; padding: 1.25rem 1.5rem; font-size: 0.9rem; color: var(--muted); }
+  .teacher-note strong { color: var(--text); }
+  .pipeline { display: flex; align-items: center; gap: 0.5rem; font-family: 'Courier New',monospace; font-size: 0.875rem; flex-wrap: wrap; margin: 1rem 0; }
+  .pipeline-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.8rem; }
+  .pipeline-stage.active { border-color: var(--accent); color: var(--accent); }
+  .pipeline-arrow { color: var(--muted); }
+  .bug-box { border: 1px solid var(--red); background: var(--red-dim); border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .bug-title { font-family: 'Courier New',monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--red); margin-bottom: 0.4rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; }
+  th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 400; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; }
+  td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--code-border); }
+  tr:last-child td { border-bottom: none; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <header>
+    <div class="lesson-tag">Lesson 4 &middot; Compiler Construction &middot; Evaluation</div>
+    <h1>The Tree-Walking Interpreter</h1>
+    <p class="subtitle">Values, environments, and walking the AST to produce results</p>
+  </header>
+
+  <div class="bug-box">
+    <div class="bug-title">Fix first: keyword token type</div>
+    <p style="margin-bottom:0.5rem;">Your tokenizer emits <em>all</em> identifiers — including <code>if</code>, <code>fn</code>, <code>while</code> — as <code>TokenType_Ident</code>, but <code>isKeyword</code> checks for <code>TokenType_Keyword</code>. Statement dispatch is silently broken. Fix <code>consumeIdent</code> in <a href="../internal/script/tokenizer.go">tokenizer.go</a>:</p>
+    <pre><code><span class="kw">switch</span> value {
+<span class="kw">case</span> <span class="str">"import"</span>, <span class="str">"from"</span>, <span class="str">"while"</span>, <span class="str">"if"</span>, <span class="str">"else"</span>,
+     <span class="str">"struct"</span>, <span class="str">"fn"</span>, <span class="str">"mut"</span>, <span class="str">"let"</span>, <span class="str">"return"</span>, <span class="str">"impl"</span>, <span class="str">"null"</span>:
+    t.tokens = <span class="fn">append</span>(t.tokens, <span class="fn">NewKeywordToken</span>(value, start, end))
+<span class="kw">default</span>:
+    t.tokens = <span class="fn">append</span>(t.tokens, <span class="fn">NewIdentToken</span>(value, start, end))
+}</code></pre>
+    Add a test: parse <code>if (1) { 2; }</code> and assert the result is an <code>IfStatement</code>, not an error.
+  </div>
+
+  <h2>Where You Are</h2>
+
+  <div class="pipeline">
+    <div class="pipeline-stage">Source text</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage">Tokenizer ✓</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage">Parser ✓</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage active">Interpreter ← you are here</div>
+  </div>
+
+  <p>The parser produces an AST. The interpreter <em>walks</em> that tree and computes a result for each node. It's recursive in the same way the parser was — each node type has a dedicated eval case, and compound nodes (like <code>BinaryExpression</code>) eval their children first.</p>
+
+  <h2>Part 1: Values</h2>
+
+  <p>The interpreter needs a runtime representation of every value the language can produce. In a typed language you'd track the type too; for now, a Go interface with concrete types works cleanly:</p>
+
+  <pre><code><span class="kw">type</span> <span class="type">Value</span> <span class="kw">interface</span> {
+    <span class="fn">String</span>() <span class="type">string</span>   <span class="cmt">// for printing</span>
+    <span class="fn">Truthy</span>() <span class="type">bool</span>    <span class="cmt">// for if/while conditions</span>
+}
+
+<span class="kw">type</span> <span class="type">NumberValue</span> <span class="kw">struct</span>{ V <span class="type">float64</span> }
+<span class="kw">type</span> <span class="type">StringValue</span> <span class="kw">struct</span>{ V <span class="type">string</span> }
+<span class="kw">type</span> <span class="type">BoolValue</span>   <span class="kw">struct</span>{ V <span class="type">bool</span> }
+<span class="kw">type</span> <span class="type">NullValue</span>   <span class="kw">struct</span>{}
+
+<span class="kw">func</span> (n <span class="type">NumberValue</span>) <span class="fn">Truthy</span>() <span class="type">bool</span> { <span class="kw">return</span> n.V != <span class="num">0</span> }
+<span class="kw">func</span> (s <span class="type">StringValue</span>) <span class="fn">Truthy</span>() <span class="type">bool</span> { <span class="kw">return</span> s.V != <span class="str">""</span> }
+<span class="kw">func</span> (b <span class="type">BoolValue</span>)   <span class="fn">Truthy</span>() <span class="type">bool</span> { <span class="kw">return</span> b.V }
+<span class="kw">func</span> (n <span class="type">NullValue</span>)   <span class="fn">Truthy</span>() <span class="type">bool</span> { <span class="kw">return</span> <span class="kw">false</span> }
+
+<span class="kw">func</span> (n <span class="type">NumberValue</span>) <span class="fn">String</span>() <span class="type">string</span> { <span class="kw">return</span> fmt.<span class="fn">Sprintf</span>(<span class="str">"%g"</span>, n.V) }
+<span class="kw">func</span> (s <span class="type">StringValue</span>) <span class="fn">String</span>() <span class="type">string</span> { <span class="kw">return</span> s.V }
+<span class="kw">func</span> (b <span class="type">BoolValue</span>)   <span class="fn">String</span>() <span class="type">string</span> { <span class="kw">return</span> fmt.<span class="fn">Sprintf</span>(<span class="str">"%v"</span>, b.V) }
+<span class="kw">func</span> (n <span class="type">NullValue</span>)   <span class="fn">String</span>() <span class="type">string</span> { <span class="kw">return</span> <span class="str">"null"</span> }
+
+<span class="kw">type</span> <span class="type">FunctionValue</span> <span class="kw">struct</span> {
+    Params []<span class="type">AstNode</span>    <span class="cmt">// the Parameter nodes from the AST</span>
+    Body   <span class="type">AstNode</span>      <span class="cmt">// the Block node</span>
+    Env    *<span class="type">Environment</span> <span class="cmt">// the closure — captures defining scope</span>
+}
+<span class="kw">func</span> (f <span class="type">FunctionValue</span>) <span class="fn">Truthy</span>() <span class="type">bool</span>    { <span class="kw">return</span> <span class="kw">true</span> }
+<span class="kw">func</span> (f <span class="type">FunctionValue</span>) <span class="fn">String</span>() <span class="type">string</span> { <span class="kw">return</span> <span class="str">"&lt;fn&gt;"</span> }</code></pre>
+
+  <div class="callout insight">
+    <div class="callout-title">FunctionValue captures its environment</div>
+    The <code>Env</code> field on <code>FunctionValue</code> is what makes closures work. When a function is <em>declared</em>, it captures the environment at that point. When called, it creates a child scope of that captured environment — not of the call site. This is how inner functions can see outer variables even after the outer function returns.
+  </div>
+
+  <h2>Part 2: The Environment</h2>
+
+  <p>Variables live in an <strong>environment</strong> — a map from name to value. Nested scopes (function bodies, blocks) get child environments that delegate lookups to their parent:</p>
+
+  <pre><code><span class="kw">type</span> <span class="type">Environment</span> <span class="kw">struct</span> {
+    vars   <span class="kw">map</span>[<span class="type">string</span>]<span class="type">Value</span>
+    parent *<span class="type">Environment</span>
+}
+
+<span class="kw">func</span> <span class="fn">NewEnvironment</span>(parent *<span class="type">Environment</span>) *<span class="type">Environment</span> {
+    <span class="kw">return</span> &<span class="type">Environment</span>{vars: <span class="kw">make</span>(<span class="kw">map</span>[<span class="type">string</span>]<span class="type">Value</span>), parent: parent}
+}
+
+<span class="kw">func</span> (e *<span class="type">Environment</span>) <span class="fn">Get</span>(name <span class="type">string</span>) (<span class="type">Value</span>, <span class="type">bool</span>) {
+    v, ok := e.vars[name]
+    <span class="kw">if</span> !ok && e.parent != <span class="kw">nil</span> {
+        <span class="kw">return</span> e.parent.<span class="fn">Get</span>(name) <span class="cmt">// walk up the chain</span>
+    }
+    <span class="kw">return</span> v, ok
+}
+
+<span class="kw">func</span> (e *<span class="type">Environment</span>) <span class="fn">Set</span>(name <span class="type">string</span>, v <span class="type">Value</span>) {
+    e.vars[name] = v
+}
+
+<span class="kw">func</span> (e *<span class="type">Environment</span>) <span class="fn">Assign</span>(name <span class="type">string</span>, v <span class="type">Value</span>) <span class="type">bool</span> {
+    <span class="kw">if</span> _, ok := e.vars[name]; ok {
+        e.vars[name] = v
+        <span class="kw">return</span> <span class="kw">true</span>
+    }
+    <span class="kw">if</span> e.parent != <span class="kw">nil</span> {
+        <span class="kw">return</span> e.parent.<span class="fn">Assign</span>(name, v) <span class="cmt">// mutate the scope that owns it</span>
+    }
+    <span class="kw">return</span> <span class="kw">false</span>
+}</code></pre>
+
+  <p>Notice the distinction between <code>Set</code> and <code>Assign</code>. <code>Set</code> declares a new variable in the <em>current</em> scope. <code>Assign</code> walks up to find an existing binding and mutates it there. Without this split, <code>x = 1</code> inside a function would shadow the outer <code>x</code> instead of updating it.</p>
+
+  <h2>Part 3: The Eval Function</h2>
+
+  <p>The evaluator is a single function with a type switch — exactly like the parser's statement dispatcher, but over AST node types instead of tokens:</p>
+
+  <pre><code><span class="kw">func</span> <span class="fn">Eval</span>(node <span class="type">AstNode</span>, env *<span class="type">Environment</span>) (<span class="type">Value</span>, <span class="type">error</span>) {
+    <span class="kw">switch</span> n := node.(<span class="kw">type</span>) {
+
+    <span class="kw">case</span> *<span class="type">Program</span>:
+        <span class="kw">var</span> result <span class="type">Value</span> = <span class="type">NullValue</span>{}
+        <span class="kw">for</span> _, stmt := <span class="kw">range</span> n.Stmts {
+            v, err := <span class="fn">Eval</span>(stmt, env)
+            <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+            result = v
+        }
+        <span class="kw">return</span> result, <span class="kw">nil</span>
+
+    <span class="kw">case</span> *<span class="type">NumberLiteral</span>:
+        f, err := strconv.<span class="fn">ParseFloat</span>(n.Value, <span class="num">64</span>)
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+        <span class="kw">return</span> <span class="type">NumberValue</span>{V: f}, <span class="kw">nil</span>
+
+    <span class="kw">case</span> *<span class="type">Identifier</span>:
+        v, ok := env.<span class="fn">Get</span>(n.Value)
+        <span class="kw">if</span> !ok {
+            <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"undefined: %s"</span>, n.Value)
+        }
+        <span class="kw">return</span> v, <span class="kw">nil</span>
+
+    <span class="kw">case</span> *<span class="type">VariableDeclaration</span>:
+        val, err := <span class="fn">Eval</span>(n.Init, env)
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+        env.<span class="fn">Set</span>(n.Name, val)
+        <span class="kw">return</span> <span class="type">NullValue</span>{}, <span class="kw">nil</span>
+
+    <span class="kw">case</span> *<span class="type">AssignmentExpression</span>:
+        val, err := <span class="fn">Eval</span>(n.Value, env)
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+        <span class="kw">if</span> !env.<span class="fn">Assign</span>(n.Name, val) {
+            <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"assign to undefined: %s"</span>, n.Name)
+        }
+        <span class="kw">return</span> val, <span class="kw">nil</span>
+
+    <span class="kw">case</span> *<span class="type">BinaryExpression</span>:
+        <span class="kw">return</span> <span class="fn">evalBinary</span>(n, env)
+
+    <span class="kw">case</span> *<span class="type">IfStatement</span>:
+        cond, err := <span class="fn">Eval</span>(n.Condition, env)
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+        <span class="kw">if</span> cond.<span class="fn">Truthy</span>() {
+            <span class="kw">return</span> <span class="fn">Eval</span>(n.Body, env)
+        } <span class="kw">else if</span> n.Else != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="fn">Eval</span>(n.Else, env)
+        }
+        <span class="kw">return</span> <span class="type">NullValue</span>{}, <span class="kw">nil</span>
+
+    <span class="kw">case</span> *<span class="type">Block</span>:
+        child := <span class="fn">NewEnvironment</span>(env) <span class="cmt">// new scope for the block</span>
+        <span class="kw">var</span> result <span class="type">Value</span> = <span class="type">NullValue</span>{}
+        <span class="kw">for</span> _, stmt := <span class="kw">range</span> n.Stmts {
+            v, err := <span class="fn">Eval</span>(stmt, child)
+            <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+            result = v
+        }
+        <span class="kw">return</span> result, <span class="kw">nil</span>
+
+    <span class="kw">default</span>:
+        <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"eval: unhandled node %T"</span>, node)
+    }
+}</code></pre>
+
+  <h2>Part 4: Binary Operations</h2>
+
+  <pre><code><span class="kw">func</span> <span class="fn">evalBinary</span>(n *<span class="type">BinaryExpression</span>, env *<span class="type">Environment</span>) (<span class="type">Value</span>, <span class="type">error</span>) {
+    left, err := <span class="fn">Eval</span>(n.Left, env)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    right, err := <span class="fn">Eval</span>(n.Right, env)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+
+    lv, lok := left.(<span class="type">NumberValue</span>)
+    rv, rok := right.(<span class="type">NumberValue</span>)
+
+    <span class="kw">switch</span> n.Operator {
+    <span class="kw">case</span> <span class="type">TokenType_Plus</span>:
+        <span class="kw">if</span> lok && rok { <span class="kw">return</span> <span class="type">NumberValue</span>{V: lv.V + rv.V}, <span class="kw">nil</span> }
+        <span class="kw">return</span> <span class="type">StringValue</span>{V: left.<span class="fn">String</span>() + right.<span class="fn">String</span>()}, <span class="kw">nil</span> <span class="cmt">// string concat</span>
+    <span class="kw">case</span> <span class="type">TokenType_Minus</span>:
+        <span class="kw">if</span> !lok || !rok { <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"- requires numbers"</span>) }
+        <span class="kw">return</span> <span class="type">NumberValue</span>{V: lv.V - rv.V}, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="type">TokenType_Star</span>:
+        <span class="kw">if</span> !lok || !rok { <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"* requires numbers"</span>) }
+        <span class="kw">return</span> <span class="type">NumberValue</span>{V: lv.V * rv.V}, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="type">TokenType_EqualEqual</span>:
+        <span class="kw">return</span> <span class="type">BoolValue</span>{V: left.<span class="fn">String</span>() == right.<span class="fn">String</span>()}, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="type">TokenType_LessThen</span>:
+        <span class="kw">if</span> !lok || !rok { <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"&lt; requires numbers"</span>) }
+        <span class="kw">return</span> <span class="type">BoolValue</span>{V: lv.V < rv.V}, <span class="kw">nil</span>
+    <span class="kw">default</span>:
+        <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"unknown operator: %v"</span>, n.Operator)
+    }
+}</code></pre>
+
+  <h2>Part 5: The Hard Part — Return</h2>
+
+  <p>Here's the problem. <code>return</code> needs to escape from wherever it appears — possibly deep inside nested blocks and loops — all the way back to the function call that should receive the value. Go's normal error propagation would need every caller to check "is this a return?" at every level.</p>
+
+  <p>The clean solution: a <strong>sentinel error type</strong> that carries the return value. It's technically an error, but it's not an error — it's a signal.</p>
+
+  <pre><code><span class="kw">type</span> <span class="type">returnSignal</span> <span class="kw">struct</span> { value <span class="type">Value</span> }
+<span class="kw">func</span> (r <span class="type">returnSignal</span>) <span class="fn">Error</span>() <span class="type">string</span> { <span class="kw">return</span> <span class="str">"return"</span> }</code></pre>
+
+  <p>The <code>ReturnStatement</code> case in Eval wraps the value in this signal:</p>
+
+  <pre><code><span class="kw">case</span> *<span class="type">ReturnStatement</span>:
+    <span class="kw">if</span> n.Value == <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, <span class="type">returnSignal</span>{value: <span class="type">NullValue</span>{}}
+    }
+    val, err := <span class="fn">Eval</span>(n.Value, env)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    <span class="kw">return</span> <span class="kw">nil</span>, <span class="type">returnSignal</span>{value: val}</code></pre>
+
+  <p>The function call handler is the <em>only</em> place that catches this signal. Everything else just propagates it:</p>
+
+  <pre><code><span class="kw">case</span> *<span class="type">FunctionCall</span>:
+    calleeVal, err := <span class="fn">Eval</span>(n.Callee, env)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    fn, ok := calleeVal.(<span class="type">FunctionValue</span>)
+    <span class="kw">if</span> !ok { <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"not a function"</span>) }
+
+    <span class="cmt">// build the call environment as a child of the closure's env</span>
+    callEnv := <span class="fn">NewEnvironment</span>(fn.Env)
+    <span class="kw">for</span> i, param := <span class="kw">range</span> fn.Params {
+        p := param.(*<span class="type">Parameter</span>)
+        arg, err := <span class="fn">Eval</span>(n.Args[i], env)
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+        callEnv.<span class="fn">Set</span>(p.Name, arg)
+    }
+
+    _, err = <span class="fn">Eval</span>(fn.Body, callEnv)
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        <span class="kw">if</span> ret, ok := err.(<span class="type">returnSignal</span>); ok {
+            <span class="kw">return</span> ret.value, <span class="kw">nil</span> <span class="cmt">// unwrap the signal here — only here</span>
+        }
+        <span class="kw">return</span> <span class="kw">nil</span>, err <span class="cmt">// real error — propagate</span>
+    }
+    <span class="kw">return</span> <span class="type">NullValue</span>{}, <span class="kw">nil</span></code></pre>
+
+  <div class="callout insight">
+    <div class="callout-title">Why not use panic/recover?</div>
+    Go's <code>panic</code>/<code>recover</code> would also work. But sentinel errors are explicit — the type system proves you handle them, and they compose cleanly with real errors. You'll use the same pattern for <code>break</code> and <code>continue</code> in <code>while</code> loops later.
+  </div>
+
+  <hr style="border-color: var(--border); margin: 2.5rem 0;">
+
+  <div class="quiz">
+    <h2>Check Your Understanding</h2>
+
+    <div id="q1">
+      <p class="question">1. Why does <code>FunctionValue</code> store an <code>*Environment</code> (the defining scope) rather than just the body AST?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q1',false)">For performance — avoids re-parsing the body each call</button>
+        <button class="option" onclick="answer(this,'q1',true)">So the function can access variables from the scope where it was defined, even if called from a different scope — this is what makes closures work</button>
+        <button class="option" onclick="answer(this,'q1',false)">The environment is needed to resolve the function's parameter types</button>
+      </div>
+      <div class="feedback" id="q1-feedback"></div>
+    </div>
+
+    <div id="q2" style="margin-top:1.5rem;">
+      <p class="question">2. Why does the call handler use <code>NewEnvironment(fn.Env)</code> (closure env) instead of <code>NewEnvironment(env)</code> (call-site env)?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q2',true)">Using fn.Env gives lexical scoping — the function sees variables from where it was defined. Using env would give dynamic scoping — it would see the caller's variables instead.</button>
+        <button class="option" onclick="answer(this,'q2',false)">fn.Env is faster to look up than env</button>
+        <button class="option" onclick="answer(this,'q2',false)">env might be nil at the call site</button>
+      </div>
+      <div class="feedback" id="q2-feedback"></div>
+    </div>
+
+    <div id="q3" style="margin-top:1.5rem;">
+      <p class="question">3. A <code>return</code> is 3 blocks deep inside a function body. How does the return value reach the function call handler?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q3',false)">Each block checks if the last statement was a return and forwards it</button>
+        <button class="option" onclick="answer(this,'q3',true)">returnSignal propagates up as an error through every Eval call until the FunctionCall case catches it with a type assertion</button>
+        <button class="option" onclick="answer(this,'q3',false)">Eval stores the return value in a global variable that the call handler reads</button>
+      </div>
+      <div class="feedback" id="q3-feedback"></div>
+    </div>
+  </div>
+
+  <h2>Your Turn: Build the Interpreter</h2>
+
+  <p>Create <a href="../internal/script/interpreter.go">internal/script/interpreter.go</a> (new file):</p>
+
+  <ol style="padding-left:1.5rem; line-height:2.25;">
+    <li>Fix the tokenizer keyword bug first — write a test that parses <code>if (1) { 2; }</code></li>
+    <li>Define the <code>Value</code> interface and the four concrete types (<code>NumberValue</code>, <code>StringValue</code>, <code>BoolValue</code>, <code>NullValue</code>)</li>
+    <li>Define <code>FunctionValue</code> with <code>Params</code>, <code>Body</code>, <code>Env</code></li>
+    <li>Implement <code>Environment</code> with <code>Get</code>, <code>Set</code>, <code>Assign</code></li>
+    <li>Implement <code>Eval</code> with cases for: <code>*Program</code>, <code>*Block</code>, <code>*NumberLiteral</code>, <code>*Identifier</code>, <code>*VariableDeclaration</code>, <code>*AssignmentExpression</code>, <code>*BinaryExpression</code>, <code>*IfStatement</code></li>
+    <li>Add <code>returnSignal</code> and wire <code>*ReturnStatement</code> + <code>*FunctionCall</code> + <code>*FunctionDeclaration</code></li>
+    <li>Add a <code>*WhileStatement</code> case (hint: it's a <code>for</code> loop in Go calling <code>Eval(n.Condition)</code> each iteration)</li>
+    <li>Write an end-to-end test: parse and eval <code>fn add(a: int, b: int): int { return a + b; }</code> followed by <code>add(3, 4);</code> — assert the result is <code>NumberValue{7}</code></li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-title">Tip: FunctionDeclaration eval</div>
+    Evaluating a <code>FunctionDeclaration</code> doesn't run the body — it just stores a <code>FunctionValue</code> in the environment under the function's name. The body runs when the function is <em>called</em>.
+  </div>
+
+  <div class="citation">
+    <strong>Sources:</strong>
+    <a href="https://craftinginterpreters.com/evaluating-expressions.html" target="_blank">Crafting Interpreters §7 — Evaluating Expressions</a> &middot;
+    <a href="https://craftinginterpreters.com/statements-and-state.html" target="_blank">Crafting Interpreters §8 — Statements and State</a> &middot;
+    <a href="https://interpreterbook.com/" target="_blank">Writing An Interpreter In Go — Thorsten Ball, Ch. 3-4</a>
+  </div>
+
+  <div class="teacher-note">
+    <strong>Ask your teacher (me) anything.</strong> Good follow-up questions: "How do I implement <code>break</code> and <code>continue</code> in while loops?", "How do structs work at runtime — what value type do they need?", "What's the difference between lexical and dynamic scoping?", "How would I add built-in functions like <code>print</code>?"
+  </div>
+
+  <div class="nav">
+    <span><a href="0003-parsing-statements.html">← Lesson 3: Parsing Statements</a></span>
+    <span>Next: <em>Structs &amp; Methods at Runtime</em></span>
+  </div>
+
+</div>
+<script>
+const explanations = {
+  q1: {
+    correct: "Exactly. A function without its captured environment is just syntax. The environment is what turns it into a closure — it carries the bindings visible at the point of definition, so the function can reference outer variables when called later from anywhere.",
+    wrong: "The environment has nothing to do with performance or types. It's what enables closures: when the function runs, it can see variables from the scope where it was declared, not just the call site."
+  },
+  q2: {
+    correct: "Right — this is the lexical vs dynamic scoping distinction. Almost every modern language (Go, JavaScript, Python, Rust) uses lexical scoping: a function sees the scope it was *written* in. Using the call-site env instead would give you dynamic scoping, where a function sees the caller's variables — a design most languages abandoned because it's unpredictable.",
+    wrong: "It's about which variables the function can see. fn.Env is the scope at definition time; env is the scope at call time. Using fn.Env gives the predictable, expected behavior: a function sees where it was defined, not where it was called from."
+  },
+  q3: {
+    correct: "Correct. returnSignal implements the error interface, so it propagates up through the normal error return path. Every intermediate Eval call sees an error and returns it immediately. The FunctionCall case is the first to do a type assertion — if err.(returnSignal) succeeds, it knows it's a return value, not a real error.",
+    wrong: "No per-block checking needed — that's the elegance of the sentinel approach. The error propagation mechanism does the work automatically. Every caller that does 'if err != nil { return nil, err }' is silently forwarding the signal upward without needing to know about it."
+  }
+};
+let answered = {};
+function answer(btn, qid, isCorrect) {
+  if (answered[qid]) return;
+  answered[qid] = true;
+  btn.parentElement.querySelectorAll('.option').forEach(b => b.style.pointerEvents = 'none');
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  const fb = document.getElementById(qid + '-feedback');
+  fb.textContent = explanations[qid][isCorrect ? 'correct' : 'wrong'];
+  fb.className = 'feedback show ' + (isCorrect ? 'correct' : 'wrong');
+  document.getElementById('progress').style.width = (40 + (Object.keys(answered).length / 3) * 45) + '%';
+}
+</script>
+</body>
+</html>

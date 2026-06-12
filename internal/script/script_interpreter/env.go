@@ -1,0 +1,37 @@
+package scriptinterpreter
+
+type Environment struct {
+	vars   map[string]Value
+	parent *Environment
+}
+
+func NewEnvironment(parent *Environment) *Environment {
+	return &Environment{
+		vars: make(map[string]Value), parent: parent,
+	}
+}
+
+func (e *Environment) Get(name string) (Value, bool) {
+	v, ok := e.vars[name]
+	if !ok && e.parent != nil {
+		return e.parent.Get(name)
+	}
+	return v, ok
+}
+
+func (e *Environment) Set(name string, v Value) {
+	e.vars[name] = v
+}
+
+func (e *Environment) Assign(name string, v Value) bool {
+	if _, ok := e.vars[name]; ok {
+		e.vars[name] = v
+		return true
+	}
+
+	if e.parent != nil {
+		return e.parent.Assign(name, v)
+	}
+
+	return false
+}
