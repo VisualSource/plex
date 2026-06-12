@@ -242,6 +242,7 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 		}
 		v, ok := instance.Fields[n.Field]
 		if !ok {
+
 			return nil, fmt.Errorf("no field %s", n.Field)
 		}
 		return v, nil
