@@ -25,7 +25,7 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 			return nil, err
 		}
 
-		return &NumberValue{V: f}, nil
+		return NumberValue{V: f}, nil
 	case *script.Identifier:
 		v, ok := env.Get(n.Value)
 		if !ok {
@@ -83,6 +83,38 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 			return nil, err
 		}
 		return nil, returnSignal{value: val}
+
+	case *script.FunctionDeclaration:
+		env.Set(n.Name, FunctionValue{
+			Params: n.Params,
+			Body:   n.Body,
+			Env:    NewEnvironment(env),
+		})
+		return NullValue{}, nil
+	case *script.WhileStatement:
+
+		for {
+			cond, err := Eval(n.Condition, env)
+			if err != nil {
+				return nil, err
+			}
+
+			if !cond.Truthy() {
+				break
+			}
+
+			_, err = Eval(n.Body, env)
+			if err != nil {
+				if ret, ok := err.(returnSignal); ok {
+					return ret.value, nil
+				}
+
+				return nil, err
+			}
+
+		}
+
+		return NullValue{}, nil
 	case *script.FunctionCall:
 		calleeVal, err := Eval(n.Callee, env)
 		if err != nil {

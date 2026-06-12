@@ -10,10 +10,17 @@ import (
 
 func TestEval(t *testing.T) {
 	tokens, err := script.NewTokenizer(strings.NewReader(`
-		fn add(a: int, b: int): int {
-			return a + b;
+		fn mul(a: int, b: int): int {
+			let result = 0;
+			let i = 0;
+			while i < b {
+				result = result + a;
+				i = i + 1;
+			}
+
+			return result;
 		}
-		add(3,4);
+		mul(3,4);
 	`)).Tokenize()
 	if err != nil {
 		t.Fatal(err)
@@ -32,7 +39,7 @@ func TestEval(t *testing.T) {
 
 	v := output.String()
 
-	if v != "7" {
+	if v != "12" {
 		t.Fatalf("was expecting to get 7 but get %s", v)
 	}
 }

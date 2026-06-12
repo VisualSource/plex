@@ -57,9 +57,45 @@ func (p *Parser) advance() Token {
 	return t
 }
 
+var tokenSymbol = map[TokenType]string{
+	TokenType_Plus:               "+",
+	TokenType_Minus:              "-",
+	TokenType_Star:               "*",
+	TokenType_Div:                "/",
+	TokenType_Mod:                "%",
+	TokenType_LessThen:           "<",
+	TokenType_GreaterThen:        ">",
+	TokenType_LessThenOrEqual:    "<=",
+	TokenType_GreaterThenOrEqaul: ">=",
+	TokenType_EqualEqual:         "==",
+	TokenType_NotEqual:           "!=",
+	TokenType_AND:                "&&",
+	TokenType_OR:                 "||",
+	TokenType_Incrment:           "++",
+	TokenType_Decrement:          "--",
+	TokenType_Equal:              "=",
+	TokenType_EOF:                "EOF",
+	TokenType_BracketCurlyOpen:   "{",
+	TokenType_BracketCulryClose:  "}",
+	TokenType_BracketSquareOpen:  "[",
+	TokenType_BracketSquareClose: "]",
+	TokenType_BracketParamOpen:   "(",
+	TokenType_BracketParamClose:  ")",
+	TokenType_Semicolon:          ";",
+	TokenType_Colon:              ":",
+	TokenType_Comma:              ",",
+	TokenType_Dot:                ".",
+	TokenType_Keyword:            "#keyword",
+	TokenType_String:             "#string",
+	TokenType_Ident:              "#ident",
+	TokenType_Question:           "?",
+	TokenType_FatArrow:           "=>",
+	TokenType_Number:             "#number",
+}
+
 func (p *Parser) expect(tt TokenType) (Token, error) {
 	if p.peek().IsToken() != tt {
-		return nil, fmt.Errorf("expected %v, get %v", tt, p.peek().IsToken())
+		return nil, fmt.Errorf("expected %v, get %v", tokenSymbol[tt], tokenSymbol[p.peek().IsToken()])
 	}
 	return p.advance(), nil
 }
@@ -122,7 +158,7 @@ func (p *Parser) parsePrimary() (AstNode, error) {
 		_, err = p.expect(TokenType_BracketParamClose)
 		return inner, err
 	default:
-		return nil, fmt.Errorf("unexpected token: %v", t.IsToken())
+		return nil, fmt.Errorf("unexpected token: %v", tokenSymbol[t.IsToken()])
 	}
 }
 
