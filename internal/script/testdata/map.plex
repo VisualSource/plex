@@ -1,0 +1,154 @@
+
+// This need break statements, array methods (len, append), property assignment, indexing, arrays, nullable types, type casting support, ternary, export and import handling
+
+
+struct KeyValue {
+    key: string;
+    value: string;
+}
+
+
+// https://github.com/cruzelx/DSA-with-golang/blob/be1c80d50f06672f9bd3c4380945fea91f17f9e2/search/hashTable/hashTable.go
+// Map<string,string>
+export struct Map {
+    bucketSize: int;
+    filledSize: int;
+    bucket: KeyValue[][];
+    loadFactor: int;
+}
+
+fn nativeHash(key: string): int {
+    let mut hash = 0;
+    let mut i = 0;
+
+    while i < key.len() {
+        let charCode = int(key[c]);
+        hash = hash + charCode;
+        i++;
+    }
+
+    return hash;
+}
+fn unknownHash(key:string): int {
+    let mut hash = 0;
+    let mut mul = 1;
+    let mut i = 0;
+    while i < key.len() {
+        let charCode = int(key[i]);
+
+        mul = i % 4 == 0 ? 1 : mul * 256;
+
+        hash = hash + charCode * mul;
+
+        i++
+    }
+
+    return hash;
+}
+
+impl Map {
+    fn set(key: string, value: string) {
+        let load = self.filledSize * 100 / self.bucketSize;
+
+        if load >= self.loadFactor {
+            self.bucketSize = self.bucketSize * 2;
+
+            let temp = self.bucket 
+
+            self.bucket = [];
+
+            let mut i = 0;
+            while i < temp.len() {
+                let v = temp[i];
+                let mut j = 0;
+                while j < v.len() {
+                    let w = v[j];
+                    let hash = self._hash(w.key);
+                    self.bucket[hash].append(KeyValue(w.key, w.value));
+                    j++;    
+                }
+                i++;
+            }
+        }
+
+        let hash = self._hash(key);
+
+        if self.bucket[hash].len() > 0 {
+            let mut i = 0;
+            while i < self.bucket[hash].len() {
+                let v = self.bucket[hash][i];
+
+                if v.key == key {
+                    self.bucket[hash][i].value = value;
+                    return;
+                }
+
+                i++;
+            }
+        }
+
+
+        if self.bucket[hash].len() == 0 {
+            self.filledSize++;
+        }
+
+        self.bucket[hash].append(KeyValue(key,value));
+    }
+
+    fn get(key: string): string? {
+        let hash = self._hash(key);
+
+        if self.bucket[hash].len() > 0 {
+            let mut i = 0;
+            while i < self.bucket[hash].len() {
+                let v = self.bucket[hash][i];
+                if v.key == key {
+                    return v.value;
+                }
+                i++;
+            }
+        }
+
+        return nil;
+    }
+
+    fn remove(key: string){
+        let hash = self._hash(key);
+
+        if self.bucket[hash].len() > 0 {
+            let mut i = 0;
+            while i < self.bucket[hash].len() {
+                let v = self.bucket[hash][i];
+
+                if v.key == key {
+                    self.bucket[hash].remove(i);
+
+                    if self.bucket[hash].len() == 0 {
+                        self.filledSize--;
+                    }
+                    return true;
+                }
+                i++;
+            }
+        }
+
+        return false;
+    }
+
+
+    fn _hash(key: string): int {
+        let mut h1 = hash(key) % self.bucketSize;
+        let h2 = unknownHash(key) % self.bucketSize;
+
+        let i = 0;
+        while self.bucket[h1].len() > 0 && self.bucket[h1][0].key != key {
+            h1 = (h1 + i*h2 + (i*i*i-i)/6) % self.bucketSize;
+            if i == self.bucketSize {
+                break;
+            }
+            i++;
+        }
+
+        return h1;
+    }
+}
