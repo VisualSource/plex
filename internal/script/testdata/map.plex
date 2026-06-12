@@ -137,7 +137,7 @@ impl Map {
 
 
     fn _hash(key: string): int {
-        let mut h1 = hash(key) % self.bucketSize;
+        let mut h1 = nativeHash(key) % self.bucketSize;
         let h2 = unknownHash(key) % self.bucketSize;
 
         let i = 0;
