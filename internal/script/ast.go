@@ -148,6 +148,9 @@ func (p *Parser) parsePrimary() (AstNode, error) {
 	case TokenType_Ident:
 		tok := p.advance().(*ValueToken)
 		return NewIdentifier(tok.Value, tok.Start, tok.End), nil
+	case TokenType_String:
+		tok := p.advance().(*ValueToken)
+		return NewStringLiteral(tok.Value, tok.Start, tok.End), nil
 	case TokenType_BracketParamOpen:
 		p.advance()
 		inner, err := p.parseExpression()

@@ -48,7 +48,7 @@ func TestEvalGlobalEnv(t *testing.T) {
 	tokens, err := script.NewTokenizer(strings.NewReader(`
 		struct Point { x: int; y: int; }
 		impl Point {
-			fn sum(self: Point): int {
+			fn sum(): int {
 				return self.x + self.y;
 			}
 		}

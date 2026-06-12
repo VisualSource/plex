@@ -40,8 +40,25 @@ type NumberLiteral struct {
 	Value      string
 }
 
+type StringLiteral struct {
+	Start, End Position
+	Value      string
+}
+
+func (s *StringLiteral) Range() (Position, Position) {
+	return s.Start, s.End
+}
+
 func (m *NumberLiteral) Range() (Position, Position) {
 	return m.Start, m.End
+}
+
+func NewStringLiteral(value string, start, end Position) *StringLiteral {
+	return &StringLiteral{
+		Value: value,
+		End:   end,
+		Start: start,
+	}
 }
 
 func NewNumberLiteral(value string, start, end Position) *NumberLiteral {

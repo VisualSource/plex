@@ -19,6 +19,8 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 			result = v
 		}
 		return result, nil
+	case *script.StringLiteral:
+		return StringValue{V: n.Value}, nil
 	case *script.NumberLiteral:
 		f, err := strconv.ParseFloat(n.Value, 64)
 		if err != nil {
@@ -112,6 +114,44 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 
 		return NullValue{}, nil
 	case *script.FunctionCall:
+		if ma, ok := n.Callee.(*script.MemberAccess); ok {
+			obj, err := Eval(ma.Object, env)
+			if err != nil {
+				return nil, err
+			}
+
+			instance, ok := obj.(*StructValue)
+			if ok {
+				typeVal, _ := env.Get(instance.TypeName)
+				st := typeVal.(StructType)
+				method, ok := st.Methods[ma.Field]
+				if !ok {
+					return nil, fmt.Errorf("no method %s", ma.Field)
+				}
+
+				callEnv := NewEnvironment(method.Env)
+
+				for i, param := range method.Params {
+					if i > len(n.Args)-1 {
+						return nil, fmt.Errorf("method %s was expecting arg at position %d", ma.Field, i+1)
+					}
+					arg, err := Eval(n.Args[i], env)
+					if err != nil {
+						return nil, err
+					}
+
+					callEnv.Set(param.(*script.Parameter).Name, arg)
+				}
+				callEnv.Set("self", instance) // override arg name self
+
+				_, err := Eval(method.Body, callEnv)
+				if ret, ok := err.(returnSignal); ok {
+					return ret.value, nil
+				}
+				return NullValue{}, err
+			}
+		}
+
 		calleeVal, err := Eval(n.Callee, env)
 		if err != nil {
 			return nil, err
@@ -133,41 +173,6 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 			}
 			return instance, nil
 		case FunctionValue:
-			if ma, ok := n.Callee.(*script.MemberAccess); ok {
-				obj, err := Eval(ma.Object, env)
-				if err != nil {
-					return nil, err
-				}
-
-				instance, ok := obj.(*StructValue)
-				if ok {
-					typeVal, _ := env.Get(instance.TypeName)
-					st := typeVal.(StructType)
-					method, ok := st.Methods[ma.Field]
-					if !ok {
-						return nil, fmt.Errorf("no method %s", ma.Field)
-					}
-
-					callEnv := NewEnvironment(method.Env)
-
-					for i, param := range method.Params {
-						arg, err := Eval(n.Args[i], env)
-						if err != nil {
-							return nil, err
-						}
-
-						callEnv.Set(param.(*script.Parameter).Name, arg)
-					}
-					callEnv.Set("self", instance) // override arg name self
-
-					_, err := Eval(method.Body, callEnv)
-					if ret, ok := err.(returnSignal); ok {
-						return ret.value, nil
-					}
-					return NullValue{}, err
-				}
-			}
-
 			callEnv := NewEnvironment(callee.Env)
 			for i, param := range callee.Params {
 				p := param.(*script.Parameter)
@@ -213,7 +218,6 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 			Methods: make(map[string]FunctionValue),
 		})
 		return NullValue{}, nil
-
 	case *script.StructImplStatement:
 		v, ok := env.Get(n.Name)
 		if !ok {
