@@ -90,6 +90,7 @@ type Type struct {
 	Start, End Position
 	Name       string
 	IsArray    bool
+	IsNullable bool
 }
 
 func (t *Type) Range() (Position, Position) {
@@ -248,4 +249,32 @@ type ReturnStatement struct {
 
 func (r *ReturnStatement) Range() (Position, Position) {
 	return r.Start, r.End
+}
+
+type BreakStatement struct {
+	Start, End Position
+}
+
+func (r *BreakStatement) Range() (Position, Position) {
+	return r.Start, r.End
+}
+
+type MemberAssignment struct {
+	Start, End Position
+	Object     AstNode
+	Field      string
+	Value      AstNode
+}
+
+func (m *MemberAssignment) Range() (Position, Position) {
+	return m.Start, m.End
+}
+
+type ArrayLiteral struct {
+	Start, End Position
+	Elements   []AstNode
+}
+
+func (a *ArrayLiteral) Range() (Position, Position) {
+	return a.Start, a.End
 }

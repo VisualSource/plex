@@ -76,6 +76,8 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 			result = v
 		}
 		return result, nil
+	case *script.BreakStatement:
+		return nil, breakSignal{}
 	case *script.ReturnStatement:
 		if n.Value == nil {
 			return nil, returnSignal{value: NullValue{}}
@@ -107,9 +109,12 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 
 			_, err = Eval(n.Body, env)
 			if err != nil {
+				if _, ok := err.(breakSignal); ok {
+					return NullValue{}, nil
+				}
+
 				return nil, err
 			}
-
 		}
 
 		return NullValue{}, nil
@@ -120,8 +125,40 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 				return nil, err
 			}
 
-			instance, ok := obj.(*StructValue)
-			if ok {
+			switch instance := obj.(type) {
+			case *ArrayValue:
+				switch ma.Field {
+				case "len":
+					return instance.len()
+				case "append":
+					if len(n.Args) != 1 {
+						return nil, fmt.Errorf("requires a arg")
+					}
+					arg, err := Eval(n.Args[0], env)
+					if err != nil {
+						return nil, err
+					}
+
+					return instance.append(arg)
+				case "remove":
+					if len(n.Args) != 1 {
+						return nil, fmt.Errorf("requires a arg")
+					}
+					arg, err := Eval(n.Args[0], env)
+					if err != nil {
+						return nil, err
+					}
+
+					return instance.remove(arg)
+				default:
+					return nil, fmt.Errorf("array has not method %s", ma.Field)
+				}
+			case StringValue:
+				if ma.Field == "len" {
+					return NumberValue{V: float64(len(instance.V))}, nil
+				}
+				return nil, fmt.Errorf("#string does not have method %s", ma.Field)
+			case *StructValue:
 				typeVal, _ := env.Get(instance.TypeName)
 				st := typeVal.(StructType)
 				method, ok := st.Methods[ma.Field]
@@ -149,6 +186,7 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 					return ret.value, nil
 				}
 				return NullValue{}, err
+
 			}
 		}
 
@@ -250,6 +288,94 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 			return nil, fmt.Errorf("no field %s", n.Field)
 		}
 		return v, nil
+	case *script.MemberAssignment:
+		obj, err := Eval(n.Object, env)
+		if err != nil {
+			return nil, err
+		}
+		instance, ok := obj.(*StructValue)
+		if !ok {
+			return nil, fmt.Errorf("cannot assig field on non-struct value")
+		}
+
+		val, err := Eval(n.Value, env)
+		if err != nil {
+			return nil, err
+		}
+
+		instance.Fields[n.Field] = val
+		return val, nil
+	case *script.TernaryExpression:
+		cond, err := Eval(n.Condition, env)
+		if err != nil {
+			return nil, err
+		}
+
+		if cond.Truthy() {
+			result, err := Eval(n.TrueBlock, env)
+			if err != nil {
+				return nil, err
+			}
+			return result, nil
+		}
+
+		result, err := Eval(n.FalseBlock, env)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	case *script.ArrayAccess:
+		field, err := Eval(n.Field, env)
+		if err != nil {
+			return nil, err
+		}
+
+		obj, err := Eval(n.Object, env)
+		if err != nil {
+			return nil, err
+		}
+
+		switch n := field.(type) {
+		case *ArrayValue:
+			i, ok := obj.(NumberValue)
+			if !ok {
+				return nil, fmt.Errorf("index into non-array")
+			}
+
+			idx := int(i.V)
+
+			if idx < 0 || idx > len(n.Elements) {
+				return nil, fmt.Errorf("index out of bounds")
+			}
+
+			return n.Elements[idx], nil
+		case StringValue:
+			num, ok := obj.(NumberValue)
+			if !ok {
+				return nil, fmt.Errorf("cannot index string with %T", num)
+			}
+
+			r := int(num.V)
+
+			if r < 0 || r > len(n.V) {
+				return nil, fmt.Errorf("index out of range")
+			}
+
+			return StringValue{V: string(n.V[r])}, nil
+		default:
+			return nil, fmt.Errorf("cannot index %T", obj)
+		}
+	case *script.ArrayLiteral:
+		elements := make([]Value, len(n.Elements))
+		for i, el := range n.Elements {
+			v, err := Eval(el, env)
+			if err != nil {
+				return nil, err
+			}
+			elements[i] = v
+		}
+
+		return &ArrayValue{Elements: elements}, nil
 	default:
 		return nil, fmt.Errorf("eval: unhandled node %T", node)
 	}
@@ -300,3 +426,7 @@ func evalBinary(n *script.BinaryExpression, env *Environment) (Value, error) {
 type returnSignal struct{ value Value }
 
 func (r returnSignal) Error() string { return "return" }
+
+type breakSignal struct{}
+
+func (b breakSignal) Error() string { return "break" }

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 6: Introduction to Code Generation</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --border: #2a2d3a; --text: #e2e4ef;
+    --muted: #8b8fa8; --accent: #7c6ff7; --accent-dim: #3d3a6e;
+    --green: #4eca8b; --green-dim: #1d3d2e; --red: #f07178; --red-dim: #3d1f22;
+    --yellow: #ffd580; --yellow-dim: #3d3218; --code-bg: #141720; --code-border: #252836;
+    --teal: #89ddff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Georgia','Times New Roman',serif; background: var(--bg); color: var(--text); line-height: 1.75; padding: 0 1rem 4rem; }
+  .page { max-width: 760px; margin: 0 auto; }
+  header { border-bottom: 1px solid var(--border); padding: 2.5rem 0 1.5rem; margin-bottom: 2.5rem; }
+  .lesson-tag { font-family: 'Courier New',monospace; font-size: 0.75rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 0.75rem; }
+  h1 { font-size: 2rem; font-weight: 700; line-height: 1.2; margin-bottom: 0.5rem; }
+  .subtitle { color: var(--muted); font-size: 1rem; }
+  h2 { font-size: 1.25rem; font-weight: 700; margin: 2.5rem 0 0.75rem; }
+  h3 { font-size: 1rem; font-weight: 700; margin: 1.5rem 0 0.5rem; color: var(--accent); font-family: 'Courier New',monospace; }
+  p { margin-bottom: 1rem; }
+  a { color: var(--accent); text-decoration: underline; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1rem 0; font-family: 'Courier New',monospace; font-size: 0.875rem; line-height: 1.6; }
+  code { font-family: 'Courier New',monospace; font-size: 0.875em; background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 3px; padding: 0.1em 0.35em; }
+  pre code { background: none; border: none; padding: 0; }
+  .kw { color: #c792ea; } .fn { color: #82aaff; } .type { color: #ffcb6b; }
+  .str { color: #c3e88d; } .cmt { color: #546e7a; font-style: italic; }
+  .num { color: #f78c6c; } .wat { color: var(--teal); }
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-dim); border-radius: 0 6px 6px 0; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .callout.insight { border-color: var(--green); background: var(--green-dim); }
+  .callout.warning { border-color: var(--yellow); background: var(--yellow-dim); }
+  .callout-title { font-family: 'Courier New',monospace; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 0.4rem; }
+  .callout.insight .callout-title { color: var(--green); } .callout.warning .callout-title { color: var(--yellow); }
+  .quiz { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin: 2rem 0; }
+  .quiz h2 { margin-top: 0; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); font-family: 'Courier New',monospace; }
+  .question { margin: 1.25rem 0 0.75rem; font-weight: 700; }
+  .options { display: flex; flex-direction: column; gap: 0.5rem; }
+  .option { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.65rem 1rem; cursor: pointer; font-family: 'Courier New',monospace; font-size: 0.875rem; color: var(--text); text-align: left; transition: border-color 0.15s, background 0.15s; }
+  .option:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .option.correct { border-color: var(--green) !important; background: var(--green-dim) !important; }
+  .option.wrong { border-color: var(--red) !important; background: var(--red-dim) !important; }
+  .feedback { display: none; margin-top: 0.75rem; padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; }
+  .feedback.show { display: block; } .feedback.correct { background: var(--green-dim); color: var(--green); } .feedback.wrong { background: var(--red-dim); color: var(--red); }
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); font-size: 0.875rem; color: var(--muted); }
+  .citation { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem; padding-top: 1rem; }
+  .citation a { color: var(--muted); }
+  .progress-bar { height: 3px; background: var(--border); border-radius: 2px; margin-bottom: 2rem; }
+  .progress-fill { height: 100%; width: 60%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+  .teacher-note { margin-top: 3rem; background: var(--surface); border-radius: 8px; padding: 1.25rem 1.5rem; font-size: 0.9rem; color: var(--muted); }
+  .teacher-note strong { color: var(--text); }
+  .side-by-side { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  .side-label { font-family: 'Courier New',monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.4rem; }
+  .stack-trace { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 8px; padding: 1rem 1.25rem; font-family: 'Courier New',monospace; font-size: 0.875rem; }
+  .stack-row { display: flex; align-items: center; gap: 1rem; padding: 0.2rem 0; border-bottom: 1px solid var(--code-border); }
+  .stack-row:last-child { border-bottom: none; }
+  .stack-instr { color: var(--teal); min-width: 180px; }
+  .stack-state { color: var(--green); }
+  .stack-arrow { color: var(--muted); }
+  .pipeline { display: flex; align-items: center; gap: 0.5rem; font-family: 'Courier New',monospace; font-size: 0.875rem; flex-wrap: wrap; margin: 1rem 0; }
+  .pipeline-stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.8rem; }
+  .pipeline-stage.active { border-color: var(--accent); color: var(--accent); }
+  .pipeline-arrow { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+
+  <header>
+    <div class="lesson-tag">Lesson 6 &middot; Compiler Construction &middot; Code Generation</div>
+    <h1>Introduction to Code Generation</h1>
+    <p class="subtitle">From evaluating trees to emitting WebAssembly</p>
+  </header>
+
+  <h2>The Mindset Shift</h2>
+
+  <p>The interpreter walks the AST and <em>computes</em> results in Go memory. A compiler walks the same AST and <em>emits instructions</em> that a different machine will later execute. The tree traversal is identical — what changes is what you do at each node.</p>
+
+  <div class="side-by-side">
+    <div>
+      <div class="side-label">Interpreter — eval NumberLiteral</div>
+      <pre style="margin:0;"><code><span class="cmt">// computes immediately</span>
+<span class="kw">case</span> *<span class="type">NumberLiteral</span>:
+    f, _ := strconv.<span class="fn">ParseFloat</span>(n.Value, <span class="num">64</span>)
+    <span class="kw">return</span> <span class="type">NumberValue</span>{V: f}, <span class="kw">nil</span></code></pre>
+    </div>
+    <div>
+      <div class="side-label">Compiler — compile NumberLiteral</div>
+      <pre style="margin:0;"><code><span class="cmt">// emits an instruction</span>
+<span class="kw">case</span> *<span class="type">NumberLiteral</span>:
+    c.<span class="fn">emit</span>(<span class="str">"f64.const"</span>, n.Value)
+    <span class="kw">return</span> <span class="kw">nil</span></code></pre>
+    </div>
+  </div>
+
+  <div class="callout insight">
+    <div class="callout-title">The key insight</div>
+    The recursive structure of your AST maps directly to the order in which you emit instructions. The compiler is just <code>Eval</code> with <code>return value</code> replaced by <code>emit instruction</code>.
+  </div>
+
+  <div class="pipeline">
+    <div class="pipeline-stage">Source text</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage">Tokenizer ✓</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage">Parser ✓</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage">Interpreter ✓</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage active">Compiler ← you are here</div>
+    <div class="pipeline-arrow">→</div>
+    <div class="pipeline-stage">WASM runtime</div>
+  </div>
+
+  <h2>WebAssembly: a Stack Machine</h2>
+
+  <p>WebAssembly is a <strong>stack machine</strong>. Every instruction either pushes a value onto an implicit stack or pops operands and pushes a result. There are no visible registers — just the stack.</p>
+
+  <p>Trace through <code>1 + 2 * 3</code>. The AST puts <code>*</code> deeper (higher precedence), so the compiler visits it first:</p>
+
+  <div class="stack-trace">
+    <div class="stack-row">
+      <span class="stack-instr">f64.const 1</span>
+      <span class="stack-arrow">→</span>
+      <span class="stack-state">[ 1 ]</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-instr">f64.const 2</span>
+      <span class="stack-arrow">→</span>
+      <span class="stack-state">[ 1, 2 ]</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-instr">f64.const 3</span>
+      <span class="stack-arrow">→</span>
+      <span class="stack-state">[ 1, 2, 3 ]</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-instr">f64.mul</span>
+      <span class="stack-arrow">→</span>
+      <span class="stack-state">[ 1, 6 ]</span>
+    </div>
+    <div class="stack-row">
+      <span class="stack-instr">f64.add</span>
+      <span class="stack-arrow">→</span>
+      <span class="stack-state">[ 7 ]</span>
+    </div>
+  </div>
+
+  <p>The postorder traversal of the AST <em>is</em> the instruction sequence. You emit left operand, then right operand, then the operator — which is exactly the order recursive compile functions produce them.</p>
+
+  <h2>WAT: the Text Format</h2>
+
+  <p>WebAssembly has a human-readable text format called <strong>WAT</strong>. You'll generate this first — it's debuggable, and <code>wazero</code> can run it after converting to binary with <code>wat2wasm</code>, or you can use a Go WAT parser. Here's what a compiled plex function looks like:</p>
+
+  <pre><code><span class="cmt">;; plex source: fn add(a: int, b: int): int { return a + b; }</span>
+<span class="wat">(module
+  (func $add (param $a f64) (param $b f64) (result f64)
+    local.get $a
+    local.get $b
+    f64.add)
+  (export "add" (func $add))
+)</span></code></pre>
+
+  <div class="callout warning">
+    <div class="callout-title">Types: the first hard problem</div>
+    WASM is statically typed: every value is <code>i32</code>, <code>i64</code>, <code>f32</code>, or <code>f64</code>. Plex uses dynamic values. For a first pass: <strong>compile all plex numbers to <code>f64</code></strong>. This is exactly what early JavaScript engines did. Structs, arrays, and strings require WASM linear memory — that's Lesson 7.
+  </div>
+
+  <h2>The Compiler Struct</h2>
+
+  <p>The compiler needs to track state that Eval didn't: which locals are declared in the current function, and what output we're building. A simple struct handles both:</p>
+
+  <pre><code><span class="kw">type</span> <span class="type">Compiler</span> <span class="kw">struct</span> {
+    out    strings.<span class="type">Builder</span>
+    locals []<span class="type">string</span> <span class="cmt">// param and let names in current function</span>
+    depth  <span class="type">int</span>       <span class="cmt">// indentation</span>
+}
+
+<span class="kw">func</span> (c *<span class="type">Compiler</span>) <span class="fn">emit</span>(parts ...string) {
+    c.out.<span class="fn">WriteString</span>(strings.<span class="fn">Repeat</span>(<span class="str">"  "</span>, c.depth))
+    c.out.<span class="fn">WriteString</span>(strings.<span class="fn">Join</span>(parts, <span class="str">" "</span>))
+    c.out.<span class="fn">WriteRune</span>(<span class="str">'\n'</span>)
+}
+
+<span class="kw">func</span> (c *<span class="type">Compiler</span>) <span class="fn">Compile</span>(node script.<span class="type">AstNode</span>) <span class="type">error</span> {
+    <span class="kw">switch</span> n := node.(<span class="kw">type</span>) {
+    <span class="cmt">// ... cases below</span>
+    <span class="kw">default</span>:
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"compile: unhandled %T"</span>, node)
+    }
+}
+
+<span class="kw">func</span> <span class="fn">CompileProgram</span>(program *script.<span class="type">Program</span>) (<span class="type">string</span>, <span class="type">error</span>) {
+    c := &<span class="type">Compiler</span>{}
+    c.<span class="fn">emit</span>(<span class="str">"(module"</span>)
+    c.depth++
+    <span class="kw">for</span> _, stmt := <span class="kw">range</span> program.Stmts {
+        <span class="kw">if</span> err := c.<span class="fn">Compile</span>(stmt); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="str">""</span>, err
+        }
+    }
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)
+    <span class="kw">return</span> c.out.<span class="fn">String</span>(), <span class="kw">nil</span>
+}</code></pre>
+
+  <h2>Compiling Expressions</h2>
+
+  <p>Each expression case emits its children first, then its own instruction — postorder, just like the stack trace above:</p>
+
+  <pre><code><span class="kw">case</span> *script.<span class="type">NumberLiteral</span>:
+    c.<span class="fn">emit</span>(<span class="str">"f64.const"</span>, n.Value)
+
+<span class="kw">case</span> *script.<span class="type">Identifier</span>:
+    c.<span class="fn">emit</span>(<span class="str">"local.get"</span>, <span class="str">"$"</span>+n.Value)
+
+<span class="kw">case</span> *script.<span class="type">BinaryExpression</span>:
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Left); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Right); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    <span class="kw">switch</span> n.Operator {
+    <span class="kw">case</span> script.<span class="type">TokenType_Plus</span>:  c.<span class="fn">emit</span>(<span class="str">"f64.add"</span>)
+    <span class="kw">case</span> script.<span class="type">TokenType_Minus</span>: c.<span class="fn">emit</span>(<span class="str">"f64.sub"</span>)
+    <span class="kw">case</span> script.<span class="type">TokenType_Star</span>:  c.<span class="fn">emit</span>(<span class="str">"f64.mul"</span>)
+    <span class="kw">case</span> script.<span class="type">TokenType_Div</span>:   c.<span class="fn">emit</span>(<span class="str">"f64.div"</span>)
+    <span class="kw">case</span> script.<span class="type">TokenType_LessThen</span>: c.<span class="fn">emit</span>(<span class="str">"f64.lt"</span>)
+    <span class="kw">case</span> script.<span class="type">TokenType_EqualEqual</span>: c.<span class="fn">emit</span>(<span class="str">"f64.eq"</span>)
+    <span class="kw">default</span>: <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unsupported operator: %v"</span>, n.Operator)
+    }</code></pre>
+
+  <h2>Compiling Functions</h2>
+
+  <p>A function declaration emits a WAT <code>func</code> block. Parameters become WASM locals. Local variables declared with <code>let</code> become mutable locals declared at the top of the function.</p>
+
+  <pre><code><span class="kw">case</span> *script.<span class="type">FunctionDeclaration</span>:
+    <span class="cmt">// build param signature: (param $a f64) (param $b f64)</span>
+    params := strings.<span class="type">Builder</span>{}
+    c.locals = []<span class="type">string</span>{}
+    <span class="kw">for</span> _, p := <span class="kw">range</span> n.Params {
+        param := p.(*script.<span class="type">Parameter</span>)
+        params.<span class="fn">WriteString</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">" (param $%s f64)"</span>, param.Name))
+        c.locals = <span class="fn">append</span>(c.locals, param.Name)
+    }
+
+    result := <span class="str">""</span>
+    <span class="kw">if</span> n.ReturnType != <span class="kw">nil</span> {
+        result = <span class="str">" (result f64)"</span>
+    }
+
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(func $%s%s%s"</span>, n.Name, params.<span class="fn">String</span>(), result))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(export \"%s\" (func $%s))"</span>, n.Name, n.Name))
+    c.depth++
+
+    <span class="cmt">// first pass: collect let declarations so we can emit (local $x f64) headers</span>
+    <span class="kw">for</span> _, local := <span class="kw">range</span> <span class="fn">collectLocals</span>(n.Body) {
+        c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(local $%s f64)"</span>, local))
+    }
+
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Body); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)
+
+<span class="kw">case</span> *script.<span class="type">ReturnStatement</span>:
+    <span class="kw">if</span> n.Value != <span class="kw">nil</span> {
+        <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Value); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    }
+    c.<span class="fn">emit</span>(<span class="str">"return"</span>)
+
+<span class="kw">case</span> *script.<span class="type">VariableDeclaration</span>:
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Init); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.<span class="fn">emit</span>(<span class="str">"local.set $"</span> + n.Name)
+
+<span class="kw">case</span> *script.<span class="type">AssignmentExpression</span>:
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Value); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.<span class="fn">emit</span>(<span class="str">"local.set $"</span> + n.Name)</code></pre>
+
+  <div class="callout">
+    <div class="callout-title">Why collect locals first?</div>
+    In WASM, all local variables must be declared at the <em>top</em> of the function before any instructions. But in plex, <code>let</code> can appear anywhere in the body. A pre-pass walks the block collecting all <code>VariableDeclaration</code> names so you can emit their <code>(local $x f64)</code> declarations up front.
+  </div>
+
+  <h3>collectLocals — the pre-pass</h3>
+
+  <pre><code><span class="kw">func</span> <span class="fn">collectLocals</span>(node script.<span class="type">AstNode</span>) []<span class="type">string</span> {
+    <span class="kw">var</span> names []<span class="type">string</span>
+    <span class="kw">switch</span> n := node.(<span class="kw">type</span>) {
+    <span class="kw">case</span> *script.<span class="type">Block</span>:
+        <span class="kw">for</span> _, s := <span class="kw">range</span> n.Stmts {
+            names = <span class="fn">append</span>(names, <span class="fn">collectLocals</span>(s)...)
+        }
+    <span class="kw">case</span> *script.<span class="type">VariableDeclaration</span>:
+        names = <span class="fn">append</span>(names, n.Name)
+    <span class="kw">case</span> *script.<span class="type">IfStatement</span>:
+        names = <span class="fn">append</span>(names, <span class="fn">collectLocals</span>(n.Body)...)
+        <span class="kw">if</span> n.Else != <span class="kw">nil</span> { names = <span class="fn">append</span>(names, <span class="fn">collectLocals</span>(n.Else)...) }
+    <span class="kw">case</span> *script.<span class="type">WhileStatement</span>:
+        names = <span class="fn">append</span>(names, <span class="fn">collectLocals</span>(n.Body)...)
+    }
+    <span class="kw">return</span> names
+}</code></pre>
+
+  <h2>Compiling Control Flow</h2>
+
+  <p>WASM has structured control flow — no <code>goto</code>, no arbitrary jumps. <code>if</code> and loops use block syntax:</p>
+
+  <pre><code><span class="kw">case</span> *script.<span class="type">IfStatement</span>:
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Condition); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.<span class="fn">emit</span>(<span class="str">"(if"</span>)
+    c.depth++
+    c.<span class="fn">emit</span>(<span class="str">"(then"</span>)
+    c.depth++
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Body); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)
+    <span class="kw">if</span> n.Else != <span class="kw">nil</span> {
+        c.<span class="fn">emit</span>(<span class="str">"(else"</span>)
+        c.depth++
+        <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Else); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+        c.depth--
+        c.<span class="fn">emit</span>(<span class="str">")"</span>)
+    }
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)
+
+<span class="kw">case</span> *script.<span class="type">WhileStatement</span>:
+    <span class="cmt">// WASM loops: (block (loop ... br_if 1 ... br 0))</span>
+    <span class="cmt">// br 0 = branch to loop top; br_if 1 = break out of block</span>
+    c.<span class="fn">emit</span>(<span class="str">"(block"</span>)
+    c.depth++
+    c.<span class="fn">emit</span>(<span class="str">"(loop"</span>)
+    c.depth++
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Condition); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.<span class="fn">emit</span>(<span class="str">"i32.eqz"</span>)   <span class="cmt">// invert: exit if condition false</span>
+    c.<span class="fn">emit</span>(<span class="str">"br_if 1"</span>)  <span class="cmt">// jump out of block if condition false</span>
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Body); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.<span class="fn">emit</span>(<span class="str">"br 0"</span>)     <span class="cmt">// jump back to loop top</span>
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>) <span class="cmt">// end loop</span>
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>) <span class="cmt">// end block</span></code></pre>
+
+  <div class="callout insight">
+    <div class="callout-title">Structured control flow is not a limitation</div>
+    WASM deliberately has no <code>goto</code>. The <code>(block (loop ...))</code> pattern is how every loop compiles. <code>br 0</code> means "branch to the start of the innermost enclosing loop." <code>br_if 1</code> means "branch out of the block one level up if condition is true." The numbers are <em>depth indices</em>, not labels. See the <a href="https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions" target="_blank">WASM spec</a> for the formal model.
+  </div>
+
+  <hr style="border-color: var(--border); margin: 2.5rem 0;">
+
+  <div class="quiz">
+    <h2>Check Your Understanding</h2>
+
+    <div id="q1">
+      <p class="question">1. Why does the compiler emit Left, then Right, then the operator — in that order?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q1',false)">Because WASM requires operands before operators in its binary format</button>
+        <button class="option" onclick="answer(this,'q1',true)">The stack machine pops operands in the order they were pushed. Emitting left then right pushes them in the right order so the operator pops them correctly.</button>
+        <button class="option" onclick="answer(this,'q1',false)">It matches the order the parser saw them in the source</button>
+      </div>
+      <div class="feedback" id="q1-feedback"></div>
+    </div>
+
+    <div id="q2" style="margin-top:1.5rem;">
+      <p class="question">2. Why does <code>collectLocals</code> need to be a separate pre-pass rather than emitting locals inline as they're encountered?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q2',true)">WASM requires all local declarations at the top of the function before any instructions. Inline emission would place declarations mid-body, which is invalid WAT.</button>
+        <button class="option" onclick="answer(this,'q2',false)">For performance — collecting them first avoids redundant work</button>
+        <button class="option" onclick="answer(this,'q2',false)">To check for duplicate variable names</button>
+      </div>
+      <div class="feedback" id="q2-feedback"></div>
+    </div>
+
+    <div id="q3" style="margin-top:1.5rem;">
+      <p class="question">3. <code>br_if 1</code> breaks out of the while loop. What does the <code>1</code> mean?</p>
+      <div class="options">
+        <button class="option" onclick="answer(this,'q3',false)">Jump 1 instruction forward</button>
+        <button class="option" onclick="answer(this,'q3',false)">Always-true condition value</button>
+        <button class="option" onclick="answer(this,'q3',true)">Break out of the enclosing block 1 level up — 0 would be the loop itself, 1 is the surrounding block that wraps it</button>
+      </div>
+      <div class="feedback" id="q3-feedback"></div>
+    </div>
+  </div>
+
+  <h2>Your Turn</h2>
+
+  <p>Create <a href="../internal/script/compiler/wasm.go">internal/script/compiler/wasm.go</a>:</p>
+
+  <ol style="padding-left:1.5rem; line-height:2.25;">
+    <li>Implement the <code>Compiler</code> struct with <code>emit</code>, <code>depth</code>, and <code>Compile</code></li>
+    <li>Add cases for <code>*Program</code>, <code>*FunctionDeclaration</code>, <code>*Block</code></li>
+    <li>Add expression cases: <code>*NumberLiteral</code>, <code>*Identifier</code>, <code>*BinaryExpression</code></li>
+    <li>Add <code>*VariableDeclaration</code>, <code>*AssignmentExpression</code>, <code>*ReturnStatement</code></li>
+    <li>Implement <code>collectLocals</code></li>
+    <li>Add <code>*IfStatement</code> and <code>*WhileStatement</code></li>
+    <li>Write a test: compile <code>fn add(a: int, b: int): int { return a + b; }</code> and assert the output contains <code>f64.add</code> and <code>(param $a f64)</code></li>
+    <li><strong>Stretch:</strong> install <a href="https://github.com/nicowillis/go-wat" target="_blank">a Go WAT parser</a> or use <code>wat2wasm</code> + wazero to actually run the compiled output</li>
+  </ol>
+
+  <div class="callout warning">
+    <div class="callout-title">What this compiler can't do yet</div>
+    Strings, arrays, and structs require WASM <em>linear memory</em> — a heap you manage manually. Lesson 7 covers that. For now, the compiler handles pure arithmetic functions — which is already enough to understand the full pipeline from source to executing machine code.
+  </div>
+
+  <div class="citation">
+    <strong>Sources:</strong>
+    <a href="https://webassembly.github.io/spec/core/text/index.html" target="_blank">WebAssembly Text Format Spec</a> &middot;
+    <a href="https://craftinginterpreters.com/chunks-of-bytecode.html" target="_blank">Crafting Interpreters §14 — Chunks of Bytecode</a> &middot;
+    <a href="https://github.com/nicowillis/go-wat" target="_blank">go-wat — WAT parser for Go</a> &middot;
+    <a href="https://github.com/tetratelabs/wazero" target="_blank">wazero — zero-dependency WASM runtime</a>
+  </div>
+
+  <div class="teacher-note">
+    <strong>Ask your teacher (me) anything.</strong> Good follow-up questions: "How does WASM handle function calls — what does the compiled output look like?", "What is linear memory and how would structs map to it?", "How does a register machine differ from a stack machine?", "What's an IR and why do production compilers use one?"
+  </div>
+
+  <div class="nav">
+    <span><a href="0005-structs-and-native-functions.html">← Lesson 5: Structs &amp; Native Functions</a></span>
+    <span>Next: <em>Linear Memory &amp; the Heap</em></span>
+  </div>
+
+</div>
+<script>
+const explanations = {
+  q1: {
+    correct: "Right. The stack machine model requires operands to be on the stack before the operator runs. If you emitted the operator first, it would try to pop values that aren't there yet. Postorder traversal — children before parent — naturally produces the correct push order.",
+    wrong: "It's about the stack machine's execution model. The operator pops its operands from the stack, so they must be pushed first. The compiler's recursive structure naturally produces this order: compile left (pushes left), compile right (pushes right), emit operator (pops both, pushes result)."
+  },
+  q2: {
+    correct: "Exactly. The WAT spec requires (local $x f64) declarations to appear at the top of the function body, before any instructions. A tree walk that emits locals inline as it hits VariableDeclaration nodes would produce invalid WAT. The pre-pass solves this by collecting all names first.",
+    wrong: "It's a WASM format constraint. Local variable declarations must all appear at the top of the function — you can't intersperse them with instructions. The pre-pass is mandatory, not a performance trick."
+  },
+  q3: {
+    correct: "Correct. WASM branch depths count outward from the innermost block. Inside the (loop ...), depth 0 is the loop itself (br 0 = go back to loop start). The (block ...) wrapping the loop is depth 1. br_if 1 exits the block, which is how you break out of the loop.",
+    wrong: "The number is a nesting depth, not an offset or value. From inside the (loop), depth 0 refers to the loop itself, depth 1 refers to the enclosing (block). br_if 1 means: if condition is true, branch to the exit of the block one level up — effectively breaking the loop."
+  }
+};
+let answered = {};
+function answer(btn, qid, isCorrect) {
+  if (answered[qid]) return;
+  answered[qid] = true;
+  btn.parentElement.querySelectorAll('.option').forEach(b => b.style.pointerEvents = 'none');
+  btn.classList.add(isCorrect ? 'correct' : 'wrong');
+  const fb = document.getElementById(qid + '-feedback');
+  fb.textContent = explanations[qid][isCorrect ? 'correct' : 'wrong'];
+  fb.className = 'feedback show ' + (isCorrect ? 'correct' : 'wrong');
+  document.getElementById('progress').style.width = (60 + (Object.keys(answered).length / 3) * 30) + '%';
+}
+</script>
+</body>
+</html>

@@ -160,6 +160,34 @@ func (p *Parser) parsePrimary() (AstNode, error) {
 
 		_, err = p.expect(TokenType_BracketParamClose)
 		return inner, err
+	case TokenType_BracketSquareOpen:
+		open := p.advance()
+		start, _ := open.Range()
+		elements := make([]AstNode, 0)
+		for p.peek().IsToken() != TokenType_BracketSquareClose {
+			el, err := p.parseExpression()
+			if err != nil {
+				return nil, err
+			}
+			elements = append(elements, el)
+			if p.peek().IsToken() != TokenType_Comma {
+				break
+			}
+			p.advance() // ","
+		}
+
+		close, err := p.expect(TokenType_BracketSquareClose)
+		if err != nil {
+			return nil, err
+		}
+
+		_, end := close.Range()
+
+		return &ArrayLiteral{
+			Start:    start,
+			End:      end,
+			Elements: elements,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unexpected token: %v", tokenSymbol[t.IsToken()])
 	}
@@ -382,25 +410,44 @@ func (p *Parser) parseTernary() (AstNode, error) {
 
 // assignment ::= IDENT "=" expression | ternary
 func (p *Parser) parseAssignment() (AstNode, error) {
-	if p.peek().IsToken() == TokenType_Ident && p.peekN(1).IsToken() == TokenType_Equal {
-		name := p.advance().(*ValueToken)
-		p.advance() // eat "="
-
-		value, err := p.parseExpression()
-		if err != nil {
-			return nil, err
-		}
-
-		_, end := value.Range()
-		return &AssignmentExpression{
-			Start: name.Start,
-			End:   end,
-			Name:  name.Value,
-			Value: value,
-		}, nil
+	expr, err := p.parseTernary()
+	if err != nil {
+		return nil, err
 	}
 
-	return p.parseTernary()
+	if p.peek().IsToken() != TokenType_Equal {
+		return expr, nil // not assignment
+	}
+	p.advance() // eat '='
+
+	value, err := p.parseExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	start, _ := expr.Range()
+	_, end := value.Range()
+
+	switch target := expr.(type) {
+	case *Identifier:
+		return &AssignmentExpression{
+			Start: start,
+			End:   end,
+			Name:  target.Value,
+			Value: value,
+		}, nil
+	case *MemberAccess:
+		return &MemberAssignment{
+			Start:  start,
+			End:    end,
+			Object: target.Object,
+			Field:  target.Field,
+			Value:  value,
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid assignment target")
+
+	}
 }
 
 // expression ::= assignment
@@ -441,6 +488,8 @@ func (p *Parser) parseStatement() (AstNode, error) {
 		return p.parseVarDecl()
 	case isKeyword(t, "return"):
 		return p.parseReturnStatement()
+	case isKeyword(t, "break"):
+		return p.parseBreakStatement()
 	default:
 		return p.parseExprStmt()
 	}
@@ -595,7 +644,7 @@ func (p *Parser) parseParam() (AstNode, error) {
 	}, nil
 }
 
-// typeExpr ::= IDENT ( "[" "]" )?
+// typeExpr ::= IDENT ( "[" "]" )* "?"?
 func (p *Parser) parseTypeExpr() (AstNode, error) {
 	token, err := p.expect(TokenType_Ident)
 	if err != nil {
@@ -609,10 +658,16 @@ func (p *Parser) parseTypeExpr() (AstNode, error) {
 		Name:  token.(*ValueToken).Value,
 	}
 
-	if p.peek().IsToken() == TokenType_BracketSquareOpen && p.peekN(1).IsToken() == TokenType_BracketSquareClose {
+	for p.peek().IsToken() == TokenType_BracketSquareOpen && p.peekN(1).IsToken() == TokenType_BracketSquareClose {
 		p.advance()
 		last := p.advance()
 		t.IsArray = true
+		_, t.End = last.Range()
+	}
+
+	if p.peek().IsToken() == TokenType_Question {
+		last := p.advance()
+		t.IsNullable = true
 		_, t.End = last.Range()
 	}
 
@@ -901,6 +956,22 @@ func (p *Parser) parseReturnStatement() (AstNode, error) {
 		Start: start,
 		End:   end,
 		Value: expr,
+	}, nil
+}
+
+func (p *Parser) parseBreakStatement() (AstNode, error) {
+	start, _ := p.advance().Range()
+
+	tok, err := p.expect(TokenType_Semicolon)
+	if err != nil {
+		return nil, err
+	}
+
+	_, end := tok.Range()
+
+	return &BreakStatement{
+		Start: start,
+		End:   end,
 	}, nil
 }
 

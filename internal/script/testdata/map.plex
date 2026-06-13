@@ -1,5 +1,16 @@
 
-// This need break statements, array methods (len, append), string methods, string indexing, property assignment, indexing, arrays, nullable types, type casting support, ternary, export and import handling
+// This need
+//DONE: break statements, 
+//DONE: array methods (len, append), 
+//DONE: string methods, 
+//DONE: string indexing, 
+//DONE: property assignment, 
+//DONE: indexing, 
+//DONE: arrays,
+//DONE: nullable types, 
+//DONE: type casting support,
+//DONE: ternary, 
+//export and import handling
 
 
 struct KeyValue {

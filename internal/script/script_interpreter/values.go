@@ -2,6 +2,7 @@ package scriptinterpreter
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/VisualSource/plex/internal/script"
 )
@@ -59,3 +60,34 @@ type NativeFunction struct {
 
 func (n NativeFunction) Truthy() bool   { return true }
 func (n NativeFunction) String() string { return fmt.Sprintf("<native:%s>", n.Name) }
+
+type ArrayValue struct {
+	Elements []Value
+}
+
+func (a *ArrayValue) Truthy() bool   { return len(a.Elements) > 0 }
+func (a *ArrayValue) String() string { return fmt.Sprintf("<array len=%d>", len(a.Elements)) }
+
+func (a *ArrayValue) len() (NumberValue, error) {
+	return NumberValue{V: float64(len(a.Elements))}, nil
+}
+
+func (a *ArrayValue) append(value Value) (NullValue, error) {
+	a.Elements = append(a.Elements, value)
+
+	return NullValue{}, nil
+}
+
+func (a *ArrayValue) remove(arg Value) (Value, error) {
+	idx, ok := arg.(NumberValue)
+	if !ok {
+		return nil, fmt.Errorf("expected argument to be a number")
+	}
+	num := int(idx.V)
+
+	removed := a.Elements[num]
+
+	a.Elements = slices.Delete(a.Elements, num, num+1)
+
+	return removed, nil
+}

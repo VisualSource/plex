@@ -64,6 +64,24 @@ func NewGlobalEnv() *Environment {
 		return StringValue{V: args[0].String()}, nil
 	}})
 
+	env.Set("int", NativeFunction{Name: "int", Fn: func(args []Value) (Value, error) {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("str: expected 1 arg")
+		}
+
+		if s, ok := args[0].(StringValue); ok {
+			if len(s.V) == 1 {
+				return NumberValue{V: float64(s.V[0])}, nil
+			}
+		}
+
+		return nil, fmt.Errorf("int: unable to convert to int")
+	}})
+
+	env.Set("nil", NullValue{})
+	env.Set("false", BoolValue{V: false})
+	env.Set("true", BoolValue{V: true})
+
 	return env
 
 }

@@ -70,3 +70,32 @@ func TestEvalGlobalEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestEvalWhileBreak(t *testing.T) {
+	tokens, err := script.NewTokenizer(strings.NewReader(`
+		let mut i = 0;
+		while 0 == 0 {
+			break;
+			i++;
+		} 
+		i;
+	`)).Tokenize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := script.NewParser(tokens)
+	ast, err := p.Parse()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	env := scriptinterpreter.NewGlobalEnv()
+	body, err := scriptinterpreter.Eval(ast, env)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if body.String() != "0" {
+		t.Fatal("was expecting value to be zero")
+	}
+}
