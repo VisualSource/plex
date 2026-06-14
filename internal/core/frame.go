@@ -68,7 +68,7 @@ func (f *Frame) LoadRemote(url url.URL, allowRelativeFileImport bool) error {
 			return errors.New("Invalid file path")
 		}
 
-		file, err := os.OpenFile(url.Path, os.O_RDONLY, os.ModeDevice)
+		file, err := os.OpenFile(url.Path, os.O_RDONLY, 0666)
 		if err != nil {
 			return err
 		}

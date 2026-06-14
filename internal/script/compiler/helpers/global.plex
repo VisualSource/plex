@@ -1,0 +1,22 @@
+import heapPtr from "plex:globals";
+ 
+/*
+Simple bump allocator
+
+=== WAT ===
+(func $alloc (param $size i32) (result i32)
+  (local $ptr i32)
+  global.get $heap_ptr    ;; push current heap_ptr
+  local.set $ptr          ;; ptr = heap_ptr
+  global.get $heap_ptr
+  local.get $size
+  i32.add
+  global.set $heap_ptr    ;; heap_ptr += size
+  local.get $ptr          ;; return original ptr
+)
+*/
+/*export*/fn alloc(size: i32): i32 {
+    let ptr = heapPtr;
+    heapPtr = heapPtr + size;
+    return ptr;
+}

@@ -1,0 +1,5 @@
+fn add(a: float, b: float): float { return a + b; }
+
+fn double(x: float): float {
+    return add(x,x);
+}

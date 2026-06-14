@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 8 – Linear Memory and Strings</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: Georgia, serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 820px;
+    margin: 40px auto;
+    padding: 0 24px;
+    line-height: 1.75;
+  }
+
+  h1 {
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 10px;
+    color: #fff;
+  }
+
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  a { color: var(--blue); }
+
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.88em;
+    color: #c9d1d9;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 0.88em;
+    line-height: 1.55;
+    margin: 1.4em 0;
+  }
+
+  pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: #c9d1d9;
+  }
+
+  .task {
+    background: #1e1e0e;
+    border-left: 4px solid var(--yellow);
+    padding: 14px 18px;
+    margin: 1.6em 0;
+    border-radius: 0 6px 6px 0;
+  }
+
+  .task h4 { margin: 0 0 10px; color: var(--yellow); font-size: 1em; }
+
+  .callout {
+    background: #0e1e0e;
+    border-left: 4px solid var(--green);
+    padding: 14px 18px;
+    margin: 1.6em 0;
+    border-radius: 0 6px 6px 0;
+  }
+
+  .callout h4 { margin: 0 0 10px; color: var(--green); font-size: 1em; }
+
+  .warning {
+    background: #1e0e0e;
+    border-left: 4px solid var(--accent);
+    padding: 14px 18px;
+    margin: 1.6em 0;
+    border-radius: 0 6px 6px 0;
+  }
+
+  .warning h4 { margin: 0 0 10px; color: var(--accent); font-size: 1em; }
+
+  .diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    font-family: monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    color: #8b949e;
+    margin: 1.4em 0;
+    white-space: pre;
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+
+  ul li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 8 – Linear Memory and Strings</h1>
+
+<p>Your compiler handles numbers and control flow. But plex also has strings, arrays, and structs —
+none of which fit in an <code>f64</code>. This lesson explains how WASM handles complex types,
+and gets you emitting strings from the compiler.</p>
+
+<hr>
+
+<h2>1. The problem: WASM only knows four types</h2>
+
+<p>At the instruction level, WASM has exactly four value types: <code>i32</code>, <code>i64</code>,
+<code>f32</code>, <code>f64</code>. There is no string type, no pointer type, no array type.
+Everything more complex than a number lives in <strong>linear memory</strong>.</p>
+
+<p>Linear memory is a flat, byte-addressable array that grows in 64 KiB pages. Your code reads and
+writes it using load/store instructions. An <code>i32</code> on the stack is just a byte offset into
+that array — a raw address. The WASM runtime itself has no idea whether offset 42 holds the start
+of a string or a struct field; that interpretation is entirely up to your program.</p>
+
+<div class="diagram">
+  byte offset:  0    1    2    3    4    5    6    7    8 ...
+  memory:     [ 'h' 'e' 'l' 'l' 'o' '\0'  5.0 (f64 across 8 bytes) ... ]
+                ^                          ^
+                string at offset 0         f64 stored at offset 6
+</div>
+
+<h3>Memory instructions</h3>
+
+<p>The main load/store instructions you'll use:</p>
+
+<pre><code>;; store a byte (i32 truncated to 8 bits) at address
+i32.const 0      ;; address
+i32.const 72     ;; value ('H')
+i32.store8       ;; mem[0] = 72
+
+;; load a byte from address
+i32.const 0
+i32.load8_u      ;; push mem[0] as unsigned i32
+
+;; store an f64 at address (uses 8 bytes)
+i32.const 8      ;; address
+f64.const 3.14
+f64.store        ;; mem[8..15] = 3.14</code></pre>
+
+<p>Every load/store takes an address (i32 on the stack) as its first operand, then the value
+to store (or leaves the loaded value on the stack).</p>
+
+<hr>
+
+<h2>2. Declaring memory in WAT</h2>
+
+<p>A module declares how many pages of memory it needs:</p>
+
+<pre><code>(module
+  (memory 1)           ;; 1 page = 65,536 bytes
+  (export "memory" (memory 0))  ;; optional: let the host read memory too
+  ...
+)</code></pre>
+
+<p>One page (65,536 bytes) is enough for anything reasonable in a teaching compiler. If your
+program needed dynamic growth you'd call <code>memory.grow</code>, but we won't need that here.</p>
+
+<hr>
+
+<h2>3. Static strings: the data section</h2>
+
+<p>The simplest way to put strings into memory is to lay them out at compile time using a
+<code>(data ...)</code> declaration. The assembler writes the bytes into memory before the
+program even starts running.</p>
+
+<pre><code>(module
+  (memory 1)
+  (data (i32.const 0) "hello\00")   ;; writes 6 bytes starting at offset 0
+  (data (i32.const 6) "world\00")   ;; writes 6 bytes starting at offset 6
+
+  (func $main
+    i32.const 0   ;; address of "hello"
+    call $print   ;; host function that reads from memory
+  )
+)</code></pre>
+
+<p>Notice what the string <em>value</em> becomes in the instruction stream: just an
+<code>i32.const</code> with its offset. The string data isn't on the stack — only its address is.</p>
+
+<h3>The two-pass strategy</h3>
+
+<p>To compile string literals you need their addresses before you emit any instructions, because
+the data section comes first in the WAT output. The cleanest approach is a two-pass compiler:</p>
+
+<ol>
+  <li><strong>Pass 1 (collect)</strong> — walk the entire AST looking for <code>*script.StringLiteral</code>
+      nodes. Record each unique string and assign it a byte offset.</li>
+  <li><strong>Pass 2 (emit)</strong> — emit the module header, the memory declaration, the data sections,
+      then compile all functions normally. When you hit a <code>StringLiteral</code> in Pass 2,
+      look up its offset and emit <code>i32.const &lt;offset&gt;</code>.</li>
+</ol>
+
+<div class="callout">
+<h4>Why not a single pass?</h4>
+<p>You could buffer all function output in a <code>strings.Builder</code> and prepend the header
+later — that's a valid one-pass approach. Two passes are conceptually cleaner for a teaching
+compiler because each pass has a single clear purpose.</p>
+</div>
+
+<hr>
+
+<h2>4. Implementation</h2>
+
+<h3>New fields on Compiler</h3>
+
+<p>Add a string table to track which strings you've seen and their offsets:</p>
+
+<pre><code>type stringEntry struct {
+    value  string
+    offset int
+}
+
+type Compiler struct {
+    out     strings.Builder
+    locals  []string
+    depth   int
+    strings []stringEntry  // collected in pass 1
+    dataPtr int            // next free byte in static data area
+}</code></pre>
+
+<h3>Pass 1: collectStrings</h3>
+
+<p>Walk the AST and record every <code>*script.StringLiteral</code>. Null-terminate each one
+so C-style host functions (like a WASI print) can read them:</p>
+
+<pre><code>func (c *Compiler) collectStrings(node script.AstNode) {
+    switch n := node.(type) {
+    case *script.Program:
+        for _, s := range n.Stmts { c.collectStrings(s) }
+    case *script.FunctionDeclaration:
+        c.collectStrings(n.Body)
+    case *script.Block:
+        for _, s := range n.Stmts { c.collectStrings(s) }
+    case *script.IfStatement:
+        c.collectStrings(n.Condition)
+        c.collectStrings(n.Body)
+        if n.Else != nil { c.collectStrings(n.Else) }
+    case *script.WhileStatement:
+        c.collectStrings(n.Condition)
+        c.collectStrings(n.Body)
+    case *script.ReturnStatement:
+        if n.Value != nil { c.collectStrings(n.Value) }
+    case *script.VariableDeclaration:
+        c.collectStrings(n.Init)
+    case *script.FunctionCall:
+        for _, a := range n.Args { c.collectStrings(a) }
+    case *script.StringLiteral:
+        // null-terminate: length = len(value) + 1
+        c.strings = append(c.strings, stringEntry{value: n.Value, offset: c.dataPtr})
+        c.dataPtr += len(n.Value) + 1
+    }
+}</code></pre>
+
+<h3>Compiling StringLiteral</h3>
+
+<p>In the main <code>Compile</code> switch, look up the offset and push it as an i32:</p>
+
+<pre><code>case *script.StringLiteral:
+    for _, entry := range c.strings {
+        if entry.value == n.Value {
+            c.emit(fmt.Sprintf("i32.const %d", entry.offset))
+            return nil
+        }
+    }
+    return fmt.Errorf("compile: string %q not in table", n.Value)</code></pre>
+
+<h3>Emitting the module header</h3>
+
+<p>Update <code>CompileProgram</code> to run the collect pass first, then emit the memory
+declaration and data sections before the functions:</p>
+
+<pre><code>func CompileProgram(program *script.Program) (string, error) {
+    c := &Compiler{}
+    c.collectStrings(program)
+
+    c.emit("(module")
+    c.depth++
+
+    if len(c.strings) > 0 {
+        c.emit("(memory 1)")
+        c.emit(fmt.Sprintf("(export \"memory\" (memory 0))"))
+        for _, entry := range c.strings {
+            // escape the string for WAT: backslash → \\, quote → \"
+            escaped := strings.ReplaceAll(entry.value, "\\", "\\\\")
+            escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+            c.emit(fmt.Sprintf("(data (i32.const %d) \"%s\\00\")", entry.offset, escaped))
+        }
+    }
+
+    for _, stmt := range program.Stmts {
+        if err := c.Compile(stmt); err != nil {
+            return "", err
+        }
+    }
+    c.depth--
+    c.emit(")")
+    return c.out.String(), nil
+}</code></pre>
+
+<div class="task">
+<h4>Task A — Implement string literal compilation</h4>
+<p>Add <code>stringEntry</code>, the new fields to <code>Compiler</code>,
+<code>collectStrings</code>, the <code>*script.StringLiteral</code> case in <code>Compile</code>,
+and update <code>CompileProgram</code> as shown above.</p>
+<p>Test it by adding a string to <code>test.plex</code>:</p>
+<pre><code>fn greet(): int {
+    let msg = "hello";
+    return msg;
+}</code></pre>
+<p>The generated WAT should contain a <code>(memory 1)</code> declaration, a
+<code>(data (i32.const 0) "hello\00")</code> section, and an <code>i32.const 0</code> where
+the string literal is used.</p>
+</div>
+
+<hr>
+
+<h2>5. Calling a host print function</h2>
+
+<p>Your WASM module doesn't know how to print — that's the host's job (Node.js, the browser,
+a Go runtime). You wire them together with an <strong>import</strong>.</p>
+
+<p>In WAT, declare the import at the top of the module:</p>
+
+<pre><code>(import "env" "print_str" (func $print_str (param i32)))</code></pre>
+
+<p>This says: "I expect the host to provide a function named <code>print_str</code> in the
+<code>env</code> namespace. It takes one i32 (the string offset) and returns nothing."</p>
+
+<p>Then in Node.js, you provide that function when instantiating the module:</p>
+
+<pre><code>const memory = new WebAssembly.Memory({ initial: 1 });
+
+const imports = {
+  env: {
+    print_str(offset) {
+      // read null-terminated string from WASM memory
+      const bytes = new Uint8Array(memory.buffer);
+      let str = "";
+      while (bytes[offset] !== 0) str += String.fromCharCode(bytes[offset++]);
+      console.log(str);
+    }
+  }
+};
+
+const { instance } = await WebAssembly.instantiate(bytes, imports);
+</code></pre>
+
+<div class="warning">
+<h4>The memory must be shared</h4>
+<p>The host's <code>print_str</code> reads from the same <code>WebAssembly.Memory</code> object
+that the module uses. If you export the memory from the module (as shown above) and use it as
+the shared memory in the import object, both sides see the same bytes. If you don't share the
+object, the host reads from a different buffer — it sees garbage.</p>
+</div>
+
+<div class="task">
+<h4>Task B — Run a string-printing program end to end</h4>
+<ol>
+  <li>Write a plex function that "returns" a string literal (returns its address as an int).</li>
+  <li>Compile it with your compiler to WAT.</li>
+  <li>Run <code>wat2wasm</code> to get a binary.</li>
+  <li>Write a <code>run.mjs</code> that imports <code>print_str</code>, provides shared memory, and calls your exported function.</li>
+  <li>Verify that Node prints the string.</li>
+</ol>
+</div>
+
+<hr>
+
+<h2>6. What this unlocks</h2>
+
+<p>Once memory exists, arrays and structs follow the same pattern — they're just blobs of bytes
+at known offsets. An array is: 4 bytes for the length (i32), then N × element-size bytes for the
+elements. A struct is: the fields laid out sequentially with known offsets (a "struct layout").</p>
+
+<p>All the load/store logic your interpreter did implicitly (putting values in a Go map) the compiler
+now does explicitly with byte offsets. Same logical operation; completely different implementation.</p>
+
+<p>The next lesson will cover dynamic allocation — a bump allocator for heap-allocated arrays
+and structs — but everything in this lesson is the foundation for that.</p>
+
+<hr>
+
+<h2>Q&amp;A prompts</h2>
+
+<ul>
+  <li>What happens if two string literals have the same value? Should they share an offset or get separate ones?</li>
+  <li>If a string can appear inside a nested function, does <code>collectStrings</code> need to recurse into it? Is there a case where it might miss one?</li>
+  <li>The <code>greet</code> function above declares <code>let msg = "hello"</code> and returns <code>msg</code>. The return type is declared as <code>int</code> — is that type correct for an address?</li>
+</ul>
+
+<p>When you've finished Tasks A and B, say <strong>"next lesson"</strong> for Lesson 9: dynamic
+allocation — arrays and structs on the heap.</p>
+
+</body>
+</html>

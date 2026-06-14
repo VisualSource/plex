@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 9 – The Heap and Arrays</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: Georgia, serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 820px;
+    margin: 40px auto;
+    padding: 0 24px;
+    line-height: 1.75;
+  }
+
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  a { color: var(--blue); }
+
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "Fira Code", "Cascadia Code", monospace;
+    font-size: 0.88em;
+    color: #c9d1d9;
+  }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    font-size: 0.88em;
+    line-height: 1.55;
+    margin: 1.4em 0;
+  }
+
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: #c9d1d9; }
+
+  .task {
+    background: #1e1e0e;
+    border-left: 4px solid var(--yellow);
+    padding: 14px 18px;
+    margin: 1.6em 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .task h4 { margin: 0 0 10px; color: var(--yellow); font-size: 1em; }
+
+  .callout {
+    background: #0e1e0e;
+    border-left: 4px solid var(--green);
+    padding: 14px 18px;
+    margin: 1.6em 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout h4 { margin: 0 0 10px; color: var(--green); font-size: 1em; }
+
+  .warning {
+    background: #1e0e0e;
+    border-left: 4px solid var(--accent);
+    padding: 14px 18px;
+    margin: 1.6em 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .warning h4 { margin: 0 0 10px; color: var(--accent); font-size: 1em; }
+
+  .note {
+    background: #0e0e1e;
+    border-left: 4px solid var(--purple);
+    padding: 14px 18px;
+    margin: 1.6em 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .note h4 { margin: 0 0 10px; color: var(--purple); font-size: 1em; }
+
+  .diagram {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    font-family: monospace;
+    font-size: 0.85em;
+    line-height: 1.6;
+    color: #8b949e;
+    margin: 1.4em 0;
+    white-space: pre;
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+  ul li { margin-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: var(--surface); color: var(--blue); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 9 – The Heap and Arrays</h1>
+
+<p>You have type-aware locals, string addresses, and a working type resolver. Before this lesson
+is over you will have arrays in WASM — real, indexable arrays that live in linear memory at runtime.
+To get there, you need two things: a mutable global heap pointer, and the arithmetic to lay out
+and index an array's bytes.</p>
+
+<hr>
+
+<h2>1. First: fix the TODO you left in BinaryExpression</h2>
+
+<p>Your <code>resolveType</code> correctly maps <code>int</code> → <code>i64</code>, but
+<code>BinaryExpression</code> still always emits <code>f64.add</code>, <code>f64.lt</code>, etc.
+Now that locals carry types, this inconsistency will cause WASM validation errors as soon as you
+mix integer variables with arithmetic.</p>
+
+<p>The WASM operator names are symmetric — just swap the prefix:</p>
+
+<table>
+  <tr><th>plex/WASM type</th><th>add</th><th>sub</th><th>mul</th><th>div</th><th>less-than</th><th>equal</th></tr>
+  <tr><td><code>f64</code></td><td>f64.add</td><td>f64.sub</td><td>f64.mul</td><td>f64.div</td><td>f64.lt</td><td>f64.eq</td></tr>
+  <tr><td><code>f32</code></td><td>f32.add</td><td>f32.sub</td><td>f32.mul</td><td>f32.div</td><td>f32.lt</td><td>f32.eq</td></tr>
+  <tr><td><code>i64</code></td><td>i64.add</td><td>i64.sub</td><td>i64.mul</td><td>i64.div_s</td><td>i64.lt_s</td><td>i64.eq</td></tr>
+  <tr><td><code>i32</code></td><td>i32.add</td><td>i32.sub</td><td>i32.mul</td><td>i32.div_s</td><td>i32.lt_s</td><td>i32.eq</td></tr>
+</table>
+
+<p>The <code>_s</code> suffix on integer divide and less-than means "signed" — plex numbers are
+signed, so always use the signed variants.</p>
+
+<div class="task">
+<h4>Task A — Type-aware BinaryExpression</h4>
+<p>The compiler needs to know the type of the operands to pick the right operator prefix.
+The cleanest approach: add a helper method <code>typeOf(node AstNode) string</code> that
+inspects the node and returns the WASM type string. Then use it in the binary expression case.</p>
+
+<pre><code>func (c *Compiler) typeOf(node script.AstNode) string {
+    switch n := node.(type) {
+    case *script.NumberLiteral:
+        if strings.Contains(n.Value, ".") {
+            return "f64"
+        }
+        return "i64"
+    case *script.Identifier:
+        for _, l := range c.locals {
+            if l.Name == n.Value {
+                return l.Type
+            }
+        }
+        return "f64" // fallback
+    case *script.BinaryExpression:
+        return c.typeOf(n.Left) // type propagates from left operand
+    case *script.FunctionCall:
+        return "f64" // TODO: look up return type from function table
+    default:
+        return "f64"
+    }
+}</code></pre>
+
+<p>Then in the <code>BinaryExpression</code> case, determine the prefix before the operator switch:</p>
+
+<pre><code>prefix := c.typeOf(n.Left)
+switch n.Operator {
+case script.TokenType_Plus:
+    c.emit(prefix + ".add")
+case script.TokenType_Minus:
+    c.emit(prefix + ".sub")
+case script.TokenType_Star:
+    c.emit(prefix + ".mul")
+case script.TokenType_Div:
+    divOp := prefix + ".div"
+    if prefix == "i32" || prefix == "i64" {
+        divOp += "_s"
+    }
+    c.emit(divOp)
+case script.TokenType_LessThen:
+    ltOp := prefix + ".lt"
+    if prefix == "i32" || prefix == "i64" {
+        ltOp += "_s"
+    }
+    c.emit(ltOp)
+case script.TokenType_EqualEqual:
+    c.emit(prefix + ".eq")
+...
+}</code></pre>
+
+<p>Make sure your existing compiler tests still pass after this change.</p>
+</div>
+
+<div class="note">
+<h4>Why left operand determines the type</h4>
+<p>In a well-typed expression, both sides of a binary operator should have the same type.
+Using the left operand's type as the "result type" is a simplification that works for homogeneous
+expressions. A full compiler would resolve the type of both sides and report a type error if they
+differ — that's a future lesson.</p>
+</div>
+
+<hr>
+
+<h2>2. WASM globals</h2>
+
+<p>A mutable global is a named value that persists across function calls, visible to all functions
+in the module. It's declared at the module level:</p>
+
+<pre><code>(global $heap_ptr (mut i32) (i32.const 1024))
+</code></pre>
+
+<p>The <code>(mut i32)</code> says it's a mutable i32. The initial value is 1024 — we reserve the
+first 1 KiB for static data (string literals, etc.).</p>
+
+<p>Reading and writing it:</p>
+
+<pre><code>global.get $heap_ptr    ;; push current heap_ptr onto stack
+global.set $heap_ptr    ;; pop top of stack → store in heap_ptr</code></pre>
+
+<p>This is the only state in WASM that survives between calls without going through memory.
+Locals disappear when the function returns; the global lives until the module is destroyed.</p>
+
+<hr>
+
+<h2>3. The bump allocator</h2>
+
+<p>A bump allocator (also called an arena allocator) is the simplest possible heap: a pointer
+that only ever moves forward. To allocate N bytes:</p>
+
+<ol>
+  <li>Read the current heap pointer → that's your allocated address.</li>
+  <li>Add N to the heap pointer.</li>
+  <li>Write the new value back.</li>
+  <li>Return the original address.</li>
+</ol>
+
+<p>In WAT, a helper function for this:</p>
+
+<pre><code>(func $alloc (param $size i32) (result i32)
+  (local $ptr i32)
+  global.get $heap_ptr    ;; push current heap_ptr
+  local.set $ptr          ;; ptr = heap_ptr
+  global.get $heap_ptr
+  local.get $size
+  i32.add
+  global.set $heap_ptr    ;; heap_ptr += size
+  local.get $ptr          ;; return original ptr
+)</code></pre>
+
+<p>There is no free. Memory is never reclaimed. For a teaching compiler this is fine — most
+programs run, produce output, and exit. Garbage collection is a lesson for another day.</p>
+
+<div class="callout">
+<h4>Why start the heap at 1024?</h4>
+<p>Your static data (string literals) starts at offset 0. If you start the heap at 0 too,
+a heap allocation would overwrite your string data. 1024 bytes gives plenty of room for static
+data without needing to track exactly how many bytes the data section used. If your static data
+ever grows past 1024 bytes, you'd bump this number up — or better, calculate it from
+<code>c.dataPtr</code> rounded up to a nice alignment.</p>
+</div>
+
+<hr>
+
+<h2>4. Array layout in memory</h2>
+
+<p>An array needs to store two things: how many elements it has (the length), and the elements
+themselves. The standard layout is a header followed by data:</p>
+
+<div class="diagram">
+  offset + 0:  [length: i32]       4 bytes
+  offset + 4:  [element 0: f64]    8 bytes
+  offset + 12: [element 1: f64]    8 bytes
+  offset + 20: [element 2: f64]    8 bytes
+  ...
+
+  total size = 4 + (N × 8) bytes for an f64 array
+</div>
+
+<p>So for an array <code>[1.0, 2.0, 3.0]</code>, you allocate <code>4 + 3×8 = 28</code> bytes,
+write <code>3</code> at the base, write <code>1.0</code> at <code>base+4</code>,
+<code>2.0</code> at <code>base+12</code>, <code>3.0</code> at <code>base+20</code>, and push
+the base address.</p>
+
+<h3>The store instructions</h3>
+
+<pre><code>;; write an i32 to memory: i32.store takes (addr, value)
+local.get $ptr
+i32.const 3        ;; length = 3
+i32.store          ;; mem[$ptr] = 3
+
+;; write an f64 to memory: f64.store takes (addr, value)
+local.get $ptr
+i32.const 4        ;; offset past the length header
+i32.add            ;; address of element 0
+f64.const 1.0
+f64.store          ;; mem[$ptr + 4] = 1.0</code></pre>
+
+<hr>
+
+<h2>5. Compiling ArrayLiteral</h2>
+
+<p>The <code>*script.ArrayLiteral</code> node has a slice of element expressions. To compile it:</p>
+
+<ol>
+  <li>Calculate the total size: <code>4 + len(elements) × 8</code> bytes.</li>
+  <li>Call <code>$alloc</code> to get a base address.</li>
+  <li>Store the local variable pointing to that address.</li>
+  <li>Write the length header at <code>base + 0</code>.</li>
+  <li>For each element, compile the element expression and store it at <code>base + 4 + (i × 8)</code>.</li>
+  <li>Push the base address (the "value" of the array literal is a pointer).</li>
+</ol>
+
+<div class="task">
+<h4>Task B — Implement arrays</h4>
+<p>Three things to do:</p>
+
+<p><strong>1. Add the <code>$alloc</code> function and the global to <code>CompileProgram</code>.</strong>
+Emit them when memory is needed (you already have the <code>len(c.strings) > 0</code> guard —
+extend it to also cover arrays, or emit memory unconditionally).</p>
+
+<pre><code>c.emit("(global $heap_ptr (mut i32) (i32.const 1024))")
+c.emit("(func $alloc (param $size i32) (result i32)")
+c.depth++
+c.emit("(local $ptr i32)")
+c.emit("global.get $heap_ptr")
+c.emit("local.set $ptr")
+c.emit("global.get $heap_ptr")
+c.emit("local.get $size")
+c.emit("i32.add")
+c.emit("global.set $heap_ptr")
+c.emit("local.get $ptr")
+c.depth--
+c.emit(")")</code></pre>
+
+<p><strong>2. Add <code>*script.ArrayLiteral</code> to the <code>collectLocals</code> / <code>collectStrings</code>
+passes.</strong> Recurse into element expressions so nested strings and locals are found.</p>
+
+<p><strong>3. Add <code>*script.ArrayLiteral</code> to <code>Compile</code>.</strong></p>
+
+<pre><code>case *script.ArrayLiteral:
+    elemSize := 8  // f64 element size in bytes
+    totalSize := 4 + len(n.Elements)*elemSize
+
+    // allocate memory, capture base address in a temp local
+    // (you'll need a fresh temp local — consider a helper that generates "$tmp0", "$tmp1", etc.)
+    c.emit(fmt.Sprintf("i32.const %d", totalSize))
+    c.emit("call $alloc")
+    // store address, then work with it...
+    // write length header, then each element</code></pre>
+
+<p>The tricky part: after calling <code>$alloc</code>, the address is on the stack. To use it
+multiple times (once for the length write, once per element), you need to <code>local.tee</code>
+it into a temporary local — <code>local.tee</code> stores a value and also leaves it on the stack,
+unlike <code>local.set</code> which consumes it.</p>
+
+<pre><code>c.emit("local.tee $tmp")    ;; stores addr AND leaves it on stack
+c.emit("i32.const 3")
+c.emit("i32.store")         ;; writes length
+
+;; element 0
+c.emit("local.get $tmp")
+c.emit("i32.const 4")
+c.emit("i32.add")           ;; addr + 4
+// compile element 0 expression
+c.emit("f64.store")</code></pre>
+
+<p>You'll need to track how many temp locals you've emitted and declare them at the function
+top (same way you declare regular locals). A simple approach: add a <code>tmpCount int</code>
+field to <code>Compiler</code> and generate <code>$tmp0</code>, <code>$tmp1</code>, etc.,
+resetting per function.</p>
+</div>
+
+<hr>
+
+<h2>6. Array element access</h2>
+
+<p>Reading <code>arr[i]</code> in WASM means: compute the byte offset, then load from memory.</p>
+
+<pre><code>;; load arr[i] where arr is an i32 pointer, i is an i64
+;; byte offset = 4 + i * 8
+local.get $arr     ;; base address (i32)
+i32.const 4
+i32.add            ;; skip length header
+local.get $i
+i32.wrap_i64       ;; convert i64 index to i32 (needed for address arithmetic)
+i32.const 8
+i32.mul            ;; i * 8
+i32.add            ;; base + 4 + i*8
+f64.load           ;; load the f64 element</code></pre>
+
+<p>Notice <code>i32.wrap_i64</code> — if your index is an <code>i64</code> (which it would be if
+declared as <code>int</code>), address arithmetic requires <code>i32</code>. The <code>wrap</code>
+instruction truncates the i64 to i32, which is safe as long as arrays aren't billions of elements
+long.</p>
+
+<div class="task">
+<h4>Task C (stretch) — Implement ArrayAccess</h4>
+<p>Add <code>*script.ArrayAccess</code> to <code>Compile</code>. Remember from the parser that
+<code>ArrayAccess.Object</code> is the array expression and <code>ArrayAccess.Field</code> is
+the index expression (the naming is swapped from what you'd expect — this was noted as a known
+issue in the parser).</p>
+</div>
+
+<hr>
+
+<h2>7. What you've built</h2>
+
+<p>After this lesson your compiler handles the full value model:</p>
+
+<ul>
+  <li><strong>Numbers</strong> → f64/i64/i32 on the WASM stack, arithmetic via typed operators</li>
+  <li><strong>Strings</strong> → i32 addresses into the static data section</li>
+  <li><strong>Arrays</strong> → i32 addresses into heap-allocated memory, length header + elements</li>
+</ul>
+
+<p>Structs follow the same pattern as arrays — a pointer to a block of bytes, with known field
+offsets instead of a length header and indexed elements. That's Lesson 10.</p>
+
+<hr>
+
+<h2>Q&amp;A prompts</h2>
+
+<ul>
+  <li>What happens if you allocate an array but the function returns before writing all the elements? Is the memory corrupted or just uninitialised?</li>
+  <li>The bump allocator never frees memory. If a function that creates an array is called in a loop 1000 times, what happens to heap usage?</li>
+  <li>Why does <code>local.tee</code> exist as a separate instruction from <code>local.set</code>? Couldn't you just do <code>local.set</code> then <code>local.get</code>?</li>
+</ul>
+
+<p>When you've finished Tasks A and B (and C if you want), say <strong>"next lesson"</strong>
+for Lesson 10: struct layout and field access.</p>
+
+</body>
+</html>

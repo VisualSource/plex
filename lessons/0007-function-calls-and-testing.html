@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 7 – Function Calls and Testing the Compiler</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; padding: 0 20px; line-height: 1.7; color: #222; }
+  h1 { border-bottom: 3px solid #222; padding-bottom: 8px; }
+  h2 { margin-top: 2.5em; }
+  h3 { margin-top: 1.8em; color: #444; }
+  code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+  pre { background: #f4f4f4; padding: 16px; border-radius: 5px; overflow-x: auto; font-size: 0.92em; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .task { background: #fff8e1; border-left: 4px solid #f9a825; padding: 12px 16px; margin: 1.5em 0; border-radius: 0 5px 5px 0; }
+  .task h4 { margin: 0 0 8px; color: #e65100; }
+  .callout { background: #e8f5e9; border-left: 4px solid #388e3c; padding: 12px 16px; margin: 1.5em 0; border-radius: 0 5px 5px 0; }
+  .callout h4 { margin: 0 0 8px; color: #1b5e20; }
+  .warning { background: #fce4ec; border-left: 4px solid #c62828; padding: 12px 16px; margin: 1.5em 0; border-radius: 0 5px 5px 0; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 7 – Function Calls and Testing the Compiler</h1>
+
+<p>Your compiler can already produce valid WAT for arithmetic, control flow, and function declarations.
+But it still can't <em>call</em> a function from another function — the most fundamental building block
+of any real program. That's what this lesson covers.</p>
+
+<p>We'll also write the first compiler test so you can verify the output without manually inspecting a
+<code>.wat</code> file every time.</p>
+
+<hr>
+
+<h2>1. The WASM <code>call</code> instruction</h2>
+
+<p>WebAssembly's calling convention is completely stack-based. To call a function you:</p>
+
+<ol>
+  <li>Push each argument onto the stack (in order, left to right).</li>
+  <li>Emit <code>call $funcname</code>. The runtime pops the arguments, runs the function,
+      and pushes the return value (if any) back onto the stack.</li>
+</ol>
+
+<p>So calling <code>add(1.0, 2.0)</code> compiles to:</p>
+
+<pre><code>f64.const 1
+f64.const 2
+call $add     ;; pops 2 args, pushes result</code></pre>
+
+<p>That's it. Arguments are evaluated in order, and the stack does the rest. This is postorder
+traversal again — same rule that made binary expressions work: emit the operands first,
+then the operation.</p>
+
+<h3>Why the order matters</h3>
+
+<p>WASM is strictly typed and strictly ordered. If you emit arguments in the wrong order, the
+function gets the wrong values. If you emit the wrong number, the validator rejects the module.
+Your compiler already enforces this naturally by compiling args in a loop — left to right is
+the correct order for WASM.</p>
+
+<hr>
+
+<h2>2. What a <code>FunctionCall</code> node looks like</h2>
+
+<p>From <code>internal/script/ast_nodes.go</code>:</p>
+
+<pre><code>type FunctionCall struct {
+    Callee AstNode   // usually an *Identifier (the function name)
+    Args   []AstNode // the argument expressions
+}</code></pre>
+
+<p>The callee is an <code>AstNode</code> — not just a string — because plex could eventually support
+first-class functions (<code>f(g)(x)</code>). For now, every direct call has a plain <code>*Identifier</code>
+as the callee. Use a type switch to extract the name and fall through to an error for anything
+you don't handle yet.</p>
+
+<hr>
+
+<h2>3. Implementation</h2>
+
+<div class="task">
+<h4>Task A — Add <code>*script.FunctionCall</code> to the compiler</h4>
+<p>In <code>internal/script/compiler/compiler.go</code>, add a new case to the <code>Compile</code>
+switch. The logic is:</p>
+<ol>
+  <li>Loop over <code>n.Args</code> and <code>Compile</code> each one (pushes args onto the stack).</li>
+  <li>Type-switch on <code>n.Callee</code>. For <code>*script.Identifier</code>, emit <code>call $name</code>.
+      For anything else, return an error.</li>
+</ol>
+
+<p>Sketch:</p>
+<pre><code>case *script.FunctionCall:
+    for _, arg := range n.Args {
+        if err := c.Compile(arg); err != nil {
+            return err
+        }
+    }
+    switch callee := n.Callee.(type) {
+    case *script.Identifier:
+        c.emit("call $" + callee.Value)
+    default:
+        return fmt.Errorf("compile: unsupported callee %T", n.Callee)
+    }</code></pre>
+</div>
+
+<h3>Test it by hand first</h3>
+
+<p>Update <code>cmd/plexc/test.plex</code>:</p>
+
+<pre><code>fn add(a: int, b: int): int {
+    return a + b;
+}
+
+fn double(x: int): int {
+    return add(x, x);
+}
+</code></pre>
+
+<p>Run <code>go run ./cmd/plexc/ -file cmd/plexc/test.plex</code> and look at the generated
+<code>test.wat</code>. You should see a <code>call $add</code> inside <code>double</code>'s body.</p>
+
+<hr>
+
+<h2>4. Testing the compiler in Go</h2>
+
+<p>Manual inspection doesn't scale. Let's write a proper test.</p>
+
+<p>A compiler test has a different shape than an interpreter test:</p>
+<ul>
+  <li>Interpreter test: run the program, assert on the output value.</li>
+  <li>Compiler test: compile the program, assert on the generated text.</li>
+</ul>
+
+<p>Both are valid. For a WAT compiler, checking the output string is straightforward and
+reliable — if the WAT is structurally wrong, <code>wat2wasm</code> will reject it anyway.</p>
+
+<div class="task">
+<h4>Task B — Write <code>internal/script/compiler/compiler_test.go</code></h4>
+<p>Create the test file with one test that compiles a plex program and checks the WAT output
+contains the expected instructions. Use <code>strings.Contains</code> for the checks — you don't
+want to assert exact whitespace.</p>
+
+<pre><code>package compiler_test
+
+import (
+    "strings"
+    "testing"
+
+    "github.com/VisualSource/plex/internal/script"
+    "github.com/VisualSource/plex/internal/script/compiler"
+)
+
+func TestCompileFunctionCall(t *testing.T) {
+    src := `
+        fn add(a: int, b: int): int { return a + b; }
+        fn double(x: int): int { return add(x, x); }
+    `
+    tokens, err := script.NewTokenizer(strings.NewReader(src)).Tokenize()
+    if err != nil {
+        t.Fatal(err)
+    }
+    ast, err := script.NewParser(tokens).Parse()
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    wat, err := compiler.CompileProgram(ast.(*script.Program))
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    checks := []string{
+        "(func $add",
+        "(func $double",
+        "call $add",
+        "(export \"add\"",
+        "(export \"double\"",
+        "f64.add",
+    }
+    for _, want := range checks {
+        if !strings.Contains(wat, want) {
+            t.Errorf("WAT missing %q\n\nGot:\n%s", want, wat)
+        }
+    }
+}</code></pre>
+
+<p>Run it with <code>go test ./internal/script/compiler/</code>.</p>
+</div>
+
+<hr>
+
+<h2>5. Running the WASM for real</h2>
+
+<p>You have <code>wat2wasm</code> installed, and Node.js supports WASM natively. That means you can
+run your compiled code right now without adding any Go dependency.</p>
+
+<p>Step 1 — compile to binary:</p>
+<pre><code>wat2wasm test.wat -o test.wasm</code></pre>
+
+<p>Step 2 — run with Node.js. Create <code>cmd/plexc/run.mjs</code>:</p>
+
+<pre><code>import { readFileSync } from "fs";
+
+const bytes = readFileSync("test.wasm");
+const { instance } = await WebAssembly.instantiate(bytes);
+
+console.log(instance.exports.add(3, 4));    // expect 7
+console.log(instance.exports.double(5));    // expect 10
+</code></pre>
+
+<pre><code>node cmd/plexc/run.mjs</code></pre>
+
+<div class="callout">
+<h4>Why is Node happy with f64 params even though we pass integers?</h4>
+<p>JavaScript automatically coerces numbers to the right WASM type when calling exports.
+<code>3</code> becomes <code>3.0</code> (f64). The result comes back as a JS number, which prints
+without a decimal point if it's whole. No special handling needed on the JS side.</p>
+</div>
+
+<hr>
+
+<h2>6. What you've built</h2>
+
+<p>Your compiler now has a complete pipeline:</p>
+
+<pre><code>plex source
+    → tokenizer
+    → parser (AST)
+    → compiler (WAT text)
+    → wat2wasm (WASM binary)
+    → WebAssembly runtime (executed)</code></pre>
+
+<p>This is the same pipeline used by production compilers — the stages are identical, just with
+more complexity in each one. You've closed the loop from source text to running machine instructions.</p>
+
+<hr>
+
+<h2>Q&amp;A prompts</h2>
+
+<ul>
+  <li>What happens if a function returns nothing (no <code>result</code>) but we call it in an expression that expects a value?</li>
+  <li>How would you compile a call to a native/imported function like <code>print</code>?</li>
+  <li>How does the <code>mul</code> function from the interpreter tests translate to WAT now that we have function calls?</li>
+</ul>
+
+<p>When you're done with Tasks A and B (and the Node.js run if you want), say <strong>"next lesson"</strong>
+and we'll move to Lesson 8: linear memory — how strings, arrays, and structs actually live in WASM.</p>
+
+</body>
+</html>

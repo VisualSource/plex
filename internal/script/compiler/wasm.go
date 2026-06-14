@@ -1,4 +1,4 @@
-package vipscript
+package compiler
 
 // goal
 // compile script ast into wasm binary format

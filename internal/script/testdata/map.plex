@@ -21,7 +21,7 @@ struct KeyValue {
 
 // https://github.com/cruzelx/DSA-with-golang/blob/be1c80d50f06672f9bd3c4380945fea91f17f9e2/search/hashTable/hashTable.go
 // Map<string,string>
-export struct Map {
+struct Map {
     bucketSize: int;
     filledSize: int;
     bucket: KeyValue[][];
