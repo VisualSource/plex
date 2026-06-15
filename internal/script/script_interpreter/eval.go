@@ -325,17 +325,17 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 		}
 		return result, nil
 	case *script.ArrayAccess:
-		field, err := Eval(n.Field, env)
+		target, err := Eval(n.Target, env)
 		if err != nil {
 			return nil, err
 		}
 
-		obj, err := Eval(n.Object, env)
+		obj, err := Eval(n.Index, env)
 		if err != nil {
 			return nil, err
 		}
 
-		switch n := field.(type) {
+		switch n := target.(type) {
 		case *ArrayValue:
 			i, ok := obj.(NumberValue)
 			if !ok {

@@ -158,8 +158,12 @@ type UnaryExpression struct {
 
 type ArrayAccess struct {
 	Start, End Position
-	Object     AstNode
-	Field      AstNode
+
+	// what we are indexing with
+	Target AstNode
+
+	// what we are indexing into
+	Index AstNode
 }
 
 func (a *ArrayAccess) Range() (Position, Position) {

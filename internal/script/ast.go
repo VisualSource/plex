@@ -264,8 +264,8 @@ func (p *Parser) parsePostfix() (AstNode, error) {
 			expr = &ArrayAccess{
 				Start:  start,
 				End:    end,
-				Object: obj,
-				Field:  expr,
+				Index:  obj,
+				Target: expr,
 			}
 		case TokenType_Dot:
 			p.advance()

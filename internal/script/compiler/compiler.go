@@ -23,7 +23,7 @@ type Compiler struct {
 
 	globalVars []string
 
-	tmpCount int
+	tempArrayVars []string
 
 	strings []stringEntry
 	dataPtr int
@@ -42,21 +42,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 	switch n := node.(type) {
 	case *script.ImportStatement:
 		if c.depth != 1 {
-			return fmt.Errorf("imports must be used at top level")
-		}
-
-		switch n.Source {
-		case "plex:globals":
-			for _, imp := range n.Imports {
-				switch imp {
-				case "heapPtr":
-				default:
-					return fmt.Errorf("unknown import: %s", imp)
-				}
-			}
-
-		default:
-			return fmt.Errorf("compile: failed to import")
+			return fmt.Errorf("can not import in this scope")
 		}
 	case *script.NumberLiteral:
 		c.emit("f64.const", n.Value)
@@ -141,7 +127,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.emit(fmt.Sprintf("(func $%s%s%s", n.Name, params.String(), result))
 		c.depth++
 
-		for _, local := range collectLocals(n.Body) {
+		for _, local := range c.collectLocals(n.Body) {
 			c.emit(fmt.Sprintf("(local $%s %s)", local.Name, local.Type))
 		}
 
@@ -149,6 +135,9 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		if err := c.Compile(n.Body); err != nil {
 			return err
 		}
+
+		c.tempArrayVars = c.tempArrayVars[:0]
+
 		c.depth--
 		c.emit(")")
 		c.emit(fmt.Sprintf("(export \"%s\" (func $%s))", n.Name, n.Name))
@@ -257,22 +246,31 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		return fmt.Errorf("compile: string %q not in table", n.Value)
 
 	case *script.ArrayLiteral:
-		elemSize := 8
+
+		tmpName := c.tempArrayVars[len(c.tempArrayVars)-1]
+		c.tempArrayVars = c.tempArrayVars[:len(c.tempArrayVars)-1]
+
+		elemSize := 8 // f64 element size in bytes, would need to reslove size for structs
 		totalSize := 4 + len(n.Elements)*elemSize
 
 		// allocate memory, capture base in a temp loca
+
+		c.emit(";; array literal")
+
 		c.emit(fmt.Sprintf("i32.const %d", totalSize))
 		c.emit("call $alloc")
+		c.emit(fmt.Sprintf("local.tee $%s", tmpName)) // store addr and leave it on stack
 
-		c.tmpCount++
-
-		c.emit(fmt.Sprintf("local.tee $tmp%d", c.tmpCount))
 		c.emit(fmt.Sprintf("i32.const %d", len(n.Elements)))
 		c.emit("i32.store")
 
-		for _, v := range n.Elements {
-			c.emit(fmt.Sprintf("local.get $tmp%d", c.tmpCount))
-			c.emit("i32.const 4")
+		for i, v := range n.Elements {
+			offset := 4 + i*elemSize
+
+			c.emit(fmt.Sprintf(";; insert element %d", i))
+
+			c.emit(fmt.Sprintf("local.get $%s", tmpName))
+			c.emit(fmt.Sprintf("i32.const %d", offset))
 			c.emit("i32.add")
 
 			if err := c.Compile(v); err != nil {
@@ -280,7 +278,36 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			}
 
 			c.emit("f64.store")
+
+			c.emit(";; insert end")
 		}
+
+		c.emit(fmt.Sprintf("local.get $%s", tmpName)) // put array ptr back on stack
+
+		c.emit(";; end array literal")
+	case *script.ArrayAccess:
+
+		c.emit(";; array access")
+
+		// get object
+		if err := c.Compile(n.Target); err != nil {
+			return err
+		}
+		c.emit("i32.const 4")
+		c.emit("i32.add") // skip len header
+
+		if err := c.Compile(n.Index); err != nil {
+			return err
+		}
+		c.emit("i32.wrap_i64") //TODO: need to reslove if we need to do thing
+
+		c.emit("i32.const 8") // 8 = f64, should be size of object ex. sizeof(struct) || sizeof(string)
+		c.emit("i32.mul")     // get offset
+
+		c.emit("i32.add")  // base prt + len(4) + offset(i * size)
+		c.emit("f64.load") // load element, TODO: reslove TYPE HERE
+
+		c.emit(";; end array access")
 
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)
@@ -442,23 +469,60 @@ func (c *Compiler) loadHelper(name string) error {
 	return nil
 }
 
+func (c *Compiler) importModules(node *script.Program) error {
+	for _, stmt := range node.Stmts {
+		switch n := stmt.(type) {
+		case *script.ImportStatement:
+			if c.depth != 1 {
+				return fmt.Errorf("imports must be used at top level")
+			}
+
+			switch n.Source {
+			case "plex:globals":
+				for _, imp := range n.Imports {
+					switch imp {
+					case "heapPtr":
+					default:
+						return fmt.Errorf("unknown import: %s", imp)
+					}
+				}
+			case "plex:console":
+				for _, imp := range n.Imports {
+					switch imp {
+					case "print":
+						c.emit("(import \"env\" \"print\" (func $print (param i32)))")
+					default:
+						return fmt.Errorf("unknown import: %s", imp)
+					}
+				}
+			default:
+				return fmt.Errorf("compile: failed to import")
+			}
+		}
+	}
+
+	return nil
+}
+
 type Local struct {
 	Name string
 	Type string
 }
 
-func collectLocals(node script.AstNode) []Local {
+func (c *Compiler) collectLocals(node script.AstNode) []Local {
 	var names []Local
 	switch n := node.(type) {
 	case *script.Block:
 		for _, s := range n.Stmts {
-			names = append(names, collectLocals(s)...)
+			names = append(names, c.collectLocals(s)...)
 		}
 	case *script.VariableDeclaration:
 		local := Local{
 			Name: n.Name,
 			Type: "f64", // f64,i64,f32,i32
 		}
+
+		names = append(names, c.collectLocals(n.Init)...)
 
 		if n.Type != nil { // use explict type
 			local.Type = resolveType(n.Type)
@@ -475,14 +539,22 @@ func collectLocals(node script.AstNode) []Local {
 
 		names = append(names, local)
 	case *script.IfStatement:
-		names = append(names, collectLocals(n.Body)...)
+		names = append(names, c.collectLocals(n.Body)...)
 		if n.Else != nil {
-			names = append(names, collectLocals(n.Else)...)
+			names = append(names, c.collectLocals(n.Else)...)
 		}
 	case *script.WhileStatement:
-		names = append(names, collectLocals(n.Body)...)
+		names = append(names, c.collectLocals(n.Body)...)
 	case *script.ArrayLiteral:
+		curr := len(c.tempArrayVars)
+		name := fmt.Sprintf("__array_tmp%d", curr)
 
+		c.tempArrayVars = append(c.tempArrayVars, name)
+
+		names = append(names, Local{
+			Name: name,
+			Type: "i32", // pointer
+		})
 	}
 
 	return names
@@ -527,6 +599,8 @@ func CompileProgram(program *script.Program) (string, error) {
 
 	c.emit("(module")
 	c.depth++
+
+	c.importModules(program)
 
 	if len(c.strings) > 0 {
 		c.emit("(memory 1)")

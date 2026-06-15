@@ -275,6 +275,19 @@ func TestParser_Parse(t *testing.T) {
 											Stmts
 			`,
 		},
+		{
+			name:  "Indexing",
+			input: `target[index];`,
+			want: `
+				Program
+					Stmts
+						ArrayAccess
+							Target
+								Identifier(target)
+							Index
+								Identifier(index)
+			`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

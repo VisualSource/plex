@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 10 – Struct Layout and Field Access</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 820px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: #c9d1d9; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task h4 { margin: 0 0 10px; color: var(--yellow); font-size: 1em; }
+  .callout { background: #0e1e0e; border-left: 4px solid var(--green); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .callout h4 { margin: 0 0 10px; color: var(--green); font-size: 1em; }
+  .warning { background: #1e0e0e; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warning h4 { margin: 0 0 10px; color: var(--accent); font-size: 1em; }
+  .note { background: #0e0e1e; border-left: 4px solid var(--purple); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .note h4 { margin: 0 0 10px; color: var(--purple); font-size: 1em; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; font-family: monospace; font-size: 0.85em; line-height: 1.6; color: #8b949e; margin: 1.4em 0; white-space: pre; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+  ul li, ol li { margin-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: var(--surface); color: var(--blue); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 10 – Struct Layout and Field Access</h1>
+
+<p>Arrays were the first heap-allocated type. Structs are the second — and the conceptual leap
+is small. Where an array uses a sequential index to find elements, a struct uses compile-time
+field offsets. The runtime arithmetic is almost identical.</p>
+
+<p>But before structs, there's a small bug to fix from Lesson 9.</p>
+
+<hr>
+
+<h2>0. Quick fix: <code>clear(c.tempArrayVars)</code></h2>
+
+<p>In <code>FunctionDeclaration</code> you call <code>clear(c.tempArrayVars)</code> after
+compiling the body. Go's <code>clear</code> zeros all elements but does <em>not</em> change
+<code>len</code> — so the next function with arrays will find stale length, and the pop
+<code>c.tempArrayVars[len(c.tempArrayVars)-1]</code> will return <code>""</code>.</p>
+
+<p>Fix: reset the slice to empty after each function.</p>
+
+<pre><code>// instead of: clear(c.tempArrayVars)
+c.tempArrayVars = c.tempArrayVars[:0]</code></pre>
+
+<p>This keeps the underlying array (no allocation) but sets <code>len</code> back to zero.</p>
+
+<hr>
+
+<h2>1. Struct layout</h2>
+
+<p>A struct is a block of bytes in memory. Each field occupies a fixed-size slot at a known
+offset from the base address. The compiler determines those offsets once, at compile time, and
+uses them every time a field is read or written.</p>
+
+<p>For a struct with all <code>f64</code> fields (8 bytes each):</p>
+
+<div class="diagram">
+  struct Point { x: float; y: float; }
+
+  offset 0:  [x: f64]   8 bytes
+  offset 8:  [y: f64]   8 bytes
+
+  total size = 16 bytes
+</div>
+
+<p>For mixed types:</p>
+
+<div class="diagram">
+  struct Rect { x: float; y: float; w: float; h: float; }
+
+  offset 0:  [x: f64]    8 bytes
+  offset 8:  [y: f64]    8 bytes
+  offset 16: [w: f64]    8 bytes
+  offset 24: [h: f64]    8 bytes
+
+  total size = 32 bytes
+</div>
+
+<p>The offset of each field is the sum of the sizes of all preceding fields.
+For a teaching compiler where everything is either <code>f64</code> (8 bytes),
+<code>i64</code> (8 bytes), <code>i32</code> (4 bytes), or a pointer (<code>i32</code>, 4 bytes),
+you can compute this with a running total.</p>
+
+<hr>
+
+<h2>2. The struct registry</h2>
+
+<p>The compiler needs to know the layout of every struct before it can compile field access.
+Add a registry of struct definitions:</p>
+
+<pre><code>type StructField struct {
+    Name   string
+    Type   string // WASM type
+    Offset int    // byte offset from struct base
+}
+
+type StructDef struct {
+    Name   string
+    Fields []StructField
+    Size   int // total bytes
+}
+
+type Compiler struct {
+    // ... existing fields ...
+    structs map[string]StructDef
+}</code></pre>
+
+<p>Initialize it in <code>CompileProgram</code> alongside the other setup.</p>
+
+<h3>Registering a struct</h3>
+
+<p>When the compiler encounters a <code>*script.StructStatement</code>, it should register
+the struct and then <em>not</em> emit any WAT</code> — structs have no runtime representation
+at the declaration site. They only take up space when constructed.</p>
+
+<pre><code>func (c *Compiler) registerStruct(n *script.StructStatement) {
+    var fields []StructField
+    offset := 0
+    for _, f := range n.Fields {
+        param := f.(*script.Parameter)
+        wasmType := resolveType(param.Type)
+        size := sizeOf(wasmType)
+        fields = append(fields, StructField{
+            Name:   param.Name,
+            Type:   wasmType,
+            Offset: offset,
+        })
+        offset += size
+    }
+    c.structs[n.Name] = StructDef{Name: n.Name, Fields: fields, Size: offset}
+}</code></pre>
+
+<p>You need a helper that maps a WASM type to its byte size:</p>
+
+<pre><code>func sizeOf(wasmType string) int {
+    switch wasmType {
+    case "f64", "i64":
+        return 8
+    case "f32", "i32":
+        return 4
+    default:
+        return 8 // default to 8 (pointer-sized on 64-bit host, but i32 in WASM)
+    }
+}</code></pre>
+
+<div class="task">
+<h4>Task A — Register structs in a pre-pass</h4>
+<p>Add a <code>collectStructs</code> method that walks the program and calls
+<code>registerStruct</code> for every <code>*script.StructStatement</code>. Call it from
+<code>CompileProgram</code> before the main compile loop, so struct definitions are always
+available before any function tries to construct or access them.</p>
+
+<p>In the <code>Compile</code> switch, add a case for <code>*script.StructStatement</code>
+that just calls <code>registerStruct</code> and returns — no WAT emitted.</p>
+</div>
+
+<hr>
+
+<h2>3. Struct construction</h2>
+
+<p>In plex, you construct a struct by calling its name as a function: <code>Point(1.0, 2.0)</code>.
+In the interpreter, <code>FunctionCall</code> checked whether the callee was a <code>StructType</code>
+and handled it specially. The compiler does the same thing — check the struct registry first.</p>
+
+<p>The construction sequence:</p>
+<ol>
+  <li>Allocate <code>struct.Size</code> bytes with <code>$alloc</code>.</li>
+  <li>For each field (in order), compile the corresponding argument and store it at
+      <code>base + field.Offset</code>.</li>
+  <li>Leave the base address on the stack.</li>
+</ol>
+
+<p>This is almost identical to <code>ArrayLiteral</code> — allocate, write fields, return pointer.
+The difference is that field offsets come from the struct definition, not a uniform stride.</p>
+
+<div class="task">
+<h4>Task B — Compile struct construction</h4>
+<p>In the <code>*script.FunctionCall</code> case, before emitting <code>call $name</code>,
+check whether the callee identifier matches a registered struct:</p>
+
+<pre><code>case *script.Identifier:
+    if def, ok := c.structs[callee.Value]; ok {
+        // struct construction — same temp-var pattern as ArrayLiteral
+        // alloc def.Size bytes
+        // tee into temp local
+        // for each field: local.get tmp, i32.const offset, i32.add, compile arg, TYPE.store
+        // local.get tmp  (leave pointer on stack)
+    } else {
+        c.emit("call $" + callee.Value)
+    }</code></pre>
+
+<p>You'll need another temp variable — you can reuse the same
+<code>tempArrayVars</code> mechanism, or add a dedicated <code>tempStructVars</code> slice.
+Simpler: unify them into a single <code>tempVars</code> slice since the purpose is the same
+(hold a heap pointer temporarily).</p>
+</div>
+
+<hr>
+
+<h2>4. Field access: MemberAccess</h2>
+
+<p>Reading <code>p.x</code> compiles to: compute the address of the field, then load.</p>
+
+<pre><code>;; p.x where p is i32 pointer to a Point, x is at offset 0
+local.get $p
+i32.const 0     ;; field offset
+i32.add
+f64.load        ;; load an f64</code></pre>
+
+<p>For <code>p.y</code> (offset 8):</p>
+
+<pre><code>local.get $p
+i32.const 8
+i32.add
+f64.load</code></pre>
+
+<p>The compiler looks up the field name in the struct definition to find the offset.
+The tricky part: how does the compiler know what struct type <code>p</code> holds?</p>
+
+<p>Right now, your <code>typeOf</code> returns <code>"i32"</code> for any pointer — it doesn't
+track <em>which</em> struct type an <code>i32</code> points to. For field access you need
+the struct name, not just "i32".</p>
+
+<h3>The minimal solution: a local type table</h3>
+
+<p>Extend <code>Local</code> with an optional struct name:</p>
+
+<pre><code>type Local struct {
+    Name       string
+    Type       string // WASM type
+    StructName string // set when Type == "i32" and it points to a struct
+}</code></pre>
+
+<p>When you collect locals for a variable declaration whose initialiser is a struct
+construction call, record the struct name. Then in <code>*script.MemberAccess</code>,
+look up the local's struct name to find the field definition.</p>
+
+<div class="task">
+<h4>Task C — Compile MemberAccess</h4>
+
+<p>Add <code>*script.MemberAccess</code> to <code>Compile</code>:</p>
+
+<pre><code>case *script.MemberAccess:
+    // 1. compile the object expression (pushes i32 base address)
+    if err := c.Compile(n.Object); err != nil {
+        return err
+    }
+    // 2. find which struct type the object is
+    structName := c.structNameOf(n.Object)
+    def, ok := c.structs[structName]
+    if !ok {
+        return fmt.Errorf("compile: unknown struct %q for member access", structName)
+    }
+    // 3. find the field offset
+    for _, field := range def.Fields {
+        if field.Name == n.Field {
+            c.emit(fmt.Sprintf("i32.const %d", field.Offset))
+            c.emit("i32.add")
+            c.emit(field.Type + ".load")
+            return nil
+        }
+    }
+    return fmt.Errorf("compile: struct %q has no field %q", structName, n.Field)</code></pre>
+
+<p>You'll need <code>structNameOf(node AstNode) string</code> — a helper that, given an
+expression node, returns the struct name it evaluates to. For an <code>*Identifier</code>,
+look it up in <code>c.locals</code> and return its <code>StructName</code>.</p>
+</div>
+
+<hr>
+
+<h2>5. Field assignment: MemberAssignment</h2>
+
+<p>Writing <code>p.x = 5.0</code> is a store instead of a load. The pattern: compute the
+field address, compile the right-hand value, store.</p>
+
+<pre><code>;; p.x = 5.0
+local.get $p
+i32.const 0     ;; offset of x
+i32.add
+f64.const 5.0
+f64.store</code></pre>
+
+<div class="task">
+<h4>Task D (stretch) — Compile MemberAssignment</h4>
+<p>Same lookup pattern as <code>MemberAccess</code>, but emit <code>TYPE.store</code>
+instead of <code>TYPE.load</code>, with the value compiled after the address calculation.</p>
+</div>
+
+<hr>
+
+<h2>6. End-to-end test</h2>
+
+<p>Write a plex program and compile it, then verify the WAT with <code>wat2wasm</code>:</p>
+
+<pre><code>struct Point { x: float; y: float; }
+
+fn make_point(x: float, y: float): Point {
+    return Point(x, y);
+}
+
+fn get_x(p: Point): float {
+    return p.x;
+}
+</code></pre>
+
+<p>Expected WAT (roughly):</p>
+<pre><code>(module
+  (memory 1)
+  (global $heapPtr (mut i32) (i32.const 0))
+  ...
+  (func $make_point (param $x f64) (param $y f64) (result i32)
+    i32.const 16      ;; sizeof Point
+    call $alloc
+    local.tee $tmp
+    i32.const 0       ;; offset of x
+    i32.add
+    local.get $x
+    f64.store
+    local.get $tmp
+    i32.const 8       ;; offset of y
+    i32.add
+    local.get $y
+    f64.store
+    local.get $tmp
+  )
+  (func $get_x (param $p i32) (result f64)
+    local.get $p
+    i32.const 0
+    i32.add
+    f64.load
+  )
+  ...
+)</code></pre>
+
+<hr>
+
+<h2>Q&amp;A prompts</h2>
+
+<ul>
+  <li>What happens if two struct fields have different sizes — say one <code>i32</code> and one <code>f64</code>? Does the layout calculation still work?</li>
+  <li>In C, compilers add <em>padding</em> between fields to keep them aligned to their natural size (a <code>f64</code> at byte offset 4 would be misaligned). Does WASM require this? What does <code>f64.store</code> do with an unaligned address?</li>
+  <li>How would you handle <code>impl</code> blocks — methods on a struct — in the compiler? The interpreter injected <code>self</code> into the environment. What's the equivalent in WASM?</li>
+</ul>
+
+<p>When you've finished Tasks A, B, and C, say <strong>"next lesson"</strong> for Lesson 11 —
+either methods and <code>impl</code> blocks, or type checking as a compiler pass, depending
+on where you want to go.</p>
+
+</body>
+</html>
