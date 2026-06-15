@@ -11,31 +11,23 @@ import (
 	"github.com/VisualSource/plex/internal/script"
 )
 
-type stringEntry struct {
-	value  string
-	offset int
-}
+//go:embed runtime_helpers/*.plex
+var globalHelpers embed.FS
 
 type Compiler struct {
 	out    strings.Builder
 	locals []Local
 	depth  int
 
+	structs map[string]structDef
+
 	globalVars []string
 
-	tempArrayVars []string
+	tempVars []string
 
-	strings []stringEntry
-	dataPtr int
-}
-
-//go:embed helpers/*.plex
-var globalHelpers embed.FS
-
-func (c *Compiler) emit(parts ...string) {
-	c.out.WriteString(strings.Repeat(" ", c.depth))
-	c.out.WriteString(strings.Join(parts, " "))
-	c.out.WriteRune('\n')
+	strings   []stringEntry
+	dataPtr   int
+	needsHeap bool
 }
 
 func (c *Compiler) Compile(node script.AstNode) error {
@@ -136,7 +128,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return err
 		}
 
-		c.tempArrayVars = c.tempArrayVars[:0]
+		c.tempVars = c.tempVars[:0]
 
 		c.depth--
 		c.emit(")")
@@ -232,7 +224,12 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:
-			c.emit("call $" + callee.Value)
+			if def, ok := c.structs[callee.Value]; ok {
+				// init struct
+
+			} else {
+				c.emit("call $" + callee.Value)
+			}
 		default:
 			return fmt.Errorf("compile: unsupported callee %T", n.Callee)
 		}
@@ -247,8 +244,8 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 	case *script.ArrayLiteral:
 
-		tmpName := c.tempArrayVars[len(c.tempArrayVars)-1]
-		c.tempArrayVars = c.tempArrayVars[:len(c.tempArrayVars)-1]
+		tmpName := c.tempVars[len(c.tempVars)-1]
+		c.tempVars = c.tempVars[:len(c.tempVars)-1]
 
 		elemSize := 8 // f64 element size in bytes, would need to reslove size for structs
 		totalSize := 4 + len(n.Elements)*elemSize
@@ -308,6 +305,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.emit("f64.load") // load element, TODO: reslove TYPE HERE
 
 		c.emit(";; end array access")
+	case *script.StructStatement:
 
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)
@@ -315,93 +313,10 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 	return nil
 }
-
-func (c *Compiler) collectStrings(node script.AstNode) {
-	switch n := node.(type) {
-	case *script.Block:
-		for _, s := range n.Stmts {
-			c.collectStrings(s)
-		}
-	case *script.Program:
-		for _, s := range n.Stmts {
-			c.collectStrings(s)
-		}
-	case *script.FunctionDeclaration:
-		c.collectStrings(n.Body)
-	case *script.IfStatement:
-		c.collectStrings(n.Condition)
-		c.collectStrings(n.Body)
-		if n.Else != nil {
-			c.collectStrings(n.Else)
-		}
-	case *script.WhileStatement:
-		c.collectStrings(n.Condition)
-		c.collectStrings(n.Body)
-	case *script.ReturnStatement:
-		if n.Value != nil {
-			c.collectStrings(n.Value)
-		}
-	case *script.VariableDeclaration:
-		c.collectStrings(n.Init)
-	case *script.FunctionCall:
-		for _, a := range n.Args {
-			c.collectStrings(a)
-		}
-	case *script.StringLiteral:
-		c.strings = append(c.strings, stringEntry{
-			value:  n.Value,
-			offset: c.dataPtr,
-		})
-		c.dataPtr += len(n.Value) + 1
-	case *script.ArrayLiteral:
-		for _, s := range n.Elements {
-			c.collectStrings(s)
-		}
-	}
-
-}
-func (c *Compiler) hasHeapObjects(node script.AstNode) bool {
-	switch n := node.(type) {
-	case *script.Block:
-		for _, s := range n.Stmts {
-			if hasObj := c.hasHeapObjects(s); hasObj {
-				return true
-			}
-		}
-		return false
-	case *script.Program:
-		for _, s := range n.Stmts {
-			if hasObj := c.hasHeapObjects(s); hasObj {
-				return true
-			}
-		}
-		return false
-	case *script.FunctionDeclaration:
-		return c.hasHeapObjects(n.Body)
-	case *script.IfStatement:
-		hasObj := c.hasHeapObjects(n.Body)
-		if hasObj {
-			return true
-		}
-		if n.Else != nil {
-			return c.hasHeapObjects(n.Else)
-		}
-		return false
-	case *script.WhileStatement:
-		return c.hasHeapObjects(n.Condition) || c.hasHeapObjects(n.Body)
-	case *script.ReturnStatement:
-		if n.Value != nil {
-			return c.hasHeapObjects(n.Value)
-		}
-	case *script.VariableDeclaration:
-		return c.hasHeapObjects(n.Init)
-	case *script.ArrayLiteral:
-		return true
-	case *script.StructStatement:
-		return true
-	}
-
-	return false
+func (c *Compiler) emit(parts ...string) {
+	c.out.WriteString(strings.Repeat(" ", c.depth))
+	c.out.WriteString(strings.Join(parts, " "))
+	c.out.WriteRune('\n')
 }
 
 func (c *Compiler) typeOf(node script.AstNode) (string, error) {
@@ -453,7 +368,7 @@ func (c *Compiler) typeOf(node script.AstNode) (string, error) {
 }
 
 func (c *Compiler) loadHelper(name string) error {
-	file, err := globalHelpers.Open("helpers/" + name)
+	file, err := globalHelpers.Open("runtime_helpers/" + name)
 	if err != nil {
 		return err
 	}
@@ -504,11 +419,6 @@ func (c *Compiler) importModules(node *script.Program) error {
 	return nil
 }
 
-type Local struct {
-	Name string
-	Type string
-}
-
 func (c *Compiler) collectLocals(node script.AstNode) []Local {
 	var names []Local
 	switch n := node.(type) {
@@ -546,56 +456,92 @@ func (c *Compiler) collectLocals(node script.AstNode) []Local {
 	case *script.WhileStatement:
 		names = append(names, c.collectLocals(n.Body)...)
 	case *script.ArrayLiteral:
-		curr := len(c.tempArrayVars)
-		name := fmt.Sprintf("__array_tmp%d", curr)
+		curr := len(c.tempVars)
+		name := fmt.Sprintf("___tmp%d", curr)
 
-		c.tempArrayVars = append(c.tempArrayVars, name)
+		c.tempVars = append(c.tempVars, name)
 
 		names = append(names, Local{
 			Name: name,
 			Type: "i32", // pointer
 		})
+
 	}
 
 	return names
 }
 
-func resolveType(node script.AstNode) string {
-	// may need ref to compiter struct for type look up but should be fine for now.
-
-	if t, ok := node.(*script.Type); ok {
-		if !t.IsArray {
-			switch t.Name {
-			case "i64", "int":
-				return "i64"
-			case "f64", "float":
-				return "f64"
-			case "f32":
-				return "f32"
-			case "nil":
-				// not sure what type nil should be yet,
-				// but should point to a undefined/unset value
-			case "i32", "string":
-				// string is a pointer to starting offset
-				fallthrough
-			default:
-				// unknown type, i32,string are i32 pointers
-				// can only be structs right now
-				// as creating named types for like i64 can't be done yet
-				// so return i32 for a pointer
-				return "i32"
-			}
-		} else {
-			return "i32" // array type is a pointer to the start of the array
+// collect static strings
+// check for heap objects (structs,arrays, maybe strings?)
+// register structs
+func (c *Compiler) prepass(node script.AstNode) {
+	switch n := node.(type) {
+	case *script.Program:
+		for _, child := range n.Stmts {
+			c.prepass(child)
 		}
-	}
+	case *script.Block:
+		for _, child := range n.Stmts {
+			c.prepass(child)
+		}
+	case *script.FunctionDeclaration:
+		c.prepass(n.Body)
+	case *script.IfStatement:
+		c.prepass(n.Condition)
+		c.prepass(n.Body)
+		if n.Else != nil {
+			c.prepass(n.Else)
+		}
+	case *script.WhileStatement:
+		c.prepass(n.Condition)
+		c.prepass(n.Body)
+	case *script.ReturnStatement:
+		c.prepass(n.Value)
+	case *script.VariableDeclaration:
+		c.prepass(n.Init)
+	case *script.FunctionCall:
+		for _, arg := range n.Args {
+			c.prepass(arg)
+		}
+	case *script.StringLiteral:
+		c.strings = append(c.strings, stringEntry{
+			value:  n.Value,
+			offset: c.dataPtr,
+		})
+		c.dataPtr += len(n.Value) + 1
+	case *script.ArrayLiteral:
+		c.needsHeap = true
+		for _, arg := range n.Elements {
+			c.prepass(arg)
+		}
+	case *script.StructStatement:
+		c.needsHeap = true
 
-	return "f64"
+		def := structDef{Name: n.Name, Fields: make([]structField, 0), Size: 0}
+
+		offset := 0
+		for _, f := range n.Fields {
+			param := f.(*script.Parameter)
+			wasmType := resolveType(param.Type)
+			size := sizeOf(wasmType)
+
+			def.Fields = append(def.Fields, structField{
+				Name:   param.Name,
+				Type:   wasmType,
+				Offset: offset,
+			})
+
+			offset += size
+		}
+
+		c.structs[n.Name] = def
+
+	}
 }
 
 func CompileProgram(program *script.Program) (string, error) {
 	c := &Compiler{}
-	c.collectStrings(program)
+	c.prepass(program)
 
 	c.emit("(module")
 	c.depth++
@@ -617,7 +563,7 @@ func CompileProgram(program *script.Program) (string, error) {
 
 	// collect struct/arrays/ dyn strings
 
-	if c.hasHeapObjects(program) {
+	if c.needsHeap {
 		// round this, if 1000 -> 1024
 		heapStart := int(math.Ceil(float64(c.dataPtr)/8) * 8)
 		c.emit(fmt.Sprintf("(global $heapPtr (mut i32) (i32.const %d))", heapStart))
