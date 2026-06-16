@@ -151,7 +151,6 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		if err := c.Compile(n.Body); err != nil {
 			return err
 		}
-
 		c.endTransaction()
 
 		for _, local := range c.locals {
@@ -186,9 +185,22 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			//TODO: should valiate the declaration expresion matchs explict type
 		} else {
 			// implicit type
-			switch n.Init.(type) {
+			switch i := n.Init.(type) {
 			case *script.NumberLiteral:
 				// TODO: should reslove to i64 by default or f64 when thers a . in the number
+			case *script.FunctionCall:
+				local.Type = "i32"
+
+				switch callee := i.Callee.(type) {
+				case *script.Identifier:
+					if def, ok := c.structs[callee.Value]; ok {
+						local.Owner = def.Name
+					}
+				default:
+					// todo reslove type from function, throw error if number returns void
+					return fmt.Errorf("unable to reslove type")
+				}
+
 			default: // arrays, structs, strings will be i32 for points
 				local.Type = "i32"
 			}
@@ -386,13 +398,13 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		if err := c.Compile(n.Index); err != nil {
 			return err
 		}
-		c.emit("i32.wrap_i64") //TODO: need to reslove if we need to do thing
+		c.emit("i32.wrap_i64") //TODO: need to resolve if we need to do thing
 
 		c.emit("i32.const 8") // 8 = f64, should be size of object ex. sizeof(struct) || sizeof(string)
 		c.emit("i32.mul")     // get offset
 
 		c.emit("i32.add")  // base prt + len(4) + offset(i * size)
-		c.emit("f64.load") // load element, TODO: reslove TYPE HERE
+		c.emit("f64.load") // load element, TODO: resolve TYPE HERE
 
 		c.emit(";; end array access")
 	case *script.StructStatement:
@@ -402,15 +414,52 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return err
 		}
 
-		// reslove object
-		//
+		// check what the object is as strings,and arrays have callable methods
+		// like len(), append(), remove()
+
+		// TODO: update this so that we can resolve from arrays and the like
+		id, ok := n.Object.(*script.Identifier)
+		if !ok {
+			return fmt.Errorf("unable to resolve struct")
+		}
+
+		// resolve struct name
+		def, ok := c.structs[id.Value]
+		if !ok {
+			return fmt.Errorf("compile: unknown struct %q for member access", id.Value)
+		}
+		for _, field := range def.Fields {
+			if field.Name == n.Field {
+				c.emit(fmt.Sprintf("i32.const %d", field.Offset))
+				c.emit("i32.add")
+				c.emit(fmt.Sprintf("%s.load", field.Type))
+				return nil
+			}
+		}
 	case *script.MemberAssignment:
 		if err := c.Compile(n.Object); err != nil {
 			return err
 		}
 
-		//reslove object
+		// TODO: update this so that we can resolve from arrays and the like
+		id, ok := n.Object.(*script.Identifier)
+		if !ok {
+			return fmt.Errorf("unable to resolve struct")
+		}
 
+		// resolve struct name
+		def, ok := c.structs[id.Value]
+		if !ok {
+			return fmt.Errorf("compile: unknown struct %q for member access", id.Value)
+		}
+		for _, field := range def.Fields {
+			if field.Name == n.Field {
+				c.emit(fmt.Sprintf("i32.const %d", field.Offset))
+				c.emit("i32.add")
+				c.emit(fmt.Sprintf("%s.store", field.Type))
+				return nil
+			}
+		}
 		// load value
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)
