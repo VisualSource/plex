@@ -23,11 +23,38 @@ type Compiler struct {
 
 	globalVars []string
 
-	tempVars []string
+	tempVars int
 
 	strings   []stringEntry
 	dataPtr   int
 	needsHeap bool
+
+	inTransaction bool
+	transaction   strings.Builder
+}
+
+func (c *Compiler) startTransaction() {
+	c.inTransaction = true
+	c.transaction.Reset()
+
+}
+func (c *Compiler) endTransaction() {
+	c.inTransaction = false
+}
+func (c *Compiler) writeTransaction() {
+	c.out.WriteString(c.transaction.String())
+}
+func (c *Compiler) emit(parts ...string) {
+	var target *strings.Builder
+	if c.inTransaction {
+		target = &c.transaction
+	} else {
+		target = &c.out
+	}
+
+	target.WriteString(strings.Repeat(" ", c.depth))
+	target.WriteString(strings.Join(parts, " "))
+	target.WriteRune('\n')
 }
 
 func (c *Compiler) Compile(node script.AstNode) error {
@@ -119,20 +146,27 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.emit(fmt.Sprintf("(func $%s%s%s", n.Name, params.String(), result))
 		c.depth++
 
-		for _, local := range c.collectLocals(n.Body) {
-			c.emit(fmt.Sprintf("(local $%s %s)", local.Name, local.Type))
-		}
-
+		c.startTransaction()
 		//TODO: if theres a return (there should be one if ReturnType is set) validate that the types match ReturnType
 		if err := c.Compile(n.Body); err != nil {
 			return err
 		}
 
-		c.tempVars = c.tempVars[:0]
+		c.endTransaction()
+
+		for _, local := range c.locals {
+			c.emit(fmt.Sprintf("(local $%s %s)", local.Name, local.Type))
+		}
+
+		c.writeTransaction()
 
 		c.depth--
 		c.emit(")")
+
+		// this should be controlled via export keyword not all functions need to be exported
 		c.emit(fmt.Sprintf("(export \"%s\" (func $%s))", n.Name, n.Name))
+
+		c.locals = c.locals[:0]
 
 	case *script.ReturnStatement:
 		if n.Value != nil {
@@ -142,6 +176,26 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 		c.emit("return")
 	case *script.VariableDeclaration:
+		local := Local{
+			Name: n.Name,
+			Type: "f64", // f64,i64,f32,i32
+		}
+
+		if n.Type != nil { // use explict type
+			local.Type = resolveType(n.Type)
+			//TODO: should valiate the declaration expresion matchs explict type
+		} else {
+			// implicit type
+			switch n.Init.(type) {
+			case *script.NumberLiteral:
+				// TODO: should reslove to i64 by default or f64 when thers a . in the number
+			default: // arrays, structs, strings will be i32 for points
+				local.Type = "i32"
+			}
+		}
+
+		c.locals = append(c.locals, local)
+
 		if err := c.Compile(n.Init); err != nil {
 			return err
 		}
@@ -225,8 +279,42 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:
 			if def, ok := c.structs[callee.Value]; ok {
-				// init struct
+				c.emit(fmt.Sprintf(";; start struct(%s) init", def.Name))
 
+				tmpName := fmt.Sprintf("__struct_%s_tmp%d", def.Name, c.tempVars)
+				c.tempVars++
+
+				c.locals = append(c.locals, Local{Name: tmpName, Type: "i32"})
+
+				c.emit(fmt.Sprintf("i32.const %d", def.Size))
+				c.emit("call $alloc")
+				c.emit(fmt.Sprintf("local.tee $%s", tmpName)) // store addr and leave it on stack
+
+				// init fields
+
+				if len(n.Args) != len(def.Fields) {
+					return fmt.Errorf("%d args where passed to ctor when only %d where expected", len(n.Args), len(def.Fields))
+				}
+
+				for i, arg := range n.Args {
+					field := def.Fields[i]
+					c.emit(fmt.Sprintf(";; set field %s", field.Name))
+
+					c.emit(fmt.Sprintf("local.get $%s", tmpName))
+					c.emit(fmt.Sprintf("i32.const %d", field.Offset))
+					c.emit("i32.add")
+
+					if err := c.Compile(arg); err != nil {
+						return err
+					}
+
+					c.emit(fmt.Sprintf("%s.store", field.Type))
+
+					c.emit(";; end")
+				}
+				c.emit(fmt.Sprintf("local.get $%s", tmpName))
+
+				c.emit(fmt.Sprintf(";; end struct(%s) int", def.Name))
 			} else {
 				c.emit("call $" + callee.Value)
 			}
@@ -244,8 +332,10 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 	case *script.ArrayLiteral:
 
-		tmpName := c.tempVars[len(c.tempVars)-1]
-		c.tempVars = c.tempVars[:len(c.tempVars)-1]
+		tmpName := fmt.Sprintf("__array_tmp%d", c.tempVars)
+		c.tempVars++
+
+		c.locals = append(c.locals, Local{Name: tmpName, Type: "i32"})
 
 		elemSize := 8 // f64 element size in bytes, would need to reslove size for structs
 		totalSize := 4 + len(n.Elements)*elemSize
@@ -306,17 +396,20 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		c.emit(";; end array access")
 	case *script.StructStatement:
+		// struct should already have been registered
+	case *script.MemberAccess:
+		if err := c.Compile(n.Object); err != nil {
+			return err
+		}
+
+		// reslove object
+		//
 
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)
 	}
 
 	return nil
-}
-func (c *Compiler) emit(parts ...string) {
-	c.out.WriteString(strings.Repeat(" ", c.depth))
-	c.out.WriteString(strings.Join(parts, " "))
-	c.out.WriteRune('\n')
 }
 
 func (c *Compiler) typeOf(node script.AstNode) (string, error) {
@@ -419,58 +512,6 @@ func (c *Compiler) importModules(node *script.Program) error {
 	return nil
 }
 
-func (c *Compiler) collectLocals(node script.AstNode) []Local {
-	var names []Local
-	switch n := node.(type) {
-	case *script.Block:
-		for _, s := range n.Stmts {
-			names = append(names, c.collectLocals(s)...)
-		}
-	case *script.VariableDeclaration:
-		local := Local{
-			Name: n.Name,
-			Type: "f64", // f64,i64,f32,i32
-		}
-
-		names = append(names, c.collectLocals(n.Init)...)
-
-		if n.Type != nil { // use explict type
-			local.Type = resolveType(n.Type)
-			//TODO: should valiate the declaration expresion matchs explict type
-		} else {
-			// implicit type
-			switch n.Init.(type) {
-			case *script.NumberLiteral:
-				// TODO: should reslove to i64 by default or f64 when thers a . in the number
-			default: // arrays, structs, strings will be i32 for points
-				local.Type = "i32"
-			}
-		}
-
-		names = append(names, local)
-	case *script.IfStatement:
-		names = append(names, c.collectLocals(n.Body)...)
-		if n.Else != nil {
-			names = append(names, c.collectLocals(n.Else)...)
-		}
-	case *script.WhileStatement:
-		names = append(names, c.collectLocals(n.Body)...)
-	case *script.ArrayLiteral:
-		curr := len(c.tempVars)
-		name := fmt.Sprintf("___tmp%d", curr)
-
-		c.tempVars = append(c.tempVars, name)
-
-		names = append(names, Local{
-			Name: name,
-			Type: "i32", // pointer
-		})
-
-	}
-
-	return names
-}
-
 // collect static strings
 // check for heap objects (structs,arrays, maybe strings?)
 // register structs
@@ -540,7 +581,9 @@ func (c *Compiler) prepass(node script.AstNode) {
 }
 
 func CompileProgram(program *script.Program) (string, error) {
-	c := &Compiler{}
+	c := &Compiler{
+		structs: make(map[string]structDef),
+	}
 	c.prepass(program)
 
 	c.emit("(module")

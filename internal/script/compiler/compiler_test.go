@@ -1,6 +1,7 @@
 package compiler_test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -37,5 +38,38 @@ func TestCompilerFunctionCall(t *testing.T) {
 		if !strings.Contains(wat, want) {
 			t.Errorf("WAT missing %q\n\nGot:\n%s", want, wat)
 		}
+	}
+}
+
+func TestStructGenAndCtor(t *testing.T) {
+	src := `
+		struct Point { x: float; y: float; }
+
+		fn make_point(x: float, y: float): Point {
+			return Point(x, y);
+		}
+
+		fn get_x(p: Point): float {
+			return p.x;
+		}
+	`
+
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := compiler.CompileProgram(ast.(*script.Program))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err := os.ReadFile("testdata/struct.wat")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result != string(snapshot) {
+		t.Fatal("result != snapshot")
 	}
 }

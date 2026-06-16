@@ -6,8 +6,9 @@ type stringEntry struct {
 }
 
 type Local struct {
-	Name string
-	Type string
+	Name  string
+	Type  string
+	Owner string
 }
 
 type structField struct {
