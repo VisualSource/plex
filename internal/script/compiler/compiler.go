@@ -131,15 +131,15 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		for _, p := range n.Params {
 			param := p.(*script.Parameter)
 
-			t := resolveType(param.Type.(*script.Type))
+			t, typeName := resolveType(param.Type.(*script.Type))
 
 			params.WriteString(fmt.Sprintf(" (param $%s %s)", param.Name, t))
-			c.locals = append(c.locals, Local{Name: param.Name, Type: t})
+			c.locals = append(c.locals, Local{Name: param.Name, Type: t, Owner: typeName})
 		}
 
 		result := ""
 		if n.ReturnType != nil {
-			t := resolveType(n.ReturnType)
+			t, _ := resolveType(n.ReturnType)
 			result = fmt.Sprintf(" (result %s)", t)
 		}
 
@@ -181,7 +181,8 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 
 		if n.Type != nil { // use explict type
-			local.Type = resolveType(n.Type)
+			local.Type, local.Owner = resolveType(n.Type)
+
 			//TODO: should valiate the declaration expresion matchs explict type
 		} else {
 			// implicit type
@@ -423,8 +424,20 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return fmt.Errorf("unable to resolve struct")
 		}
 
+		var stype string
+		for _, i := range c.locals {
+			if i.Name == id.Value {
+				stype = i.Owner
+				break
+			}
+		}
+
+		if stype == "" {
+			return fmt.Errorf("compile: failed to resolve struct type")
+		}
+
 		// resolve struct name
-		def, ok := c.structs[id.Value]
+		def, ok := c.structs[stype]
 		if !ok {
 			return fmt.Errorf("compile: unknown struct %q for member access", id.Value)
 		}
@@ -446,9 +459,19 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		if !ok {
 			return fmt.Errorf("unable to resolve struct")
 		}
+		var stype string
+		for _, i := range c.locals {
+			if i.Name == id.Value {
+				stype = i.Owner
+				break
+			}
+		}
 
+		if stype == "" {
+			return fmt.Errorf("compile: failed to resolve struct type")
+		}
 		// resolve struct name
-		def, ok := c.structs[id.Value]
+		def, ok := c.structs[stype]
 		if !ok {
 			return fmt.Errorf("compile: unknown struct %q for member access", id.Value)
 		}
@@ -619,7 +642,7 @@ func (c *Compiler) prepass(node script.AstNode) {
 		offset := 0
 		for _, f := range n.Fields {
 			param := f.(*script.Parameter)
-			wasmType := resolveType(param.Type)
+			wasmType, _ := resolveType(param.Type)
 			size := sizeOf(wasmType)
 
 			def.Fields = append(def.Fields, structField{
