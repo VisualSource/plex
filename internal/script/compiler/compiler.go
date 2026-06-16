@@ -404,7 +404,14 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		// reslove object
 		//
+	case *script.MemberAssignment:
+		if err := c.Compile(n.Object); err != nil {
+			return err
+		}
 
+		//reslove object
+
+		// load value
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)
 	}
