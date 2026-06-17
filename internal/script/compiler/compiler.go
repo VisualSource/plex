@@ -25,6 +25,8 @@ type Compiler struct {
 
 	tempVars int
 
+	implBlock string
+
 	strings   []stringEntry
 	dataPtr   int
 	needsHeap bool
@@ -135,6 +137,21 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.locals = make([]Local, 0)
 
 		skipParam := []string{}
+
+		if c.implBlock != "" {
+			d := c.structs[c.implBlock]
+
+			if slices.Contains(d.Methods, n.Name) {
+				return fmt.Errorf("struct already has a method named %s", n.Name)
+			}
+
+			d.Methods = append(d.Methods, n.Name)
+
+			skipParam = append(skipParam, "self")
+			params.WriteString("( param $self i32)")
+			c.locals = append(c.locals, Local{Name: "self", Type: "i32", Owner: ""})
+		}
+
 		for _, p := range n.Params {
 			param := p.(*script.Parameter)
 
@@ -151,7 +168,14 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			result = fmt.Sprintf(" (result %s)", t)
 		}
 
-		c.emit(fmt.Sprintf("(func $%s%s%s", n.Name, params.String(), result))
+		var funcName string
+		if c.implBlock != "" {
+			funcName = fmt.Sprintf("__%s__%s", c.implBlock, funcName)
+		} else {
+			funcName = n.Name
+		}
+
+		c.emit(fmt.Sprintf("(func $%s%s%s", funcName, params.String(), result))
 		c.depth++
 
 		c.startTransaction()
@@ -436,27 +460,16 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		// like len(), append(), remove()
 
 		// TODO: update this so that we can resolve from arrays and the like
-		id, ok := n.Object.(*script.Identifier)
-		if !ok {
-			return fmt.Errorf("unable to resolve struct")
-		}
 
-		var stype string
-		for _, i := range c.locals {
-			if i.Name == id.Value {
-				stype = i.Owner
-				break
-			}
-		}
-
-		if stype == "" {
-			return fmt.Errorf("compile: failed to resolve struct type")
+		typename, err := c.typeofStruct(n.Object)
+		if err != nil {
+			return err
 		}
 
 		// resolve struct name
-		def, ok := c.structs[stype]
+		def, ok := c.structs[typename]
 		if !ok {
-			return fmt.Errorf("compile: unknown struct %q for member access", id.Value)
+			return fmt.Errorf("compile: unknown struct for member access")
 		}
 		for _, field := range def.Fields {
 			if field.Name == n.Field {
@@ -501,11 +514,48 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			}
 		}
 		// load value
+	case *script.StructImplStatement:
+		_, ok := c.structs[n.Name]
+		if !ok {
+			return fmt.Errorf("compile: unknown struct")
+		}
+
+		c.implBlock = n.Name
+		for _, method := range n.Methods {
+			if err := c.Compile(method); err != nil {
+				return err
+			}
+		}
+		c.implBlock = ""
+
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)
 	}
 
 	return nil
+}
+
+func (c *Compiler) typeofStruct(node script.AstNode) (string, error) {
+	switch n := node.(type) {
+	case *script.Identifier:
+
+		var stype string
+		for _, i := range c.locals {
+			if i.Name == n.Value {
+				stype = i.Owner
+				break
+			}
+		}
+
+		if stype == "" {
+			return "", fmt.Errorf("compile: failed to resolve struct type")
+		}
+
+		return stype, nil
+	default:
+		return "", fmt.Errorf("failed to resolve struct type")
+	}
+
 }
 
 func (c *Compiler) typeOf(node script.AstNode) (string, error) {

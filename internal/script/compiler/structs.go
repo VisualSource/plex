@@ -27,7 +27,8 @@ type structField struct {
 }
 
 type structDef struct {
-	Name   string
-	Fields []structField
-	Size   int
+	Name    string
+	Fields  []structField
+	Methods []string
+	Size    int
 }
