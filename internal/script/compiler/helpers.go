@@ -19,7 +19,7 @@ func resolveType(node script.AstNode) (string, string) {
 				// but should point to a undefined/unset value
 			case "i32", "string":
 				// string is a pointer to starting offset
-				return "", ""
+				return "i32", ""
 			default:
 				// unknown type, i32,string are i32 pointers
 				// can only be structs right now

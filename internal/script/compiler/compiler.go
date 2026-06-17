@@ -66,6 +66,12 @@ func (c *Compiler) Compile(node script.AstNode) error {
 	case *script.NumberLiteral:
 		c.emit("f64.const", n.Value)
 	case *script.Identifier:
+		if !slices.ContainsFunc(c.locals, func(e Local) bool {
+			return e.Name == n.Value
+		}) && !slices.Contains(c.globalVars, n.Value) {
+			return fmt.Errorf("unknown identifier '%s'", n.Value)
+		}
+
 		if slices.Contains(c.globalVars, n.Value) {
 			c.emit("global.get", "$"+n.Value)
 		} else {
@@ -128,6 +134,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		params := strings.Builder{}
 		c.locals = make([]Local, 0)
 
+		skipParam := []string{}
 		for _, p := range n.Params {
 			param := p.(*script.Parameter)
 
@@ -135,6 +142,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 			params.WriteString(fmt.Sprintf(" (param $%s %s)", param.Name, t))
 			c.locals = append(c.locals, Local{Name: param.Name, Type: t, Owner: typeName})
+			skipParam = append(skipParam, param.Name)
 		}
 
 		result := ""
@@ -154,6 +162,9 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.endTransaction()
 
 		for _, local := range c.locals {
+			if slices.Contains(skipParam, local.Name) {
+				continue
+			}
 			c.emit(fmt.Sprintf("(local $%s %s)", local.Name, local.Type))
 		}
 
@@ -205,6 +216,12 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			default: // arrays, structs, strings will be i32 for points
 				local.Type = "i32"
 			}
+		}
+
+		if slices.ContainsFunc(c.locals, func(a Local) bool {
+			return a.Name == local.Name
+		}) {
+			return fmt.Errorf("there is already a variable with name %s", local.Name)
 		}
 
 		c.locals = append(c.locals, local)
@@ -283,12 +300,6 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			}
 		}
 	case *script.FunctionCall:
-		for _, arg := range n.Args {
-			if err := c.Compile(arg); err != nil {
-				return err
-			}
-		}
-
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:
 			if def, ok := c.structs[callee.Value]; ok {
@@ -312,8 +323,9 @@ func (c *Compiler) Compile(node script.AstNode) error {
 				for i, arg := range n.Args {
 					field := def.Fields[i]
 					c.emit(fmt.Sprintf(";; set field %s", field.Name))
-
-					c.emit(fmt.Sprintf("local.get $%s", tmpName))
+					if i != 0 {
+						c.emit(fmt.Sprintf("local.get $%s", tmpName))
+					}
 					c.emit(fmt.Sprintf("i32.const %d", field.Offset))
 					c.emit("i32.add")
 
@@ -329,6 +341,11 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 				c.emit(fmt.Sprintf(";; end struct(%s) int", def.Name))
 			} else {
+				for _, arg := range n.Args {
+					if err := c.Compile(arg); err != nil {
+						return err
+					}
+				}
 				c.emit("call $" + callee.Value)
 			}
 		default:
@@ -639,7 +656,6 @@ func (c *Compiler) prepass(node script.AstNode) {
 
 		def := structDef{Name: n.Name, Fields: make([]structField, 0), Size: 0}
 
-		offset := 0
 		for _, f := range n.Fields {
 			param := f.(*script.Parameter)
 			wasmType, _ := resolveType(param.Type)
@@ -648,10 +664,11 @@ func (c *Compiler) prepass(node script.AstNode) {
 			def.Fields = append(def.Fields, structField{
 				Name:   param.Name,
 				Type:   wasmType,
-				Offset: offset,
+				Offset: def.Size,
 			})
 
-			offset += size
+			def.Size += size
+
 		}
 
 		c.structs[n.Name] = def
