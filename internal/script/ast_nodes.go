@@ -4,6 +4,12 @@ type AstNode interface {
 	Range() (Position, Position)
 }
 
+type Expression interface {
+	AstNode
+	GetType() *Type // returns nil if not yet checked
+	SetType(*Type)
+}
+
 type Program struct {
 	Start, End Position
 	Stmts      []AstNode
@@ -18,6 +24,14 @@ type VariableDeclaration struct {
 	Name       string
 	Type       AstNode
 	Init       AstNode
+	type_      *Type
+}
+
+func (v *VariableDeclaration) GetType() *Type {
+	return v.type_
+}
+func (v *VariableDeclaration) SetType(t *Type) {
+	v.type_ = t
 }
 
 func (v *VariableDeclaration) Range() (Position, Position) {
@@ -29,6 +43,14 @@ type BinaryExpression struct {
 	Left       AstNode
 	Operator   TokenType
 	Right      AstNode
+	type_      *Type
+}
+
+func (b *BinaryExpression) SetType(t *Type) {
+	b.type_ = t
+}
+func (b *BinaryExpression) GetType() *Type {
+	return b.type_
 }
 
 func (b *BinaryExpression) Range() (Position, Position) {
@@ -38,27 +60,17 @@ func (b *BinaryExpression) Range() (Position, Position) {
 type NumberLiteral struct {
 	Start, End Position
 	Value      string
+	type_      *Type
 }
 
-type StringLiteral struct {
-	Start, End Position
-	Value      string
+func (m *NumberLiteral) SetType(t *Type) {
+	m.type_ = t
 }
-
-func (s *StringLiteral) Range() (Position, Position) {
-	return s.Start, s.End
+func (m *NumberLiteral) GetType() *Type {
+	return m.type_
 }
-
 func (m *NumberLiteral) Range() (Position, Position) {
 	return m.Start, m.End
-}
-
-func NewStringLiteral(value string, start, end Position) *StringLiteral {
-	return &StringLiteral{
-		Value: value,
-		End:   end,
-		Start: start,
-	}
 }
 
 func NewNumberLiteral(value string, start, end Position) *NumberLiteral {
@@ -69,9 +81,42 @@ func NewNumberLiteral(value string, start, end Position) *NumberLiteral {
 	}
 }
 
+type StringLiteral struct {
+	Start, End Position
+	Value      string
+	type_      *Type
+}
+
+func (s *StringLiteral) SetType(t *Type) {
+	s.type_ = t
+}
+func (s *StringLiteral) GetType() *Type {
+	return s.type_
+}
+
+func (s *StringLiteral) Range() (Position, Position) {
+	return s.Start, s.End
+}
+
+func NewStringLiteral(value string, start, end Position) *StringLiteral {
+	return &StringLiteral{
+		Value: value,
+		End:   end,
+		Start: start,
+	}
+}
+
 type Identifier struct {
 	Start, End Position
 	Value      string
+	type_      *Type
+}
+
+func (i *Identifier) SetType(t *Type) {
+	i.type_ = t
+}
+func (i *Identifier) GetType() *Type {
+	return i.type_
 }
 
 func (i *Identifier) Range() (Position, Position) {
@@ -86,14 +131,23 @@ func NewIdentifier(value string, start, end Position) *Identifier {
 	}
 }
 
-type Type struct {
+type TypeExpr struct {
 	Start, End Position
 	Name       string
 	IsArray    bool
 	IsNullable bool
+	type_      *Type
 }
 
-func (t *Type) Range() (Position, Position) {
+func (t *TypeExpr) GetType() *Type {
+	return t.type_
+}
+
+func (t *TypeExpr) SetType(v *Type) {
+	t.type_ = v
+}
+
+func (t *TypeExpr) Range() (Position, Position) {
 	return t.Start, t.End
 }
 
@@ -111,6 +165,15 @@ type Parameter struct {
 	Name       string
 	Type       AstNode
 	Mut        bool
+	type_      *Type
+}
+
+func (p *Parameter) GetType() *Type {
+	return p.type_
+}
+
+func (p *Parameter) SetType(t *Type) {
+	p.type_ = t
 }
 
 func (p *Parameter) Range() (Position, Position) {
@@ -133,6 +196,15 @@ type FunctionCall struct {
 	Start, End Position
 	Callee     AstNode
 	Args       []AstNode
+	type_      *Type
+}
+
+func (f *FunctionCall) GetType() *Type {
+	return f.type_
+}
+
+func (f *FunctionCall) SetType(t *Type) {
+	f.type_ = t
 }
 
 func (f *FunctionCall) Range() (Position, Position) {
@@ -143,6 +215,15 @@ type MemberAccess struct {
 	Start, End Position
 	Object     AstNode
 	Field      string
+	type_      *Type
+}
+
+func (m *MemberAccess) SetType(t *Type) {
+	m.type_ = t
+}
+
+func (m *MemberAccess) GetType() *Type {
+	return m.type_
 }
 
 func (n *MemberAccess) Range() (Position, Position) {
@@ -249,6 +330,14 @@ func (s *StructImplStatement) Range() (Position, Position) {
 type ReturnStatement struct {
 	Start, End Position
 	Value      AstNode
+	type_      *Type
+}
+
+func (r *ReturnStatement) GetType() *Type {
+	return r.type_
+}
+func (r *ReturnStatement) SetType(t *Type) {
+	r.type_ = t
 }
 
 func (r *ReturnStatement) Range() (Position, Position) {
@@ -277,6 +366,15 @@ func (m *MemberAssignment) Range() (Position, Position) {
 type ArrayLiteral struct {
 	Start, End Position
 	Elements   []AstNode
+	type_      *Type
+}
+
+func (a *ArrayLiteral) GetType() *Type {
+	return a.type_
+}
+
+func (a *ArrayLiteral) SetType(t *Type) {
+	a.type_ = t
 }
 
 func (a *ArrayLiteral) Range() (Position, Position) {

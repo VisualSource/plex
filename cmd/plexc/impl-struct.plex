@@ -3,10 +3,18 @@ struct Point {
     y: float;
 }
 
+
 impl Point {
     fn getX(): float {
         return self.x;
     }
+    fn doubleX(): float { 
+        return self.getX() * 2.0; 
+    }
+    /*fn distanceTo(other: Point): float {
+        //Don't have power operator (should add one)
+        return ((self.x - other.x) *  (self.x - other.x)) + ((self.y - other.y) * (self.y - other.y));
+    }*/
 }
 
 fn main(){

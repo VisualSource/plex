@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/VisualSource/plex/internal/script"
+	"github.com/VisualSource/plex/internal/script/typeschecker"
 )
 
 //go:embed runtime_helpers/*.plex
@@ -19,7 +20,7 @@ type Compiler struct {
 	locals []Local
 	depth  int
 
-	structs map[string]structDef
+	structs map[string]*structDef
 
 	globalVars []string
 
@@ -66,7 +67,14 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return fmt.Errorf("can not import in this scope")
 		}
 	case *script.NumberLiteral:
-		c.emit("f64.const", n.Value)
+		t := n.GetType()
+		if t == nil {
+			return fmt.Errorf("no type set for number")
+		}
+
+		prefix := getWasmType(t)
+
+		c.emit(prefix+".const", n.Value)
 	case *script.Identifier:
 		if !slices.ContainsFunc(c.locals, func(e Local) bool {
 			return e.Name == n.Value
@@ -87,27 +95,12 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return err
 		}
 
-		tL, err := c.typeOf(n.Left)
-		if err != nil {
-			return err
+		t := n.GetType()
+		if t == nil {
+			return fmt.Errorf("no type set for operation")
 		}
-		tR, err := c.typeOf(n.Right)
-		if err != nil {
-			return err
-		}
+		prefix := getWasmType(t)
 
-		prefix := "unknown"
-		if tL == "unknown" && tR != "unknown" {
-			prefix = tR
-		} else if tL != "unknown" && tR == "unknown" {
-			prefix = tL
-		} else if tL == tR && tL != "unknown" {
-			prefix = tL
-		} else {
-			return fmt.Errorf("type miss match %s %s", tL, tR)
-		}
-
-		//TODO some type inpection so we can find out what we need to use here
 		switch n.Operator {
 		case script.TokenType_Plus:
 			c.emit(prefix + ".add")
@@ -139,23 +132,15 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		skipParam := []string{}
 
 		if c.implBlock != "" {
-			d := c.structs[c.implBlock]
-
-			if slices.Contains(d.Methods, n.Name) {
-				return fmt.Errorf("struct already has a method named %s", n.Name)
-			}
-
-			d.Methods = append(d.Methods, n.Name)
-
 			skipParam = append(skipParam, "self")
-			params.WriteString("( param $self i32)")
-			c.locals = append(c.locals, Local{Name: "self", Type: "i32", Owner: ""})
+			params.WriteString(" (param $self i32)")
+			c.locals = append(c.locals, Local{Name: "self", Type: "i32", Owner: c.implBlock})
 		}
 
 		for _, p := range n.Params {
 			param := p.(*script.Parameter)
 
-			t, typeName := resolveType(param.Type.(*script.Type))
+			t, typeName := resolveType(param.Type.(*script.TypeExpr))
 
 			params.WriteString(fmt.Sprintf(" (param $%s %s)", param.Name, t))
 			c.locals = append(c.locals, Local{Name: param.Name, Type: t, Owner: typeName})
@@ -170,7 +155,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		var funcName string
 		if c.implBlock != "" {
-			funcName = fmt.Sprintf("__%s__%s", c.implBlock, funcName)
+			funcName = fmt.Sprintf("__%s__%s", c.implBlock, n.Name)
 		} else {
 			funcName = n.Name
 		}
@@ -197,8 +182,10 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.depth--
 		c.emit(")")
 
-		// this should be controlled via export keyword not all functions need to be exported
-		c.emit(fmt.Sprintf("(export \"%s\" (func $%s))", n.Name, n.Name))
+		if c.implBlock == "" {
+			// this should be controlled via export keyword not all functions need to be exported
+			c.emit(fmt.Sprintf("(export \"%s\" (func $%s))", n.Name, n.Name))
+		}
 
 		c.locals = c.locals[:0]
 
@@ -372,6 +359,32 @@ func (c *Compiler) Compile(node script.AstNode) error {
 				}
 				c.emit("call $" + callee.Value)
 			}
+		case *script.MemberAccess:
+			t := callee.Object.(script.Expression).GetType()
+
+			// resolve struct name
+			def, ok := c.structs[t.Struct]
+			if !ok {
+				return fmt.Errorf("compile: unknown struct for member access")
+			}
+
+			if _, ok := def.Methods[callee.Field]; !ok {
+				return fmt.Errorf("compile: struct %s does not own a method named: %s", t.Struct, callee.Field)
+			}
+
+			if err := c.Compile(callee.Object); err != nil { // inject self arg
+				return err
+			}
+
+			for _, arg := range n.Args {
+				if err := c.Compile(arg); err != nil {
+					return err
+				}
+			}
+
+			funcName := fmt.Sprintf("__%s__%s", t.Struct, callee.Field)
+
+			c.emit("call $" + funcName)
 		default:
 			return fmt.Errorf("compile: unsupported callee %T", n.Callee)
 		}
@@ -461,13 +474,10 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		// TODO: update this so that we can resolve from arrays and the like
 
-		typename, err := c.typeofStruct(n.Object)
-		if err != nil {
-			return err
-		}
+		t := n.Object.(script.Expression).GetType()
 
 		// resolve struct name
-		def, ok := c.structs[typename]
+		def, ok := c.structs[t.Struct]
 		if !ok {
 			return fmt.Errorf("compile: unknown struct for member access")
 		}
@@ -515,16 +525,24 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 		// load value
 	case *script.StructImplStatement:
-		_, ok := c.structs[n.Name]
+		def, ok := c.structs[n.Name]
 		if !ok {
 			return fmt.Errorf("compile: unknown struct")
 		}
 
 		c.implBlock = n.Name
 		for _, method := range n.Methods {
+			methodName := method.(*script.FunctionDeclaration).Name
+
+			if _, ok := def.Methods[methodName]; ok {
+				return fmt.Errorf("struct already has a method named %s", n.Name)
+			}
+			def.Methods[methodName] = methodName
+
 			if err := c.Compile(method); err != nil {
 				return err
 			}
+
 		}
 		c.implBlock = ""
 
@@ -533,77 +551,6 @@ func (c *Compiler) Compile(node script.AstNode) error {
 	}
 
 	return nil
-}
-
-func (c *Compiler) typeofStruct(node script.AstNode) (string, error) {
-	switch n := node.(type) {
-	case *script.Identifier:
-
-		var stype string
-		for _, i := range c.locals {
-			if i.Name == n.Value {
-				stype = i.Owner
-				break
-			}
-		}
-
-		if stype == "" {
-			return "", fmt.Errorf("compile: failed to resolve struct type")
-		}
-
-		return stype, nil
-	default:
-		return "", fmt.Errorf("failed to resolve struct type")
-	}
-
-}
-
-func (c *Compiler) typeOf(node script.AstNode) (string, error) {
-	switch n := node.(type) {
-	case *script.NumberLiteral:
-		if strings.Contains(n.Value, ".") {
-			return "f64", nil
-		}
-		return "i64", nil
-	case *script.Identifier:
-		for _, l := range c.locals {
-			if l.Name == n.Value {
-				return l.Type, nil
-			}
-		}
-		return "unknown", nil
-	case *script.BinaryExpression:
-		tl, err := c.typeOf(n.Left)
-		if err != nil {
-			return "", err
-		}
-		tr, err := c.typeOf(n.Right)
-		if err != nil {
-			return "", err
-		}
-
-		if tl == "unknown" && tr == "unknown" {
-			return "unknown", nil
-		}
-
-		if tl == "unknown" && tr != "unknown" {
-			return tr, nil
-		}
-
-		if tl != "unknown" && tr == "unknown" {
-			return tl, nil
-		}
-
-		if tl != tr {
-			return "", fmt.Errorf("type %s does not match %s", tl, tr)
-		}
-
-		return tl, nil
-	case *script.FunctionCall:
-		return "f64", nil //TODO: look up return from function type
-	default:
-		return "unknown", nil
-	}
 }
 
 func (c *Compiler) loadHelper(name string) error {
@@ -632,6 +579,18 @@ func (c *Compiler) importModules(node *script.Program) error {
 			}
 
 			switch n.Source {
+			case "plex:math":
+				for _, imp := range n.Imports {
+					switch imp {
+					case "sqrt":
+						c.emit("(import \"env\" \"sqrt\" (func $sqrt (param if64)))")
+					case "pow":
+						c.emit("(import \"env\" \"pow\" (func $pow (param f64) (param f64)))")
+					default:
+						return fmt.Errorf("unknown import: %s", imp)
+					}
+				}
+
 			case "plex:globals":
 				for _, imp := range n.Imports {
 					switch imp {
@@ -704,7 +663,7 @@ func (c *Compiler) prepass(node script.AstNode) {
 	case *script.StructStatement:
 		c.needsHeap = true
 
-		def := structDef{Name: n.Name, Fields: make([]structField, 0), Size: 0}
+		def := &structDef{Name: n.Name, Methods: make(map[string]string), Fields: make([]structField, 0), Size: 0}
 
 		for _, f := range n.Fields {
 			param := f.(*script.Parameter)
@@ -727,8 +686,12 @@ func (c *Compiler) prepass(node script.AstNode) {
 }
 
 func CompileProgram(program *script.Program) (string, error) {
+	if err := typeschecker.Check(program); err != nil {
+		return "", err
+	}
+
 	c := &Compiler{
-		structs: make(map[string]structDef),
+		structs: make(map[string]*structDef),
 	}
 	c.prepass(program)
 

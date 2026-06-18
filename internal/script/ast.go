@@ -652,7 +652,7 @@ func (p *Parser) parseTypeExpr() (AstNode, error) {
 	}
 	start, end := token.Range()
 
-	t := &Type{
+	t := &TypeExpr{
 		Start: start,
 		End:   end,
 		Name:  token.(*ValueToken).Value,

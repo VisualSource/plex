@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 12 – Type Checking as a Separate Pass</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 820px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: #c9d1d9; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task h4 { margin: 0 0 10px; color: var(--yellow); font-size: 1em; }
+  .callout { background: #0e1e0e; border-left: 4px solid var(--green); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .callout h4 { margin: 0 0 10px; color: var(--green); font-size: 1em; }
+  .warning { background: #1e0e0e; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warning h4 { margin: 0 0 10px; color: var(--accent); font-size: 1em; }
+  .note { background: #0e0e1e; border-left: 4px solid var(--purple); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .note h4 { margin: 0 0 10px; color: var(--purple); font-size: 1em; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; font-family: monospace; font-size: 0.85em; line-height: 1.6; color: #8b949e; margin: 1.4em 0; white-space: pre; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+  ul li, ol li { margin-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: var(--surface); color: var(--blue); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 12 – Type Checking as a Separate Pass</h1>
+
+<p>Your compiler currently mixes <em>type checking</em> into <em>code generation</em>. The
+checks are scattered across <code>typeOf</code>, <code>typeofStruct</code>, the
+<code>BinaryExpression</code> case, the <code>VariableDeclaration</code> case, the
+<code>MemberAccess</code> case — and so on. This lesson is about lifting that work into a
+separate compiler pass.</p>
+
+<p>This is one of the most important architectural moves in compiler construction. Once you see
+it, you start seeing it everywhere — LLVM has dozens of passes, GCC has hundreds, Rust's
+compiler has a strict sequence (parse → name resolution → HIR → type check → MIR → codegen).
+The discipline of "do one job per pass" is what makes those compilers
+<a href="https://rustc-dev-guide.rust-lang.org/overview.html">comprehensible at scale</a>.</p>
+
+<div class="callout">
+<h4>Core idea</h4>
+<p><strong>A type checker is just a tree-walking interpreter that produces types instead of
+values.</strong> Same shape as your interpreter from Lesson 4. Same recursion. Different
+output type.</p>
+</div>
+
+<hr>
+
+<h2>1. Why separate the pass?</h2>
+
+<p>Right now, your codegen does two jobs at once: <em>check that the program is valid</em>
+and <em>emit WAT</em>. Mixing them has four concrete costs:</p>
+
+<table>
+<thead>
+<tr><th>Problem</th><th>What it looks like in your code</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><strong>Half-compiled output on errors</strong></td>
+  <td>If <code>BinaryExpression</code> errors at line ~107 with "type mismatch", you've
+      already emitted the LHS WAT into <code>c.out</code>. The transaction mechanism
+      (<code>startTransaction</code>/<code>writeTransaction</code>) is a workaround for
+      exactly this — it shouldn't be needed.</td>
+</tr>
+<tr>
+  <td><strong>One error per compile</strong></td>
+  <td>Your <code>Compile</code> returns the first error. A real compiler reports all type
+      errors so the user can fix them in batches.</td>
+</tr>
+<tr>
+  <td><strong>No type information across the AST</strong></td>
+  <td><code>typeOf</code> at line 591 returns <code>"unknown"</code> for anything it doesn't
+      handle, and <code>FunctionCall</code> hardcodes <code>"f64"</code> (line 633) with a
+      <code>TODO</code>. There's no place that authoritatively knows what type each expression
+      has, so checks degrade to "give up".</td>
+</tr>
+<tr>
+  <td><strong>Codegen can't be retargeted</strong></td>
+  <td>If you ever wanted to emit, say, native ARM or LLVM IR instead of WAT, you'd have to
+      re-port all the type checks too. With a separate pass, codegen for a new target reads a
+      pre-checked AST and emits — nothing else.</td>
+</tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>2. What a "pass" actually is</h2>
+
+<p>A compiler pass is a function that takes the AST and either returns a transformed AST,
+a list of errors, or both. There's no magic — it's the visitor pattern from Lesson 4 with a
+different return type.</p>
+
+<div class="diagram">
+  Source
+    │
+    ▼
+  [Parse]      →  AST
+    │
+    ▼
+  [Type check] →  AST (or typed AST, or error list)   ← we're adding THIS pass
+    │
+    ▼
+  [Codegen]    →  WAT
+</div>
+
+<p>Each pass is conceptually independent. Each can be unit-tested in isolation — you can give
+the type checker a hand-crafted AST and assert it produces the expected error, without ever
+running the parser or the codegen.</p>
+
+<p>See Bob Nystrom's
+<a href="https://craftinginterpreters.com/resolving-and-binding.html">Resolving and Binding</a>
+chapter — his resolver pass is structurally identical to a type checker (walks AST, maintains
+scopes, doesn't emit anything, reports errors).</p>
+
+<hr>
+
+<h2>3. The current scattered state — an inventory</h2>
+
+<p>Before refactoring, see the surface area. Here's everything in your compiler that does
+type work:</p>
+
+<table>
+<thead>
+<tr><th>Location</th><th>What it does</th><th>What it should do</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td><a href="../internal/script/compiler/compiler.go">compiler.go</a>:89–108<br><code>BinaryExpression</code></td>
+  <td>Calls <code>typeOf</code> on both sides, picks one as the operation type, errors on mismatch.</td>
+  <td>Codegen should already <em>know</em> the operation type. The check belongs in the pass.</td>
+</tr>
+<tr>
+  <td>compiler.go:214–244<br><code>VariableDeclaration</code></td>
+  <td>Infers a type from the initialiser (f64 default, i32 for FunctionCall, struct-owner from registry).</td>
+  <td>Inference belongs in the pass. Codegen should read the type off the (typed) AST node.</td>
+</tr>
+<tr>
+  <td>compiler.go:486–510<br><code>MemberAccess</code></td>
+  <td>Calls <code>typeofStruct</code>, looks up field, emits offset.</td>
+  <td>Pass resolves the struct + field. Codegen reads the resolved offset.</td>
+</tr>
+<tr>
+  <td>compiler.go:377–404<br><code>MemberAccess</code> inside <code>FunctionCall</code></td>
+  <td>Same pattern for methods — resolve receiver type, validate method, mangle, call.</td>
+  <td>Pass resolves the call target. Codegen reads the mangled name.</td>
+</tr>
+<tr>
+  <td>compiler.go:568–589<br><code>typeofStruct</code></td>
+  <td>Only handles <code>*Identifier</code>. Breaks on nested access like <code>a.b.c</code>.</td>
+  <td>Generalises naturally once it's a real pass — recurses over any expression.</td>
+</tr>
+<tr>
+  <td>compiler.go:591–637<br><code>typeOf</code></td>
+  <td>Partial: returns <code>"unknown"</code> for many cases. <code>FunctionCall</code> hardcodes <code>f64</code>.</td>
+  <td>Replaced by the pass, which knows every expression's type by the time codegen runs.</td>
+</tr>
+<tr>
+  <td><a href="../internal/script/compiler/helpers.go">helpers.go</a>:5–36<br><code>resolveType</code></td>
+  <td>Maps explicit type annotations (<code>*script.Type</code>) to WASM types.</td>
+  <td>Stays — but the pass uses it too.</td>
+</tr>
+</tbody>
+</table>
+
+<p>Notice the pattern: every one of these has to <em>recompute</em> type information that
+should already be known. The pass computes it once, attaches it to the AST, and codegen reads.</p>
+
+<hr>
+
+<h2>4. The design</h2>
+
+<p>Create a new package <code>internal/script/typecheck</code> with a single entry point:</p>
+
+<pre><code>package typecheck
+
+func Check(program *script.Program) error {
+    c := &Checker{
+        structs: make(map[string]*StructInfo),
+        funcs:   make(map[string]*FuncInfo),
+        scope:   newScope(),
+    }
+    c.collectSignatures(program)
+    return c.checkProgram(program)
+}</code></pre>
+
+<p>The shape of <code>Checker</code> mirrors <code>Compiler</code>, but holds <em>type</em>
+information rather than emission state:</p>
+
+<pre><code>type Checker struct {
+    structs map[string]*StructInfo  // struct name → fields + methods
+    funcs   map[string]*FuncInfo    // function name → param types + return type
+    scope   *Scope                  // current variable type bindings (stack of maps)
+    errors  []error                 // accumulate, don't bail
+}
+
+type Scope struct {
+    parent *Scope
+    vars   map[string]Type
+}</code></pre>
+
+<p>And a small <code>Type</code> representation — enough to express what plex has:</p>
+
+<pre><code>type Type struct {
+    Kind     TypeKind  // Int, Float, String, Array, Struct, Void, Unknown
+    Element  *Type     // for Array: the element type
+    Struct   string    // for Struct: the struct name
+}</code></pre>
+
+<div class="note">
+<h4>Why not use Go's <code>string</code> like the current compiler does?</h4>
+<p>Strings are fine for "i32" / "f64". They fall apart for compound types: an "array of
+Points" can't be expressed as a single string without parsing it back out. A small struct
+type composes naturally — <code>Type{Kind: Array, Element: &Type{Kind: Struct, Struct: "Point"}}</code>.
+This is the same reason real compilers have a real <code>Type</code> data structure
+(see <a href="https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html">Rust's
+<code>Ty</code></a>).</p>
+</div>
+
+<h3>Two-pass structure</h3>
+
+<p>The checker itself runs in two phases:</p>
+
+<ol>
+  <li><strong>Collect signatures.</strong> Walk the program; for every
+      <code>StructStatement</code>, register fields. For every <code>FunctionDeclaration</code>,
+      register param/return types. For every <code>StructImplStatement</code>, register methods.
+      No checking yet — just enough to make forward references work.</li>
+  <li><strong>Check expressions and statements.</strong> Walk the program a second time. For
+      each expression, compute its type. For each statement, verify the types of its parts.
+      Accumulate errors in <code>c.errors</code>.</li>
+</ol>
+
+<p>This is the same pattern that lets your impl block call methods declared later in the same
+block (Lesson 11, Task C). Forward references are <em>cheap</em> when you have a separate
+pass.</p>
+
+<hr>
+
+<h2>5. Annotating the AST</h2>
+
+<p>This is the part that pays the largest dividend. You have two options:</p>
+
+<div class="diagram">
+  Option 1: Side table
+    Checker keeps map[script.AstNode]Type
+    Codegen calls checker.TypeOf(node) for every read
+
+  Option 2: Embedded annotation
+    Add a Type field to every expression AST node
+    Checker sets it; codegen reads it directly
+</div>
+
+<p>Option 1 is non-invasive (no AST changes), but slow (map lookup per node) and awkward
+(codegen needs the checker around). Option 2 is the standard approach. Add to your AST:</p>
+
+<pre><code>// In internal/script/ast.go (or wherever expression types live)
+
+type Expression interface {
+    AstNode
+    GetType() *Type      // returns nil if not yet checked
+    SetType(*Type)
+}
+
+// Then on each concrete expression node:
+type NumberLiteral struct {
+    Value string
+    Type_ *Type   // set by the checker
+}
+func (n *NumberLiteral) GetType() *Type { return n.Type_ }
+func (n *NumberLiteral) SetType(t *Type) { n.Type_ = t }</code></pre>
+
+<p>This is called a "decorated AST" or "typed AST" — the AST carries the typing decisions
+forward. See the Crafting Interpreters
+<a href="https://craftinginterpreters.com/representing-code.html">AST chapter</a> for the
+underlying visitor design.</p>
+
+<div class="warning">
+<h4>The dependency direction</h4>
+<p>Once codegen reads types off the AST, codegen <em>requires</em> that the checker has
+already run. Enforce this at the entry point:</p>
+<pre><code>func CompileProgram(p *script.Program) (string, error) {
+    if err := typecheck.Check(p); err != nil {
+        return "", err
+    }
+    // ... compile with confidence ...
+}</code></pre>
+<p>This is how every production compiler works. The codegen never <em>asks</em> what the type
+is — it has already been computed.</p>
+</div>
+
+<hr>
+
+<h2>6. The minimal first cut</h2>
+
+<p>Don't try to move everything at once. Pick the smallest scattered check and move it.</p>
+
+<div class="task">
+<h4>Task A — Extract <code>BinaryExpression</code> type checking</h4>
+<p>The cleanest place to start. Today, compiler.go:89–108 does:</p>
+<ul>
+  <li>Call <code>typeOf(Left)</code></li>
+  <li>Call <code>typeOf(Right)</code></li>
+  <li>Pick a prefix (with the "unknown" fallback hack)</li>
+  <li>Error if mismatch</li>
+  <li>Emit the operator</li>
+</ul>
+
+<p>Refactor it to: <em>just</em> emit the operator, using the type already stamped on the AST node.</p>
+
+<p>Steps:</p>
+<ol>
+  <li>Create <code>internal/script/typecheck/checker.go</code> with a stub <code>Check</code>
+      function and a minimal <code>Checker</code> struct.</li>
+  <li>Add <code>Type_</code> fields and <code>GetType</code>/<code>SetType</code> methods to
+      <code>NumberLiteral</code>, <code>Identifier</code>, and <code>BinaryExpression</code>.</li>
+  <li>Implement <code>checkExpression(expr) *Type</code> in the checker for those three nodes.
+      For <code>BinaryExpression</code>: check left, check right, verify they match, set the
+      node's type to the operand type. Return the type.</li>
+  <li>In <code>CompileProgram</code>, call <code>typecheck.Check(p)</code> before
+      <code>c.prepass(p)</code> and <code>c.Compile(p)</code>.</li>
+  <li>In <code>BinaryExpression</code> codegen, replace the <code>typeOf</code> calls with
+      <code>n.GetType().WasmName()</code> (a method on your <code>Type</code> that returns
+      "i32"/"i64"/"f32"/"f64").</li>
+  <li>Delete the old <code>typeOf</code>'s <code>BinaryExpression</code> case — it's now dead
+      code.</li>
+</ol>
+
+<p>Run <a href="../cmd/plexc/impl-struct.plex">impl-struct.plex</a> end-to-end. Output should
+be byte-identical to before. That's the validation: the refactor preserved behaviour while
+relocating the work.</p>
+</div>
+
+<hr>
+
+<h2>7. Building out the checker</h2>
+
+<div class="task">
+<h4>Task B — Extract <code>typeofStruct</code> and generalise it</h4>
+<p>The current <code>typeofStruct</code> (line 568) only handles <code>*Identifier</code>.
+That's why <code>a.b.c</code> would break — you can't ask "what's the struct type of
+<code>a.b</code>?" today.</p>
+<p>In the checker, <code>checkExpression(*MemberAccess)</code> returns the field's type, and
+along the way records that the receiver is a struct. Field access of a struct that has another
+struct field becomes a recursive call: check the receiver, get its (struct) type, look up the
+field in <em>that</em> struct, return the field's type.</p>
+<p>Implement <code>MemberAccess</code> in the checker. Then update codegen to read offsets off
+the typed AST instead of recomputing.</p>
+</div>
+
+<div class="task">
+<h4>Task C — Error accumulation</h4>
+<p>Make the checker collect errors instead of bailing on the first one:</p>
+<pre><code>func (c *Checker) error(node script.AstNode, format string, args ...any) {
+    c.errors = append(c.errors, fmt.Errorf(format, args...))
+}</code></pre>
+<p>At the end of <code>Check</code>, if <code>len(c.errors) > 0</code>, join them and return
+the combined error. Then write a test that has three type errors in one program and assert
+all three are reported.</p>
+<p>This is one of the biggest UX wins of a separate pass — a user-facing compiler that reports
+all errors at once feels dramatically better.</p>
+</div>
+
+<div class="task">
+<h4>Task D (deep) — Function calls and return types</h4>
+<p>Move function-call checking into the pass:</p>
+<ol>
+  <li>Verify the function exists.</li>
+  <li>Verify argument count matches parameter count.</li>
+  <li>Verify each argument's type matches the corresponding parameter's type.</li>
+  <li>Set the call's type to the function's declared return type.</li>
+</ol>
+<p>This is what <code>typeOf(*FunctionCall)</code> on line 632 should have been doing all
+along (it currently hardcodes <code>f64</code>). Once this works, you can check that the
+return value of a function is used in a context that accepts it — a real type check, finally.</p>
+<p>Also: walk the function body and ensure every <code>ReturnStatement</code>'s value matches
+the declared return type. This is the kind of cross-AST check that's painful in mixed
+codegen and trivial in a dedicated pass.</p>
+</div>
+
+<hr>
+
+<h2>8. What this enables next</h2>
+
+<p>Once you have a real type-check pass, several future lessons become straightforward:</p>
+
+<ul>
+  <li><strong>Generics / parametric polymorphism.</strong> The checker has somewhere to do
+      substitution. Without a pass, there's nowhere to even start.</li>
+  <li><strong>Type inference (Hindley-Milner style).</strong> Inference is a constraint-solving
+      problem the checker accumulates and solves. See
+      <a href="https://en.wikipedia.org/wiki/Hindley%E2%80%93Milner_type_system">HM</a> for the
+      classical algorithm, or
+      <a href="https://papl.cs.brown.edu/2014/Type_Inference.html">PAPL's chapter</a> for a
+      gentler intro.</li>
+  <li><strong>Exhaustiveness checking.</strong> If you add <code>match</code> expressions
+      later, the checker verifies every variant is handled. Codegen never sees a non-exhaustive
+      match.</li>
+  <li><strong>Borrow checking / linear types.</strong> The Rust-style "you can't use this
+      variable after it's been moved" check is a separate analysis pass. Builds on type
+      checking.</li>
+</ul>
+
+<hr>
+
+<h2>Q&amp;A prompts</h2>
+
+<ul>
+  <li>Your interpreter (Lesson 4) and your type checker have the same shape — both walk the
+      AST, both maintain a scoped environment, both recurse on subexpressions. What's the
+      <em>category-theoretic</em> name for this shape? (Hint: catamorphism, fold.) Could you
+      write a generic visitor that both your interpreter and your checker use?</li>
+  <li>In Rust, the type checker runs <em>after</em> name resolution but <em>before</em> the
+      borrow checker — three separate passes. Why couldn't they be one? What would go wrong if
+      borrow checking ran before type checking?</li>
+  <li>Your checker has a forward-reference problem: a function body can call another function
+      declared later in the same file. You solved it with a two-phase checker (collect
+      signatures, then check bodies). What if you had <em>mutually recursive types</em> —
+      <code>struct A { b: B }</code> and <code>struct B { a: A }</code>? Does your design
+      handle that? What's the simplest fix?</li>
+  <li>The current compiler propagates <code>"unknown"</code> as a type, and uses an
+      "unknown picks the other side" rule in <code>BinaryExpression</code>. Why is this
+      dangerous? Construct a small plex program that should be a type error but currently
+      compiles cleanly because of this rule.</li>
+</ul>
+
+<hr>
+
+<p><strong>Open this lesson:</strong></p>
+<pre><code>start lessons/0012-type-checking-as-a-separate-pass.html</code></pre>
+
+<p><strong>When you've done Task A</strong> (extracting <code>BinaryExpression</code>), say
+<strong>"next lesson"</strong> for Lesson 13. Likely candidates:</p>
+<ul>
+  <li><strong>Function call type checking, including return types.</strong> Builds on Task D
+      and gives you the first real cross-statement type check.</li>
+  <li><strong>The typed-AST refactor in full</strong> — go through every expression node and
+      give it a <code>Type</code>. Removes <code>typeOf</code> entirely.</li>
+  <li><strong>Mutability and <code>self</code> assignment</strong> — the other Lesson 11 branch,
+      now easier to think about because the checker tracks types.</li>
+</ul>
+
+<p>As always — questions welcome. The checker is conceptually simple but mechanically
+fiddly; if any step in Task A is unclear, ask before you start hammering at code.</p>
+
+</body>
+</html>

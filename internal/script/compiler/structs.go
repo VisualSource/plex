@@ -29,6 +29,6 @@ type structField struct {
 type structDef struct {
 	Name    string
 	Fields  []structField
-	Methods []string
+	Methods map[string]string
 	Size    int
 }

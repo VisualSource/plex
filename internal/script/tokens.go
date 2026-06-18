@@ -1,5 +1,7 @@
 package script
 
+import "fmt"
+
 type TokenType uint
 
 const (
@@ -64,6 +66,10 @@ var delimMap = map[rune]TokenType{
 type Position struct {
 	Col int64
 	Row int64
+}
+
+func (p Position) String() string {
+	return fmt.Sprintf("%d:%d", p.Row, p.Col)
 }
 
 func NewPosition(col, row int64) Position {
