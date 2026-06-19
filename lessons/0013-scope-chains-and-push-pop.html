@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 13 – Scope Chains: The Push/Pop Pattern</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 820px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: #c9d1d9; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task h4 { margin: 0 0 10px; color: var(--yellow); font-size: 1em; }
+  .callout { background: #0e1e0e; border-left: 4px solid var(--green); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .callout h4 { margin: 0 0 10px; color: var(--green); font-size: 1em; }
+  .warning { background: #1e0e0e; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warning h4 { margin: 0 0 10px; color: var(--accent); font-size: 1em; }
+  .note { background: #0e0e1e; border-left: 4px solid var(--purple); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .note h4 { margin: 0 0 10px; color: var(--purple); font-size: 1em; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; font-family: monospace; font-size: 0.85em; line-height: 1.6; color: #8b949e; margin: 1.4em 0; white-space: pre; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+  ul li, ol li { margin-bottom: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 1.2em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: var(--surface); color: var(--blue); }
+
+  /* Quiz styles */
+  .quiz { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 1.6em 0; }
+  .quiz h4 { margin: 0 0 14px; color: var(--yellow); }
+  .quiz-option { display: block; background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 5px; padding: 10px 14px; margin: 6px 0; cursor: pointer; transition: border-color 0.15s; font-family: monospace; font-size: 0.9em; }
+  .quiz-option:hover { border-color: var(--blue); }
+  .quiz-option.correct { border-color: var(--green); background: #0e1e0e; color: var(--green); }
+  .quiz-option.wrong { border-color: var(--accent); background: #1e0e0e; color: var(--accent); }
+  .quiz-feedback { margin-top: 12px; font-size: 0.9em; display: none; }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.ok { color: var(--green); }
+  .quiz-feedback.bad { color: var(--accent); }
+
+  /* Scope tracer */
+  #tracer { font-family: monospace; font-size: 0.9em; }
+  #tracer-code { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px; line-height: 2; }
+  #tracer-code .line { display: block; padding: 1px 0; cursor: pointer; border-radius: 3px; }
+  #tracer-code .line:hover { background: #1a2a3a; }
+  #tracer-code .line.active { background: #1a2a1a; border-left: 3px solid var(--green); padding-left: 8px; }
+  #scope-display { margin-top: 16px; }
+  .scope-frame { border: 1px solid var(--border); border-radius: 5px; margin: 6px 0; overflow: hidden; }
+  .scope-header { background: var(--surface); padding: 6px 12px; font-size: 0.8em; color: var(--muted); }
+  .scope-vars { padding: 8px 12px; }
+  .scope-var { padding: 2px 0; }
+  .scope-var span { color: var(--blue); }
+  .scope-var em { color: var(--purple); font-style: normal; }
+  #lookup-result { margin-top: 12px; padding: 10px 14px; border-radius: 5px; background: var(--code-bg); display: none; }
+  #lookup-result.found { border-left: 3px solid var(--green); color: var(--green); }
+  #lookup-result.notfound { border-left: 3px solid var(--accent); color: var(--accent); }
+  .btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 5px; cursor: pointer; font-family: inherit; font-size: 0.9em; margin: 4px; }
+  .btn:hover { border-color: var(--blue); color: var(--blue); }
+  .btn.primary { border-color: var(--green); color: var(--green); }
+  .btn.primary:hover { background: #0e1e0e; }
+
+  .hl-kw { color: #ff7b72; }
+  .hl-fn { color: #d2a8ff; }
+  .hl-str { color: #a5d6ff; }
+  .hl-num { color: #79c0ff; }
+  .hl-cm { color: #8b949e; font-style: italic; }
+  .hl-type { color: #ffa657; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 13 – Scope Chains: The Push/Pop Pattern</h1>
+
+<p>Your type checker has a working <code>Scope</code> chain. The data structure is right.
+The bug is one missing step: when you enter a function body, you never tell the checker
+<em>"look in this scope now."</em> Variable lookups in the body fall through to the global
+scope and fail on every argument.</p>
+
+<p>This lesson teaches the <strong>push/pop pattern</strong> — the universal way type checkers
+(and interpreters) track which scope is "current" as they recurse into nested constructs.</p>
+
+<hr>
+
+<h2>1. How your scope chain already works</h2>
+
+<p>Your <code>Scope</code> struct is a linked list of maps. Each node points to its parent.
+Lookup walks up the chain until it finds the name or exhausts the list:</p>
+
+<pre><code><span class="hl-kw">func</span> (s *<span class="hl-type">Scope</span>) <span class="hl-fn">Get</span>(ident <span class="hl-type">string</span>) *script.<span class="hl-type">Type</span> {
+    <span class="hl-kw">if</span> t, ok := s.vars[ident]; ok {
+        <span class="hl-kw">return</span> t              <span class="hl-cm">// found here</span>
+    }
+    <span class="hl-kw">if</span> s.parent == <span class="hl-kw">nil</span> {
+        <span class="hl-kw">return</span> <span class="hl-kw">nil</span>            <span class="hl-cm">// exhausted</span>
+    }
+    <span class="hl-kw">return</span> s.parent.<span class="hl-fn">Get</span>(ident) <span class="hl-cm">// try parent</span>
+}</code></pre>
+
+<p>This is the textbook environment model — the same structure used in every Lisp interpreter
+ever written, in Go's own scoping rules, and in
+<a href="https://craftinginterpreters.com/resolving-and-binding.html">Crafting Interpreters §11</a>.
+The design is correct. What's missing is the pointer discipline on <code>c.scope</code>.</p>
+
+<div class="diagram">
+  c.scope always points at the CURRENT innermost scope.
+  Lookup starts here and walks up.
+
+  Global scope      Function scope    Block scope
+  ┌────────────┐    ┌────────────┐    ┌────────────┐
+  │ add: func  │◄───│ x: int     │◄───│ y: int     │
+  │ PI: float  │    │ z: string  │    └────────────┘
+  └────────────┘    └────────────┘         ▲
+                                      c.scope
+</div>
+
+<hr>
+
+<h2>2. The bug in your current code</h2>
+
+<p>In <a href="../internal/script/typeschecker/typecheck.go">typecheck.go</a>,
+the <code>FunctionDeclaration</code> case populates <code>fn.Scope</code> with the
+parameters — but then calls <code>checkStmt(n.Body)</code> without switching
+<code>c.scope</code>:</p>
+
+<pre><code><span class="hl-kw">case</span> *script.<span class="hl-type">FunctionDeclaration</span>:
+    fn := c.funcs[n.Name]
+
+    <span class="hl-kw">for</span> _, arg := <span class="hl-kw">range</span> n.Params {
+        t := c.<span class="hl-fn">checkExpression</span>(arg)
+        fn.Args[arg.Name].Type = t
+        fn.Scope.vars[arg.Name] = t   <span class="hl-cm">// ✓ args go into fn.Scope</span>
+    }
+
+    c.<span class="hl-fn">checkStmt</span>(n.Body)              <span class="hl-cm">// ✗ c.scope is still the GLOBAL scope</span>
+    <span class="hl-cm">// Body tries c.scope.Get("x") → looks in global → not found → error</span></code></pre>
+
+<p><code>fn.Scope</code> has the right data. <code>c.scope</code> just doesn't point at it.
+Every <code>Identifier</code> lookup inside the body calls <code>c.scope.Get(...)</code>,
+which is still global.</p>
+
+<hr>
+
+<h2>3. The fix: push before, pop after</h2>
+
+<p>The pattern is three lines, always in the same order:</p>
+
+<pre><code><span class="hl-cm">// 1. Save the current scope</span>
+prev := c.scope
+
+<span class="hl-cm">// 2. Push the new scope as current</span>
+c.scope = newScope
+
+<span class="hl-cm">// ... recurse into the body ...</span>
+
+<span class="hl-cm">// 3. Pop back to the saved scope</span>
+c.scope = prev</code></pre>
+
+<p>Applied to your <code>FunctionDeclaration</code> case:</p>
+
+<pre><code><span class="hl-kw">case</span> *script.<span class="hl-type">FunctionDeclaration</span>:
+    c.<span class="hl-fn">checkExpression</span>(n.ReturnType)
+    fn := c.funcs[n.Name]
+
+    <span class="hl-kw">for</span> _, arg := <span class="hl-kw">range</span> n.Params {
+        t := c.<span class="hl-fn">checkExpression</span>(arg)
+        fn.Args[arg.Name].Type = t
+        fn.Scope.vars[arg.Name] = t
+    }
+
+    prev := c.scope          <span class="hl-cm">// save</span>
+    c.scope = fn.Scope       <span class="hl-cm">// push</span>
+    c.<span class="hl-fn">checkStmt</span>(n.Body)
+    c.scope = prev           <span class="hl-cm">// pop</span></code></pre>
+
+<p>That's the entire fix. Three lines. The recursion now sees the function's scope, and
+parent-chain lookup reaches the global scope automatically because <code>fn.Scope</code>
+was created with <code>newScope(c.scope)</code> in <code>collectSignatures</code>.</p>
+
+<div class="callout">
+<h4>Why save and restore instead of just navigating with parent?</h4>
+<p>After checking the body you need to return to exactly where you were, not just "one level
+up". If functions are ever nested — or if you later add closures — the parent chain doesn't
+give you a reliable way back. Saving and restoring the pointer is O(1) and immune to nesting
+depth.</p>
+</div>
+
+<hr>
+
+<h2>4. When to push a new scope</h2>
+
+<p>The rule is: <strong>any construct that introduces a new binding lifetime needs its own scope.</strong>
+For plex right now:</p>
+
+<table>
+<thead>
+<tr><th>Construct</th><th>Create new scope?</th><th>Why</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>Function body</td>
+  <td>Yes — already in <code>FuncInfo.Scope</code></td>
+  <td>Parameters and locals must not leak to callers</td>
+</tr>
+<tr>
+  <td><code>Block</code> (if/else/while body)</td>
+  <td>Yes — not yet done</td>
+  <td>Variables declared in an <code>if</code> branch must not outlive it</td>
+</tr>
+<tr>
+  <td>Individual expression</td>
+  <td>No</td>
+  <td>Expressions don't declare variables</td>
+</tr>
+<tr>
+  <td>Top-level <code>Program</code></td>
+  <td>Global scope only — already done</td>
+  <td>The root; has no parent</td>
+</tr>
+</tbody>
+</table>
+
+<p>For blocks (if/for/while), the same push/pop pattern applies — but you create the scope
+on the fly instead of looking it up from <code>FuncInfo</code>:</p>
+
+<pre><code><span class="hl-kw">case</span> *script.<span class="hl-type">Block</span>:
+    prev := c.scope
+    c.scope = <span class="hl-fn">newScope</span>(c.scope)    <span class="hl-cm">// fresh child scope</span>
+    <span class="hl-kw">for</span> _, stmt := <span class="hl-kw">range</span> n.Stmts {
+        c.<span class="hl-fn">checkStmt</span>(stmt)
+    }
+    c.scope = prev</code></pre>
+
+<p>Variable declarations inside that block call <code>c.scope.Set(...)</code>, which writes
+to the new child. When the block ends, the child scope is simply abandoned — Go's GC cleans
+it up. Variables in the block are invisible to the outer scope because lookup only walks
+<em>up</em> the chain, never down.</p>
+
+<div class="note">
+<h4>Shadowing falls out for free</h4>
+<p>If an inner scope has the same name as an outer one, <code>Get</code> returns the inner
+binding first because it searches from the innermost scope outward. You don't need special
+shadowing logic — the chain order handles it.</p>
+</div>
+
+<hr>
+
+<h2>5. Interactive: trace a lookup</h2>
+
+<p>Step through a plex program. Click a line to see what <code>c.scope</code> looks like at
+that point and where a variable lookup would resolve.</p>
+
+<div id="tracer">
+  <div id="tracer-code">
+    <span class="line" data-step="0"><span class="hl-cm">// global scope</span></span>
+    <span class="line" data-step="1"><span class="hl-kw">fn</span> <span class="hl-fn">add</span>(x: <span class="hl-type">int</span>, y: <span class="hl-type">int</span>): <span class="hl-type">int</span> {</span>
+    <span class="line" data-step="2">&nbsp;&nbsp;<span class="hl-kw">let</span> result = x + y;</span>
+    <span class="line" data-step="3">&nbsp;&nbsp;<span class="hl-kw">if</span> (result &gt; 100) {</span>
+    <span class="line" data-step="4">&nbsp;&nbsp;&nbsp;&nbsp;<span class="hl-kw">let</span> cap = 100;</span>
+    <span class="line" data-step="5">&nbsp;&nbsp;&nbsp;&nbsp;<span class="hl-kw">return</span> cap;</span>
+    <span class="line" data-step="6">&nbsp;&nbsp;}</span>
+    <span class="line" data-step="7">&nbsp;&nbsp;<span class="hl-kw">return</span> result;</span>
+    <span class="line" data-step="8">}</span>
+  </div>
+
+  <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+    <button class="btn" onclick="tracerStep(-1)">← Back</button>
+    <button class="btn" onclick="tracerStep(1)">Next →</button>
+    <span id="tracer-label" style="color:var(--muted); font-size:0.85em"></span>
+  </div>
+
+  <div id="scope-display" style="margin-top:16px"></div>
+
+  <div style="margin-top:12px">
+    <span style="font-size:0.9em; color:var(--muted)">Lookup: </span>
+    <select id="lookup-var" style="background:var(--code-bg); border:1px solid var(--code-border); color:var(--text); padding:4px 8px; border-radius:4px; font-family:monospace; font-size:0.9em">
+      <option value="x">x</option>
+      <option value="y">y</option>
+      <option value="result">result</option>
+      <option value="cap">cap</option>
+      <option value="add">add</option>
+      <option value="ghost">ghost (unknown)</option>
+    </select>
+    <button class="btn primary" onclick="doLookup()" style="margin-left:4px">c.scope.Get()</button>
+    <div id="lookup-result"></div>
+  </div>
+</div>
+
+<hr>
+
+<h2>6. Quiz</h2>
+
+<div class="quiz" id="q1">
+  <h4>Question 1</h4>
+  <p>You add this line at the end of a function body: <code>let z = 42;</code>.
+     Where does <code>z</code> get registered by <code>c.scope.Set("z", ...)</code>?</p>
+  <button class="quiz-option" onclick="answer('q1', this, false)">In the global scope, because <code>c.scope</code> is always global</button>
+  <button class="quiz-option" onclick="answer('q1', this, true)">In the function's scope — <code>c.scope</code> was pushed to <code>fn.Scope</code> before entering the body</button>
+  <button class="quiz-option" onclick="answer('q1', this, false)">Directly on the <code>FuncInfo</code> struct</button>
+  <div class="quiz-feedback" id="q1-fb"></div>
+</div>
+
+<div class="quiz" id="q2">
+  <h4>Question 2</h4>
+  <p>After checking a function body, you restore <code>c.scope = prev</code>.
+     What happens to variables declared inside the function?</p>
+  <button class="quiz-option" onclick="answer('q2', this, false)">They are deleted from memory immediately</button>
+  <button class="quiz-option" onclick="answer('q2', this, true)">They're unreachable from the current <code>c.scope</code> chain — effectively invisible. Go's GC reclaims the scope map eventually.</button>
+  <button class="quiz-option" onclick="answer('q2', this, false)">They get copied into the global scope</button>
+  <div class="quiz-feedback" id="q2-fb"></div>
+</div>
+
+<div class="quiz" id="q3">
+  <h4>Question 3</h4>
+  <p>You have this plex code. After the type checker processes line 3,
+     which scopes can a lookup for <code>x</code> reach?</p>
+  <pre style="margin:10px 0"><code>let x: int = 1;          // 1
+fn foo(x: string): void { // 2
+    return x;             // 3  ← lookup happens here
+}</code></pre>
+  <button class="quiz-option" onclick="answer('q3', this, false)">Only the global scope — the function scope doesn't exist yet</button>
+  <button class="quiz-option" onclick="answer('q3', this, true)">The function scope first (finds <code>x: string</code>), then global — but stops at the function scope because it found a binding</button>
+  <button class="quiz-option" onclick="answer('q3', this, false)">Both scopes simultaneously — it merges the results</button>
+  <div class="quiz-feedback" id="q3-fb"></div>
+</div>
+
+<hr>
+
+<h2>7. Tasks</h2>
+
+<div class="task">
+<h4>Task A — The fix (required)</h4>
+<p>In <a href="../internal/script/typeschecker/typecheck.go">typecheck.go</a>,
+add the three-line push/pop to the <code>FunctionDeclaration</code> case.
+The function body should now be able to see its parameters.</p>
+<p>Verify by writing a test in <code>internal/script/typeschecker/</code> that checks a
+function which uses its argument — it should type-check without errors.</p>
+</div>
+
+<div class="task">
+<h4>Task B — Block scopes (stretch)</h4>
+<p>Update the <code>Block</code> case in <code>checkStmt</code> to push a new child scope
+before iterating statements, and pop it after. This means variables declared inside an
+<code>if</code> branch won't pollute the enclosing function scope.</p>
+<p>Test it: two nested blocks each declaring a variable with the same name should not
+cause a conflict.</p>
+</div>
+
+<div class="task">
+<h4>Task C — Return type validation (stretch)</h4>
+<p>There's a <code>// TODO: validate that return matches return type</code> comment
+in your checker. Now that the function scope is entered correctly, you have access to
+<code>fn.ReturnType</code> and the <code>ReturnStatement</code>'s value type. Hook up
+the check. A function declared as <code>: int</code> that returns a <code>string</code>
+should produce an error.</p>
+<p><em>Hint:</em> you'll need to pass the expected return type into the body check somehow.
+One clean way is to store it on the <code>Checker</code> struct temporarily, the same way
+<code>c.scope</code> is temporarily replaced.</p>
+</div>
+
+<hr>
+
+<p style="font-size:0.9em; color:var(--muted)">
+  ← <a href="0012-type-checking-as-a-separate-pass.html">Lesson 12 – Type Checking as a Separate Pass</a>
+  &nbsp;|&nbsp;
+  Ask your agent if anything is unclear — scope chains are one of those topics where one
+  concrete example clears up a week of confusion.
+</p>
+
+<script>
+// ── Quiz ──────────────────────────────────────────────────────────────────────
+const feedback = {
+  q1: {
+    ok: "Exactly. After the push, <code>c.scope</code> IS <code>fn.Scope</code>. <code>Set</code> always writes to whatever <code>c.scope</code> currently is.",
+    bad: "Not quite. After the three-line push, <code>c.scope</code> points at <code>fn.Scope</code>. Any call to <code>c.scope.Set(...)</code> inside the body writes there."
+  },
+  q2: {
+    ok: "Right. The data is still in memory until GC runs, but no pointer in the live scope chain reaches it. From the type checker's perspective they're gone.",
+    bad: "The scope map still exists in memory — Go doesn't delete it. But once <code>c.scope</code> points back at the parent, there's no path to reach those vars through normal lookup. They're effectively invisible."
+  },
+  q3: {
+    ok: "Correct. The function scope shadows the global binding. <code>Get</code> finds <code>x: string</code> in the function scope first and stops — it never reaches the global <code>x: int</code>. This is how shadowing works for free.",
+    bad: "Lookup is innermost-first. The function scope holds <code>x: string</code> (the parameter). <code>Get</code> finds it there and returns it without looking in the global scope. Shadowing is an emergent property of the chain order."
+  }
+};
+
+function answer(qid, btn, correct) {
+  const quiz = document.getElementById(qid);
+  quiz.querySelectorAll('.quiz-option').forEach(b => b.onclick = null);
+  btn.classList.add(correct ? 'correct' : 'wrong');
+  const fb = document.getElementById(qid + '-fb');
+  fb.innerHTML = feedback[qid][correct ? 'ok' : 'bad'];
+  fb.className = 'quiz-feedback show ' + (correct ? 'ok' : 'bad');
+}
+
+// ── Scope tracer ──────────────────────────────────────────────────────────────
+const steps = [
+  {
+    label: "Before entering 'add' — global scope only",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } }
+    ],
+    active: 0
+  },
+  {
+    label: "Entering FunctionDeclaration — about to push fn.Scope",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } }
+    ],
+    active: 1
+  },
+  {
+    label: "c.scope = fn.Scope — parameters registered, body begins",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } },
+      { name: "fn: add", vars: { x: "int", y: "int" } }
+    ],
+    active: 2
+  },
+  {
+    label: "Checking 'let result = x + y' — x and y visible via fn scope",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } },
+      { name: "fn: add", vars: { x: "int", y: "int", result: "int" } }
+    ],
+    active: 3
+  },
+  {
+    label: "Entering if-block — pushing a new child scope (Task B)",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } },
+      { name: "fn: add", vars: { x: "int", y: "int", result: "int" } },
+      { name: "block (if)", vars: {} }
+    ],
+    active: 3
+  },
+  {
+    label: "Inside if-block — 'let cap = 100' written to block scope",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } },
+      { name: "fn: add", vars: { x: "int", y: "int", result: "int" } },
+      { name: "block (if)", vars: { cap: "int" } }
+    ],
+    active: 4
+  },
+  {
+    label: "return cap — lookup finds 'cap' in the block scope",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } },
+      { name: "fn: add", vars: { x: "int", y: "int", result: "int" } },
+      { name: "block (if)", vars: { cap: "int" } }
+    ],
+    active: 5
+  },
+  {
+    label: "End of if-block — c.scope popped back to fn scope. 'cap' gone.",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } },
+      { name: "fn: add", vars: { x: "int", y: "int", result: "int" } }
+    ],
+    active: 6
+  },
+  {
+    label: "return result — 'result' found in fn scope",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } },
+      { name: "fn: add", vars: { x: "int", y: "int", result: "int" } }
+    ],
+    active: 7
+  },
+  {
+    label: "End of function — c.scope popped back to global. All locals gone.",
+    scopes: [
+      { name: "global", vars: { add: "fn(int,int):int" } }
+    ],
+    active: 8
+  }
+];
+
+let currentStep = 0;
+
+function renderStep() {
+  const s = steps[currentStep];
+  document.getElementById('tracer-label').textContent = s.label;
+
+  // highlight active line
+  document.querySelectorAll('#tracer-code .line').forEach((el, i) => {
+    el.classList.toggle('active', i === s.active);
+  });
+
+  // render scope stack (innermost at top)
+  const display = document.getElementById('scope-display');
+  const reversed = [...s.scopes].reverse();
+  display.innerHTML = reversed.map((sc, i) => `
+    <div class="scope-frame">
+      <div class="scope-header">${i === 0 ? '▶ current: ' : '  parent: '}${sc.name}</div>
+      <div class="scope-vars">
+        ${Object.entries(sc.vars).map(([k,v]) =>
+          `<div class="scope-var"><span>${k}</span>: <em>${v}</em></div>`
+        ).join('') || '<div class="scope-var" style="color:var(--muted)">(empty)</div>'}
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('lookup-result').style.display = 'none';
+}
+
+function tracerStep(dir) {
+  currentStep = Math.max(0, Math.min(steps.length - 1, currentStep + dir));
+  renderStep();
+}
+
+function doLookup() {
+  const name = document.getElementById('lookup-var').value;
+  const s = steps[currentStep];
+  const result = document.getElementById('lookup-result');
+
+  // walk from innermost to outermost
+  let found = null;
+  let foundIn = null;
+  for (let i = s.scopes.length - 1; i >= 0; i--) {
+    if (s.scopes[i].vars[name] !== undefined) {
+      found = s.scopes[i].vars[name];
+      foundIn = s.scopes[i].name;
+      break;
+    }
+  }
+
+  result.style.display = 'block';
+  if (found) {
+    result.className = 'found';
+    result.textContent = `✓ found "${name}" → ${found}   (in scope: ${foundIn})`;
+  } else {
+    result.className = 'notfound';
+    result.textContent = `✗ "${name}" not found — checker would emit an "unknown identifier" error`;
+  }
+}
+
+renderStep();
+</script>
+</body>
+</html>
