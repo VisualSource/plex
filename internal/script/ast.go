@@ -857,7 +857,7 @@ func (p *Parser) parseVarDecl() (AstNode, error) {
 		return nil, err
 	}
 
-	var varType AstNode
+	var varType *TypeExpr
 	if p.peek().IsToken() == TokenType_Colon {
 		if _, err := p.expect(TokenType_Colon); err != nil {
 			return nil, err

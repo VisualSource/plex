@@ -30,9 +30,28 @@ type FuncInfo struct {
 	ReturnType *script.Type
 	Args       map[string]*FuncArg
 }
+
+func newFuncInfo(parent *Scope) *FuncInfo {
+	return &FuncInfo{
+		Scope: newScope(parent),
+		Args:  make(map[string]*FuncArg),
+	}
+}
+
 type Scope struct {
 	parent *Scope
 	vars   map[string]*script.Type
+}
+
+func newScope(parent *Scope) *Scope {
+	return &Scope{
+		parent: parent,
+		vars:   make(map[string]*script.Type),
+	}
+}
+
+func (s *Scope) Set(ident string, ty *script.Type) {
+	s.vars[ident] = ty
 }
 
 func (s *Scope) Get(ident string) *script.Type {
@@ -53,14 +72,15 @@ type Checker struct {
 	scope   *Scope
 	errors  []error
 
-	implBlock bool
+	implBlock      bool
+	expectedReturn *script.Type
 }
 
 func Check(program *script.Program) error {
 	c := &Checker{
 		structs: make(map[string]*StructInfo),
 		funcs:   make(map[string]*FuncInfo),
-		scope:   &Scope{vars: make(map[string]*script.Type)},
+		scope:   newScope(nil),
 	}
 
 	c.collectSignatures(program)
@@ -78,18 +98,13 @@ func (c *Checker) collectSignatures(program script.AstNode) {
 			c.collectSignatures(s)
 		}
 	case *script.FunctionDeclaration:
-		def := &FuncInfo{
-			Scope: &Scope{
-				parent: c.scope,
-				vars:   make(map[string]*script.Type),
-			},
-			Args: make(map[string]*FuncArg),
-		}
+		def := newFuncInfo(c.scope)
 
 		for i, arg := range n.Params {
 			def.Args[arg.Name] = &FuncArg{Pos: i}
 		}
 
+		c.funcs[n.Name] = def
 	case *script.StructStatement:
 		if _, ok := c.structs[n.Name]; ok {
 			c.error(n, "struct with name %s already exists", n.Name)
@@ -119,12 +134,17 @@ func (c *Checker) collectSignatures(program script.AstNode) {
 		}
 
 		for _, fn := range n.Methods {
-			def.Methods[fn.Name] = &FuncInfo{}
+			def.Methods[fn.Name] = newFuncInfo(c.scope)
 		}
 	}
 }
 func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 	switch n := expr.(type) {
+	case *script.Parameter:
+		t := c.checkExpression(n.Type)
+		n.SetType(t)
+
+		return t
 	case *script.TypeExpr:
 		var structName string
 		var kind script.TypeKind
@@ -256,16 +276,52 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 	}
 }
 
+func isSameType(a, b *script.Type) bool {
+	if a == nil || b == nil {
+		return false
+	}
+
+	return a.Kind == b.Kind && a.Struct == b.Struct
+}
+
 func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 	switch n := node.(type) {
+	case *script.VariableDeclaration:
+		t := c.checkStmt(n.Init)
+
+		if n.Type != nil {
+			exp := c.checkExpression(n.Type)
+			if !isSameType(t, exp) {
+				c.error(n, "type annonation does not match init")
+				return nil
+			}
+
+			c.scope.Set(n.Name, exp)
+			n.SetType(exp)
+			return exp
+		}
+
+		c.scope.Set(n.Name, t)
+
+		n.SetType(t)
+		return t
 	case *script.Block:
+		prev := c.scope
+		c.scope = newScope(c.scope)
 		for _, stmt := range n.Stmts {
 			c.checkStmt(stmt)
 		}
+		c.scope = prev
 	case *script.FunctionDeclaration:
-		c.checkExpression(n.ReturnType)
 
 		fn := c.funcs[n.Name]
+
+		fn.ReturnType = c.checkExpression(n.ReturnType)
+		if fn.ReturnType == nil {
+			fn.ReturnType = &script.Type{
+				Kind: script.TypeKind_Void,
+			}
+		}
 
 		for _, arg := range n.Params {
 			t := c.checkExpression(arg)
@@ -273,18 +329,45 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 			fn.Scope.vars[arg.Name] = t
 		}
 
+		c.expectedReturn = fn.ReturnType
+
+		prev := c.scope
+		c.scope = fn.Scope
 		c.checkStmt(n.Body)
+		c.scope = prev
 
-		//TODO: validate that return matches return type
-
+		c.expectedReturn = nil
+	case *script.IfStatement:
+		c.checkStmt(n.Condition)
+		c.checkStmt(n.Body)
+		if n.Else != nil {
+			c.checkStmt(n.Else)
+		}
+	case *script.WhileStatement:
+		c.checkStmt(n.Condition)
+		c.checkStmt(n.Body)
 	case *script.NumberLiteral:
 		return c.checkExpression(n)
+	case *script.FunctionCall:
+
+		t := c.checkStmt(n.Callee)
+
+		c.error(n, "unable to")
+
+		return t
 	case *script.Identifier:
 		return c.checkExpression(n)
 	case *script.BinaryExpression:
 		return c.checkExpression(n)
 	case *script.ReturnStatement:
-		return c.checkStmt(n.Value)
+		rt := c.checkStmt(n.Value)
+
+		if !isSameType(rt, c.expectedReturn) {
+			c.error(n, "was expecting return to be %T but was given %T", c.expectedReturn.Kind, rt.Kind)
+			return nil
+		}
+
+		return rt
 	}
 	return nil
 }

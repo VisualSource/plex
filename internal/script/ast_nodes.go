@@ -22,7 +22,7 @@ func (p *Program) Range() (Position, Position) {
 type VariableDeclaration struct {
 	Start, End Position
 	Name       string
-	Type       AstNode
+	Type       *TypeExpr
 	Init       AstNode
 	type_      *Type
 }
