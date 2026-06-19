@@ -28,7 +28,7 @@ func (b BoolValue) String() string   { return fmt.Sprintf("%v", b.V) }
 func (n NullValue) String() string   { return "null" }
 
 type FunctionValue struct {
-	Params []script.AstNode
+	Params []*script.Parameter
 	Body   script.AstNode
 	Env    *Environment
 }

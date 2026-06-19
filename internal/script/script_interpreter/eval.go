@@ -177,7 +177,7 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 						return nil, err
 					}
 
-					callEnv.Set(param.(*script.Parameter).Name, arg)
+					callEnv.Set(param.Name, arg)
 				}
 				callEnv.Set("self", instance) // override arg name self
 
@@ -213,12 +213,11 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 		case FunctionValue:
 			callEnv := NewEnvironment(callee.Env)
 			for i, param := range callee.Params {
-				p := param.(*script.Parameter)
 				arg, err := Eval(n.Args[i], env)
 				if err != nil {
 					return nil, err
 				}
-				callEnv.Set(p.Name, arg)
+				callEnv.Set(param.Name, arg)
 			}
 
 			_, err = Eval(callee.Body, callEnv)
@@ -247,7 +246,7 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 	case *script.StructStatement:
 		fields := make([]string, 0, len(n.Fields))
 		for _, f := range n.Fields {
-			fields = append(fields, f.(*script.Parameter).Name)
+			fields = append(fields, f.Name)
 		}
 
 		env.Set(n.Name, StructType{
@@ -265,8 +264,7 @@ func Eval(node script.AstNode, env *Environment) (Value, error) {
 		if !ok {
 			return nil, fmt.Errorf("%s is not a struct type", n.Name)
 		}
-		for _, m := range n.Methods {
-			fn := m.(*script.FunctionDeclaration)
+		for _, fn := range n.Methods {
 			st.Methods[fn.Name] = FunctionValue{Params: fn.Params, Body: fn.Body, Env: env}
 		}
 		env.Assign(n.Name, st)

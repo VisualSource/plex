@@ -8,13 +8,28 @@ import (
 	"github.com/VisualSource/plex/internal/script"
 )
 
-type StructInfo struct{}
+type StructInfo struct {
+	Fields  map[string]*script.Type
+	Methods map[string]*FuncInfo
+}
 
 func (s *StructInfo) GetTypeOf(ident string) *script.Type {
+	if t, ok := s.Fields[ident]; ok {
+		return t
+	}
+
 	return nil
 }
 
-type FuncInfo struct{}
+type FuncArg struct {
+	Type *script.Type
+	Pos  int
+}
+type FuncInfo struct {
+	Scope      *Scope
+	ReturnType *script.Type
+	Args       map[string]*FuncArg
+}
 type Scope struct {
 	parent *Scope
 	vars   map[string]*script.Type
@@ -37,6 +52,8 @@ type Checker struct {
 	funcs   map[string]*FuncInfo
 	scope   *Scope
 	errors  []error
+
+	implBlock bool
 }
 
 func Check(program *script.Program) error {
@@ -50,104 +67,133 @@ func Check(program *script.Program) error {
 	return c.checkProgram(program)
 }
 
-func (c *Checker) collectSignatures(program *script.Program) {
+func (c *Checker) collectSignatures(program script.AstNode) {
+	switch n := program.(type) {
+	case *script.Program:
+		for _, stmt := range n.Stmts {
+			c.collectSignatures(stmt)
+		}
+	case *script.Block:
+		for _, s := range n.Stmts {
+			c.collectSignatures(s)
+		}
+	case *script.FunctionDeclaration:
+		def := &FuncInfo{
+			Scope: &Scope{
+				parent: c.scope,
+				vars:   make(map[string]*script.Type),
+			},
+			Args: make(map[string]*FuncArg),
+		}
 
+		for i, arg := range n.Params {
+			def.Args[arg.Name] = &FuncArg{Pos: i}
+		}
+
+	case *script.StructStatement:
+		if _, ok := c.structs[n.Name]; ok {
+			c.error(n, "struct with name %s already exists", n.Name)
+			break
+		}
+
+		fields := make(map[string]*script.Type)
+
+		c.structs[n.Name] = &StructInfo{
+			Fields:  fields,
+			Methods: make(map[string]*FuncInfo),
+		}
+
+		for _, field := range n.Fields {
+			if _, ok := fields[field.Name]; ok {
+				c.error(n, "struct %s already has a field named %s", n.Name, field.Name)
+				continue
+			}
+
+			fields[field.Name] = nil
+		}
+	case *script.StructImplStatement:
+		def, ok := c.structs[n.Name]
+		if !ok {
+			c.error(n, "struct with name %s already exists", n.Name)
+			break
+		}
+
+		for _, fn := range n.Methods {
+			def.Methods[fn.Name] = &FuncInfo{}
+		}
+	}
 }
-
-/*
-Typechecker MemberAccess (typecheck.go:59-76)
-
-case *script.MemberAccess:
-
-	t := c.checkExpression(n.Object.(script.Expression))
-	def, ok := c.structs[t.Struct]
-	...
-
-Blocker — StructInfo is empty (typecheck.go:11-15):
-
-type StructInfo struct{}
-
-	func (s *StructInfo) GetTypeOf(ident string) *script.Type {
-	    return nil
-	}
-
-This is just a stub. GetTypeOf always returns nil, so every member access will fail with "struct has no field or method with name of X". And collectSignatures is empty too, so c.structs is never populated — even if StructInfo had real data, the map lookup on t.Struct would always miss.
-
-You need:
-
-	type StructInfo struct {
-	    Fields  map[string]*script.Type
-	    Methods map[string]*FuncInfo  // for method calls later
-	}
-
-	func (s *StructInfo) GetTypeOf(ident string) *script.Type {
-	    if t, ok := s.Fields[ident]; ok {
-	        return t
-	    }
-	    return nil
-	}
-
-And collectSignatures needs to walk the program's StructStatement nodes and populate c.structs[n.Name] with fields. Same shape as prepass in the compiler (compiler.go:736-756).
-
-Bug — nil/kind check missing on t:
-
-t := c.checkExpression(n.Object.(script.Expression))
-def, ok := c.structs[t.Struct]   // ← panics if t is nil; silently wrong if t.Kind != Struct
-If the recursive check errored, t is nil and dereferencing panics. If the receiver is an i64 literal or similar, t.Struct is "" and you'll get a confusing "no struct with typeof " error. Two short guards:
-
-	if t == nil {
-	    return nil  // child already reported
-	}
-
-	if t.Kind != script.TypeKind_Struct {
-	    c.error(n, "cannot access field on non-struct type")
-	    return nil
-	}
-
-def, ok := c.structs[t.Struct]
-Compiler MemberAccess (compiler.go:467-491)
-
-t := n.Object.(script.Expression).GetType()
-def, ok := c.structs[t.Struct]
-Good — this is exactly the Task A pattern. Codegen reads the type off the typed AST instead of recomputing. The old typeofStruct call is gone.
-
-Bug — silent fall-through when field not found:
-
-	for _, field := range def.Fields {
-	    if field.Name == n.Field {
-	        // emit, return nil  ← good
-	    }
-	}
-
-// ← falls out of switch, returns nil with no error and no WAT emitted
-If the field name doesn't match anything, the loop ends and MemberAccess exits cleanly without emitting any WAT. The function returns nil (no error). The caller stitches in nothing, output is broken silently.
-
-In theory the typechecker should have caught this — but the compiler shouldn't trust that. Add a return fmt.Errorf(...) after the loop:
-
-	for _, field := range def.Fields {
-	    if field.Name == n.Field {
-	        c.emit(fmt.Sprintf("i32.const %d", field.Offset))
-	        c.emit("i32.add")
-	        c.emit(fmt.Sprintf("%s.load", field.Type))
-	        return nil
-	    }
-	}
-
-return fmt.Errorf("compile: struct %q has no field %q", t.Struct, n.Field)
-Same nil-check applies: t := n.Object.(script.Expression).GetType() — if the typechecker didn't fire on this node, t is nil.
-
-Summary
-Issue	Severity	Location
-StructInfo is empty stub — every field lookup will fail	blocker	typecheck.go:11-15
-collectSignatures empty — c.structs never populated	blocker	typecheck.go:53-55
-Missing nil/kind guards on t	bug (panics on bad input)	both files
-Silent fall-through on field-not-found in compiler	bug (broken output)	compiler.go:484-491
-Once StructInfo and collectSignatures are populated, the MemberAccess shape you have will work end-to-end. The compiler side is genuinely correct — it just needs the typechecker upstream to be doing its job.
-*/
 func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 	switch n := expr.(type) {
+	case *script.TypeExpr:
+		var structName string
+		var kind script.TypeKind
+		switch n.Name {
+		case "int":
+			kind = script.TypeKind_Int
+		case "f64":
+			kind = script.TypeKind_F64
+		case "i32":
+			kind = script.TypeKind_I32
+		case "i64":
+			kind = script.TypeKind_I64
+		case "f32":
+			kind = script.TypeKind_F32
+		case "float":
+			kind = script.TypeKind_Float
+		case "string":
+			kind = script.TypeKind_String
+		case "void":
+			kind = script.TypeKind_Void
+		default:
+			if _, ok := c.structs[n.Name]; ok {
+				kind = script.TypeKind_Struct
+				structName = n.Name
+			} else {
+
+				c.error(n, "unknown type %s", n.Name)
+				return nil
+			}
+		}
+
+		root := &script.Type{
+			Kind:   kind,
+			Struct: structName,
+		}
+
+		if !n.IsArray {
+			root.Nullable = n.IsNullable
+			n.SetType(root)
+			return root
+		}
+
+		t := &script.Type{
+			Kind:    script.TypeKind_Array,
+			Element: root,
+		}
+
+		for i := 1; i < n.ArrayDepth; i++ {
+			t = &script.Type{
+				Kind:    script.TypeKind_Array,
+				Element: t,
+			}
+		}
+
+		t.Nullable = n.IsNullable
+
+		n.SetType(t)
+		return t
 	case *script.MemberAccess:
 		t := c.checkExpression(n.Object.(script.Expression))
+
+		if t == nil {
+			return nil
+		}
+
+		if t.Kind != script.TypeKind_Struct {
+			c.error(n, "cannot access field on non-struct type")
+			return nil
+		}
 
 		def, ok := c.structs[t.Struct]
 		if !ok {
@@ -217,13 +263,28 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 			c.checkStmt(stmt)
 		}
 	case *script.FunctionDeclaration:
+		c.checkExpression(n.ReturnType)
+
+		fn := c.funcs[n.Name]
+
+		for _, arg := range n.Params {
+			t := c.checkExpression(arg)
+			fn.Args[arg.Name].Type = t
+			fn.Scope.vars[arg.Name] = t
+		}
+
 		c.checkStmt(n.Body)
+
+		//TODO: validate that return matches return type
+
 	case *script.NumberLiteral:
 		return c.checkExpression(n)
 	case *script.Identifier:
 		return c.checkExpression(n)
 	case *script.BinaryExpression:
 		return c.checkExpression(n)
+	case *script.ReturnStatement:
+		return c.checkStmt(n.Value)
 	}
 	return nil
 }

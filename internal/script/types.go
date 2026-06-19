@@ -8,9 +8,7 @@ const (
 	TypeKind_F32
 	TypeKind_F64
 	TypeKind_Int
-	TypeKind_Uint
 	TypeKind_Float
-	TypeKind_Nil
 	TypeKind_String
 	TypeKind_Array
 	TypeKind_Struct
@@ -19,7 +17,8 @@ const (
 )
 
 type Type struct {
-	Kind    TypeKind
-	Element *Type
-	Struct  string
+	Kind     TypeKind
+	Element  *Type
+	Struct   string
+	Nullable bool
 }

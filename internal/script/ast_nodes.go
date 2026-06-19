@@ -135,6 +135,7 @@ type TypeExpr struct {
 	Start, End Position
 	Name       string
 	IsArray    bool
+	ArrayDepth int
 	IsNullable bool
 	type_      *Type
 }
@@ -163,7 +164,7 @@ func (b *Block) Range() (Position, Position) {
 type Parameter struct {
 	Start, End Position
 	Name       string
-	Type       AstNode
+	Type       *TypeExpr
 	Mut        bool
 	type_      *Type
 }
@@ -183,8 +184,8 @@ func (p *Parameter) Range() (Position, Position) {
 type FunctionDeclaration struct {
 	Start, End Position
 	Name       string
-	Params     []AstNode
-	ReturnType AstNode
+	Params     []*Parameter
+	ReturnType *TypeExpr
 	Body       AstNode
 }
 
@@ -310,7 +311,7 @@ func (w *WhileStatement) Range() (Position, Position) {
 type StructStatement struct {
 	Start, End Position
 	Name       string
-	Fields     []AstNode
+	Fields     []*Parameter
 }
 
 func (s *StructStatement) Range() (Position, Position) {
@@ -320,7 +321,7 @@ func (s *StructStatement) Range() (Position, Position) {
 type StructImplStatement struct {
 	Start, End Position
 	Name       string
-	Methods    []AstNode
+	Methods    []*FunctionDeclaration
 }
 
 func (s *StructImplStatement) Range() (Position, Position) {

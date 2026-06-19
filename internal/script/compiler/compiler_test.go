@@ -20,7 +20,7 @@ func TestCompilerFunctionCall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	wat, err := compiler.CompileProgram(ast.(*script.Program))
+	wat, err := compiler.CompileProgram(ast)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestStructGenAndCtor(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := compiler.CompileProgram(ast.(*script.Program))
+	result, err := compiler.CompileProgram(ast)
 	if err != nil {
 		t.Fatal(err)
 	}

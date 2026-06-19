@@ -137,10 +137,8 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			c.locals = append(c.locals, Local{Name: "self", Type: "i32", Owner: c.implBlock})
 		}
 
-		for _, p := range n.Params {
-			param := p.(*script.Parameter)
-
-			t, typeName := resolveType(param.Type.(*script.TypeExpr))
+		for _, param := range n.Params {
+			t, typeName := resolveType(param.Type)
 
 			params.WriteString(fmt.Sprintf(" (param $%s %s)", param.Name, t))
 			c.locals = append(c.locals, Local{Name: param.Name, Type: t, Owner: typeName})
@@ -489,6 +487,8 @@ func (c *Compiler) Compile(node script.AstNode) error {
 				return nil
 			}
 		}
+
+		return fmt.Errorf("compile: failed to file field %T", node)
 	case *script.MemberAssignment:
 		if err := c.Compile(n.Object); err != nil {
 			return err
@@ -532,7 +532,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		c.implBlock = n.Name
 		for _, method := range n.Methods {
-			methodName := method.(*script.FunctionDeclaration).Name
+			methodName := method.Name
 
 			if _, ok := def.Methods[methodName]; ok {
 				return fmt.Errorf("struct already has a method named %s", n.Name)
@@ -665,8 +665,7 @@ func (c *Compiler) prepass(node script.AstNode) {
 
 		def := &structDef{Name: n.Name, Methods: make(map[string]string), Fields: make([]structField, 0), Size: 0}
 
-		for _, f := range n.Fields {
-			param := f.(*script.Parameter)
+		for _, param := range n.Fields {
 			wasmType, _ := resolveType(param.Type)
 			size := sizeOf(wasmType)
 

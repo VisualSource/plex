@@ -39,7 +39,7 @@ func main() {
 
 	switch output {
 	case "wasm-wat":
-		result, err := compiler.CompileProgram(ast.(*script.Program))
+		result, err := compiler.CompileProgram(ast)
 		if err != nil {
 			fmt.Printf("error: %s", err.Error())
 			return

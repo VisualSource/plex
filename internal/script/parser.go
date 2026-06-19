@@ -2,7 +2,7 @@ package script
 
 import "io"
 
-func Parse(stream io.Reader) (AstNode, error) {
+func Parse(stream io.Reader) (*Program, error) {
 	tokens, err := NewTokenizer(stream).Tokenize()
 	if err != nil {
 		return nil, err

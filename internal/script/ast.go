@@ -12,7 +12,7 @@ type Parser struct {
 // #region Entry
 
 // program ::= statement* EOF
-func (p *Parser) Parse() (AstNode, error) {
+func (p *Parser) Parse() (*Program, error) {
 	program := &Program{}
 
 	for p.peek().IsToken() != TokenType_EOF {
@@ -580,8 +580,8 @@ func (p *Parser) parseIfStmt() (AstNode, error) {
 }
 
 // params ::= param ( "," param )*
-func (p *Parser) parseParams() ([]AstNode, error) {
-	params := make([]AstNode, 0)
+func (p *Parser) parseParams() ([]*Parameter, error) {
+	params := make([]*Parameter, 0)
 
 	for {
 		if p.peek().IsToken() != TokenType_Ident && p.peek().IsToken() != TokenType_Keyword {
@@ -606,7 +606,7 @@ func (p *Parser) parseParams() ([]AstNode, error) {
 }
 
 // param ::= "mut"? IDENT ":" typeExpr
-func (p *Parser) parseParam() (AstNode, error) {
+func (p *Parser) parseParam() (*Parameter, error) {
 	isMut := isKeyword(p.peek(), "mut")
 
 	var start Position
@@ -645,7 +645,7 @@ func (p *Parser) parseParam() (AstNode, error) {
 }
 
 // typeExpr ::= IDENT ( "[" "]" )* "?"?
-func (p *Parser) parseTypeExpr() (AstNode, error) {
+func (p *Parser) parseTypeExpr() (*TypeExpr, error) {
 	token, err := p.expect(TokenType_Ident)
 	if err != nil {
 		return nil, err
@@ -662,6 +662,7 @@ func (p *Parser) parseTypeExpr() (AstNode, error) {
 		p.advance()
 		last := p.advance()
 		t.IsArray = true
+		t.ArrayDepth++
 		_, t.End = last.Range()
 	}
 
@@ -675,7 +676,7 @@ func (p *Parser) parseTypeExpr() (AstNode, error) {
 }
 
 // fnDecl ::= "fn" IDENT "(" params? ")" (":" typeExpr)? block
-func (p *Parser) parseFnDecl() (AstNode, error) {
+func (p *Parser) parseFnDecl() (*FunctionDeclaration, error) {
 	start, _ := p.advance().Range()
 	name, err := p.expect(TokenType_Ident)
 	if err != nil {
@@ -695,7 +696,7 @@ func (p *Parser) parseFnDecl() (AstNode, error) {
 		return nil, err
 	}
 
-	var returnType AstNode
+	var returnType *TypeExpr
 	if p.peek().IsToken() == TokenType_Colon {
 		p.advance()
 		returnType, err = p.parseTypeExpr()
@@ -808,7 +809,7 @@ func (p *Parser) parseStruct() (AstNode, error) {
 		return nil, err
 	}
 
-	fields := make([]AstNode, 0)
+	fields := make([]*Parameter, 0)
 
 	for {
 		if p.peek().IsToken() != TokenType_Ident {
@@ -906,7 +907,7 @@ func (p *Parser) parseStructImpl() (AstNode, error) {
 		return nil, err
 	}
 
-	methods := make([]AstNode, 0)
+	methods := make([]*FunctionDeclaration, 0)
 	for {
 		next := p.peek()
 		if next.IsToken() == TokenType_BracketCulryClose || next.IsToken() == TokenType_EOF {
