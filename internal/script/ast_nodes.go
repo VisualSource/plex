@@ -52,7 +52,6 @@ func (b *BinaryExpression) SetType(t *Type) {
 func (b *BinaryExpression) GetType() *Type {
 	return b.type_
 }
-
 func (b *BinaryExpression) Range() (Position, Position) {
 	return b.Start, b.End
 }
@@ -72,7 +71,6 @@ func (m *NumberLiteral) GetType() *Type {
 func (m *NumberLiteral) Range() (Position, Position) {
 	return m.Start, m.End
 }
-
 func NewNumberLiteral(value string, start, end Position) *NumberLiteral {
 	return &NumberLiteral{
 		Value: value,
@@ -93,11 +91,9 @@ func (s *StringLiteral) SetType(t *Type) {
 func (s *StringLiteral) GetType() *Type {
 	return s.type_
 }
-
 func (s *StringLiteral) Range() (Position, Position) {
 	return s.Start, s.End
 }
-
 func NewStringLiteral(value string, start, end Position) *StringLiteral {
 	return &StringLiteral{
 		Value: value,
@@ -118,11 +114,9 @@ func (i *Identifier) SetType(t *Type) {
 func (i *Identifier) GetType() *Type {
 	return i.type_
 }
-
 func (i *Identifier) Range() (Position, Position) {
 	return i.Start, i.End
 }
-
 func NewIdentifier(value string, start, end Position) *Identifier {
 	return &Identifier{
 		Value: value,
@@ -143,11 +137,9 @@ type TypeExpr struct {
 func (t *TypeExpr) GetType() *Type {
 	return t.type_
 }
-
 func (t *TypeExpr) SetType(v *Type) {
 	t.type_ = v
 }
-
 func (t *TypeExpr) Range() (Position, Position) {
 	return t.Start, t.End
 }
@@ -172,11 +164,9 @@ type Parameter struct {
 func (p *Parameter) GetType() *Type {
 	return p.type_
 }
-
 func (p *Parameter) SetType(t *Type) {
 	p.type_ = t
 }
-
 func (p *Parameter) Range() (Position, Position) {
 	return p.Start, p.End
 }
@@ -203,11 +193,9 @@ type FunctionCall struct {
 func (f *FunctionCall) GetType() *Type {
 	return f.type_
 }
-
 func (f *FunctionCall) SetType(t *Type) {
 	f.type_ = t
 }
-
 func (f *FunctionCall) Range() (Position, Position) {
 	return f.Start, f.End
 }
@@ -222,11 +210,9 @@ type MemberAccess struct {
 func (m *MemberAccess) SetType(t *Type) {
 	m.type_ = t
 }
-
 func (m *MemberAccess) GetType() *Type {
 	return m.type_
 }
-
 func (n *MemberAccess) Range() (Position, Position) {
 	return n.Start, n.End
 }
@@ -236,6 +222,17 @@ type UnaryExpression struct {
 	Operator   TokenType
 	Operand    AstNode
 	Postfix    bool
+	type_      *Type
+}
+
+func (u *UnaryExpression) GetType() *Type {
+	return u.type_
+}
+func (u *UnaryExpression) SetType(t *Type) {
+	u.type_ = t
+}
+func (u *UnaryExpression) Range() (Position, Position) {
+	return u.Start, u.End
 }
 
 type ArrayAccess struct {
@@ -246,14 +243,17 @@ type ArrayAccess struct {
 
 	// what we are indexing into
 	Index AstNode
+	type_ *Type
 }
 
+func (a *ArrayAccess) SetType(t *Type) {
+	a.type_ = t
+}
+func (a *ArrayAccess) GetType() *Type {
+	return a.type_
+}
 func (a *ArrayAccess) Range() (Position, Position) {
 	return a.Start, a.End
-}
-
-func (u *UnaryExpression) Range() (Position, Position) {
-	return u.Start, u.End
 }
 
 type AssignmentExpression struct {
@@ -271,8 +271,15 @@ type TernaryExpression struct {
 	Condition  AstNode
 	TrueBlock  AstNode
 	FalseBlock AstNode
+	type_      *Type
 }
 
+func (t *TernaryExpression) SetType(n *Type) {
+	t.type_ = n
+}
+func (t *TernaryExpression) GetType() *Type {
+	return t.type_
+}
 func (t *TernaryExpression) Range() (Position, Position) {
 	return t.Start, t.End
 }
@@ -340,7 +347,6 @@ func (r *ReturnStatement) GetType() *Type {
 func (r *ReturnStatement) SetType(t *Type) {
 	r.type_ = t
 }
-
 func (r *ReturnStatement) Range() (Position, Position) {
 	return r.Start, r.End
 }
@@ -373,11 +379,9 @@ type ArrayLiteral struct {
 func (a *ArrayLiteral) GetType() *Type {
 	return a.type_
 }
-
 func (a *ArrayLiteral) SetType(t *Type) {
 	a.type_ = t
 }
-
 func (a *ArrayLiteral) Range() (Position, Position) {
 	return a.Start, a.End
 }

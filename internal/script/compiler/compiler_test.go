@@ -73,3 +73,34 @@ func TestStructGenAndCtor(t *testing.T) {
 		t.Fatal("result != snapshot")
 	}
 }
+
+func TestAlloc(t *testing.T) {
+	src := `
+		import heapPtr from "plex:globals";
+
+		fn alloc(size: i32): i32 {
+			let ptr = heapPtr;
+			heapPtr = heapPtr + size;
+			return ptr;
+		}
+	`
+
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := compiler.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err := os.ReadFile("testdata/struct.wat")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result != string(snapshot) {
+		t.Fatal("result != snapshot")
+	}
+}

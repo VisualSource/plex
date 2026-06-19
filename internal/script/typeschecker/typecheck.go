@@ -1,40 +1,64 @@
 package typeschecker
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/VisualSource/plex/internal/script"
 )
 
+type orderedItem struct {
+	Type *script.Type
+	Pos  int
+}
+
 type StructInfo struct {
-	Fields  map[string]*script.Type
+	Fields  map[string]*orderedItem
 	Methods map[string]*FuncInfo
+}
+
+func (s *StructInfo) GetFieldsInOrder() []*orderedItem {
+	items := slices.Collect(maps.Values(s.Fields))
+
+	slices.SortFunc(items, func(a, b *orderedItem) int {
+		return cmp.Compare(a.Pos, b.Pos)
+	})
+
+	return items
 }
 
 func (s *StructInfo) GetTypeOf(ident string) *script.Type {
 	if t, ok := s.Fields[ident]; ok {
-		return t
+		return t.Type
 	}
 
 	return nil
 }
 
-type FuncArg struct {
-	Type *script.Type
-	Pos  int
-}
 type FuncInfo struct {
 	Scope      *Scope
 	ReturnType *script.Type
-	Args       map[string]*FuncArg
+	Args       map[string]*orderedItem
+}
+
+func (f *FuncInfo) GetArgsInOrder() []*orderedItem {
+	items := slices.Collect(maps.Values(f.Args))
+
+	slices.SortFunc(items, func(a, b *orderedItem) int {
+		return cmp.Compare(a.Pos, b.Pos)
+	})
+
+	return items
 }
 
 func newFuncInfo(parent *Scope) *FuncInfo {
 	return &FuncInfo{
 		Scope: newScope(parent),
-		Args:  make(map[string]*FuncArg),
+		Args:  make(map[string]*orderedItem),
 	}
 }
 
@@ -89,6 +113,31 @@ func Check(program *script.Program) error {
 
 func (c *Checker) collectSignatures(program script.AstNode) {
 	switch n := program.(type) {
+	case *script.ImportStatement:
+		// import and type check
+		switch n.Source {
+		case "plex:globals":
+			seen := make(map[string]bool)
+
+			for _, imp := range n.Imports {
+				switch imp {
+				case "heapPtr":
+					if _, ok := seen[imp]; ok {
+						c.error(n, "already imported %s", imp)
+						continue
+					}
+					seen[imp] = true
+					c.scope.Set("heapPtr", &script.Type{
+						Kind: script.TypeKind_I32,
+					})
+				default:
+					c.error(n, "unknown import '%s'", imp)
+
+				}
+			}
+		default:
+			c.error(n, "failed to import source file")
+		}
 	case *script.Program:
 		for _, stmt := range n.Stmts {
 			c.collectSignatures(stmt)
@@ -101,7 +150,7 @@ func (c *Checker) collectSignatures(program script.AstNode) {
 		def := newFuncInfo(c.scope)
 
 		for i, arg := range n.Params {
-			def.Args[arg.Name] = &FuncArg{Pos: i}
+			def.Args[arg.Name] = &orderedItem{Pos: i}
 		}
 
 		c.funcs[n.Name] = def
@@ -111,7 +160,7 @@ func (c *Checker) collectSignatures(program script.AstNode) {
 			break
 		}
 
-		fields := make(map[string]*script.Type)
+		fields := make(map[string]*orderedItem)
 
 		c.structs[n.Name] = &StructInfo{
 			Fields:  fields,
@@ -139,6 +188,11 @@ func (c *Checker) collectSignatures(program script.AstNode) {
 	}
 }
 func (c *Checker) checkExpression(expr script.Expression) *script.Type {
+	type_ := expr.GetType()
+	if type_ != nil {
+		return type_
+	}
+
 	switch n := expr.(type) {
 	case *script.Parameter:
 		t := c.checkExpression(n.Type)
@@ -203,10 +257,12 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 
 		n.SetType(t)
 		return t
+
 	case *script.MemberAccess:
 		t := c.checkExpression(n.Object.(script.Expression))
 
 		if t == nil {
+			c.error(n, "failed to resolve object type for member access")
 			return nil
 		}
 
@@ -244,6 +300,13 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 
 		n.SetType(t)
 		return t
+	case *script.StringLiteral:
+		t := &script.Type{
+			Kind: script.TypeKind_String,
+		}
+
+		n.SetType(t)
+		return t
 	case *script.Identifier:
 		ident := c.scope.Get(n.Value)
 
@@ -251,6 +314,8 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 			c.error(n, "unknown identifier %s", n.Value)
 			return nil
 		}
+
+		n.SetType(ident)
 
 		return ident
 	case *script.BinaryExpression:
@@ -269,7 +334,167 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 		n.SetType(leftType)
 
 		return leftType
+	case *script.ArrayLiteral:
+		var expectedType *script.Type
 
+		for _, el := range n.Elements {
+			t := c.checkExpression(el.(script.Expression))
+
+			if expectedType == nil {
+				expectedType = t
+			} else {
+				if !isSameType(expectedType, t) {
+					c.error(n, "elements do not match in array")
+					return nil
+				}
+			}
+		}
+
+		n.SetType(expectedType)
+
+		return expectedType
+	case *script.UnaryExpression:
+		t := c.checkExpression(n.Operand.(script.Expression))
+
+		n.SetType(t)
+		return t
+	case *script.ArrayAccess:
+		indexType := c.checkExpression(n.Index.(script.Expression))
+
+		if indexType.Kind != script.TypeKind_I64 && indexType.Kind != script.TypeKind_Int {
+			c.error(n, "invalid indexing type")
+			return nil
+		}
+
+		switch target := n.Target.(type) {
+		case *script.StringLiteral:
+			t := c.checkExpression(target)
+
+			n.SetType(t)
+			return t
+
+		case *script.ArrayLiteral:
+			t := c.checkExpression(target)
+
+			n.SetType(t.Element)
+			return t.Element
+		case *script.Identifier:
+			i := c.scope.Get(target.Value)
+
+			if i == nil {
+				c.error(n, "unknown identifier %s", target.Value)
+				return nil
+			}
+
+			switch i.Kind {
+			case script.TypeKind_Array:
+				n.SetType(i.Element)
+
+				return i.Element
+			case script.TypeKind_String:
+				n.SetType(i)
+				return i
+			default:
+				c.error(n, "unable to index into given target")
+				return nil
+			}
+		default:
+			c.error(n, "unable to index into given target")
+			return nil
+		}
+	case *script.FunctionCall:
+		switch callee := n.Callee.(type) {
+		case *script.MemberAccess:
+			revType := c.checkExpression(callee.Object.(script.Expression))
+			if revType == nil {
+				c.error(n, "failed to resolve type for object")
+				return nil
+			}
+			switch revType.Kind {
+			case script.TypeKind_Array:
+				switch callee.Field {
+				case "append":
+					t := &script.Type{
+						Kind: script.TypeKind_Void,
+					}
+					callee.SetType(t)
+					n.SetType(t)
+					return t
+				case "remove":
+					c.checkArgs(callee, []*orderedItem{
+						{
+							Pos: 0,
+							Type: &script.Type{
+								Kind: script.TypeKind_Int,
+							},
+						},
+					})
+					callee.SetType(revType.Element)
+					n.SetType(revType.Element)
+					return revType.Element
+				case "len":
+					t := &script.Type{
+						Kind: script.TypeKind_Int,
+					}
+					callee.SetType(t)
+					n.SetType(t)
+					return t
+				default:
+					c.error(n, "array has no method %s", callee.Field)
+					return nil
+				}
+			case script.TypeKind_String:
+				switch callee.Field {
+				case "len":
+					t := &script.Type{
+						Kind: script.TypeKind_Int,
+					}
+
+					callee.SetType(t)
+					n.SetType(t)
+					return t
+				default:
+					c.error(n, "array has no method %s", callee.Field)
+					return nil
+				}
+			case script.TypeKind_Struct:
+				sdef := c.structs[revType.Struct]
+				method, ok := sdef.Methods[callee.Field]
+				if !ok {
+					c.error(n, "struct %s has no method %s", revType.Struct, callee.Field)
+					return nil
+				}
+				callee.SetType(method.ReturnType)
+
+				c.checkArgs(n, method.GetArgsInOrder())
+				n.SetType(method.ReturnType)
+
+				return method.ReturnType
+			default:
+				c.error(n, "method call on non callable type")
+				return nil
+			}
+		case *script.Identifier:
+			if sdef, ok := c.structs[callee.Value]; ok {
+				t := &script.Type{Kind: script.TypeKind_Struct, Struct: callee.Value}
+
+				c.checkArgs(n, sdef.GetFieldsInOrder())
+				n.SetType(t)
+				return t
+			}
+
+			if fdef, ok := c.funcs[callee.Value]; ok {
+				c.checkArgs(n, fdef.GetArgsInOrder())
+				n.SetType(fdef.ReturnType)
+				return fdef.ReturnType
+			}
+
+			c.error(n, "unknown callable %s", callee.Value)
+			return nil
+		default:
+			c.error(n, "unknown callable %T", callee)
+			return nil
+		}
 	default:
 		c.error(n, "unhandled node %T", n)
 		return nil
@@ -284,15 +509,69 @@ func isSameType(a, b *script.Type) bool {
 	return a.Kind == b.Kind && a.Struct == b.Struct
 }
 
+func (c *Checker) checkArgs(node script.AstNode, args []*orderedItem) {}
+
+func (c Checker) checkFunction(info *FuncInfo, def *script.FunctionDeclaration) {
+
+	if def.ReturnType == nil {
+		info.ReturnType = &script.Type{
+			Kind: script.TypeKind_Void,
+		}
+	} else {
+		info.ReturnType = c.checkExpression(def.ReturnType)
+	}
+
+	for _, arg := range def.Params {
+		t := c.checkExpression(arg)
+		info.Args[arg.Name].Type = t
+		info.Scope.vars[arg.Name] = t
+	}
+
+	c.expectedReturn = info.ReturnType
+
+	prev := c.scope
+	c.scope = info.Scope
+	c.checkStmt(def.Body)
+	c.scope = prev
+
+	c.expectedReturn = nil
+}
+
 func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 	switch n := node.(type) {
+	case *script.StructStatement:
+		def, ok := c.structs[n.Name]
+		if !ok {
+			c.error(n, "struct not found")
+			return nil
+		}
+
+		for i, field := range n.Fields {
+			t := c.checkExpression(field)
+			def.Fields[field.Name] = &orderedItem{
+				Pos:  i,
+				Type: t,
+			}
+		}
+
+		return nil
+	case *script.AssignmentExpression:
+		v := c.scope.Get(n.Name)
+
+		if v == nil {
+			c.error(n, "unknown variable %s", n.Name)
+			return nil
+		}
+
+		c.checkStmt(n.Value)
+
 	case *script.VariableDeclaration:
 		t := c.checkStmt(n.Init)
 
 		if n.Type != nil {
 			exp := c.checkExpression(n.Type)
 			if !isSameType(t, exp) {
-				c.error(n, "type annonation does not match init")
+				c.error(n, "type annotation does not match init")
 				return nil
 			}
 
@@ -302,7 +581,6 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		}
 
 		c.scope.Set(n.Name, t)
-
 		n.SetType(t)
 		return t
 	case *script.Block:
@@ -313,30 +591,8 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		}
 		c.scope = prev
 	case *script.FunctionDeclaration:
-
 		fn := c.funcs[n.Name]
-
-		fn.ReturnType = c.checkExpression(n.ReturnType)
-		if fn.ReturnType == nil {
-			fn.ReturnType = &script.Type{
-				Kind: script.TypeKind_Void,
-			}
-		}
-
-		for _, arg := range n.Params {
-			t := c.checkExpression(arg)
-			fn.Args[arg.Name].Type = t
-			fn.Scope.vars[arg.Name] = t
-		}
-
-		c.expectedReturn = fn.ReturnType
-
-		prev := c.scope
-		c.scope = fn.Scope
-		c.checkStmt(n.Body)
-		c.scope = prev
-
-		c.expectedReturn = nil
+		c.checkFunction(fn, n)
 	case *script.IfStatement:
 		c.checkStmt(n.Condition)
 		c.checkStmt(n.Body)
@@ -348,26 +604,90 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		c.checkStmt(n.Body)
 	case *script.NumberLiteral:
 		return c.checkExpression(n)
+	case *script.TernaryExpression:
+		c.checkStmt(n.Condition)
+
+		a := c.checkStmt(n.FalseBlock)
+		b := c.checkStmt(n.TrueBlock)
+
+		if !isSameType(a, b) {
+			c.error(n, "left and right no not have matching types")
+			return nil
+		}
+
+		n.SetType(a)
+		return a
 	case *script.FunctionCall:
-
-		t := c.checkStmt(n.Callee)
-
-		c.error(n, "unable to")
-
-		return t
+		return c.checkExpression(n)
 	case *script.Identifier:
+		return c.checkExpression(n)
+	case *script.UnaryExpression:
 		return c.checkExpression(n)
 	case *script.BinaryExpression:
 		return c.checkExpression(n)
 	case *script.ReturnStatement:
 		rt := c.checkStmt(n.Value)
 
-		if !isSameType(rt, c.expectedReturn) {
-			c.error(n, "was expecting return to be %T but was given %T", c.expectedReturn.Kind, rt.Kind)
+		if (c.expectedReturn == nil || c.expectedReturn.Kind == script.TypeKind_Void) && !(rt == nil || rt.Kind == script.TypeKind_Void) {
+			c.error(n, "was expecting return to be void but was given %T", rt.Kind)
+			return nil
+		} else if !isSameType(rt, c.expectedReturn) {
+			if rt != nil {
+				c.error(n, "was expecting return to be %T but was given %T", c.expectedReturn.Kind, rt.Kind)
+			} else {
+				c.error(n, "was expecting return to be %T but not was given", c.expectedReturn.Kind)
+			}
+
 			return nil
 		}
 
+		n.SetType(rt)
+
 		return rt
+	case *script.MemberAssignment:
+		t := c.checkExpression(n.Object.(script.Expression))
+
+		def, ok := c.structs[t.Struct]
+		if !ok {
+			c.error(n, "can not assign to struct %s", t.Struct)
+			return nil
+		}
+
+		field, ok := def.Fields[n.Field]
+		if !ok {
+			c.error(n, "unknown field '%s'", n.Field)
+			return nil
+		}
+
+		vt := c.checkExpression(n.Value.(script.Expression))
+
+		if !isSameType(field.Type, vt) {
+			c.error(n, "field type and value do not match")
+			return nil
+		}
+
+		return vt
+	case *script.StructImplStatement:
+		def, ok := c.structs[n.Name]
+		if !ok {
+			c.error(n, "unknown struct")
+			return nil
+		}
+
+		for _, method := range n.Methods {
+			methodDef := def.Methods[method.Name]
+			methodDef.Scope.Set("self", &script.Type{
+				Kind:   script.TypeKind_Struct,
+				Struct: n.Name,
+			})
+
+			c.checkFunction(methodDef, method)
+		}
+
+	case *script.ArrayAccess:
+		return c.checkExpression(n)
+	case *script.MemberAccess:
+		return c.checkExpression(n)
 	}
 	return nil
 }

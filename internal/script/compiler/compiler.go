@@ -138,17 +138,22 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 
 		for _, param := range n.Params {
-			t, typeName := resolveType(param.Type)
+			t := param.GetType()
+			if t == nil {
+				return fmt.Errorf("no type set on param %s", param.Name)
+			}
 
-			params.WriteString(fmt.Sprintf(" (param $%s %s)", param.Name, t))
-			c.locals = append(c.locals, Local{Name: param.Name, Type: t, Owner: typeName})
+			wasmType := getWasmType(t)
+
+			params.WriteString(fmt.Sprintf(" (param $%s %s)", param.Name, wasmType))
+			c.locals = append(c.locals, Local{Name: param.Name, Type: wasmType, Owner: t.Struct})
 			skipParam = append(skipParam, param.Name)
 		}
 
 		result := ""
 		if n.ReturnType != nil {
-			t, _ := resolveType(n.ReturnType)
-			result = fmt.Sprintf(" (result %s)", t)
+			t := n.ReturnType.GetType()
+			result = fmt.Sprintf(" (result %s)", getWasmType(t))
 		}
 
 		var funcName string
@@ -195,36 +200,12 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 		c.emit("return")
 	case *script.VariableDeclaration:
+		t := n.GetType()
+
 		local := Local{
-			Name: n.Name,
-			Type: "f64", // f64,i64,f32,i32
-		}
-
-		if n.Type != nil { // use explict type
-			local.Type, local.Owner = resolveType(n.Type)
-
-			//TODO: should valiate the declaration expresion matchs explict type
-		} else {
-			// implicit type
-			switch i := n.Init.(type) {
-			case *script.NumberLiteral:
-				// TODO: should reslove to i64 by default or f64 when thers a . in the number
-			case *script.FunctionCall:
-				local.Type = "i32"
-
-				switch callee := i.Callee.(type) {
-				case *script.Identifier:
-					if def, ok := c.structs[callee.Value]; ok {
-						local.Owner = def.Name
-					}
-				default:
-					// todo reslove type from function, throw error if number returns void
-					return fmt.Errorf("unable to reslove type")
-				}
-
-			default: // arrays, structs, strings will be i32 for points
-				local.Type = "i32"
-			}
+			Name:  n.Name,
+			Type:  getWasmType(t),
+			Owner: t.Struct,
 		}
 
 		if slices.ContainsFunc(c.locals, func(a Local) bool {
@@ -595,6 +576,8 @@ func (c *Compiler) importModules(node *script.Program) error {
 				for _, imp := range n.Imports {
 					switch imp {
 					case "heapPtr":
+						c.globalVars = append(c.globalVars, "heapPtr")
+						// need to output the code for this at somepoint
 					default:
 						return fmt.Errorf("unknown import: %s", imp)
 					}
@@ -666,7 +649,9 @@ func (c *Compiler) prepass(node script.AstNode) {
 		def := &structDef{Name: n.Name, Methods: make(map[string]string), Fields: make([]structField, 0), Size: 0}
 
 		for _, param := range n.Fields {
-			wasmType, _ := resolveType(param.Type)
+			t := param.GetType()
+
+			wasmType := getWasmType(t)
 			size := sizeOf(wasmType)
 
 			def.Fields = append(def.Fields, structField{
@@ -718,7 +703,6 @@ func CompileProgram(program *script.Program) (string, error) {
 		// round this, if 1000 -> 1024
 		heapStart := int(math.Ceil(float64(c.dataPtr)/8) * 8)
 		c.emit(fmt.Sprintf("(global $heapPtr (mut i32) (i32.const %d))", heapStart))
-		c.globalVars = append(c.globalVars, "heapPtr")
 		//inject helper
 		if err := c.loadHelper("global.plex"); err != nil {
 			return "", err
