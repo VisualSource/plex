@@ -532,7 +532,119 @@ func (c *Compiler) Compile(node script.AstNode) error {
 					c.emit("i32.const 1")
 					c.emit("i32.add")
 					c.emit("i32.store")
+				case "remove":
+					elemType := getWasmType(t.Element)
+					elemSize := sizeOf(elemType)
 
+					// temp locals
+					arrTmp := fmt.Sprintf("__rem_arr_%d", c.tempVars)
+					idxTmp := fmt.Sprintf("__rem_idx_%d", c.tempVars)
+					retTmp := fmt.Sprintf("__rem_ret_%d", c.tempVars)
+					lenTmp := fmt.Sprintf("__rem_len_%d", c.tempVars)
+					curTmp := fmt.Sprintf("__rem_cur_%d", c.tempVars)
+					c.tempVars++
+					c.locals = append(c.locals,
+						Local{Name: arrTmp, Type: "i32"},
+						Local{Name: idxTmp, Type: "i32"},
+						Local{Name: retTmp, Type: elemType},
+						Local{Name: lenTmp, Type: "i32"},
+						Local{Name: curTmp, Type: "i32"},
+					)
+
+					// save array pointer
+					if err := c.Compile(callee.Object); err != nil {
+						return err
+					}
+					c.emit(fmt.Sprintf("local.set $%s", arrTmp))
+
+					// save index (compile arg[0], wrap i64→i32)
+					if err := c.Compile(n.Args[0]); err != nil {
+						return err
+					}
+					c.emit("i32.wrap_i64")
+					c.emit(fmt.Sprintf("local.set $%s", idxTmp))
+
+					// step 1: load and save the element to return
+					c.emit(fmt.Sprintf("local.get $%s", arrTmp))
+					c.emit("i32.const 4")
+					c.emit("i32.add")
+					c.emit(fmt.Sprintf("local.get $%s", idxTmp))
+					c.emit(fmt.Sprintf("i32.const %d", elemSize))
+					c.emit("i32.mul")
+					c.emit("i32.add")
+					c.emit(elemType + ".load")
+					c.emit(fmt.Sprintf("local.set $%s", retTmp))
+
+					// save new_len = old_len - 1
+					c.emit(fmt.Sprintf("local.get $%s", arrTmp))
+					c.emit("i32.load")
+					c.emit("i32.const 1")
+					c.emit("i32.sub")
+					c.emit(fmt.Sprintf("local.set $%s", lenTmp))
+
+					// init cursor = idx
+					c.emit(fmt.Sprintf("local.get $%s", idxTmp))
+					c.emit(fmt.Sprintf("local.set $%s", curTmp))
+
+					// step 2: shift loop (internal labels — NOT on break stack)
+					bl := fmt.Sprintf("$rem_break_%d", c.labelCount)
+					ll := fmt.Sprintf("$rem_loop_%d", c.labelCount)
+					c.labelCount++
+
+					c.emit(fmt.Sprintf("(block %s", bl))
+					c.depth++
+					c.emit(fmt.Sprintf("(loop %s", ll))
+					c.depth++
+
+					// exit check
+					c.emit(fmt.Sprintf("local.get $%s", curTmp))
+					c.emit(fmt.Sprintf("local.get $%s", lenTmp))
+					c.emit("i32.ge_s")
+					c.emit(fmt.Sprintf("br_if %s", bl))
+
+					// dst address: arr + 4 + cursor*elemSize
+					c.emit(fmt.Sprintf("local.get $%s", arrTmp))
+					c.emit("i32.const 4")
+					c.emit("i32.add")
+					c.emit(fmt.Sprintf("local.get $%s", curTmp))
+					c.emit(fmt.Sprintf("i32.const %d", elemSize))
+					c.emit("i32.mul")
+					c.emit("i32.add")
+
+					// src value: arr[cursor+1]
+					c.emit(fmt.Sprintf("local.get $%s", arrTmp))
+					c.emit("i32.const 4")
+					c.emit("i32.add")
+					c.emit(fmt.Sprintf("local.get $%s", curTmp))
+					c.emit("i32.const 1")
+					c.emit("i32.add")
+					c.emit(fmt.Sprintf("i32.const %d", elemSize))
+					c.emit("i32.mul")
+					c.emit("i32.add")
+					c.emit(elemType + ".load")
+
+					// store dst ← src
+					c.emit(elemType + ".store")
+
+					// cursor++
+					c.emit(fmt.Sprintf("local.get $%s", curTmp))
+					c.emit("i32.const 1")
+					c.emit("i32.add")
+					c.emit(fmt.Sprintf("local.set $%s", curTmp))
+					c.emit(fmt.Sprintf("br %s", ll))
+
+					c.depth--
+					c.emit(")") // end loop
+					c.depth--
+					c.emit(")") // end block
+
+					// step 3: decrement count
+					c.emit(fmt.Sprintf("local.get $%s", arrTmp))
+					c.emit(fmt.Sprintf("local.get $%s", lenTmp))
+					c.emit("i32.store")
+
+					// step 4: leave return value on stack
+					c.emit(fmt.Sprintf("local.get $%s", retTmp))
 				default:
 					return fmt.Errorf("array does not have a method of '%s'", callee.Field)
 				}

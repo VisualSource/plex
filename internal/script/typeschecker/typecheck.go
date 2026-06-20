@@ -235,9 +235,18 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 			return nil
 		}
 
-		n.SetType(leftType)
+		switch n.Operator {
+		case script.TokenType_AND, script.TokenType_OR:
+			t := &script.Type{
+				Kind: script.TypeKind_Bool,
+			}
 
-		return leftType
+			n.SetType(t)
+			return t
+		default:
+			n.SetType(leftType)
+			return leftType
+		}
 	case *script.ArrayLiteral:
 		var innerType *script.Type
 

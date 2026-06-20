@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 21 – arr.remove(i)</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat { color: #ffa657; }
+  .lbl { color: #4caf50; }
+  .mem { color: #ce93d8; }
+  .err { color: var(--accent); }
+  .ok  { color: var(--green); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; font-family: "Fira Code", monospace; font-size: 0.85em; }
+  tr:nth-child(even) { background: #111827; }
+  .step { display: grid; grid-template-columns: 2em 1fr; gap: 0 1em; margin: 1.2em 0; }
+  .step-num { color: var(--accent); font-weight: bold; font-size: 1.1em; padding-top: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 21 – <code>arr.remove(i)</code></h1>
+<p><em>Removing an element from an array means shifting everything after it one slot to the left — a compiler-generated loop inside a builtin.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>What <code>remove</code> must do</li>
+    <li>Why the return value must be saved before shifting</li>
+    <li>The shift loop in WAT — internal labels vs the break stack</li>
+    <li>Implementation sketch</li>
+    <li>Task — implement <code>arr.remove(i)</code></li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. What remove must do</h2>
+
+<p>Given <code>arr = [10, 20, 30, 40]</code> and <code>arr.remove(1)</code>, the array should become <code>[10, 30, 40]</code> and the function should return <code>20</code>.</p>
+
+<p>In terms of memory operations:</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div>Load and save the element at index <code>i</code> (the return value).</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div>Shift every element from <code>i+1</code> to <code>len-1</code> one slot to the left: <code>arr[j] = arr[j+1]</code>.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div>Decrement the count (stored at offset 0).</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div>Leave the saved element on the WAT value stack (the return value).</div>
+</div>
+
+<p>Memory before and after <code>remove(1)</code> on a <code>i64[]</code> (elemSize = 8):</p>
+
+<table>
+  <tr><th>Offset</th><th>Before</th><th>After</th></tr>
+  <tr><td>0</td><td>4  <span style="color:var(--muted)">(count)</span></td><td>3  <span style="color:var(--muted)">(count)</span></td></tr>
+  <tr><td>4</td><td>10 <span style="color:var(--muted)">(index 0)</span></td><td>10 <span style="color:var(--muted)">(index 0)</span></td></tr>
+  <tr><td>12</td><td>20 <span style="color:var(--muted)">(index 1 ← removed)</span></td><td>30 <span style="color:var(--muted)">(shifted from index 2)</span></td></tr>
+  <tr><td>20</td><td>30 <span style="color:var(--muted)">(index 2)</span></td><td>40 <span style="color:var(--muted)">(shifted from index 3)</span></td></tr>
+  <tr><td>28</td><td>40 <span style="color:var(--muted)">(index 3)</span></td><td>40 <span style="color:var(--muted)">(stale — count hides it)</span></td></tr>
+</table>
+
+<p>The stale element at offset 28 is never zeroed — it's hidden by the decremented count. Any subsequent read or append stays within the new count.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. Why the return value must be saved first</h2>
+
+<p>The shift loop overwrites <code>arr[i]</code> with <code>arr[i+1]</code>. If you start shifting before saving, the original element is gone. You must load it into a temp local <em>before</em> the first shift.</p>
+
+<pre><code><span class="cmt">;; WRONG — shifts first, then tries to load original</span>
+<span class="cmt">;; ... shift loop ...</span>
+<span class="wat">ELEM.load</span>   <span class="cmt">;; arr[i] now contains arr[i+1] — wrong value returned</span>
+
+<span class="cmt">;; CORRECT — load first, shift second</span>
+<span class="cmt">;; load arr[i] into a temp local</span>
+<span class="cmt">;; ... shift loop ...</span>
+<span class="cmt">;; push temp local as return value</span></code></pre>
+
+<p>This means you need two additional temp locals beyond the array pointer: one for the return value (element type) and one for the shift cursor (i32).</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. The shift loop in WAT</h2>
+
+<p>The shift is a simple counting loop. In plex pseudocode it looks like:</p>
+
+<pre><code><span class="kw">let</span> cursor = i;
+<span class="kw">while</span> cursor &lt; (old_len - 1) {
+    arr[cursor] = arr[cursor + 1];
+    cursor++;
+}</code></pre>
+
+<p>In WAT this becomes a <code>(block (loop …))</code> pair — the same structure as a compiled <code>while</code> statement. But there's one crucial difference: this loop is <strong>compiler-generated</strong>, not user-written. It must not interact with the user's break stack.</p>
+
+<div class="insight">
+  <strong>Internal vs user-visible labels</strong> — The break stack (<code>c.breakStack</code>) exists so that a user's <code>break</code> statement can escape the nearest enclosing while loop. A compiler-generated loop inside a builtin must use its own labels but must <em>not</em> push them onto the break stack. If it did, a <code>break</code> inside <code>remove</code> would try to escape the shift loop instead of the user's while loop. Use <code>c.labelCount</code> directly to allocate unique labels, without calling <code>pushBreakLabel</code>.
+</div>
+
+<pre><code><span class="cmt">;; allocate internal labels (do NOT push to breakStack)</span>
+shiftBreak := fmt.<span class="fn">Sprintf</span>(<span class="str">"$rem_break_%d"</span>, c.labelCount)
+shiftLoop  := fmt.<span class="fn">Sprintf</span>(<span class="str">"$rem_loop_%d"</span>, c.labelCount)
+c.labelCount++
+
+c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(block %s"</span>, shiftBreak))
+c.depth++
+c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(loop %s"</span>, shiftLoop))
+c.depth++
+
+<span class="cmt">;; ... shift body ...</span>
+
+c.depth--
+c.<span class="fn">emit</span>(<span class="str">")"</span>) <span class="cmt">// end loop</span>
+c.depth--
+c.<span class="fn">emit</span>(<span class="str">")"</span>) <span class="cmt">// end block</span></code></pre>
+
+<h3>The per-iteration copy</h3>
+
+<p>Each iteration copies one element: <code>arr[cursor] = arr[cursor+1]</code>. In WAT, <code>ELEM.store</code> consumes <code>(address, value)</code> from the stack. So you must push the <em>destination address</em> first, then load the <em>source value</em>:</p>
+
+<pre><code><span class="cmt">;; ── push destination address: ptr + 4 + cursor*elemSize ──</span>
+<span class="wat">local.get</span> $arr
+<span class="wat">i32.const 4</span>
+<span class="wat">i32.add</span>
+<span class="wat">local.get</span> $cursor
+<span class="wat">i32.const</span> <span class="mem">ELEM_SIZE</span>
+<span class="wat">i32.mul</span>
+<span class="wat">i32.add</span>
+
+<span class="cmt">;; ── push source value: arr[cursor+1] ──</span>
+<span class="wat">local.get</span> $arr
+<span class="wat">i32.const 4</span>
+<span class="wat">i32.add</span>
+<span class="wat">local.get</span> $cursor
+<span class="wat">i32.const 1</span>
+<span class="wat">i32.add</span>
+<span class="wat">i32.const</span> <span class="mem">ELEM_SIZE</span>
+<span class="wat">i32.mul</span>
+<span class="wat">i32.add</span>
+<span class="mem">ELEM_TYPE</span><span class="wat">.load</span>
+
+<span class="cmt">;; ── store (dst, value already on stack) ──</span>
+<span class="mem">ELEM_TYPE</span><span class="wat">.store</span></code></pre>
+
+<h3>Loop exit condition and cursor increment</h3>
+
+<pre><code><span class="cmt">;; exit if cursor >= old_len - 1</span>
+<span class="wat">local.get</span> $cursor
+<span class="wat">local.get</span> $new_len   <span class="cmt">;; = old_len - 1 (pre-computed)</span>
+<span class="wat">i32.ge_s</span>
+<span class="wat">br_if</span> <span class="lbl">$rem_break_N</span>
+
+<span class="cmt">;; ... copy instruction above ...</span>
+
+<span class="cmt">;; cursor++</span>
+<span class="wat">local.get</span> $cursor
+<span class="wat">i32.const 1</span>
+<span class="wat">i32.add</span>
+<span class="wat">local.set</span> $cursor
+
+<span class="wat">br</span> <span class="lbl">$rem_loop_N</span></code></pre>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>4. Full implementation sketch</h2>
+
+<p>Putting all four steps together:</p>
+
+<pre><code><span class="kw">case</span> <span class="str">"remove"</span>:
+    elemType := <span class="fn">getWasmType</span>(t.Element)
+    elemSize := <span class="fn">sizeOf</span>(elemType)
+
+    <span class="cmt">// temp locals</span>
+    arrTmp := fmt.<span class="fn">Sprintf</span>(<span class="str">"__rem_arr_%d"</span>, c.tempVars)
+    idxTmp := fmt.<span class="fn">Sprintf</span>(<span class="str">"__rem_idx_%d"</span>, c.tempVars)
+    retTmp := fmt.<span class="fn">Sprintf</span>(<span class="str">"__rem_ret_%d"</span>, c.tempVars)
+    lenTmp := fmt.<span class="fn">Sprintf</span>(<span class="str">"__rem_len_%d"</span>, c.tempVars)
+    curTmp := fmt.<span class="fn">Sprintf</span>(<span class="str">"__rem_cur_%d"</span>, c.tempVars)
+    c.tempVars++
+    c.locals = <span class="fn">append</span>(c.locals,
+        Local{Name: arrTmp, Type: <span class="str">"i32"</span>},
+        Local{Name: idxTmp, Type: <span class="str">"i32"</span>},
+        Local{Name: retTmp, Type: elemType},
+        Local{Name: lenTmp, Type: <span class="str">"i32"</span>},
+        Local{Name: curTmp, Type: <span class="str">"i32"</span>},
+    )
+
+    <span class="cmt">// save array pointer</span>
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(callee.Object); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.set $%s"</span>, arrTmp))
+
+    <span class="cmt">// save index (compile arg[0], wrap i64→i32)</span>
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Args[<span class="num">0</span>]); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    c.<span class="fn">emit</span>(<span class="str">"i32.wrap_i64"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.set $%s"</span>, idxTmp))
+
+    <span class="cmt">// step 1: load and save the element to return</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, arrTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 4"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, idxTmp))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"i32.const %d"</span>, elemSize))
+    c.<span class="fn">emit</span>(<span class="str">"i32.mul"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(elemType + <span class="str">".load"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.set $%s"</span>, retTmp))
+
+    <span class="cmt">// save new_len = old_len - 1</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, arrTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.load"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 1"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.sub"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.set $%s"</span>, lenTmp))
+
+    <span class="cmt">// init cursor = idx</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, idxTmp))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.set $%s"</span>, curTmp))
+
+    <span class="cmt">// step 2: shift loop (internal labels — NOT on break stack)</span>
+    bl := fmt.<span class="fn">Sprintf</span>(<span class="str">"$rem_break_%d"</span>, c.labelCount)
+    ll := fmt.<span class="fn">Sprintf</span>(<span class="str">"$rem_loop_%d"</span>, c.labelCount)
+    c.labelCount++
+
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(block %s"</span>, bl))
+    c.depth++
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(loop %s"</span>, ll))
+    c.depth++
+
+    <span class="cmt">// exit check</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, curTmp))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, lenTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.ge_s"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"br_if %s"</span>, bl))
+
+    <span class="cmt">// dst address: arr + 4 + cursor*elemSize</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, arrTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 4"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, curTmp))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"i32.const %d"</span>, elemSize))
+    c.<span class="fn">emit</span>(<span class="str">"i32.mul"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+
+    <span class="cmt">// src value: arr[cursor+1]</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, arrTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 4"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, curTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 1"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"i32.const %d"</span>, elemSize))
+    c.<span class="fn">emit</span>(<span class="str">"i32.mul"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(elemType + <span class="str">".load"</span>)
+
+    <span class="cmt">// store dst ← src</span>
+    c.<span class="fn">emit</span>(elemType + <span class="str">".store"</span>)
+
+    <span class="cmt">// cursor++</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, curTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 1"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.set $%s"</span>, curTmp))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"br %s"</span>, ll))
+
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)  <span class="cmt">// end loop</span>
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)  <span class="cmt">// end block</span>
+
+    <span class="cmt">// step 3: decrement count</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, arrTmp))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, lenTmp))
+    c.<span class="fn">emit</span>(<span class="str">"i32.store"</span>)
+
+    <span class="cmt">// step 4: leave return value on stack</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, retTmp))</code></pre>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Task</h2>
+
+<div class="task">
+  <strong>Task</strong>
+  <ol>
+    <li>Add the <code>"remove"</code> case inside the <code>TypeKind_Array</code> branch of the <code>FunctionCall → MemberAccess</code> compiler path.</li>
+    <li>Write a compiler test that creates a 3-element <code>i64[]</code>, removes index 1, checks the return value equals 20, and checks the new length is 2.</li>
+    <li>Write a second test that removes the first element (index 0) and verifies the remaining elements shifted correctly.</li>
+  </ol>
+</div>
+
+<h3>Suggested test program</h3>
+
+<pre><code><span class="kw">fn</span> <span class="fn">test</span>(): i64 {
+    <span class="kw">let</span> arr: i64[] = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>];
+    <span class="kw">let</span> removed = arr.<span class="fn">remove</span>(<span class="num">1</span>);
+    <span class="cmt">// arr is now [10, 30], removed == 20</span>
+    <span class="kw">return</span> removed;
+}</code></pre>
+
+<p>Expected return: <code>20</code>. Check <code>arr.len()</code> returns <code>2</code> and <code>arr[0]</code> returns <code>10</code>.</p>
+
+<div class="warn">
+  <strong>Out-of-bounds is still your problem</strong> — calling <code>arr.remove(i)</code> where <code>i &gt;= arr.len()</code> reads out of bounds memory and shifts garbage. The compiler doesn't check this; the WAT runtime doesn't either. A defensive caller should check first.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why must the element be loaded into a temp local <em>before</em> the shift loop starts?</p>
+    <label><input type="radio" name="q1" value="a"> a) WAT can only store a local.get on the stack once</label>
+    <label><input type="radio" name="q1" value="b"> b) The first shift iteration overwrites <code>arr[i]</code> with <code>arr[i+1]</code>, destroying the original value</label>
+    <label><input type="radio" name="q1" value="c"> c) The loop counter starts at <code>i</code>, so the load address changes</label>
+    <label><input type="radio" name="q1" value="d"> d) You need to return the value before the loop begins</label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. Why do we use <code>i32.wrap_i64</code> on the index argument before storing it in <code>$idx</code>?</p>
+    <label><input type="radio" name="q2" value="a"> a) Wrapping is required before every i32 store in WAT</label>
+    <label><input type="radio" name="q2" value="b"> b) Plex integers are i64; pointer arithmetic (i32.mul, i32.add) operates on i32 — the types must match</label>
+    <label><input type="radio" name="q2" value="c"> c) Because <code>arr.remove</code> takes an i32 argument according to the typechecker</label>
+    <label><input type="radio" name="q2" value="d"> d) To avoid overflow when the index is large</label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. The shift loop uses <code>c.labelCount</code> directly instead of <code>pushBreakLabel</code>. What goes wrong if it used <code>pushBreakLabel</code> instead?</p>
+    <label><input type="radio" name="q3" value="a"> a) The label counter would overflow</label>
+    <label><input type="radio" name="q3" value="b"> b) A user-level <code>break</code> inside a while loop that calls <code>arr.remove</code> would target the shift loop instead of escaping the while loop</label>
+    <label><input type="radio" name="q3" value="c"> c) The loop label would clash with the while loop label</label>
+    <label><input type="radio" name="q3" value="d"> d) Nothing — <code>pushBreakLabel</code> and direct use of <code>labelCount</code> are equivalent</label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. The shift loop exits when <code>cursor &gt;= new_len</code> (using <code>i32.ge_s</code>). Why <code>new_len</code> (= old_len − 1) rather than <code>old_len</code>?</p>
+    <label><input type="radio" name="q4" value="a"> a) We're shifting from <code>cursor</code> to <code>cursor+1</code>, so the last valid source is at <code>old_len − 1</code> (index <code>old_len − 2</code> if zero-based) — reading <code>cursor+1</code> when <code>cursor == old_len − 1</code> would be out-of-bounds</label>
+    <label><input type="radio" name="q4" value="b"> b) Because the count has already been decremented by the time the loop runs</label>
+    <label><input type="radio" name="q4" value="c"> c) To avoid an off-by-one in the cursor comparison</label>
+    <label><input type="radio" name="q4" value="d"> d) Because the last element is never moved — it just becomes stale</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+</div>
+
+<button onclick="checkQuiz()">Check answers</button>
+<div class="score-box" id="score" style="display:none"></div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>What comes next</h2>
+
+<p>With <code>remove</code> done, the array method trio is complete. The language now has all the basic collection operations a scripting language needs.</p>
+
+<p>The next interesting frontier is <strong>numeric type coercions</strong> — an <code>as</code> keyword that lets you convert between <code>i64</code>, <code>f64</code>, <code>i32</code>, and <code>f32</code>. WAT has precise instructions for each direction of conversion (<code>i64.extend_i32_s</code>, <code>i32.wrap_i64</code>, <code>f64.convert_i64_s</code>, <code>i64.trunc_f64_s</code>, …). Adding <code>as</code> requires changes in the parser, typechecker, and compiler — a good full-stack lesson.</p>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent. Good threads to pull: What would <code>arr.insert(i, v)</code> look like (shift right instead of left)? How would you detect out-of-bounds at runtime and trap?
+</p>
+
+<div class="nav">
+  <a href="0020-builtin-methods-len-append.html">← Lesson 20: len &amp; append</a>
+</div>
+
+<script>
+const answers = { q1:'b', q2:'b', q3:'b', q4:'a' };
+const explanations = {
+  q1: "Correct. The shift loop immediately writes arr[i+1] into arr[i]. After the first iteration the original element at index i is gone. Saving it to a local first is the only way to have it available as the return value after the loop completes.",
+  q2: "Correct. All plex integer expressions produce i64. WAT pointer arithmetic uses i32 instructions (i32.mul, i32.add). Mixing i64 with i32 instructions is a type error that wat2wasm will reject. i32.wrap_i64 truncates the low 32 bits — safe as long as array sizes fit in 32 bits, which is always true in a 32-bit WASM linear memory.",
+  q3: "Correct. pushBreakLabel puts the label on the break stack. A user-level break then emits br $break_N where N is the current top of the stack. If the shift loop's break label is on that stack, the user's break jumps into the shift loop's block instead of the user's while loop. Since break targets are resolved purely by stack position, the wrong block is escaped and the program produces incorrect results.",
+  q4: "Correct. When cursor = old_len − 1, the source element would be at arr[cursor + 1] = arr[old_len], which is one past the last valid element — out of bounds. The loop must stop at cursor = old_len − 2 (the last valid copy). Using new_len = old_len − 1 as the exclusive upper bound achieves exactly that."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => {
+      r.parentElement.classList.remove('correct','wrong');
+    });
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>

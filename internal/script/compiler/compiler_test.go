@@ -225,3 +225,23 @@ func TestArrayAppend(t *testing.T) {
 		},
 	}, func(ctx context.Context, r wazero.Runtime) {})
 }
+
+func TestArrayRemove(t *testing.T) {
+	src := `
+		fn test(): bool {
+			let s: int[] = [10,20,30];
+
+			let removed = s.remove(1);
+
+			return removed == 20 && s.len() == 2;
+		}
+	`
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "test",
+			args: []uint64{},
+			want: []uint64{1},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}
