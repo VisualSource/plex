@@ -45,10 +45,20 @@ func main() {
 			return
 		}
 
-		if err := os.WriteFile(name+".wat", []byte(result), 0666); err != nil {
-			fmt.Printf("error: %s", err.Error())
+		out := filepath.Join("./dist/", name+".wat")
+
+		f, err := os.Create(out)
+		if err != nil {
+			fmt.Println(err.Error())
 			return
 		}
+
+		defer f.Close()
+		if _, err := f.WriteString(result); err != nil {
+			fmt.Println(err.Error())
+		}
+
+		f.Sync()
 
 	default:
 		fmt.Printf("unknown output target: %s", output)

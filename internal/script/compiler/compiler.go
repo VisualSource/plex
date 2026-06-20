@@ -544,6 +544,11 @@ func (c *Compiler) loadHelper(name string) error {
 	if err != nil {
 		return err
 	}
+
+	if err := typeschecker.Check(helperAst); err != nil {
+		return err
+	}
+
 	if err := c.Compile(helperAst); err != nil {
 		return err
 	}
@@ -703,10 +708,12 @@ func CompileProgram(program *script.Program) (string, error) {
 		// round this, if 1000 -> 1024
 		heapStart := int(math.Ceil(float64(c.dataPtr)/8) * 8)
 		c.emit(fmt.Sprintf("(global $heapPtr (mut i32) (i32.const %d))", heapStart))
+		c.globalVars = append(c.globalVars, "heapPtr")
 		//inject helper
 		if err := c.loadHelper("global.plex"); err != nil {
 			return "", err
 		}
+
 	}
 
 	for _, stmt := range program.Stmts {

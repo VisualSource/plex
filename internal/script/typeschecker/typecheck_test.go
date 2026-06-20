@@ -10,7 +10,6 @@ import (
 )
 
 func TestCheck(t *testing.T) {
-
 	output, err := script.Parse(strings.NewReader(`
 		fn add(a: float, b: float): float { return a + b; }
 
@@ -49,7 +48,6 @@ func TestUsingImportVars(t *testing.T) {
 	}
 
 	pretty.Printf("%# v", output)
-
 }
 
 func TestStructImpl(t *testing.T) {
@@ -89,4 +87,30 @@ func TestStructImpl(t *testing.T) {
 	}
 
 	pretty.Printf("%# v", output)
+}
+
+func TestArray(t *testing.T) {
+	src := `
+	import print from "plex:console";
+
+		fn main(){
+			let a: int[] = [1,2];
+
+			let b: int = 1;
+
+			a[b];
+		}
+	`
+
+	output, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err = typeschecker.Check(output); err != nil {
+		t.Fatal(err)
+	}
+
+	pretty.Printf("%# v", output)
+
 }

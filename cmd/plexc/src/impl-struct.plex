@@ -18,7 +18,7 @@ impl Point {
 }
 
 fn main(){
-    let point = Point(1,1);
+    let point = Point(1.0,1.0);
 
     point.getX();
 }

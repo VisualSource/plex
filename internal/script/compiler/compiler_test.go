@@ -104,3 +104,34 @@ func TestAlloc(t *testing.T) {
 		t.Fatal("result != snapshot")
 	}
 }
+
+func TestArray(t *testing.T) {
+	src := `
+	fn main(){
+		let a: int[] = [1,2];
+
+		let b: int = 1;
+
+		a[b];
+	}
+	`
+
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := compiler.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	snapshot, err := os.ReadFile("testdata/struct.wat")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if result != string(snapshot) {
+		t.Fatal("result != snapshot")
+	}
+}

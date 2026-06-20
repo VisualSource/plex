@@ -1,3 +1,5 @@
+import print from "plex:console";
+
 fn greet(): string {
     let msg = "hello";
     return msg;

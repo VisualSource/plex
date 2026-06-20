@@ -5,5 +5,5 @@ fn main(){
 
     let b: int = 1;
 
-    print(a[b]);
+    a[b];
 }
