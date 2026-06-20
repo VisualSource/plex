@@ -225,12 +225,7 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 	case *script.BinaryExpression:
 		leftType := c.checkExpression(n.Left.(script.Expression))
 		rightType := c.checkExpression(n.Right.(script.Expression))
-		if leftType == nil || rightType == nil {
-			c.error(n, errors.New("left and right expression's types do not match"))
-			return nil
-		}
-
-		if leftType.Kind != rightType.Kind {
+		if !isSameType(leftType, rightType) {
 			c.error(n, errors.New("type for left and right do not match"))
 			return nil
 		}
@@ -430,6 +425,30 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 			c.error(n, fmt.Errorf("unknown callable"))
 			return nil
 		}
+	case *script.CastExpression:
+		targetType := c.checkExpression(n.TargetType)
+		if targetType == nil {
+			c.error(n, errors.New("failed to resolve type"))
+			return nil
+		}
+
+		srcType := c.checkStmt(n.Expr)
+		if srcType == nil {
+			c.error(n, errors.New("failed to resolve type"))
+			return nil
+		}
+
+		if !isNumeric(srcType) || !isNumeric(targetType) {
+			c.error(n, fmt.Errorf(
+				"cannot cast %s to %s: only numeric types are castable",
+				srcType,
+				targetType,
+			))
+			return nil
+		}
+
+		n.SetType(targetType)
+		return targetType
 	default:
 		c.error(n, fmt.Errorf("unhandled node %T", n))
 		return nil
@@ -655,6 +674,8 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		return c.checkExpression(n)
 	case *script.BreakStatement:
 		return nil
+	case *script.CastExpression:
+		return c.checkExpression(n)
 	default:
 		c.error(n, fmt.Errorf("unhandled node %T", n))
 		return nil

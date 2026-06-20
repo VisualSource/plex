@@ -340,9 +340,36 @@ func (p *Parser) parseUnary() (AstNode, error) {
 	return p.parsePostfix()
 }
 
-// power ::= unary ("**" power)?
+func (p *Parser) parseCast() (AstNode, error) {
+	expr, err := p.parseUnary()
+	if err != nil {
+		return nil, err
+	}
+
+	if !isKeyword(p.peek(), "as") {
+		return expr, nil
+	}
+	p.advance()
+
+	targetType, err := p.parseTypeExpr()
+	if err != nil {
+		return nil, err
+	}
+
+	start, _ := expr.Range()
+	_, end := targetType.Range()
+
+	return &CastExpression{
+		Start:      start,
+		End:        end,
+		Expr:       expr,
+		TargetType: targetType,
+	}, nil
+}
+
+// power ::= cast ("**" power)?
 func (p *Parser) parsePower() (AstNode, error) {
-	base, err := p.parseUnary()
+	base, err := p.parseCast()
 	if err != nil {
 		return nil, err
 	}

@@ -245,3 +245,20 @@ func TestArrayRemove(t *testing.T) {
 		},
 	}, func(ctx context.Context, r wazero.Runtime) {})
 }
+
+func TestCast(t *testing.T) {
+	src := `
+		fn main(): f64 {
+			let n: i64 = 7;
+			return (n as f64) / 2.0;
+		}
+	`
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "main",
+			args: []uint64{},
+			want: []uint64{api.EncodeF64(3.5)},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}

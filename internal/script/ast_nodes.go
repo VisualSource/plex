@@ -401,3 +401,16 @@ func (a *ArrayLiteral) SetType(t *Type) {
 func (a *ArrayLiteral) Range() (Position, Position) {
 	return a.Start, a.End
 }
+
+type CastExpression struct {
+	Start, End Position
+	Expr       AstNode
+	TargetType *TypeExpr
+	type_      *Type
+}
+
+func (c *CastExpression) SetType(t *Type) { c.type_ = t }
+func (c *CastExpression) GetType() *Type  { return c.type_ }
+func (c *CastExpression) Range() (Position, Position) {
+	return c.Start, c.End
+}

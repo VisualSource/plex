@@ -893,6 +893,18 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		c.depth--
 		c.emit(")")
+	case *script.CastExpression:
+		if err := c.Compile(n.Expr); err != nil {
+			return err
+		}
+
+		from := normaliseWasm(n.Expr.(script.Expression).GetType())
+		to := normaliseWasm(n.GetType())
+
+		instr := castInstruction(from, to)
+		if instr != "" {
+			c.emit(instr)
+		}
 
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)

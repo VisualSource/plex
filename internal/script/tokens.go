@@ -123,7 +123,7 @@ var delimMap = map[rune]TokenType{
 	']':  TokenType_BracketSquareClose,
 	'(':  TokenType_BracketParamOpen,
 	')':  TokenType_BracketParamClose,
-	'\\': TokenType_Div,
+	'/':  TokenType_Div,
 	'*':  TokenType_Star,
 	':':  TokenType_Colon,
 	',':  TokenType_Comma,

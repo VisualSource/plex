@@ -27,3 +27,39 @@ func sizeOf(value string) int {
 		return 8
 	}
 }
+
+func castInstruction(from, to string) string {
+	if from == to {
+		return "" // same type, no-op
+	}
+	key := from + "→" + to
+	return map[string]string{
+		"i32→i64": "i64.extend_i32_s",
+		"i64→i32": "i32.wrap_i64",
+		"i32→f32": "f32.convert_i32_s",
+		"i32→f64": "f64.convert_i32_s",
+		"i64→f32": "f32.convert_i64_s",
+		"i64→f64": "f64.convert_i64_s",
+		"f32→f64": "f64.promote_f32",
+		"f64→f32": "f32.demote_f64",
+		"f32→i32": "i32.trunc_f32_s",
+		"f32→i64": "i64.trunc_f32_s",
+		"f64→i32": "i32.trunc_f64_s",
+		"f64→i64": "i64.trunc_f64_s",
+	}[key]
+}
+
+func normaliseWasm(t *script.Type) string {
+	switch t.Kind {
+	case script.TypeKind_Int, script.TypeKind_I64:
+		return "i64"
+	case script.TypeKind_Float, script.TypeKind_F64:
+		return "f64"
+	case script.TypeKind_I32:
+		return "i32"
+	case script.TypeKind_F32:
+		return "f32"
+	default:
+		return ""
+	}
+}
