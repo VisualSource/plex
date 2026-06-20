@@ -18,6 +18,7 @@ const (
 	TypeKind_Struct
 	TypeKind_Void
 	TypeKind_Unknown
+	TypeKind_Bool
 )
 
 func (t TypeKind) String() string {
@@ -44,6 +45,8 @@ func (t TypeKind) String() string {
 		return "void"
 	case TypeKind_Unknown:
 		return "unknown"
+	case TypeKind_Bool:
+		return "bool"
 	default:
 		return fmt.Sprintf("TypeKind(%d)", t)
 	}

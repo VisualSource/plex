@@ -186,9 +186,23 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				continue
 			}
 			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
-		case '(', ')', ';', '*', '%', '?', ':', ',', '[', ']', '{', '}':
+		case '*':
+			start := NewPosition(t.row, t.col)
+			isNext, err := t.isNext('*')
+			if err != nil {
+				return nil, err
+			}
+			if isNext {
+				if err := t.stream.Discard(1); err != nil {
+					return nil, err
+				}
+				t.row++
+				t.tokens = append(t.tokens, NewDataToken(TokenType_Power, start, NewPosition(t.row, t.col)))
+				continue
+			}
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
+		case '(', ')', ';', '%', '?', ':', ',', '[', ']', '{', '}':
 			t.tokens = append(t.tokens, NewDataToken(delimMap[char], NewPosition(t.row, t.col), NewPosition(t.row, t.col)))
-
 		case '|':
 			next, err := t.isNext('|')
 			if err != nil {
@@ -408,7 +422,7 @@ func (t *Tokenizer) consumeIdent() error {
 	end := NewPosition(t.col, t.row)
 
 	switch value {
-	case "import", "break", "from", "let", "return", "while", "impl", "if", "else", "struct", "fn", "mut":
+	case "false", "true", "import", "break", "from", "let", "return", "while", "impl", "if", "else", "struct", "fn", "mut":
 		t.tokens = append(t.tokens, NewKeywordToken(value, start, end))
 	case "null", "int", "int64", "int32", "int16", "int8", "uint", "u64", "u32", "u16", "u8", "bool":
 		t.tokens = append(t.tokens, NewIdentToken(value, start, end))

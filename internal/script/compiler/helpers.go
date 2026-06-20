@@ -10,7 +10,7 @@ func getWasmType(tp *script.Type) string {
 		return "f64"
 	case script.TypeKind_F32:
 		return "f32"
-	case script.TypeKind_Array, script.TypeKind_Struct, script.TypeKind_String:
+	case script.TypeKind_Array, script.TypeKind_Struct, script.TypeKind_String, script.TypeKind_Bool:
 		return "i32"
 	default:
 		return "i32"

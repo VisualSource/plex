@@ -91,6 +91,7 @@ var tokenSymbol = map[TokenType]string{
 	TokenType_Question:           "?",
 	TokenType_FatArrow:           "=>",
 	TokenType_Number:             "#number",
+	TokenType_Power:              "**",
 }
 
 func (p *Parser) expect(tt TokenType) (Token, error) {
@@ -138,7 +139,7 @@ func (p *Parser) binaryExpr(builder func() (AstNode, error), check func(TokenTyp
 
 //#region Expressions
 
-// primary ::= NUMBER | STRING | IDENT | "(" expression ")"
+// primary ::= BOOLEAN | NUMBER | STRING | IDENT | "(" expression ")"
 func (p *Parser) parsePrimary() (AstNode, error) {
 	t := p.peek()
 	switch t.IsToken() {
@@ -148,6 +149,18 @@ func (p *Parser) parsePrimary() (AstNode, error) {
 	case TokenType_Ident:
 		tok := p.advance().(*ValueToken)
 		return NewIdentifier(tok.Value, tok.Start, tok.End), nil
+	case TokenType_Keyword:
+		tok := p.advance().(*ValueToken)
+
+		if tok.Value == "true" || tok.Value == "false" {
+			return &BooleanLiteral{
+				Start: tok.Start,
+				End:   tok.End,
+				Value: tok.Value == "true",
+			}, nil
+		}
+
+		return nil, fmt.Errorf("invalid keyword value %s", t)
 	case TokenType_String:
 		tok := p.advance().(*ValueToken)
 		return NewStringLiteral(tok.Value, tok.Start, tok.End), nil
@@ -327,9 +340,38 @@ func (p *Parser) parseUnary() (AstNode, error) {
 	return p.parsePostfix()
 }
 
-// factor ::= unary ( ( "*" | "/" | "%" ) unary )*
+// power ::= unary ("**" power)?
+func (p *Parser) parsePower() (AstNode, error) {
+	base, err := p.parseUnary()
+	if err != nil {
+		return nil, err
+	}
+
+	if p.peek().IsToken() != TokenType_Power {
+		return base, nil
+	}
+
+	op := p.advance()
+	exp, err := p.parsePower()
+	if err != nil {
+		return nil, err
+	}
+
+	start, _ := base.Range()
+	_, end := exp.Range()
+
+	return &BinaryExpression{
+		Start:    start,
+		End:      end,
+		Left:     base,
+		Right:    exp,
+		Operator: op.IsToken(),
+	}, nil
+}
+
+// factor ::= power ( ( "*" | "/" | "%" ) power )*
 func (p *Parser) parseFactor() (AstNode, error) {
-	return p.binaryExpr(p.parseUnary, func(tt TokenType) bool {
+	return p.binaryExpr(p.parsePower, func(tt TokenType) bool {
 		return tt == TokenType_Star || tt == TokenType_Div || tt == TokenType_Mod
 	})
 }

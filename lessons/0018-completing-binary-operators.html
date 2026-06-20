@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 18 – Completing the Binary Operator Set</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 840px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .wat  { color: #ffa657; }
+  .err  { color: var(--accent); }
+  .ok   { color: var(--green); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label input { margin-right: 8px; }
+  .reveal-btn { background: var(--accent); color: #fff; border: none; padding: 8px 18px; border-radius: 5px; cursor: pointer; font-size: 0.9em; margin-top: 10px; }
+  .answer { display: none; margin-top: 10px; padding: 10px 14px; background: #0e1e0e; border-left: 3px solid var(--green); border-radius: 0 5px 5px 0; font-size: 0.9em; color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); font-size: 0.9em; }
+  .tag { display: inline-block; background: var(--border); color: var(--blue); padding: 2px 9px; border-radius: 3px; font-size: 0.8em; margin-right: 4px; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 3px 0; }
+  .checklist li::before { content: "☐ "; color: var(--yellow); }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); padding: 8px 12px; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td code { border: none; background: none; padding: 0; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; letter-spacing: 0.05em; }
+  .compare > div pre { margin: 0; border: none; background: none; padding: 0; font-size: 0.85em; }
+  .stack { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; font-family: "Fira Code", monospace; font-size: 0.82em; margin: 0.8em 0; }
+  .stack .instr { color: var(--orange); }
+  .stack .state { color: var(--muted); margin-left: 16px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 18 — Completing the Binary Operator Set</h1>
+<p><span class="tag">compiler</span><span class="tag">WAT</span><span class="tag">comparisons</span><span class="tag">logical ops</span></p>
+
+<p>The plex tokenizer and parser already handle <code>&gt;</code>, <code>&gt;=</code>, <code>&lt;=</code>, <code>!=</code>, <code>&&</code>, <code>||</code>, and <code>%</code>. They parse and type-check correctly. They just fall through to the <code>default: return fmt.Errorf("unsupported operator")</code> in the compiler. This lesson plugs those gaps — and uncovers a genuine bug in <code>MemberAssignment</code> along the way.</p>
+
+<h2>1. Comparison Operators in WAT</h2>
+
+<p>WAT has a full set of comparison instructions. For signed 64-bit integers (<code>i64</code>):</p>
+
+<table>
+  <tr><th>plex</th><th>WAT instruction</th><th>Returns</th></tr>
+  <tr><td><code>a &lt; b</code></td><td><code>i64.lt_s</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a &gt; b</code></td><td><code>i64.gt_s</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a &lt;= b</code></td><td><code>i64.le_s</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a &gt;= b</code></td><td><code>i64.ge_s</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a == b</code></td><td><code>i64.eq</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a != b</code></td><td><code>i64.ne</code></td><td><code>i32</code></td></tr>
+</table>
+
+<p>And for <code>f64</code> (note: no <code>_s</code> suffix — floats don't have signed/unsigned variants):</p>
+
+<table>
+  <tr><th>plex</th><th>WAT instruction</th><th>Returns</th></tr>
+  <tr><td><code>a &gt; b</code></td><td><code>f64.gt</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a &gt;= b</code></td><td><code>f64.ge</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a &lt;= b</code></td><td><code>f64.le</code></td><td><code>i32</code></td></tr>
+  <tr><td><code>a != b</code></td><td><code>f64.ne</code></td><td><code>i32</code></td></tr>
+</table>
+
+<h3>The i32 return type quirk</h3>
+
+<p>Notice the "Returns" column: every comparison instruction, regardless of operand types, returns <code>i32</code> — either <code>0</code> (false) or <code>1</code> (true). This is a deliberate WAT design choice: there is no boolean type in the type system. Booleans are just integers.</p>
+
+<p>This is fine for <code>if</code> and <code>while</code> (which just pop an <code>i32</code> condition), but it means you currently can't store a comparison result in a plex variable — the typechecker would call it an <code>int</code> (i64) but WAT left an <code>i32</code> on the stack. Plex doesn't have a <code>bool</code> type yet, so this is a known limitation, not a bug to fix today.</p>
+
+<div class="insight">
+  <strong>WAT design note:</strong> Most ISAs have a similar property — ARM has condition flags, x86 has ZF/CF/etc., RISC-V has conditional branches but no explicit boolean register. WAT chose to standardise on <code>i32</code> as the condition type for all control flow, keeping the type system simple.
+</div>
+
+<p>In <code>compiler.go</code>, the existing <code>BinaryExpression</code> switch already has cases for <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>&lt;</code>, and <code>==</code>. You need to add the remaining six operators. The suffix logic follows the same pattern as the existing <code>&lt;</code> and <code>==</code> cases: for integers, append <code>_s</code> to signed comparison instructions; for floats, no suffix.</p>
+
+<pre><code><span class="cmt">// existing cases for reference:</span>
+<span class="kw">case</span> script.TokenType_LessThen:
+    ltOp := prefix + <span class="str">".lt"</span>
+    <span class="kw">if</span> prefix == <span class="str">"i32"</span> || prefix == <span class="str">"i64"</span> {
+        ltOp += <span class="str">"_s"</span>
+    }
+    c.emit(ltOp)
+<span class="kw">case</span> script.TokenType_EqualEqual:
+    c.emit(prefix + <span class="str">".eq"</span>)  <span class="cmt">// eq has no _s suffix</span></code></pre>
+
+<p>The six new cases follow the same structure. <code>!=</code> maps to <code>.ne</code> (no <code>_s</code> needed — equality and inequality are sign-agnostic at the bit level). <code>&gt;</code>, <code>&gt;=</code>, <code>&lt;=</code> all need <code>_s</code> for integers.</p>
+
+<p>While you're there, add <code>%</code> too — it maps to <code>.rem_s</code> for integers and <code>.div</code> doesn't apply for floats (WAT has no <code>f64.rem</code>; floating-point remainder is unusual, so you can error on it).</p>
+
+<h2>2. Logical Operators: &amp;&amp; and ||</h2>
+
+<p>WAT has no logical AND or OR instructions. What it has are <em>bitwise</em> instructions: <code>i32.and</code> and <code>i32.or</code>. For booleans (0 and 1), bitwise and logical are equivalent:</p>
+
+<table>
+  <tr><th>a</th><th>b</th><th>a &amp;&amp; b (logical)</th><th>a &amp; b (bitwise)</th></tr>
+  <tr><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+  <tr><td>0</td><td>1</td><td>0</td><td>0</td></tr>
+  <tr><td>1</td><td>0</td><td>0</td><td>0</td></tr>
+  <tr><td>1</td><td>1</td><td>1</td><td>1</td></tr>
+</table>
+
+<p>Since WAT comparisons always produce 0 or 1, this works correctly whenever <code>&amp;&amp;</code> and <code>||</code> are used to combine comparison results (which is the common case).</p>
+
+<div class="warn">
+  <strong>No short-circuit evaluation</strong>
+  In most languages, <code>a &amp;&amp; b</code> only evaluates <code>b</code> if <code>a</code> is true. In WAT with <code>i32.and</code>, both operands are pushed onto the stack before the instruction executes — there is no short-circuit. This means code like <code>ptr != 0 &amp;&amp; ptr.field &gt; 0</code> would still dereference <code>ptr</code> even when it's null, because both sub-expressions are compiled and run before the <code>and</code>. Plex doesn't have pointers yet, so this won't bite you today. When it matters, you'd need to rewrite using nested <code>if</code> statements instead.
+</div>
+
+<p>In the compiler, since both operands of <code>&amp;&amp;</code>/<code>||</code> are comparison results (type: <code>i32</code>), always emit <code>i32.and</code> / <code>i32.or</code> regardless of the <code>prefix</code>:</p>
+
+<pre><code><span class="kw">case</span> script.TokenType_AND:
+    c.emit(<span class="str">"i32.and"</span>)
+<span class="kw">case</span> script.TokenType_OR:
+    c.emit(<span class="str">"i32.or"</span>)</code></pre>
+
+<h2>3. The MemberAssignment Bug</h2>
+
+<p>Read the <code>*script.MemberAssignment</code> case in <code>compiler.go</code> carefully. It:</p>
+<ol>
+  <li>Compiles the object → puts the struct's base pointer on the stack</li>
+  <li>Looks up the field's offset in the struct definition</li>
+  <li>Emits <code>i32.const &lt;offset&gt;</code> and <code>i32.add</code> → stack now has the field address</li>
+  <li>Emits <code>&lt;type&gt;.store</code></li>
+</ol>
+
+<p>But a WAT <code>store</code> instruction pops <em>two</em> values from the stack: the address and the value to store. The generated code only has the address — the value to store is never compiled. The WAT would be invalid.</p>
+
+<div class="stack">
+  <div><span class="cmt">;; What the current code emits for point.x = 2.0</span></div>
+  <div><span class="instr">local.get $point</span>  <span class="state">→ stack: [ptr]</span></div>
+  <div><span class="instr">i32.const 0</span>       <span class="state">→ stack: [ptr, 0]</span></div>
+  <div><span class="instr">i32.add</span>           <span class="state">→ stack: [field-addr]</span></div>
+  <div><span class="instr">f64.store</span>         <span class="state">→ <span class="err">TRAP: stack underflow — needs [addr, value], only has [addr]</span></span></div>
+</div>
+
+<div class="stack">
+  <div><span class="cmt">;; What it should emit</span></div>
+  <div><span class="instr">local.get $point</span>  <span class="state">→ stack: [ptr]</span></div>
+  <div><span class="instr">i32.const 0</span>       <span class="state">→ stack: [ptr, 0]</span></div>
+  <div><span class="instr">i32.add</span>           <span class="state">→ stack: [field-addr]</span></div>
+  <div><span class="instr">f64.const 2.0</span>     <span class="state">→ stack: [field-addr, 2.0]  ← THIS IS MISSING</span></div>
+  <div><span class="instr">f64.store</span>         <span class="state">→ stack: []  ✓</span></div>
+</div>
+
+<p>The fix is a single line: call <code>c.Compile(n.Value)</code> immediately before the <code>emit(store)</code>.</p>
+
+<p>There's also a secondary issue: the existing code uses a local variable lookup (<code>for _, i := range c.locals</code>) to get the struct type name. But <code>n.Object</code> is an <code>AstNode</code> with a type already set by the typechecker. You can cast it to <code>script.Expression</code> and call <code>GetType()</code> directly — exactly what <code>MemberAccess</code> does. This is cleaner and handles cases where the object isn't a bare identifier (e.g., a method call result).</p>
+
+<hr>
+
+<div class="quiz-section">
+  <h3>Check Your Understanding</h3>
+
+  <div class="q">
+    <p>1. <code>i64.gt_s</code> takes two <code>i64</code> operands. What does it leave on the stack?</p>
+    <label><input type="radio" name="q1"> An <code>i64</code> — 0 or 1</label>
+    <label><input type="radio" name="q1"> An <code>i32</code> — 0 or 1</label>
+    <label><input type="radio" name="q1"> A boolean type unique to WAT</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ An <code>i32</code>. All WAT comparison instructions return <code>i32</code> (0 or 1) regardless of operand type. WAT has no boolean type — booleans are always represented as <code>i32</code> values. The suffix <code>_s</code> describes how the operands are interpreted (signed), not the result type.</div>
+  </div>
+
+  <div class="q">
+    <p>2. Why does <code>!=</code> map to <code>i64.ne</code> (no <code>_s</code> suffix) while <code>&gt;</code> maps to <code>i64.gt_s</code>?</p>
+    <label><input type="radio" name="q2"> <code>!=</code> is a newer instruction that handles both signed and unsigned automatically</label>
+    <label><input type="radio" name="q2"> Equality/inequality compare bit patterns directly — the sign interpretation doesn't matter. Order comparisons (&gt;, &lt;, etc.) do depend on sign.</label>
+    <label><input type="radio" name="q2"> WAT doesn't support unsigned <code>!=</code></label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ Equality and inequality test whether two bit patterns are identical. -1 in two's complement is <code>0xFFFFFFFF…</code> — the same bit pattern interpreted as signed -1 or unsigned max. So equality is sign-agnostic and needs no <code>_s</code>/<code>_u</code> suffix. Greater-than comparison depends on sign: -1 &gt; 0 when signed (true), but 0xFFFF… &gt; 0 when unsigned (also true, for different reasons). For plex integers you want signed semantics, so <code>_s</code>.</div>
+  </div>
+
+  <div class="q">
+    <p>3. Why must the value be compiled <em>after</em> the address computation in a struct field store?</p>
+    <label><input type="radio" name="q3"> WAT stores are always evaluated right-to-left</label>
+    <label><input type="radio" name="q3"> <code>*.store</code> pops address then value in that order — address must be on the stack before value is pushed</label>
+    <label><input type="radio" name="q3"> The value might reference the struct, so it needs the address first</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ WAT's store instruction pops the address first (deeper in the stack), then the value (top of stack). So the sequence must be: compile the address expression → it lands deeper in the stack; compile the value expression → it lands on top; <code>store</code> pops both and writes. If you compiled value before address, the stack order would be wrong and WAT validation would fail.</div>
+  </div>
+</div>
+
+<hr>
+
+<h2>Your Tasks</h2>
+
+<div class="task">
+  <strong>Task 1 — Add missing comparison operators</strong>
+  In the <code>BinaryExpression</code> switch in <code>compiler.go</code>, add cases for:
+  <ul class="checklist">
+    <li><code>TokenType_GreaterThen</code> → <code>.gt_s</code> (integers) / <code>.gt</code> (floats)</li>
+    <li><code>TokenType_GreaterThenOrEqaul</code> → <code>.ge_s</code> / <code>.ge</code></li>
+    <li><code>TokenType_LessThenOrEqual</code> → <code>.le_s</code> / <code>.le</code></li>
+    <li><code>TokenType_NotEqual</code> → <code>.ne</code> (no <code>_s</code> needed)</li>
+    <li><code>TokenType_Mod</code> → <code>.rem_s</code> for integers; return an error for floats</li>
+  </ul>
+  Compile and run this program to verify:
+  <pre><code>fn max(a: int, b: int): int {
+    if a > b { return a; }
+    return b;
+}
+
+fn clamp(x: int, lo: int, hi: int): int {
+    if x < lo { return lo; }
+    if x > hi { return hi; }
+    return x;
+}</code></pre>
+  Check: <code>max(3, 7) == 7</code>, <code>clamp(5, 1, 4) == 4</code>, <code>clamp(2, 1, 4) == 2</code>.
+</div>
+
+<div class="task">
+  <strong>Task 2 — Add logical operators</strong>
+  Add cases for <code>TokenType_AND</code> → <code>i32.and</code> and <code>TokenType_OR</code> → <code>i32.or</code>.
+  <p>Test with a combined condition:</p>
+  <pre><code>fn between(x: int, lo: int, hi: int): int {
+    if x >= lo && x <= hi { return 1; }
+    return 0;
+}</code></pre>
+  Check: <code>between(3, 1, 5) == 1</code>, <code>between(6, 1, 5) == 0</code>.
+</div>
+
+<div class="task">
+  <strong>Task 3 — Fix MemberAssignment</strong>
+  Find the <code>*script.MemberAssignment</code> case in <code>compiler.go</code>. Add the missing <code>c.Compile(n.Value)</code> call immediately before the <code>emit(store)</code> line. Then refactor the struct type lookup to use <code>n.Object.(script.Expression).GetType()</code> instead of the local variable scan — this is what <code>MemberAccess</code> already does.
+  <p>Test with:</p>
+  <pre><code>struct Point {
+    x: float;
+    y: float;
+}
+
+fn main(): float {
+    let p = Point(1.0, 2.0);
+    p.x = 10.0;
+    return p.x;
+}</code></pre>
+  Expected: <code>main() == 10</code>.
+</div>
+
+<div class="task">
+  <strong>Task 4 — Update snapshots</strong>
+  Run <code>go test ./internal/script/compiler/...</code>. If any snapshot tests fail, inspect the diff — the changes should only affect files that use the operators you added. Update snapshots with <code>go test ./... -update</code> (or whatever the update flag is in this repo's test setup).
+</div>
+
+<hr>
+
+<h2>Going Deeper</h2>
+
+<ul>
+  <li><a href="https://webassembly.github.io/spec/core/text/instructions.html#numeric-instructions" target="_blank">WAT Spec: Numeric Instructions</a> — full table of all comparison, arithmetic, and conversion instructions</li>
+  <li><a href="https://webassembly.github.io/spec/core/text/instructions.html#memory-instructions" target="_blank">WAT Spec: Memory Instructions</a> — store/load operand order</li>
+  <li><a href="https://en.wikipedia.org/wiki/Short-circuit_evaluation" target="_blank">Short-circuit evaluation (Wikipedia)</a> — why most languages don't evaluate both sides of <code>&amp;&amp;</code></li>
+</ul>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em;">
+  Questions? Ask your agent — it can walk through any of these WAT instructions with you, show you how <code>wat2wasm</code> validates types, or debug any WAT that <code>wat-decompile</code> spits out.
+</p>
+
+<div class="nav">
+  <a href="0017-unary-operators-and-if-format.html">← Lesson 17: Unary Operators and the WAT If Format</a>
+  <span>Lesson 18</span>
+</div>
+
+</body>
+</html>

@@ -227,7 +227,8 @@ func TestParser_Parse(t *testing.T) {
 					Stmts
 						IfStatement
 							Condition
-								Identifier(true)
+								BooleanLiteral
+									Value(true)
 							Body
 								Block
 									Stmts
@@ -242,7 +243,8 @@ func TestParser_Parse(t *testing.T) {
 					Stmts
 						IfStatement
 							Condition
-								Identifier(true)
+								BooleanLiteral
+									Value(true)
 							Body
 								Block
 									Stmts
@@ -259,14 +261,15 @@ func TestParser_Parse(t *testing.T) {
 					Stmts
 						IfStatement
 							Condition
-								Identifier(true)
+								BooleanLiteral
+									Value(true)
 							Body
 								Block
 									Stmts
 							Else
 								IfStatement
 									Condition
-										Identifier(false)
+										BooleanLiteral
 									Body
 										Block
 											Stmts

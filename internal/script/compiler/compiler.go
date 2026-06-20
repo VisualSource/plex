@@ -76,7 +76,17 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		prefix := getWasmType(t)
 
 		c.emit(prefix+".const", n.Value)
+	case *script.BooleanLiteral:
+		switch n.Value {
+		case true:
+			c.emit("i32.const 1")
+			return nil
+		case false:
+			c.emit("i32.const 0")
+			return nil
+		}
 	case *script.Identifier:
+
 		if !slices.ContainsFunc(c.locals, func(e Local) bool {
 			return e.Name == n.Value
 		}) && !slices.Contains(c.globalVars, n.Value) {
@@ -186,6 +196,36 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			c.emit(ltOp)
 		case script.TokenType_EqualEqual:
 			c.emit(prefix + ".eq")
+		case script.TokenType_NotEqual:
+			c.emit(prefix + ".ne")
+		case script.TokenType_GreaterThen:
+			ltOp := prefix + ".gt"
+			if prefix == "i32" || prefix == "i64" {
+				ltOp += "_s"
+			}
+			c.emit(ltOp)
+		case script.TokenType_GreaterThenOrEqaul:
+			ltOp := prefix + ".ge"
+			if prefix == "i32" || prefix == "i64" {
+				ltOp += "_s"
+			}
+			c.emit(ltOp)
+		case script.TokenType_LessThenOrEqual:
+			ltOp := prefix + ".le"
+			if prefix == "i32" || prefix == "i64" {
+				ltOp += "_s"
+			}
+			c.emit(ltOp)
+		case script.TokenType_Mod:
+			if prefix == "f32" || prefix == "f64" {
+				return fmt.Errorf("unsupported operation on floating point")
+			}
+
+			c.emit(prefix + ".rem_s")
+		case script.TokenType_AND:
+			c.emit("i32.and")
+		case script.TokenType_OR:
+			c.emit("i32.or")
 		default:
 			return fmt.Errorf("unsupported operator %v", n.Operator)
 		}
@@ -562,31 +602,30 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return err
 		}
 
-		// TODO: update this so that we can resolve from arrays and the like
-		id, ok := n.Object.(*script.Identifier)
+		target, ok := n.Object.(script.Expression)
 		if !ok {
-			return fmt.Errorf("unable to resolve struct")
-		}
-		var stype string
-		for _, i := range c.locals {
-			if i.Name == id.Value {
-				stype = i.Owner
-				break
-			}
+			return fmt.Errorf("unable to resolve type for member assignment")
 		}
 
-		if stype == "" {
-			return fmt.Errorf("compile: failed to resolve struct type")
+		t := target.GetType()
+		if t.Kind != script.TypeKind_Struct {
+			return fmt.Errorf("assignment on non struct type %s", t)
 		}
+
 		// resolve struct name
-		def, ok := c.structs[stype]
+		def, ok := c.structs[t.Struct]
 		if !ok {
-			return fmt.Errorf("compile: unknown struct %q for member access", id.Value)
+			return fmt.Errorf("compile: unknown struct %s for member access", t)
 		}
 		for _, field := range def.Fields {
 			if field.Name == n.Field {
 				c.emit(fmt.Sprintf("i32.const %d", field.Offset))
 				c.emit("i32.add")
+
+				if err := c.Compile(n.Value); err != nil {
+					return err
+				}
+
 				c.emit(fmt.Sprintf("%s.store", field.Type))
 				return nil
 			}

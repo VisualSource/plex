@@ -12,6 +12,7 @@ import (
 
 var (
 	astNodeType   = reflect.TypeOf((*script.AstNode)(nil)).Elem()
+	paramType     = reflect.TypeOf((*script.Parameter)(nil)).Elem()
 	tokenTypeType = reflect.TypeOf(script.TokenType(0))
 )
 
@@ -58,6 +59,10 @@ func writeNode(b *strings.Builder, v reflect.Value, depth int) {
 	}
 
 	typeName := v.Type().Name()
+	switch typeName {
+	case "TypeExpr":
+		typeName = "Type"
+	}
 
 	type field struct {
 		name string
@@ -65,7 +70,7 @@ func writeNode(b *strings.Builder, v reflect.Value, depth int) {
 	}
 	var fields []field
 	for _, sf := range reflect.VisibleFields(v.Type()) {
-		if sf.Name == "Start" || sf.Name == "End" {
+		if sf.Name == "Start" || sf.Name == "End" || sf.Name == "type_" {
 			continue
 		}
 		fields = append(fields, field{sf.Name, v.FieldByIndex(sf.Index)})
@@ -98,7 +103,7 @@ func writeField(b *strings.Builder, name string, fv reflect.Value, depth int) {
 		if !fv.IsNil() {
 			writeNode(b, fv, depth+1)
 		}
-	case fv.Kind() == reflect.Slice && fv.Type().Elem() == astNodeType:
+	case fv.Kind() == reflect.Slice && (fv.Type().Elem() == astNodeType || fv.Type().Elem().Implements(astNodeType)):
 		writeIndent(b, depth)
 		b.WriteString(name)
 		b.WriteByte('\n')
@@ -138,6 +143,21 @@ func writeField(b *strings.Builder, name string, fv reflect.Value, depth int) {
 		b.WriteByte('(')
 		b.WriteString(sym)
 		b.WriteString(")\n")
+	case fv.Kind() == reflect.Pointer && fv.Type().Implements(astNodeType):
+		writeIndent(b, depth)
+		b.WriteString(name)
+		b.WriteByte('\n')
+		if !fv.IsNil() {
+			writeNode(b, fv, depth+1)
+		}
+	case fv.Kind() == reflect.Int:
+		if fv.Int() != 0 {
+			writeIndent(b, depth)
+			b.WriteString(name)
+			b.WriteByte('(')
+			fmt.Fprintf(b, "%d", fv.Int())
+			b.WriteString(")\n")
+		}
 	default:
 		panic(fmt.Sprintf("formatAst: unhandled field %s (kind=%s type=%s)", name, fv.Kind(), fv.Type()))
 	}

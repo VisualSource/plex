@@ -56,6 +56,22 @@ func (b *BinaryExpression) Range() (Position, Position) {
 	return b.Start, b.End
 }
 
+type BooleanLiteral struct {
+	Start, End Position
+	Value      bool
+	type_      *Type
+}
+
+func (m *BooleanLiteral) SetType(t *Type) {
+	m.type_ = t
+}
+func (m *BooleanLiteral) GetType() *Type {
+	return m.type_
+}
+func (m *BooleanLiteral) Range() (Position, Position) {
+	return m.Start, m.End
+}
+
 type NumberLiteral struct {
 	Start, End Position
 	Value      string

@@ -22,7 +22,6 @@ const (
 	TokenType_Star
 	TokenType_Div
 	TokenType_Mod
-	TokenType_Char
 	TokenType_String
 	TokenType_Ident
 	TokenType_Question
@@ -39,7 +38,81 @@ const (
 	TokenType_OR
 	TokenType_AND
 	TokenType_Number
+	TokenType_Power
 )
+
+func (t TokenType) String() string {
+	switch t {
+	case TokenType_BracketCurlyOpen:
+		return "{"
+	case TokenType_BracketCulryClose:
+		return "}"
+	case TokenType_BracketSquareOpen:
+		return "["
+	case TokenType_BracketSquareClose:
+		return "]"
+	case TokenType_BracketParamOpen:
+		return "("
+	case TokenType_BracketParamClose:
+		return ")"
+	case TokenType_Semicolon:
+		return ";"
+	case TokenType_Colon:
+		return ":"
+	case TokenType_Comma:
+		return ","
+	case TokenType_Dot:
+		return "."
+	case TokenType_Keyword:
+		return "#keyword"
+	case TokenType_Plus:
+		return "+"
+	case TokenType_Minus:
+		return "-"
+	case TokenType_Star:
+		return "*"
+	case TokenType_Div:
+		return "/"
+	case TokenType_Mod:
+		return "%"
+	case TokenType_String:
+		return "#string"
+	case TokenType_Ident:
+		return "#ident"
+	case TokenType_Question:
+		return "?"
+	case TokenType_Equal:
+		return "="
+	case TokenType_FatArrow:
+		return "=>"
+	case TokenType_LessThen:
+		return "<"
+	case TokenType_GreaterThen:
+		return ">"
+	case TokenType_LessThenOrEqual:
+		return "<="
+	case TokenType_GreaterThenOrEqaul:
+		return ">="
+	case TokenType_Incrment:
+		return "++"
+	case TokenType_Decrement:
+		return "--"
+	case TokenType_NotEqual:
+		return "!="
+	case TokenType_EqualEqual:
+		return "=="
+	case TokenType_OR:
+		return "||"
+	case TokenType_AND:
+		return "&&"
+	case TokenType_Number:
+		return "#number"
+	case TokenType_Power:
+		return "**"
+	default:
+		return fmt.Sprintf("TokenType(%d)", t)
+	}
+}
 
 var delimMap = map[rune]TokenType{
 	'.':  TokenType_Dot,

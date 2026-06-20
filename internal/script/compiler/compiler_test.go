@@ -1,12 +1,13 @@
 package compiler_test
 
 import (
-	"os"
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/VisualSource/plex/internal/script"
 	"github.com/VisualSource/plex/internal/script/compiler"
+	"github.com/tetratelabs/wazero"
 )
 
 func TestCompilerFunctionCall(t *testing.T) {
@@ -41,6 +42,20 @@ func TestCompilerFunctionCall(t *testing.T) {
 	}
 }
 
+func TestBools(t *testing.T) {
+	src := `
+		fn getTrue(): bool {
+			return true;
+		}
+
+		fn getTrue(): bool {
+			return false;
+		}
+	`
+
+	validateFromSnapshot(t, src, "bool_test.wat")
+}
+
 func TestStructGenAndCtor(t *testing.T) {
 	src := `
 		struct Point { x: float; y: float; }
@@ -54,24 +69,7 @@ func TestStructGenAndCtor(t *testing.T) {
 		}
 	`
 
-	ast, err := script.Parse(strings.NewReader(src))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := compiler.CompileProgram(ast)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	snapshot, err := os.ReadFile("testdata/struct.wat")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if result != string(snapshot) {
-		t.Fatal("result != snapshot")
-	}
+	validateFromSnapshot(t, src, "struct.wat")
 }
 
 func TestAlloc(t *testing.T) {
@@ -85,24 +83,7 @@ func TestAlloc(t *testing.T) {
 		}
 	`
 
-	ast, err := script.Parse(strings.NewReader(src))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result, err := compiler.CompileProgram(ast)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	snapshot, err := os.ReadFile("testdata/alloc.wat")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if result != string(snapshot) {
-		t.Fatal("result != snapshot")
-	}
+	validateFromSnapshot(t, src, "alloc.wat")
 }
 
 func TestArray(t *testing.T) {
@@ -115,23 +96,33 @@ func TestArray(t *testing.T) {
 		a[b];
 	}
 	`
+	validateFromSnapshot(t, src, "array.wat")
+}
 
-	ast, err := script.Parse(strings.NewReader(src))
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestOperators(t *testing.T) {
+	src := `
+		fn max(a: int, b: int): int {
+			if a > b { return a; }
+			return b;
+		}
 
-	result, err := compiler.CompileProgram(ast)
-	if err != nil {
-		t.Fatal(err)
-	}
+		fn clamp(x: int, lo: int, hi: int): int {
+			if x < lo { return lo; }
+			if x > hi { return hi; }
+			return x;
+		}
+		`
 
-	snapshot, err := os.ReadFile("testdata/array.wat")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if result != string(snapshot) {
-		t.Fatal("result != snapshot")
-	}
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "max",
+			args: []uint64{1, 2},
+			want: []uint64{2},
+		},
+		{
+			fn:   "clamp",
+			args: []uint64{5, 0, 4},
+			want: []uint64{4},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
 }

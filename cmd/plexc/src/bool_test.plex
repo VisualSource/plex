@@ -1,0 +1,7 @@
+fn getTrue(): bool {
+	return true;
+}
+
+fn getTrue(): bool {
+	return false;
+}

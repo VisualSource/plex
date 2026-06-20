@@ -113,6 +113,8 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 			kind = script.TypeKind_String
 		case "void":
 			kind = script.TypeKind_Void
+		case "bool":
+			kind = script.TypeKind_Bool
 		default:
 			if _, ok := c.structs[n.Name]; ok {
 				kind = script.TypeKind_Struct
@@ -180,6 +182,14 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 		n.SetType(ft)
 
 		return ft
+	case *script.BooleanLiteral:
+		t := &script.Type{
+			Kind: script.TypeKind_Bool,
+		}
+
+		n.SetType(t)
+
+		return t
 	case *script.NumberLiteral:
 		var t *script.Type
 		if strings.Contains(n.Value, ".") || strings.Contains(n.Value, "e") || strings.Contains(n.Value, "E") {
@@ -252,7 +262,7 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 		n.SetType(t)
 		return t
 	case *script.UnaryExpression:
-		t := c.checkExpression(n.Operand.(script.Expression))
+		t := c.checkExpression(n.Operand)
 
 		n.SetType(t)
 		return t
@@ -615,6 +625,8 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 			c.checkFunction(methodDef, method)
 		}
 		return nil
+	case *script.BooleanLiteral:
+		return c.checkExpression(n)
 	case *script.ArrayLiteral:
 		return c.checkExpression(n)
 	case *script.ArrayAccess:

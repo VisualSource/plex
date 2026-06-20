@@ -1,11 +1,11 @@
 package script_test
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/VisualSource/plex/internal/script"
+	"github.com/kr/pretty"
 )
 
 func Test_Tokenizer(t *testing.T) {
@@ -23,6 +23,7 @@ func Test_Tokenizer(t *testing.T) {
 	
 	  d
 	*/
+	true false
 	`
 	tokenizer := script.NewTokenizer(strings.NewReader(comments))
 
@@ -31,10 +32,5 @@ func Test_Tokenizer(t *testing.T) {
 		t.Fatalf("%v", err)
 	}
 
-	bytes, err := json.MarshalIndent(tokens, "", "")
-	if err != nil {
-		panic(err)
-	}
-
-	t.Logf("%s", string(bytes))
+	pretty.Printf("%# v", tokens)
 }
