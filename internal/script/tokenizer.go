@@ -145,7 +145,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				t.row++
 				t.tokens = append(t.tokens, NewDataToken(TokenType_FatArrow, start, NewPosition(t.row, t.col)))
 				continue
-			case next[0] == '+':
+			case next[0] == '=':
 
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
