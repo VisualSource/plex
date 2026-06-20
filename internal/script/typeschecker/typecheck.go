@@ -674,6 +674,8 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		return c.checkExpression(n)
 	case *script.BreakStatement:
 		return nil
+	case *script.ContinueStatement:
+		return nil
 	case *script.CastExpression:
 		return c.checkExpression(n)
 	default:

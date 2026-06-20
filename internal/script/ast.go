@@ -559,6 +559,8 @@ func (p *Parser) parseStatement() (AstNode, error) {
 		return p.parseReturnStatement()
 	case isKeyword(t, "break"):
 		return p.parseBreakStatement()
+	case isKeyword(t, "continue"):
+		return p.parseContinueStatement()
 	default:
 		return p.parseExprStmt()
 	}
@@ -1043,6 +1045,23 @@ func (p *Parser) parseBreakStatement() (AstNode, error) {
 		Start: start,
 		End:   end,
 	}, nil
+}
+
+func (p *Parser) parseContinueStatement() (AstNode, error) {
+	start, _ := p.advance().Range()
+
+	tok, err := p.expect(TokenType_Semicolon)
+	if err != nil {
+		return nil, err
+	}
+
+	_, end := tok.Range()
+
+	return &ContinueStatement{
+		Start: start,
+		End:   end,
+	}, nil
+
 }
 
 //#endregion

@@ -375,6 +375,14 @@ func (r *BreakStatement) Range() (Position, Position) {
 	return r.Start, r.End
 }
 
+type ContinueStatement struct {
+	Start, End Position
+}
+
+func (r *ContinueStatement) Range() (Position, Position) {
+	return r.Start, r.End
+}
+
 type MemberAssignment struct {
 	Start, End Position
 	Object     AstNode

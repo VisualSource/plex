@@ -262,3 +262,28 @@ func TestCast(t *testing.T) {
 		},
 	}, func(ctx context.Context, r wazero.Runtime) {})
 }
+
+func TestContinue(t *testing.T) {
+	src := `
+        fn sum_evens(): i64 {
+            let mut i: i64 = 0;
+            let mut sum: i64 = 0;
+            while i < 10 {
+                i = i + 1;
+                if (i % 2) != 0 {
+                    continue;
+                }
+                sum = sum + i;
+            }
+            return sum;
+        }
+    `
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "sum_evens",
+			args: []uint64{},
+			want: []uint64{30},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}

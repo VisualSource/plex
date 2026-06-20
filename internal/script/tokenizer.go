@@ -422,7 +422,7 @@ func (t *Tokenizer) consumeIdent() error {
 	end := NewPosition(t.col, t.row)
 
 	switch value {
-	case "as", "false", "true", "import", "break", "from", "let", "return", "while", "impl", "if", "else", "struct", "fn", "mut":
+	case "continue", "as", "false", "true", "import", "break", "from", "let", "return", "while", "impl", "if", "else", "struct", "fn", "mut":
 		t.tokens = append(t.tokens, NewKeywordToken(value, start, end))
 	case "null", "int", "int64", "int32", "int16", "int8", "uint", "u64", "u32", "u16", "u8", "bool":
 		t.tokens = append(t.tokens, NewIdentToken(value, start, end))

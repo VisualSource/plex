@@ -36,8 +36,9 @@ type Compiler struct {
 	inTransaction bool
 	transaction   strings.Builder
 
-	labelCount int
-	breakStack []string
+	labelCount    int
+	breakStack    []string
+	continueStack []string
 }
 
 func (c *Compiler) pushBreakLabel() (string, string) {
@@ -46,15 +47,20 @@ func (c *Compiler) pushBreakLabel() (string, string) {
 
 	c.labelCount++
 	c.breakStack = append(c.breakStack, bl)
+	c.continueStack = append(c.continueStack, ll)
 
 	return bl, ll
 }
 func (c *Compiler) popBreakLabel() {
 	c.labelCount--
 	c.breakStack = c.breakStack[:len(c.breakStack)-1]
+	c.continueStack = c.continueStack[:len(c.continueStack)-1]
 }
 func (c *Compiler) currentBreakLabel() string {
 	return c.breakStack[len(c.breakStack)-1]
+}
+func (c *Compiler) currentContinueLabel() string {
+	return c.continueStack[len(c.continueStack)-1]
 }
 
 func (c *Compiler) startTransaction() {
@@ -435,6 +441,11 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 
 		c.emit(fmt.Sprintf("br %s", c.currentBreakLabel()))
+	case *script.ContinueStatement:
+		if len(c.continueStack) == 0 {
+			return fmt.Errorf("continue outside of loop")
+		}
+		c.emit(fmt.Sprintf("br %s", c.currentContinueLabel()))
 	case *script.FunctionCall:
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:
