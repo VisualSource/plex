@@ -97,11 +97,13 @@ func main() {
 			}
 			defer module.Close(ctx)
 
-			_, err = module.ExportedFunction("main").Call(ctx)
+			rr, err := module.ExportedFunction("double").Call(ctx, 2.0)
 			if err != nil {
 				fmt.Printf("error: %s", err.Error())
 				return
 			}
+
+			fmt.Printf("%v\n", rr)
 
 			/*fmt.Printf("string offset: %d\n", result[0])
 			offset := api.DecodeU32(result[0])

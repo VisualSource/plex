@@ -282,6 +282,18 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			if err := c.Compile(stmt); err != nil {
 				return err
 			}
+
+			if expr, ok := stmt.(script.Expression); ok {
+				t := expr.GetType()
+				if t != nil && t.Kind != script.TypeKind_Void {
+					switch stmt.(type) {
+					case *script.VariableDeclaration, *script.ReturnStatement:
+						// these don't need drop, return is return and variable use local.set
+					default:
+						c.emit("drop")
+					}
+				}
+			}
 		}
 	case *script.Program:
 		for _, stmt := range n.Stmts {
@@ -698,8 +710,9 @@ func CompileProgram(program *script.Program) (string, error) {
 	c.depth++
 
 	c.importModules(program)
+	// collect struct/arrays/ dyn strings
 
-	if len(c.strings) > 0 {
+	if c.needsHeap || len(c.strings) > 0 {
 		c.emit("(memory 1)")
 
 		for _, entry := range c.strings {
@@ -710,18 +723,17 @@ func CompileProgram(program *script.Program) (string, error) {
 		}
 
 		c.emit("(export \"memory\" (memory 0))")
-	}
 
-	// collect struct/arrays/ dyn strings
+		if c.needsHeap {
 
-	if c.needsHeap {
-		// round this, if 1000 -> 1024
-		heapStart := int(math.Ceil(float64(c.dataPtr)/8) * 8)
-		c.emit(fmt.Sprintf("(global $heapPtr (mut i32) (i32.const %d))", heapStart))
-		c.globalVars = append(c.globalVars, "heapPtr")
-		//inject helper
-		if err := c.loadHelper("global.plex"); err != nil {
-			return "", err
+			// round this, if 1000 -> 1024
+			heapStart := int(math.Ceil(float64(c.dataPtr)/8) * 8)
+			c.emit(fmt.Sprintf("(global $heapPtr (mut i32) (i32.const %d))", heapStart))
+			c.globalVars = append(c.globalVars, "heapPtr")
+			//inject helper
+			if err := c.loadHelper("global.plex"); err != nil {
+				return "", err
+			}
 		}
 
 	}

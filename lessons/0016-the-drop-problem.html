@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 16 – The Drop Problem: Stack-Balanced Code Generation</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 840px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .wat  { color: #ffa657; }
+  .err  { color: var(--accent); }
+  .ok   { color: var(--green); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label input { margin-right: 8px; }
+  .reveal-btn { background: var(--accent); color: #fff; border: none; padding: 8px 18px; border-radius: 5px; cursor: pointer; font-size: 0.9em; margin-top: 10px; }
+  .answer { display: none; margin-top: 10px; padding: 10px 14px; background: #0e1e0e; border-left: 3px solid var(--green); border-radius: 0 5px 5px 0; font-size: 0.9em; color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); font-size: 0.9em; }
+  .tag { display: inline-block; background: var(--border); color: var(--blue); padding: 2px 9px; border-radius: 3px; font-size: 0.8em; margin-right: 4px; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 3px 0; }
+  .checklist li::before { content: "☐ "; color: var(--yellow); }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); padding: 8px 12px; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: "Fira Code", monospace; font-size: 0.85em; }
+  td:first-child { font-family: Georgia, serif; font-size: 0.9em; }
+  .stack-diagram { display: flex; gap: 20px; align-items: flex-end; margin: 1.4em 0; }
+  .stack-col { text-align: center; min-width: 120px; }
+  .stack-col .label { font-size: 0.8em; color: var(--muted); margin-bottom: 6px; font-style: italic; }
+  .stack-box { background: var(--surface); border: 1px solid var(--border); padding: 6px 10px; border-radius: 4px; margin-top: 4px; font-family: "Fira Code", monospace; font-size: 0.82em; }
+  .stack-box.highlight { border-color: var(--accent); background: #1e0a10; color: var(--accent); }
+  .stack-box.ok { border-color: var(--green); background: #0e1e0e; color: var(--green); }
+  .stack-arrow { font-size: 1.8em; color: var(--muted); padding-bottom: 10px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; letter-spacing: 0.05em; }
+  .compare > div pre { margin: 0; border: none; background: none; padding: 0; font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 16 — The Drop Problem: Stack-Balanced Code Generation</h1>
+<p><span class="tag">compiler</span><span class="tag">WAT</span><span class="tag">stack machine</span><span class="tag">validation</span></p>
+
+<p>Compile this plex program right now:</p>
+
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>(){
+    <span class="num">1</span> + <span class="num">1</span>;
+}</code></pre>
+
+<pre><code>go run ./cmd/plexc -file cmd/plexc/src/simple.plex</code></pre>
+
+<p>The WAT output looks fine — clean, readable. Now validate it:</p>
+
+<pre><code>wat2wasm cmd/plexc/dist/simple.wat -o /tmp/simple.wasm</code></pre>
+
+<pre><code class="err">simple.wat:1:45: error: type mismatch at end of function,
+    expected [] but got [i64]</code></pre>
+
+<p>The compiler produced invalid WebAssembly. A program that would never execute. This is the drop problem.</p>
+
+<h2>1. WebAssembly Is a Stack Machine</h2>
+
+<p>A WebAssembly function body is a sequence of instructions operating on an implicit <strong>value stack</strong>. Every instruction either pushes values onto it, pops values from it, or does both.</p>
+
+<table>
+  <tr><th>Instruction</th><th>Pops</th><th>Pushes</th></tr>
+  <tr><td><code>i64.const 5</code></td><td>—</td><td>i64</td></tr>
+  <tr><td><code>i64.add</code></td><td>i64, i64</td><td>i64</td></tr>
+  <tr><td><code>local.set $x</code></td><td>i64</td><td>—</td></tr>
+  <tr><td><code>call $getX</code> (returns f64)</td><td>params</td><td>f64</td></tr>
+  <tr><td><code>drop</code></td><td>any (1 value)</td><td>—</td></tr>
+</table>
+
+<p>At the end of a function, the stack must contain exactly the function's declared return values — nothing more, nothing less. For a <code>(func $main)</code> with no result, the stack at exit must be <em>empty</em>.</p>
+
+<p>WebAssembly validators check this statically before execution. There is no "run it and see".</p>
+
+<h3>What happens with <code>1 + 1;</code></h3>
+
+<div class="stack-diagram">
+  <div class="stack-col">
+    <div class="label">after i64.const 1</div>
+    <div class="stack-box">i64</div>
+  </div>
+  <div class="stack-arrow">→</div>
+  <div class="stack-col">
+    <div class="label">after i64.const 1</div>
+    <div class="stack-box">i64</div>
+    <div class="stack-box">i64</div>
+  </div>
+  <div class="stack-arrow">→</div>
+  <div class="stack-col">
+    <div class="label">after i64.add</div>
+    <div class="stack-box highlight">i64 ← leaked</div>
+  </div>
+  <div class="stack-arrow">→</div>
+  <div class="stack-col">
+    <div class="label">end of $main</div>
+    <div class="stack-box highlight">i64 ← error!</div>
+  </div>
+</div>
+
+<p>The result of <code>1 + 1</code> is computed and left on the stack. Nobody consumes it. The function ends with one value on the stack when it declared zero. The validator rejects it.</p>
+
+<h2>2. Expression vs Statement Context</h2>
+
+<p>In plex (and most languages), the same syntax can appear in two different positions:</p>
+
+<ul>
+  <li><strong>Expression context</strong>: the value is <em>used</em> — <code>let x = point.getX();</code></li>
+  <li><strong>Statement context</strong>: the value is <em>discarded</em> — <code>point.getX();</code></li>
+</ul>
+
+<p>In expression context, the caller consumes the value. In statement context, no one does — the value must be explicitly dropped.</p>
+
+<p>The plex parser doesn't create an <code>ExpressionStatement</code> wrapper node. It returns the expression itself as the statement. So when the compiler's <code>Block</code> case iterates over <code>n.Stmts</code>, it sees a raw <code>*FunctionCall</code> or <code>*BinaryExpression</code> with no indication that it's in statement position.</p>
+
+<h2>3. The <code>drop</code> Instruction</h2>
+
+<p>WAT has exactly one instruction for this: <a href="https://webassembly.github.io/spec/core/syntax/instructions.html#syntax-instr-parametric" target="_blank"><code>drop</code></a>. It pops one value from the stack and discards it, regardless of type.</p>
+
+<div class="compare">
+  <div>
+    <h4 class="err">❌ Invalid</h4>
+    <pre><code>(func $main
+  i64.const 1
+  i64.const 1
+  i64.add
+  ;; i64 is left on stack
+  ;; function expects []
+)</code></pre>
+  </div>
+  <div>
+    <h4 class="ok">✅ Valid</h4>
+    <pre><code>(func $main
+  i64.const 1
+  i64.const 1
+  i64.add
+  drop
+  ;; stack is now empty
+  ;; function expects []
+)</code></pre>
+  </div>
+</div>
+
+<h2>4. Where to Emit the Drop</h2>
+
+<p>The fix lives in the compiler's <code>Block</code> case. After compiling each statement, check: did it push a value that nobody is going to consume?</p>
+
+<p>The logic you need:</p>
+<ol>
+  <li>Does the statement implement <code>script.Expression</code> (i.e., does it have a type)?</li>
+  <li>Is that type non-nil and non-void?</li>
+  <li>If both yes: emit <code>drop</code>.</li>
+</ol>
+
+<pre><code><span class="kw">case</span> *script.Block:
+    <span class="kw">for</span> _, stmt := <span class="kw">range</span> n.Stmts {
+        <span class="kw">if</span> err := c.Compile(stmt); err != nil {
+            <span class="kw">return</span> err
+        }
+        <span class="cmt">// If the statement left a value on the stack, discard it</span>
+        <span class="kw">if</span> expr, ok := stmt.(script.Expression); ok {
+            t := expr.GetType()
+            <span class="kw">if</span> t != nil && t.Kind != script.TypeKind_Void {
+                c.emit(<span class="str">"drop"</span>)
+            }
+        }
+    }</code></pre>
+
+<p>This works because the AST hierarchy is precise about what is an <code>Expression</code>:</p>
+
+<table>
+  <tr><th>Node type</th><th>Implements Expression?</th><th>Needs drop?</th></tr>
+  <tr><td>FunctionCall</td><td>yes</td><td>yes, if return type is non-void</td></tr>
+  <tr><td>BinaryExpression</td><td>yes</td><td>yes</td></tr>
+  <tr><td>MemberAccess</td><td>yes</td><td>yes</td></tr>
+  <tr><td>ArrayAccess</td><td>yes</td><td>yes</td></tr>
+  <tr><td>TernaryExpression</td><td>yes</td><td>yes</td></tr>
+  <tr><td>AssignmentExpression</td><td><strong>no</strong></td><td>no — compiler ends with local.set</td></tr>
+  <tr><td>MemberAssignment</td><td><strong>no</strong></td><td>no — compiler ends with .store</td></tr>
+  <tr><td>IfStatement</td><td><strong>no</strong></td><td>no</td></tr>
+  <tr><td>WhileStatement</td><td><strong>no</strong></td><td>no</td></tr>
+</table>
+
+<h3>Two special cases to be aware of</h3>
+
+<p><code>VariableDeclaration</code> implements <code>Expression</code> (it has <code>GetType()</code>) — but the compiler ends <code>VariableDeclaration</code> with <code>local.set</code>, which already consumes the value. Emitting an extra <code>drop</code> here would be wrong — you'd be trying to drop when the stack is already empty.</p>
+
+<p><code>ReturnStatement</code> also implements <code>Expression</code>. But after compiling <code>return</code>, the function exits. Any <code>drop</code> after it would be unreachable dead code.</p>
+
+<p>You need to exclude both from the drop logic. There are two clean approaches:</p>
+
+<p><strong>Option A — explicit exclusion</strong>:</p>
+<pre><code><span class="kw">switch</span> stmt.(type) {
+<span class="kw">case</span> *script.VariableDeclaration, *script.ReturnStatement:
+    <span class="cmt">// compiler already balances stack for these</span>
+<span class="kw">default</span>:
+    <span class="kw">if</span> expr, ok := stmt.(script.Expression); ok {
+        t := expr.GetType()
+        <span class="kw">if</span> t != nil && t.Kind != script.TypeKind_Void {
+            c.emit(<span class="str">"drop"</span>)
+        }
+    }
+}</code></pre>
+
+<p><strong>Option B — check type after compiling</strong> (equivalent, more compact):</p>
+<pre><code><span class="kw">if</span> expr, ok := stmt.(script.Expression); ok {
+    t := expr.GetType()
+    <span class="kw">if</span> t != nil && t.Kind != script.TypeKind_Void {
+        <span class="kw">switch</span> stmt.(type) {
+        <span class="kw">case</span> *script.VariableDeclaration, *script.ReturnStatement:
+            <span class="cmt">// already balanced</span>
+        <span class="kw">default</span>:
+            c.emit(<span class="str">"drop"</span>)
+        }
+    }
+}</code></pre>
+
+<div class="insight">
+  <strong>Design observation:</strong> The fact that <code>VariableDeclaration</code> implements <code>Expression</code> is a bit accidental — it got <code>GetType()</code>/<code>SetType()</code> so the typechecker could annotate it, but it doesn't produce a value in the stack-machine sense. This is a common friction point: the AST interface hierarchy and the stack discipline don't always align. The explicit exclusion is the honest way to handle it.
+</div>
+
+<h2>5. Verifying with <code>wat2wasm</code></h2>
+
+<p>After the fix, you can use <code>wat2wasm</code> as a ground-truth validator. It parses and validates WAT against the WebAssembly spec before converting to binary:</p>
+
+<pre><code>go run ./cmd/plexc -file cmd/plexc/src/simple.plex
+wat2wasm cmd/plexc/dist/simple.wat -o /tmp/simple.wasm
+<span class="ok"># should produce no output (success)</span>
+
+go run ./cmd/plexc -file cmd/plexc/src/impl-struct.plex
+wat2wasm cmd/plexc/dist/impl-struct.wat -o /tmp/impl-struct.wasm
+<span class="ok"># should produce no output (success)</span></code></pre>
+
+<p>If <code>wat2wasm</code> is happy, you know the output is structurally valid WebAssembly — which is a stronger guarantee than "it compiles".</p>
+
+<hr>
+
+<div class="quiz-section">
+  <h3>Check Your Understanding</h3>
+
+  <div class="q">
+    <p>1. A plex void function calls another void function: <code>printResult();</code>. After the fix, does it emit <code>drop</code>?</p>
+    <label><input type="radio" name="q1"> Yes — all function calls need drop</label>
+    <label><input type="radio" name="q1"> No — <code>call $printResult</code> pushes nothing when return type is void</label>
+    <label><input type="radio" name="q1"> It depends on the runtime</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ No drop. <code>FunctionCall.GetType()</code> returns a <code>Void</code> type. The check <code>t.Kind != TypeKind_Void</code> is false, so no <code>drop</code> is emitted. The stack stays balanced automatically.</div>
+  </div>
+
+  <div class="q">
+    <p>2. Why can't you emit <code>drop</code> after compiling a <code>VariableDeclaration</code>?</p>
+    <label><input type="radio" name="q2"> Because WAT doesn't allow <code>drop</code> after <code>local.set</code></label>
+    <label><input type="radio" name="q2"> Because the compiler already emits <code>local.set</code> which pops the value — the stack is already empty</label>
+    <label><input type="radio" name="q2"> Because <code>VariableDeclaration</code> doesn't implement <code>Expression</code></label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ The compiler ends VariableDeclaration with <code>local.set $name</code> which pops the initializer value. The stack is already empty. Emitting <code>drop</code> after that would try to pop from an empty stack — another WAT validation error.</div>
+  </div>
+
+  <div class="q">
+    <p>3. In what sense is this fix "type-directed"?</p>
+    <label><input type="radio" name="q3"> The fix only works for typed languages</label>
+    <label><input type="radio" name="q3"> The compiler uses the type annotation on the expression node to decide whether to emit <code>drop</code></label>
+    <label><input type="radio" name="q3"> It's not type-directed — it's structural</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ The compiler reads <code>expr.GetType()</code> — the type the typechecker annotated on the node — to decide if a value is on the stack. If the type is void, no value was pushed. If it's non-void, one was. This is another payoff of the annotated AST.</div>
+  </div>
+</div>
+
+<hr>
+
+<h2>Your Tasks</h2>
+
+<div class="task">
+  <strong>Task 1 — Add the drop logic to the Block compiler case</strong>
+  In <code>compiler.go</code>, find the <code>*script.Block</code> case and add the drop check after each statement is compiled. Use the explicit exclusion pattern for <code>VariableDeclaration</code> and <code>ReturnStatement</code>.
+  <ul class="checklist">
+    <li>Compile <code>simple.plex</code> and run <code>wat2wasm</code> on the output — it should pass validation</li>
+    <li>Compile <code>impl-struct.plex</code> and run <code>wat2wasm</code> — it should pass</li>
+    <li>Run all compiler Go tests — they should still pass</li>
+  </ul>
+</div>
+
+<div class="task">
+  <strong>Task 2 — Update the affected snapshots</strong>
+  The drop fix will change the output of <code>array.wat</code> (the <code>a[b];</code> statement now needs a drop). Update the snapshot to match.
+  <ul class="checklist">
+    <li>Run <code>go test ./internal/script/compiler/...</code> and note which snapshots fail</li>
+    <li>For each failure, capture the new output and update the <code>.wat</code> file</li>
+    <li>Confirm all four compiler tests pass</li>
+  </ul>
+</div>
+
+<div class="task">
+  <strong>Task 3 — Stretch: compile and run a real program</strong>
+  Once the WAT is valid, you can actually run it. Write a small Node.js script that instantiates the compiled <code>simple.wasm</code> and calls <code>main()</code>:
+  <pre><code><span class="cmt">// run.js</span>
+<span class="kw">const</span> fs = require(<span class="str">'fs'</span>);
+<span class="kw">const</span> wasm = fs.readFileSync(<span class="str">'/tmp/simple.wasm'</span>);
+WebAssembly.instantiate(wasm, {}).then(({ instance }) => {
+    instance.exports.main();
+    console.log(<span class="str">'ran ok'</span>);
+});</code></pre>
+  Then try <code>test.plex</code> (the add/double functions) — call <code>instance.exports.add(3.0, 4.0)</code> and verify you get <code>7</code>.
+</div>
+
+<hr>
+
+<h2>Going Deeper</h2>
+
+<ul>
+  <li><a href="https://webassembly.github.io/spec/core/valid/instructions.html#parametric-instructions" target="_blank">WebAssembly Spec: Parametric Instructions</a> — formal definition of <code>drop</code></li>
+  <li><a href="https://webassembly.github.io/spec/core/appendix/algorithm.html" target="_blank">WAT Validation Algorithm</a> — how validators check stack balance statically</li>
+  <li><a href="https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format" target="_blank">MDN: WAT Text Format</a> — a readable introduction to the stack machine model</li>
+</ul>
+
+<hr>
+
+<p><em>💬 Ask me anything — if you're unsure whether a particular plex construct needs a drop, or want to understand how LLVM handles this same problem for native code, just ask.</em></p>
+
+<div class="nav">
+  <a href="0015-type-directed-code-generation.html">← Lesson 15: Type-Directed Code Gen</a>
+  <a href="../reference/">Reference docs →</a>
+</div>
+
+</body>
+</html>
