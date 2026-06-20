@@ -8,6 +8,7 @@ import (
 	"github.com/VisualSource/plex/internal/script"
 	"github.com/VisualSource/plex/internal/script/compiler"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 )
 
 func TestCompilerFunctionCall(t *testing.T) {
@@ -146,6 +147,27 @@ func TestBreak(t *testing.T) {
 			fn:   "find_first",
 			args: []uint64{10},
 			want: []uint64{5},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}
+
+func TestTernary(t *testing.T) {
+	src := `
+	fn abs(x: int): int {
+		return x > 0 ? x : 0 - x;
+	}
+	`
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "abs",
+			args: []uint64{api.EncodeI64(-7)},
+			want: []uint64{7},
+		},
+		{
+			fn:   "abs",
+			args: []uint64{3},
+			want: []uint64{3},
 		},
 	}, func(ctx context.Context, r wazero.Runtime) {})
 }

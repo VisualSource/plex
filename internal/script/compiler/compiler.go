@@ -681,6 +681,38 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		}
 		c.implBlock = ""
+	case *script.TernaryExpression:
+		t := n.GetType()
+		if t == nil {
+			return fmt.Errorf("ternary: not type set")
+		}
+
+		if err := c.Compile(n.Condition); err != nil {
+			return err
+		}
+
+		wasmType := getWasmType(t)
+		c.emit(fmt.Sprintf("(if (result %s)", wasmType))
+		c.depth++
+
+		c.emit("(then")
+		c.depth++
+		if err := c.Compile(n.TrueBlock); err != nil {
+			return err
+		}
+		c.depth--
+		c.emit(")")
+
+		c.emit("(else")
+		c.depth++
+		if err := c.Compile(n.FalseBlock); err != nil {
+			return err
+		}
+		c.depth--
+		c.emit(")")
+
+		c.depth--
+		c.emit(")")
 
 	default:
 		return fmt.Errorf("compile: unhandled %T", node)
