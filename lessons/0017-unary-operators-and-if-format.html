@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 17 – Unary Operators and the WAT If Format</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 840px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .wat  { color: #ffa657; }
+  .err  { color: var(--accent); }
+  .ok   { color: var(--green); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label input { margin-right: 8px; }
+  .reveal-btn { background: var(--accent); color: #fff; border: none; padding: 8px 18px; border-radius: 5px; cursor: pointer; font-size: 0.9em; margin-top: 10px; }
+  .answer { display: none; margin-top: 10px; padding: 10px 14px; background: #0e1e0e; border-left: 3px solid var(--green); border-radius: 0 5px 5px 0; font-size: 0.9em; color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); font-size: 0.9em; }
+  .tag { display: inline-block; background: var(--border); color: var(--blue); padding: 2px 9px; border-radius: 3px; font-size: 0.8em; margin-right: 4px; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 3px 0; }
+  .checklist li::before { content: "☐ "; color: var(--yellow); }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); padding: 8px 12px; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  td:first-child { font-family: Georgia, serif; }
+  td code { border: none; background: none; padding: 0; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; letter-spacing: 0.05em; }
+  .compare > div pre { margin: 0; border: none; background: none; padding: 0; font-size: 0.85em; }
+  .stack { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; font-family: "Fira Code", monospace; font-size: 0.82em; margin: 0.8em 0; }
+  .stack .instr { color: var(--orange); }
+  .stack .state { color: var(--muted); margin-left: 16px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 17 — Unary Operators and the WAT If Format</h1>
+<p><span class="tag">compiler</span><span class="tag">WAT</span><span class="tag">unary</span><span class="tag">if statement</span></p>
+
+<p>Two things are broken. This lesson fixes both and gets fibonacci running end-to-end.</p>
+
+<p>The first: compile <code>fn fib(n: int): int { if n &lt; 2 { return n; } ... }</code> and run it through <code>wat2wasm</code>:</p>
+
+<pre><code class="err">error: unexpected token (, expected end.</code></pre>
+
+<p>The second: compile anything with <code>i++</code> or <code>-x</code> and you get:</p>
+
+<pre><code class="err">compile: unhandled *script.UnaryExpression</code></pre>
+
+<p>Both are small fixes with high payoff.</p>
+
+<h2>1. The WAT If Format Bug</h2>
+
+<p>WAT has two text formats — and the compiler is mixing them.</p>
+
+<p><strong>Linear (stack) format</strong> uses keywords without parentheses and closes with <code>end</code>:</p>
+<pre><code>;; push condition first
+local.get $n
+i64.const 2
+i64.lt_s
+<span class="wat">if</span>           <span class="cmt">;; pops condition from stack</span>
+  local.get $n
+  return
+<span class="wat">end</span>          <span class="cmt">;; closes the if</span></code></pre>
+
+<p><strong>Folded (S-expression) format</strong> uses parentheses and nests sub-expressions:</p>
+<pre><code>;; push condition first
+local.get $n
+i64.const 2
+i64.lt_s
+<span class="wat">(if</span>          <span class="cmt">;; pops condition from stack</span>
+  <span class="wat">(then</span>
+    local.get $n
+    return
+  <span class="wat">)</span>
+<span class="wat">)</span>            <span class="cmt">;; closes the (if</span></code></pre>
+
+<p>Your compiler currently emits <code>if</code> (linear keyword) followed by <code>(then</code> (folded keyword). <code>wat2wasm</code> sees <code>if</code> and expects the linear format, then finds <code>(</code> where it expects body instructions — hence "unexpected token, expected end".</p>
+
+<p>The fix is one character in the <code>IfStatement</code> case of <code>compiler.go</code>:</p>
+
+<div class="compare">
+  <div>
+    <h4 class="err">❌ Before</h4>
+    <pre><code>c.emit("if")
+c.depth++
+c.emit("(then")</code></pre>
+  </div>
+  <div>
+    <h4 class="ok">✅ After</h4>
+    <pre><code>c.emit("(if")
+c.depth++
+c.emit("(then")</code></pre>
+  </div>
+</div>
+
+<p>The rest of the if compiler (the <code>(then ...)</code> and closing <code>)</code>) is already correct for the folded format. <code>(if</code> still pops its condition from the stack — it just uses parentheses to open the block instead of the bare keyword.</p>
+
+<p>After this change, <code>wat2wasm</code> accepts fib, and it returns the right answers:</p>
+
+<pre><code><span class="ok">fib(0)  = 0
+fib(1)  = 1
+fib(5)  = 5
+fib(10) = 55</span></code></pre>
+
+<h2>2. Unary Expressions</h2>
+
+<p>In plex, <code>UnaryExpression</code> covers two distinct things:</p>
+
+<table>
+  <tr><th>Form</th><th>Postfix</th><th>Operator</th><th>Example</th></tr>
+  <tr><td>Prefix unary</td><td>false</td><td><code>TokenType_Minus</code></td><td><code>-x</code></td></tr>
+  <tr><td>Prefix unary</td><td>false</td><td><code>TokenType_Plus</code></td><td><code>+x</code></td></tr>
+  <tr><td>Postfix increment</td><td>true</td><td><code>TokenType_Incrment</code></td><td><code>i++</code></td></tr>
+  <tr><td>Postfix decrement</td><td>true</td><td><code>TokenType_Decrement</code></td><td><code>i--</code></td></tr>
+</table>
+
+<h3>Prefix minus: the integer negation problem</h3>
+
+<p>Floating-point types have a direct negation instruction: <code>f64.neg</code>. Integer types do not. To negate an integer in WAT you compute <code>0 - x</code>. But this creates an ordering problem on the stack — you need to push <code>0</code> <em>before</em> <code>x</code>, then subtract:</p>
+
+<pre><code><span class="cmt">;; -x for f64: simple</span>
+<span class="instr">local.get</span> $x
+<span class="instr">f64.neg</span>
+
+<span class="cmt">;; -x for i64: push 0 first, then x, then subtract</span>
+<span class="instr">i64.const 0</span>
+<span class="instr">local.get</span> $x     <span class="cmt">;; x is pushed AFTER 0</span>
+<span class="instr">i64.sub</span>          <span class="cmt">;; 0 - x</span></code></pre>
+
+<p>This means the integer case is structured differently from the float case in the compiler: for floats, you compile the operand then emit the instruction; for integers, you emit the zero-constant first, compile the operand, then subtract.</p>
+
+<h3>Postfix increment: the double-push pattern</h3>
+
+<p>The semantics of <code>i++</code> (post-increment): <strong>evaluate to the old value, then increment</strong>. So <code>let x = i++;</code> gives <code>x</code> the old value of <code>i</code>, and <code>i</code> gets incremented.</p>
+
+<p>On a stack machine, that looks like:</p>
+
+<div class="stack">
+  <div><span class="instr">local.get $i</span>  <span class="state">→ stack: [old]    ← this will be the "result" value</span></div>
+  <div><span class="instr">local.get $i</span>  <span class="state">→ stack: [old, old]</span></div>
+  <div><span class="instr">i64.const 1</span>   <span class="state">→ stack: [old, old, 1]</span></div>
+  <div><span class="instr">i64.add</span>       <span class="state">→ stack: [old, new]</span></div>
+  <div><span class="instr">local.set $i</span>  <span class="state">→ stack: [old]     ← new value stored back, old remains</span></div>
+</div>
+
+<p>After these five instructions, the old value is on the stack (available to the caller), and <code>i</code> has been incremented. When used as a statement, the old value on the stack gets dropped by the drop logic you added in Lesson 16.</p>
+
+<p>The implementation needs the variable name (to emit <code>local.set $i</code>). Since plex only allows increment/decrement on identifiers, you can type-assert the operand:</p>
+
+<pre><code>ident, ok := n.Operand.(*script.Identifier)
+<span class="kw">if</span> !ok {
+    <span class="kw">return</span> fmt.Errorf(<span class="str">"compile: ++ / -- requires a variable, not %T"</span>, n.Operand)
+}</code></pre>
+
+<div class="insight">
+  <strong>Pre vs post:</strong> Pre-increment (<code>++i</code>) would yield the <em>new</em> value. In WAT you'd use <code>local.tee</code> for that: get, add 1, <code>local.tee</code> (stores AND leaves new value on stack). Plex only has postfix, so you don't need to implement this — but knowing the difference is useful when you read WAT generated by other compilers.
+</div>
+
+<hr>
+
+<div class="quiz-section">
+  <h3>Check Your Understanding</h3>
+
+  <div class="q">
+    <p>1. Why can't you use <code>f64.neg</code> for integer negation?</p>
+    <label><input type="radio" name="q1"> WAT doesn't allow mixing integer and float instructions</label>
+    <label><input type="radio" name="q1"> There is no <code>i64.neg</code> instruction — WAT's integer set only has add, sub, mul, div, etc.</label>
+    <label><input type="radio" name="q1"> <code>f64.neg</code> is slower for integers</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ WAT's integer instruction set simply doesn't include a negate instruction. Integer arithmetic is <code>add</code>, <code>sub</code>, <code>mul</code>, <code>div_s</code>, etc. — no unary negate. You have to synthesize it as <code>0 - x</code>. This is a common CPU ISA decision too: x86 has <code>NEG</code> but RISC-V integer has no unary negate either.</div>
+  </div>
+
+  <div class="q">
+    <p>2. In the double-push pattern for <code>i++</code>, why is <code>local.get $i</code> emitted twice?</p>
+    <label><input type="radio" name="q2"> Once to read the value, once to trigger side effects</label>
+    <label><input type="radio" name="q2"> Once to preserve the old value as the result, once as the base for computing the incremented value</label>
+    <label><input type="radio" name="q2"> The WAT spec requires all variables to be read twice before writing</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ The first <code>local.get</code> puts the old value on the stack where it will remain as the expression result (or be dropped). The second <code>local.get</code> puts another copy on the stack so the increment computation has something to work with without consuming the result copy.</div>
+  </div>
+
+  <div class="q">
+    <p>3. The WAT if format uses <code>(if</code> not <code>if</code>. But the condition is still pushed separately — the <code>(if</code> doesn't take a sub-expression for its condition. Why is that valid?</p>
+    <label><input type="radio" name="q3"> WAT silently ignores the missing condition</label>
+    <label><input type="radio" name="q3"> In both formats, <code>if</code> pops its operand from the stack — the folded format just changes the syntax of the block body, not the condition mechanism</label>
+    <label><input type="radio" name="q3"> <code>(if</code> uses the last expression result automatically</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ Whether you write <code>if</code> or <code>(if</code>, the condition is always the top of the stack at the point the instruction is evaluated. The folded/unfolded distinction only affects the syntax of the <em>body</em> (keywords vs parentheses). The operand stack mechanism is identical.</div>
+  </div>
+</div>
+
+<hr>
+
+<h2>Your Tasks</h2>
+
+<div class="task">
+  <strong>Task 1 — Fix the if format</strong>
+  In <code>compiler.go</code>, the <code>*script.IfStatement</code> case emits <code>"if"</code>. Change it to <code>"(if"</code>.
+  <ul class="checklist">
+    <li>Make the change</li>
+    <li>Compile a fib program and validate with <code>wat2wasm</code></li>
+    <li>Run in Node.js: <code>fib(10)</code> should return <code>55</code></li>
+  </ul>
+  <p>Don't forget to update any compiler snapshot tests whose WAT output changes (the <code>struct</code> snapshot uses an if-like pattern indirectly — check if it's affected).</p>
+</div>
+
+<div class="task">
+  <strong>Task 2 — Implement <code>UnaryExpression</code> in the compiler</strong>
+  Add a <code>case *script.UnaryExpression:</code> to <code>compiler.go</code>. Handle four sub-cases:
+  <ul class="checklist">
+    <li><code>Postfix: false, Operator: Plus</code> → compile operand, nothing else (<code>+x == x</code>)</li>
+    <li><code>Postfix: false, Operator: Minus</code> → floats: compile operand + <code>f64.neg</code>; integers: <code>emit(wasmType+".const 0")</code>, compile operand, <code>emit(wasmType+".sub")</code></li>
+    <li><code>Postfix: true, Operator: Incrment</code> → type-assert operand to <code>*Identifier</code>, use the double-push pattern, then <code>local.set</code></li>
+    <li><code>Postfix: true, Operator: Decrement</code> → same, but <code>sub</code> instead of <code>add</code></li>
+  </ul>
+</div>
+
+<div class="task">
+  <strong>Task 3 — Run count() end-to-end</strong>
+  Write and compile this program:
+  <pre><code>fn count(n: int): int {
+    let i = 0;
+    while i &lt; n { i++; }
+    return i;
+}</code></pre>
+  Validate with <code>wat2wasm</code>, instantiate in Node.js, and verify <code>count(10)</code> returns <code>10</code> and <code>count(0)</code> returns <code>0</code>.
+</div>
+
+<div class="task">
+  <strong>Task 4 — Update failing snapshots</strong>
+  After Task 1, run all compiler tests. If any snapshot fails, inspect the diff to confirm the change is correct (the if body format changed), then update the snapshot.
+</div>
+
+<hr>
+
+<h2>Going Deeper</h2>
+
+<ul>
+  <li><a href="https://webassembly.github.io/spec/core/text/instructions.html#folded-instructions" target="_blank">WAT Spec: Folded Instructions</a> — the formal grammar for folded vs unfolded format</li>
+  <li><a href="https://webassembly.github.io/spec/core/syntax/instructions.html#numeric-instructions" target="_blank">WAT Numeric Instruction Set</a> — the full list of integer/float instructions (note: no <code>i32.neg</code>)</li>
+  <li><a href="https://developer.chrome.com/docs/devtools/wasm/" target="_blank">Chrome DevTools WASM debugging</a> — once programs get complex, you'll want to step through WAT execution</li>
+</ul>
+
+<hr>
+
+<p><em>💬 Ask me anything — if you want to understand how <code>local.tee</code> works (it's the key to pre-increment), or how to handle <code>arr[i]++</code> if you ever want to support that, just ask.</em></p>
+
+<div class="nav">
+  <a href="0016-the-drop-problem.html">← Lesson 16: The Drop Problem</a>
+  <a href="../reference/">Reference docs →</a>
+</div>
+
+</body>
+</html>

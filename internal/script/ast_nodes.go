@@ -220,7 +220,7 @@ func (n *MemberAccess) Range() (Position, Position) {
 type UnaryExpression struct {
 	Start, End Position
 	Operator   TokenType
-	Operand    AstNode
+	Operand    Expression
 	Postfix    bool
 	type_      *Type
 }

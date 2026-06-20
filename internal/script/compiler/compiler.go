@@ -3,6 +3,7 @@ package compiler
 import (
 	"embed"
 	_ "embed"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -86,6 +87,69 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			c.emit("global.get", "$"+n.Value)
 		} else {
 			c.emit("local.get", "$"+n.Value)
+		}
+	case *script.UnaryExpression:
+		switch {
+		case n.Operator == script.TokenType_Decrement && n.Postfix:
+			ident, ok := n.Operand.(*script.Identifier)
+			if !ok {
+				return errors.ErrUnsupported
+			}
+
+			t := ident.GetType()
+			wasmType := getWasmType(t)
+
+			c.emit(fmt.Sprintf("local.get $%s", ident.Value))
+			c.emit(fmt.Sprintf("local.get $%s", ident.Value))
+
+			c.emit(wasmType + ".const 1")
+			c.emit(wasmType + ".sub")
+
+			c.emit(fmt.Sprintf("local.set $%s", ident.Value))
+
+			return nil
+		case n.Operator == script.TokenType_Incrment && n.Postfix:
+			ident, ok := n.Operand.(*script.Identifier)
+			if !ok {
+				return errors.ErrUnsupported
+			}
+
+			t := ident.GetType()
+			wasmType := getWasmType(t)
+
+			c.emit(fmt.Sprintf("local.get $%s", ident.Value))
+			c.emit(fmt.Sprintf("local.get $%s", ident.Value))
+
+			c.emit(wasmType + ".const 1")
+			c.emit(wasmType + ".add")
+
+			c.emit(fmt.Sprintf("local.set $%s", ident.Value))
+
+		case n.Operator == script.TokenType_Plus && !n.Postfix:
+			return c.Compile(n.Operand)
+		case n.Operator == script.TokenType_Minus && !n.Postfix:
+			t := n.Operand.GetType()
+			wasmType := getWasmType(t)
+
+			switch t.Kind {
+			case script.TypeKind_F64, script.TypeKind_Float, script.TypeKind_F32:
+				if err := c.Compile(n.Operand); err != nil {
+					return err
+				}
+				c.emit(wasmType + ".neg")
+			case script.TypeKind_Int, script.TypeKind_I64, script.TypeKind_I32:
+
+				c.emit(wasmType + ".const 0")
+				if err := c.Compile(n.Operand); err != nil {
+					return err
+				}
+				c.emit(wasmType + ".sub")
+			default:
+				return errors.ErrUnsupported
+			}
+
+		default:
+			return errors.ErrUnsupported
 		}
 	case *script.BinaryExpression:
 		if err := c.Compile(n.Left); err != nil {
@@ -234,7 +298,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		if err := c.Compile(n.Condition); err != nil {
 			return err
 		}
-		c.emit("if")
+		c.emit("(if")
 		c.depth++
 		c.emit("(then")
 		c.depth++
@@ -266,6 +330,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		if err := c.Compile(n.Condition); err != nil {
 			return err
 		}
+
 		c.emit("i32.eqz") // invert: exit if condition false
 		c.emit("br_if 1") // jump out of block if condition false
 

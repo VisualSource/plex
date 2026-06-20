@@ -1,0 +1,5 @@
+fn count(n: int): int {
+    let i = 0;
+    while i < n { i++;}
+    return i;
+}

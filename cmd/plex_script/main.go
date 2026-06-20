@@ -97,7 +97,7 @@ func main() {
 			}
 			defer module.Close(ctx)
 
-			rr, err := module.ExportedFunction("double").Call(ctx, 2.0)
+			rr, err := module.ExportedFunction("count").Call(ctx, 10)
 			if err != nil {
 				fmt.Printf("error: %s", err.Error())
 				return

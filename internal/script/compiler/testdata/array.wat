@@ -1,4 +1,6 @@
 (module
+ (memory 1)
+ (export "memory" (memory 0))
  (global $heapPtr (mut i32) (i32.const 0))
  (func $alloc (param $size i32) (result i32)
   (local $ptr i32)
@@ -52,6 +54,7 @@
   i32.add
   i64.load
   ;; end array access
+  drop
  )
  (export "main" (func $main))
 )

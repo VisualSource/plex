@@ -292,7 +292,7 @@ func (p *Parser) parsePostfix() (AstNode, error) {
 				Start:    start,
 				End:      end,
 				Operator: op.IsToken(),
-				Operand:  expr,
+				Operand:  expr.(Expression),
 				Postfix:  true,
 			}
 		default:
@@ -320,7 +320,7 @@ func (p *Parser) parseUnary() (AstNode, error) {
 			Start:    start,
 			End:      end,
 			Operator: op.IsToken(),
-			Operand:  operand,
+			Operand:  operand.(Expression),
 		}, nil
 	}
 
