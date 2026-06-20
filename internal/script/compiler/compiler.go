@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/VisualSource/plex/internal/script"
@@ -379,6 +378,9 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 	case *script.ArrayLiteral:
 		t := n.GetType()
+		if t == nil {
+			return fmt.Errorf("array access has no type")
+		}
 		wasmElem := getWasmType(t.Element)
 		elemSize := sizeOf(wasmElem)
 
@@ -421,8 +423,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		c.emit(";; end array literal")
 	case *script.ArrayAccess:
-
-		t := n.GetType() // element type (already unwrapped by typechecker)
+		t := n.GetType()
 		if t == nil {
 			return fmt.Errorf("array access has no type")
 		}
@@ -443,11 +444,11 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 		c.emit("i32.wrap_i64") //TODO: need to resolve if we need to do thing
 
-		c.emit("i32.const " + strconv.FormatInt(int64(elemSize), 10)) // 8 = f64, should be size of object ex. sizeof(struct) || sizeof(string)
-		c.emit("i32.mul")                                             // get offset
+		c.emit(fmt.Sprintf("i32.const %d", elemSize))
+		c.emit("i32.mul") // get offset
 
 		c.emit("i32.add")          // base prt + len(4) + offset(i * size)
-		c.emit(wasmElem + ".load") // load element, TODO: resolve TYPE HERE
+		c.emit(wasmElem + ".load") // load element
 
 		c.emit(";; end array access")
 	case *script.StructStatement:
