@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/VisualSource/plex/internal/script"
@@ -377,16 +378,16 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		return fmt.Errorf("compile: string %q not in table", n.Value)
 
 	case *script.ArrayLiteral:
+		t := n.GetType()
+		wasmElem := getWasmType(t.Element)
+		elemSize := sizeOf(wasmElem)
 
 		tmpName := fmt.Sprintf("__array_tmp%d", c.tempVars)
 		c.tempVars++
 
 		c.locals = append(c.locals, Local{Name: tmpName, Type: "i32"})
 
-		elemSize := 8 // f64 element size in bytes, would need to reslove size for structs
 		totalSize := 4 + len(n.Elements)*elemSize
-
-		// allocate memory, capture base in a temp loca
 
 		c.emit(";; array literal")
 
@@ -398,6 +399,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.emit("i32.store")
 
 		for i, v := range n.Elements {
+
 			offset := 4 + i*elemSize
 
 			c.emit(fmt.Sprintf(";; insert element %d", i))
@@ -410,7 +412,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 				return err
 			}
 
-			c.emit("f64.store")
+			c.emit(wasmElem + ".store")
 
 			c.emit(";; insert end")
 		}
@@ -419,6 +421,13 @@ func (c *Compiler) Compile(node script.AstNode) error {
 
 		c.emit(";; end array literal")
 	case *script.ArrayAccess:
+
+		t := n.GetType() // element type (already unwrapped by typechecker)
+		if t == nil {
+			return fmt.Errorf("array access has no type")
+		}
+		wasmElem := getWasmType(t)
+		elemSize := sizeOf(wasmElem)
 
 		c.emit(";; array access")
 
@@ -434,11 +443,11 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		}
 		c.emit("i32.wrap_i64") //TODO: need to resolve if we need to do thing
 
-		c.emit("i32.const 8") // 8 = f64, should be size of object ex. sizeof(struct) || sizeof(string)
-		c.emit("i32.mul")     // get offset
+		c.emit("i32.const " + strconv.FormatInt(int64(elemSize), 10)) // 8 = f64, should be size of object ex. sizeof(struct) || sizeof(string)
+		c.emit("i32.mul")                                             // get offset
 
-		c.emit("i32.add")  // base prt + len(4) + offset(i * size)
-		c.emit("f64.load") // load element, TODO: resolve TYPE HERE
+		c.emit("i32.add")          // base prt + len(4) + offset(i * size)
+		c.emit(wasmElem + ".load") // load element, TODO: resolve TYPE HERE
 
 		c.emit(";; end array access")
 	case *script.StructStatement:
