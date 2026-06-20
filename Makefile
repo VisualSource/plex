@@ -1,17 +1,13 @@
 SHELL=/bin/bash -e -o pipefail
 PWD = $(shell pwd)
 
-# constants
-DOCKER_REPO = plex
-DOCKER_TAG = latest
+all: install-wat2wasm gen-char-ref-bin tidy ## Initializes all tools
 
-all: git-hooks gen-char-ref-bin tidy ## Initializes all tools
+install-wat2wasm: ## Installs wat2wasm (wabt) if not present
+	@command -v wat2wasm &>/dev/null || (echo "Installing wabt..." && sudo pacman -S --noconfirm wabt)
 
 out:
 	@mkdir -p out
-
-git-hooks:
-	@git config --local core.hooksPath .githooks/
 
 download: ## Downloads the dependencies
 	@go mod download
@@ -67,9 +63,6 @@ out/report.json: out
 
 clean: ## Cleans up everything
 	@rm -rf bin out 
-
-docker: ## Builds docker image
-	docker buildx build --cache-to type=inline -t $(DOCKER_REPO):$(DOCKER_TAG) .
 
 define make-go-dependency
   # target template for go tools, can be referenced e.g. via /bin/<tool>
