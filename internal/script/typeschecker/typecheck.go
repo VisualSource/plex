@@ -635,6 +635,8 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		return c.checkExpression(n)
 	case *script.StringLiteral:
 		return c.checkExpression(n)
+	case *script.BreakStatement:
+		return nil
 	default:
 		c.error(n, fmt.Errorf("unhandled node %T", n))
 		return nil

@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 19 – Break and Ternary</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .wat  { color: #ffa657; }
+  .label{ color: #4caf50; }
+  .err  { color: var(--accent); }
+  .ok   { color: var(--green); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #111827; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 19 – Break &amp; Ternary</h1>
+<p><em>Two uncompiled AST nodes, two new WAT patterns.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>Why the current while loop can't support <code>break</code></li>
+    <li>WAT named labels and the label counter pattern</li>
+    <li>Task A — implement <code>BreakStatement</code></li>
+    <li>WAT's value-producing <code>if</code></li>
+    <li>Task B — implement <code>TernaryExpression</code></li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. The problem with relative branch indices</h2>
+
+<p>Your current while loop emits <em>relative</em> branch targets:</p>
+
+<pre><code><span class="wat">(block</span>           <span class="cmt">;; index 1 (outer)</span>
+  <span class="wat">(loop</span>           <span class="cmt">;; index 0 (inner)</span>
+    <span class="cmt">;; condition</span>
+    <span class="wat">i32.eqz</span>
+    <span class="wat">br_if 1</span>       <span class="cmt">;; exit outer block</span>
+    <span class="cmt">;; body</span>
+    <span class="wat">br 0</span>          <span class="cmt">;; jump back to loop</span>
+  <span class="wat">)</span>
+<span class="wat">)</span></code></pre>
+
+<p>The number in <code>br N</code> is a <strong>depth index</strong> — 0 means "the nearest enclosing block/loop", 1 means "one level up". This works fine as long as the body is flat. But the moment you put a <code>break</code> somewhere deep inside the body, <code>br 1</code> no longer reaches the outer block — it only exits whatever is immediately around it.</p>
+
+<div class="warn">
+  <strong>The depth problem</strong>
+  If the body contains an <code>if</code> and the user writes <code>break</code> inside it, the compiler would need to know its current nesting depth to emit the right number. That's fragile and hard to track correctly across recursive <code>Compile</code> calls.
+</div>
+
+<p>The solution is <strong>named labels</strong>. WAT lets you label any <code>block</code>, <code>loop</code>, or <code>if</code>:</p>
+
+<pre><code><span class="wat">(block</span> <span class="label">$break_0</span>
+  <span class="wat">(loop</span> <span class="label">$loop_0</span>
+    <span class="cmt">;; condition</span>
+    <span class="wat">i32.eqz</span>
+    <span class="wat">br_if</span> <span class="label">$break_0</span>   <span class="cmt">;; exit by name — works at any depth</span>
+    <span class="cmt">;; body</span>
+    <span class="wat">br</span> <span class="label">$loop_0</span>       <span class="cmt">;; back to loop top by name</span>
+  <span class="wat">)</span>
+<span class="wat">)</span></code></pre>
+
+<p>Now a <code>break</code> anywhere inside the body can simply emit <code>br $break_0</code> regardless of how deeply nested it is — the assembler resolves the label.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. The label counter pattern</h2>
+
+<p>You need unique label names across nested loops. The standard approach is a monotonically-increasing counter on the <code>Compiler</code> struct:</p>
+
+<pre><code><span class="kw">type</span> <span class="fn">Compiler</span> <span class="kw">struct</span> {
+    <span class="cmt">// ... existing fields ...</span>
+    labelCount <span class="kw">int</span>
+    breakStack []<span class="kw">string</span>
+}</code></pre>
+
+<p>Each time you open a while loop, you allocate a fresh label pair and push the break label onto the stack:</p>
+
+<pre><code><span class="kw">func</span> (c *<span class="fn">Compiler</span>) <span class="fn">pushBreakLabel</span>() (<span class="kw">string</span>, <span class="kw">string</span>) {
+    n := c.labelCount
+    c.labelCount++
+    bl := fmt.Sprintf(<span class="str">"$break_%d"</span>, n)
+    ll := fmt.Sprintf(<span class="str">"$loop_%d"</span>, n)
+    c.breakStack = <span class="fn">append</span>(c.breakStack, bl)
+    <span class="kw">return</span> bl, ll
+}
+
+<span class="kw">func</span> (c *<span class="fn">Compiler</span>) <span class="fn">popBreakLabel</span>() {
+    c.breakStack = c.breakStack[:len(c.breakStack)-<span class="num">1</span>]
+}
+
+<span class="kw">func</span> (c *<span class="fn">Compiler</span>) <span class="fn">currentBreakLabel</span>() <span class="kw">string</span> {
+    <span class="kw">return</span> c.breakStack[len(c.breakStack)-<span class="num">1</span>]
+}</code></pre>
+
+<div class="insight">
+  <strong>Stack, not counter alone</strong> — a <em>stack</em> handles nested loops. The innermost loop's break label is always at the top. <code>currentBreakLabel()</code> peeks at the top without popping, so an inner break escapes the nearest loop, not a random outer one.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Task A — implement <code>BreakStatement</code></h2>
+
+<div class="task">
+  <strong>Task A (three small changes)</strong>
+  <ol>
+    <li>Add <code>labelCount int</code> and <code>breakStack []string</code> to the <code>Compiler</code> struct in <code>compiler.go</code>.</li>
+    <li>Add the three helper methods above (<code>pushBreakLabel</code>, <code>popBreakLabel</code>, <code>currentBreakLabel</code>).</li>
+    <li>Update the <code>WhileStatement</code> case to use named labels and call <code>pushBreakLabel</code> / <code>popBreakLabel</code>.</li>
+    <li>Add a <code>BreakStatement</code> case that emits <code>br $break_N</code>.</li>
+  </ol>
+</div>
+
+<h3>Updated WhileStatement</h3>
+
+<pre><code><span class="kw">case</span> *script.<span class="fn">WhileStatement</span>:
+    bl, ll := c.<span class="fn">pushBreakLabel</span>()
+    <span class="kw">defer</span> c.<span class="fn">popBreakLabel</span>()
+
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(block %s"</span>, bl))
+    c.depth++
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(loop %s"</span>, ll))
+    c.depth++
+
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Condition); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    c.<span class="fn">emit</span>(<span class="str">"i32.eqz"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"br_if %s"</span>, bl))
+
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Body); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"br %s"</span>, ll))
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>) <span class="cmt">// end loop</span>
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>) <span class="cmt">// end block</span></code></pre>
+
+<h3>BreakStatement case</h3>
+
+<pre><code><span class="kw">case</span> *script.<span class="fn">BreakStatement</span>:
+    <span class="kw">if</span> len(c.breakStack) == <span class="num">0</span> {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"break outside of loop"</span>)
+    }
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"br %s"</span>, c.<span class="fn">currentBreakLabel</span>()))</code></pre>
+
+<div class="insight">
+  <strong>defer for cleanup</strong> — using <code>defer popBreakLabel()</code> immediately after <code>pushBreakLabel()</code> ensures the label is removed from the stack even if compilation of the loop body returns an error early. This is idiomatic Go for paired push/pop operations.
+</div>
+
+<h3>Verification — write a test program</h3>
+
+<p>Create <code>cmd/plexc/src/break_test.plex</code>:</p>
+
+<pre><code><span class="kw">fn</span> <span class="fn">find_first</span>(limit: i64) -&gt; i64 {
+    <span class="kw">let</span> i: i64 = <span class="num">0</span>;
+    <span class="kw">while</span> i &lt; limit {
+        <span class="kw">if</span> i == <span class="num">5</span> {
+            <span class="kw">break</span>;
+        }
+        i = i + <span class="num">1</span>;
+    }
+    <span class="kw">return</span> i;
+}</code></pre>
+
+<p>Expected: <code>find_first(10)</code> returns <code>5</code>. The snapshot should show named block/loop labels and a <code>br $break_0</code> in the if body.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. WAT's value-producing <code>if</code></h2>
+
+<p>An ordinary WAT <code>if</code> is a statement — it executes a branch but doesn't leave a value on the stack. To get a value out, you add a <strong>result type</strong>:</p>
+
+<table>
+  <tr><th>Statement if</th><th>Value-producing if</th></tr>
+  <tr>
+    <td><pre style="margin:0"><code><span class="wat">(if</span>
+  <span class="wat">(then</span> ...<span class="wat">)</span>
+  <span class="wat">(else</span> ...<span class="wat">)</span>
+<span class="wat">)</span></code></pre></td>
+    <td><pre style="margin:0"><code><span class="wat">(if</span> <span class="label">(result i64)</span>
+  <span class="wat">(then</span> ... <span class="cmt">; must leave one i64</span><span class="wat">)</span>
+  <span class="wat">(else</span> ... <span class="cmt">; must leave one i64</span><span class="wat">)</span>
+<span class="wat">)</span></code></pre></td>
+  </tr>
+  <tr>
+    <td>Stack unchanged after if</td>
+    <td>One i64 is on the stack after if</td>
+  </tr>
+</table>
+
+<p>A plex ternary <code>x &gt; 0 ? x : -x</code> maps directly:</p>
+
+<pre><code><span class="cmt">;; x > 0 ? x : -x  (x is local $x : i64)</span>
+<span class="wat">local.get</span> $x
+<span class="wat">i64.const</span> 0
+<span class="wat">i64.gt_s</span>
+<span class="wat">(if</span> <span class="label">(result i64)</span>
+  <span class="wat">(then</span>
+    <span class="wat">local.get</span> $x
+  <span class="wat">)</span>
+  <span class="wat">(else</span>
+    <span class="wat">i64.const</span> 0
+    <span class="wat">local.get</span> $x
+    <span class="wat">i64.sub</span>
+  <span class="wat">)</span>
+<span class="wat">)</span>
+<span class="cmt">;; one i64 is now on the stack</span></code></pre>
+
+<div class="warn">
+  <strong>Both branches must agree</strong> — if the result type is <code>i64</code>, both <code>then</code> and <code>else</code> must leave exactly one <code>i64</code> on the stack. The typechecker already enforces that both sides of a ternary have the same type (<code>typecheck.go:554</code>), so by the time you reach the compiler this is guaranteed.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Task B — implement <code>TernaryExpression</code></h2>
+
+<div class="task">
+  <strong>Task B</strong>
+  Add a <code>TernaryExpression</code> case to the <code>Compile</code> switch. The pattern is: compile condition → emit <code>(if (result TYPE)</code> → compile true branch → compile false branch → close.
+</div>
+
+<pre><code><span class="kw">case</span> *script.<span class="fn">TernaryExpression</span>:
+    t := n.<span class="fn">GetType</span>()
+    <span class="kw">if</span> t == <span class="kw">nil</span> {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"ternary: no type set"</span>)
+    }
+
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Condition); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+
+    wasmType := <span class="fn">getWasmType</span>(t)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(if (result %s)"</span>, wasmType))
+    c.depth++
+
+    c.<span class="fn">emit</span>(<span class="str">"(then"</span>)
+    c.depth++
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.TrueBlock); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)
+
+    c.<span class="fn">emit</span>(<span class="str">"(else"</span>)
+    c.depth++
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.FalseBlock); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>)
+
+    c.depth--
+    c.<span class="fn">emit</span>(<span class="str">")"</span>) <span class="cmt">// end if</span></code></pre>
+
+<h3>Verification — write a test program</h3>
+
+<p>Create <code>cmd/plexc/src/ternary_test.plex</code>:</p>
+
+<pre><code><span class="kw">fn</span> <span class="fn">abs</span>(x: i64) -&gt; i64 {
+    <span class="kw">return</span> x &gt; <span class="num">0</span> ? x : <span class="num">0</span> - x;
+}</code></pre>
+
+<p>Expected: <code>abs(-7)</code> → <code>7</code>, <code>abs(3)</code> → <code>3</code>. The WAT should show <code>(if (result i64) (then ...) (else ...))</code>.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why does the current while loop use <code>br 1</code> (a number) instead of a label name?</p>
+    <label><input type="radio" name="q1" value="a"> a) Numbers are required — WAT doesn't support label names</label>
+    <label><input type="radio" name="q1" value="b"> b) The original implementation predates adding break, so named labels weren't needed yet</label>
+    <label><input type="radio" name="q1" value="c"> c) Numbers are faster at runtime than label names</label>
+    <label><input type="radio" name="q1" value="d"> d) Named labels only work inside functions, not loops</label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. In a nested while loop, what does <code>break</code> jump to?</p>
+    <label><input type="radio" name="q2" value="a"> a) The outermost loop's exit</label>
+    <label><input type="radio" name="q2" value="b"> b) The <em>innermost</em> enclosing loop's exit — the top of the <code>breakStack</code></label>
+    <label><input type="radio" name="q2" value="c"> c) The function's return</label>
+    <label><input type="radio" name="q2" value="d"> d) Whichever loop has the lowest label number</label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. What happens if you omit <code>(result i64)</code> from a ternary's <code>if</code>?</p>
+    <label><input type="radio" name="q3" value="a"> a) The if executes both branches</label>
+    <label><input type="radio" name="q3" value="b"> b) <code>wat2wasm</code> infers the type automatically</label>
+    <label><input type="radio" name="q3" value="c"> c) Both branches still run but no value is left on the stack — the expression produces nothing</label>
+    <label><input type="radio" name="q3" value="d"> d) The loop exits immediately</label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. Why use <code>defer popBreakLabel()</code> instead of calling it at the end of the case?</p>
+    <label><input type="radio" name="q4" value="a"> a) <code>defer</code> runs faster than a regular call</label>
+    <label><input type="radio" name="q4" value="b"> b) So the stack is cleaned up even when the body compilation returns an error early</label>
+    <label><input type="radio" name="q4" value="c"> c) Go requires defer for any stack operation</label>
+    <label><input type="radio" name="q4" value="d"> d) It's just style — functionally identical to a call at the end</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+
+  <button onclick="checkQuiz()">Check answers</button>
+  <div class="score-box" id="score" style="display:none"></div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>What changed in the compiler</h2>
+
+<table>
+  <tr><th>Addition</th><th>Purpose</th></tr>
+  <tr><td><code>labelCount int</code></td><td>Monotonically increasing counter to generate unique label names</td></tr>
+  <tr><td><code>breakStack []string</code></td><td>Tracks the break label for each active while loop — <code>break</code> always targets the top</td></tr>
+  <tr><td><code>pushBreakLabel()</code></td><td>Allocates a fresh <code>$break_N</code> / <code>$loop_N</code> pair, pushes break label onto stack</td></tr>
+  <tr><td><code>popBreakLabel()</code></td><td>Removes the innermost loop's break label when compilation exits the while case</td></tr>
+  <tr><td><code>BreakStatement</code> case</td><td>Emits <code>br $break_N</code> — N is whatever the current top of the stack is</td></tr>
+  <tr><td><code>TernaryExpression</code> case</td><td>Emits <code>(if (result TYPE) (then …) (else …))</code> — the value-producing WAT if form</td></tr>
+</table>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Where this fits</h2>
+
+<p>With these two cases, every node in your AST has a compiler implementation. The language now has:</p>
+
+<ul>
+  <li>All arithmetic, comparison, and logical operators</li>
+  <li>If / while / break control flow</li>
+  <li>Ternary expressions that produce values</li>
+  <li>Functions, structs, methods, arrays, strings</li>
+</ul>
+
+<p>That's a complete, working scripting language. The next frontier is making it more usable — <strong>string operations</strong> (concatenation, length, indexing) are the most user-visible gap, and they'll take you into runtime helper functions.</p>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent for clarification on any part of this lesson. Good things to explore: what happens with <code>continue</code> (if you ever add it), or how value-producing <code>if</code> interacts with the drop problem from <a href="0016-the-drop-problem.html">Lesson 16</a>.
+</p>
+
+<div class="nav">
+  <a href="0018-completing-binary-operators.html">← Lesson 18: Completing Binary Operators</a>
+</div>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'c', q4: 'b' };
+const explanations = {
+  q1: "Correct. The original while loop was written before break was needed. Relative indices work fine for the exit-on-false case since the depth is fixed. Named labels only become necessary when arbitrary code inside the body needs to escape.",
+  q2: "Correct. The breakStack always has the innermost loop's label on top. <code>break</code> peeks at the top — it never pops, so multiple breaks in one loop all target the same label.",
+  q3: "Correct. Without <code>(result TYPE)</code>, the if is a statement: both branches execute their side effects and leave nothing on the stack. The ternary's value would be silently discarded, likely causing a stack underflow when the surrounding expression tries to use it.",
+  q4: "Correct. If <code>Compile(n.Body)</code> returns an error, a call at the end of the case is never reached. <code>defer</code> runs unconditionally when the function (or case block) exits, keeping the stack consistent even in error paths."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => {
+      r.parentElement.classList.remove('correct','wrong');
+    });
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>

@@ -35,6 +35,26 @@ type Compiler struct {
 
 	inTransaction bool
 	transaction   strings.Builder
+
+	labelCount int
+	breakStack []string
+}
+
+func (c *Compiler) pushBreakLabel() (string, string) {
+	bl := fmt.Sprintf("$block%d", c.labelCount)
+	ll := fmt.Sprintf("$loop%d", c.labelCount)
+
+	c.labelCount++
+	c.breakStack = append(c.breakStack, bl)
+
+	return bl, ll
+}
+func (c *Compiler) popBreakLabel() {
+	c.labelCount--
+	c.breakStack = c.breakStack[:len(c.breakStack)-1]
+}
+func (c *Compiler) currentBreakLabel() string {
+	return c.breakStack[len(c.breakStack)-1]
 }
 
 func (c *Compiler) startTransaction() {
@@ -361,23 +381,26 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		c.depth--
 		c.emit(")")
 	case *script.WhileStatement:
+		bl, ll := c.pushBreakLabel()
+		defer c.popBreakLabel()
+
 		// WASM loops: (block (loop ... br_if 1 ... br 0))
 		// br 0 = branch to loop top; br_if 1 = break out of block
-		c.emit("(block")
+		c.emit(fmt.Sprintf("(block %s", bl))
 		c.depth++
-		c.emit("(loop")
+		c.emit(fmt.Sprintf("(loop %s", ll))
 		c.depth++
 		if err := c.Compile(n.Condition); err != nil {
 			return err
 		}
 
-		c.emit("i32.eqz") // invert: exit if condition false
-		c.emit("br_if 1") // jump out of block if condition false
+		c.emit("i32.eqz")                   // invert: exit if condition false
+		c.emit(fmt.Sprintf("br_if %s", bl)) // jump out of block if condition false
 
 		if err := c.Compile(n.Body); err != nil {
 			return err
 		}
-		c.emit("br 0") // jump back to loop top
+		c.emit(fmt.Sprintf("br %s", ll)) // jump back to loop top
 		c.depth--
 		c.emit(")") // end loop
 		c.depth--
@@ -406,6 +429,12 @@ func (c *Compiler) Compile(node script.AstNode) error {
 				return err
 			}
 		}
+	case *script.BreakStatement:
+		if len(c.breakStack) == 0 {
+			return fmt.Errorf("break outside of loop")
+		}
+
+		c.emit(fmt.Sprintf("br %s", c.currentBreakLabel()))
 	case *script.FunctionCall:
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:

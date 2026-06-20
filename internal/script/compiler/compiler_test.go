@@ -126,3 +126,26 @@ func TestOperators(t *testing.T) {
 		},
 	}, func(ctx context.Context, r wazero.Runtime) {})
 }
+
+func TestBreak(t *testing.T) {
+	src := `
+	fn find_first(limit: int): int {
+		let i = 0;
+		while i < limit {
+			if i == 5 {
+				break;
+			}
+			i = i + 1;
+		}
+		return i;
+	}
+	`
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "find_first",
+			args: []uint64{10},
+			want: []uint64{5},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}
