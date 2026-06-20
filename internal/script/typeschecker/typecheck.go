@@ -322,6 +322,15 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 			case script.TypeKind_Array:
 				switch callee.Field {
 				case "append":
+					if !c.checkArgs(n, []*orderedItem{
+						{
+							Pos:  0,
+							Type: revType.Element,
+						},
+					}) {
+						return nil
+					}
+
 					t := &script.Type{
 						Kind: script.TypeKind_Void,
 					}

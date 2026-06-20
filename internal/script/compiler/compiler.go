@@ -487,29 +487,97 @@ func (c *Compiler) Compile(node script.AstNode) error {
 		case *script.MemberAccess:
 			t := callee.Object.(script.Expression).GetType()
 
-			// resolve struct name
-			def, ok := c.structs[t.Struct]
-			if !ok {
-				return fmt.Errorf("compile: unknown struct for member access")
-			}
+			switch t.Kind {
+			case script.TypeKind_Array:
+				switch callee.Field {
+				case "len":
+					if err := c.Compile(callee.Object); err != nil {
+						return err
+					}
 
-			if _, ok := def.Methods[callee.Field]; !ok {
-				return fmt.Errorf("compile: struct %s does not own a method named: %s", t.Struct, callee.Field)
-			}
+					c.emit("i32.load")
+					c.emit("i64.extend_i32_s")
+					return nil
+				case "append":
+					elemType := getWasmType(t.Element)
+					elemSize := sizeOf(elemType)
 
-			if err := c.Compile(callee.Object); err != nil { // inject self arg
-				return err
-			}
+					tmpName := fmt.Sprintf("__append_tmp%d", c.tempVars)
+					c.tempVars++
+					c.locals = append(c.locals, Local{Name: tmpName, Type: "i32"})
 
-			for _, arg := range n.Args {
-				if err := c.Compile(arg); err != nil {
+					if err := c.Compile(callee.Object); err != nil {
+						return err
+					}
+					c.emit(fmt.Sprintf("local.tee $%s", tmpName))
+
+					c.emit(fmt.Sprintf("local.get $%s", tmpName))
+					c.emit("i32.load")
+
+					c.emit(fmt.Sprintf("i32.const %d", elemSize))
+					c.emit("i32.mul")
+					c.emit("i32.const 4")
+					c.emit("i32.add")
+					c.emit(fmt.Sprintf("local.get $%s", tmpName))
+					c.emit("i32.add")
+
+					if err := c.Compile(n.Args[0]); err != nil {
+						return err
+					}
+					c.emit(elemType + ".store")
+
+					c.emit(fmt.Sprintf("local.get $%s", tmpName))
+					c.emit(fmt.Sprintf("local.get $%s", tmpName))
+					c.emit("i32.load")
+					c.emit("i32.const 1")
+					c.emit("i32.add")
+					c.emit("i32.store")
+
+				default:
+					return fmt.Errorf("array does not have a method of '%s'", callee.Field)
+				}
+
+			case script.TypeKind_String:
+				switch callee.Field {
+				case "len":
+					if err := c.Compile(callee.Object); err != nil {
+						return err
+					}
+
+					c.emit("i32.load")
+					c.emit("i64.extend_i32_s")
+					return nil
+				default:
+					return fmt.Errorf("array does not have a method of '%s'", callee.Field)
+				}
+
+			case script.TypeKind_Struct:
+				// resolve struct name
+				def, ok := c.structs[t.Struct]
+				if !ok {
+					return fmt.Errorf("compile: unknown struct for member access")
+				}
+
+				if _, ok := def.Methods[callee.Field]; !ok {
+					return fmt.Errorf("compile: struct %s does not own a method named: %s", t.Struct, callee.Field)
+				}
+
+				if err := c.Compile(callee.Object); err != nil { // inject self arg
 					return err
 				}
+
+				for _, arg := range n.Args {
+					if err := c.Compile(arg); err != nil {
+						return err
+					}
+				}
+
+				funcName := fmt.Sprintf("__%s__%s", t.Struct, callee.Field)
+
+				c.emit("call $" + funcName)
+			default:
+				return fmt.Errorf("%s does have callable methods", t)
 			}
-
-			funcName := fmt.Sprintf("__%s__%s", t.Struct, callee.Field)
-
-			c.emit("call $" + funcName)
 		default:
 			return fmt.Errorf("compile: unsupported callee %T", n.Callee)
 		}
@@ -829,7 +897,7 @@ func (c *Compiler) prepass(node script.AstNode) {
 			value:  n.Value,
 			offset: c.dataPtr,
 		})
-		c.dataPtr += len(n.Value) + 1
+		c.dataPtr += /*str len*/ 4 + len(n.Value)
 	case *script.ArrayLiteral:
 		c.needsHeap = true
 		for _, arg := range n.Elements {
@@ -881,10 +949,14 @@ func CompileProgram(program *script.Program) (string, error) {
 		c.emit("(memory 1)")
 
 		for _, entry := range c.strings {
+			n := len(entry.value)
+			// encode length as little-endian 4 bytes
+			lenBytes := fmt.Sprintf("%02x\\%02x\\%02x\\%02x", n&0xff, (n>>8)&0xff, (n>>16)&0xff, (n>>24)&0xff)
+
 			escaped := strings.ReplaceAll(entry.value, "\\", "\\\\")
 			escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
 
-			c.emit(fmt.Sprintf("(data (i32.const %d) \"%s\\00\")", entry.offset, escaped))
+			c.emit(fmt.Sprintf("(data (i32.const %d) \"\\%s%s\")", entry.offset, lenBytes, escaped))
 		}
 
 		c.emit("(export \"memory\" (memory 0))")

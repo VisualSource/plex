@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 20 – Built-in Methods: len and append</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat { color: #ffa657; }
+  .mem { color: #4caf50; }
+  .err { color: var(--accent); }
+  .ok  { color: var(--green); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #111827; }
+  .mem-diagram { font-family: "Fira Code", monospace; font-size: 0.85em; line-height: 1.6; }
+  .mem-addr { color: var(--muted); display: inline-block; width: 50px; }
+  .mem-val  { color: var(--orange); display: inline-block; width: 90px; }
+  .mem-note { color: var(--blue); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 20 – Built-in Methods: <code>len</code> &amp; <code>append</code></h1>
+<p><em>The efficiency of a built-in method is determined at design time, by how you lay out data in memory.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>What the typechecker already knows (but the compiler ignores)</li>
+    <li><code>arr.len()</code> — one load, always O(1)</li>
+    <li>Why <code>str.len()</code> needs a layout change</li>
+    <li>Adding a length prefix to static strings</li>
+    <li>Task A — implement <code>arr.len()</code> and <code>str.len()</code></li>
+    <li><code>arr.append()</code> — growing a logical list</li>
+    <li>Task B — implement <code>arr.append()</code></li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. What the typechecker already knows</h2>
+
+<p>Open <code>typeschecker/typecheck.go</code> and look at the <code>FunctionCall → MemberAccess</code> case (around line 313). The typechecker already resolves three built-in methods for arrays and one for strings:</p>
+
+<table>
+  <tr><th>Expression</th><th>Type-checked return</th><th>Compiler?</th></tr>
+  <tr><td><code>arr.len()</code></td><td><code>TypeKind_Int</code> (i64)</td><td class="err">not yet</td></tr>
+  <tr><td><code>arr.append(elem)</code></td><td><code>TypeKind_Void</code></td><td class="err">not yet</td></tr>
+  <tr><td><code>arr.remove(i)</code></td><td>element type</td><td class="err">not yet</td></tr>
+  <tr><td><code>str.len()</code></td><td><code>TypeKind_Int</code> (i64)</td><td class="err">not yet</td></tr>
+</table>
+
+<p>The compiler's <code>FunctionCall → MemberAccess</code> path currently only handles struct methods — it looks up the callee in <code>c.structs</code> and panics on anything else. Our job is to intercept arrays and strings before hitting the struct lookup.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. <code>arr.len()</code> — one load, always O(1)</h2>
+
+<p>Recall the array layout from <a href="0009-the-heap-and-arrays.html">Lesson 9</a>:</p>
+
+<div class="mem-diagram">
+<pre>offset 0:   <span class="mem-val">i32 count</span>   <span class="mem-note">← element count stored here</span>
+offset 4:   <span class="mem-val">elem[0]</span>
+offset 4+N: <span class="mem-val">elem[1]</span>
+...</pre>
+</div>
+
+<p>The array <em>already</em> stores its length at offset 0. The array literal compiler emits:</p>
+
+<pre><code><span class="wat">i32.const</span> <span class="num">2</span>      <span class="cmt">;; element count</span>
+<span class="wat">i32.store</span>         <span class="cmt">;; write at base pointer</span></code></pre>
+
+<p>So <code>arr.len()</code> is trivially:</p>
+
+<pre><code><span class="cmt">;; arr.len() where arr is an i32 pointer</span>
+<span class="wat">local.get</span> $arr
+<span class="wat">i32.load</span>          <span class="cmt">;; read the 4-byte count</span>
+<span class="wat">i64.extend_i32_s</span>  <span class="cmt">;; promote to i64 (TypeKind_Int = i64)</span></code></pre>
+
+<div class="insight">
+  <strong>Why extend?</strong> Array length is stored as <code>i32</code> in memory (4 bytes), but <code>TypeKind_Int</code> maps to <code>i64</code> in <code>getWasmType</code>. Every integer variable in plex is 64-bit, so the result of <code>len</code> must be too — otherwise any arithmetic like <code>arr.len() - 1</code> would have a type mismatch.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. Why <code>str.len()</code> needs a layout change</h2>
+
+<p>Strings are currently stored as null-terminated byte sequences in the WAT data segment:</p>
+
+<pre><code><span class="wat">(data (i32.const 8) "hello\00")</span></code></pre>
+
+<p>The string pointer is just the <code>i32</code> offset (8 here). The data starts at that address. There is no length stored anywhere.</p>
+
+<p>To count the length you would have to scan forward until you hit the null byte — O(n) every time. For a language where you can call <code>s.len()</code> in a loop, that's a hidden performance trap.</p>
+
+<p>The fix is to store the length as 4 bytes <em>immediately before the data pointer</em>:</p>
+
+<div class="mem-diagram">
+<pre>offset 4:   <span class="mem-val">\05\00\00\00</span>  <span class="mem-note">← i32 length (5) in little-endian</span>
+offset 8:   <span class="mem-val">h e l l o</span>    <span class="mem-note">← string ptr = 8 (unchanged!)</span>
+offset 13:  <span class="mem-val">\00</span>          <span class="mem-note">← null terminator</span></pre>
+</div>
+
+<p>The string pointer <strong>still points to the data</strong> (offset 8). The host-side <code>print</code> function continues to work unchanged because it receives the same kind of pointer it always has.</p>
+
+<p><code>str.len()</code> loads the 4 bytes just before the pointer:</p>
+
+<pre><code><span class="cmt">;; str.len() where str is an i32 pointer to the first byte</span>
+<span class="wat">local.get</span> $str
+<span class="wat">i32.const</span> <span class="num">4</span>
+<span class="wat">i32.sub</span>           <span class="cmt">;; step back 4 bytes to the length field</span>
+<span class="wat">i32.load</span>          <span class="cmt">;; read the 4-byte length</span>
+<span class="wat">i64.extend_i32_s</span>  <span class="cmt">;; promote to i64</span></code></pre>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>4. Adding a length prefix to static strings</h2>
+
+<p>Two places need changing: the <strong>prepass</strong> (where offsets are calculated) and the <strong>emission</strong> (where data segments are written).</p>
+
+<h3>Prepass change</h3>
+
+<p>In <code>prepass</code>, the <code>StringLiteral</code> case currently does:</p>
+
+<pre><code><span class="cmt">// OLD</span>
+c.strings = <span class="fn">append</span>(c.strings, stringEntry{
+    value:  n.Value,
+    offset: c.dataPtr,
+})
+c.dataPtr += <span class="fn">len</span>(n.Value) + <span class="num">1</span>   <span class="cmt">// +1 for \00</span></code></pre>
+
+<p>Change it so the offset points to the <em>data</em> (after the 4-byte length), and advance <code>dataPtr</code> by the extra 4 bytes:</p>
+
+<pre><code><span class="cmt">// NEW</span>
+c.strings = <span class="fn">append</span>(c.strings, stringEntry{
+    value:  n.Value,
+    offset: c.dataPtr + <span class="num">4</span>,   <span class="cmt">// ptr points past the length field</span>
+})
+c.dataPtr += <span class="num">4</span> + <span class="fn">len</span>(n.Value) + <span class="num">1</span></code></pre>
+
+<h3>Emission change</h3>
+
+<p>In <code>CompileProgram</code>, strings are currently emitted as:</p>
+
+<pre><code>c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"(data (i32.const %d) \"%s\\00\")"</span>, entry.offset, escaped))</code></pre>
+
+<p>The data segment must now start 4 bytes before <code>entry.offset</code>, with the length encoded as 4 little-endian bytes:</p>
+
+<pre><code><span class="cmt">// encode length as little-endian 4 bytes</span>
+n := <span class="fn">len</span>(entry.value)
+lenBytes := fmt.<span class="fn">Sprintf</span>(<span class="str">"%02x\\%02x\\%02x\\%02x"</span>,
+    n&<span class="num">0xff</span>, (n>><span class="num">8</span>)&<span class="num">0xff</span>, (n>><span class="num">16</span>)&<span class="num">0xff</span>, (n>><span class="num">24</span>)&<span class="num">0xff</span>)
+
+c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(
+    <span class="str">"(data (i32.const %d) \"\\%s%s\\00\")"</span>,
+    entry.offset-<span class="num">4</span>,   <span class="cmt">// start at the length field</span>
+    lenBytes,
+    escaped,
+))</code></pre>
+
+<div class="insight">
+  <strong>Little-endian encoding in WAT data</strong> — WAT data segments use <code>\HH</code> two-hex-digit byte escapes. WebAssembly is always little-endian, so the 4-byte integer 5 is written as <code>\05\00\00\00</code> (least significant byte first). An i32 in memory can be any of the four bytes; <code>i32.load</code> reassembles them in the correct order.
+</div>
+
+<div class="warn">
+  <strong>Snapshot breakage</strong> — changing the string layout means every existing WAT snapshot that includes a string literal will differ. Run <code>go test ./internal/script/compiler/... -update</code> (or however your test suite updates snapshots) after implementing.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Task A — implement <code>arr.len()</code> and <code>str.len()</code></h2>
+
+<div class="task">
+  <strong>Task A</strong>
+  <ol>
+    <li>In <code>compiler.go</code>, find the <code>FunctionCall → MemberAccess</code> compiler case (around line 487). Right now it immediately does <code>c.structs[t.Struct]</code>. Add a type switch <em>before</em> that to handle arrays and strings.</li>
+    <li>Implement <code>arr.len()</code>: compile the object, emit <code>i32.load</code>, emit <code>i64.extend_i32_s</code>.</li>
+    <li>Apply the prepass and emission changes for strings.</li>
+    <li>Implement <code>str.len()</code>: compile the object, sub 4, load, extend.</li>
+    <li>Update snapshots; confirm a program calling <code>arr.len()</code> and <code>str.len()</code> compiles correctly.</li>
+  </ol>
+</div>
+
+<h3>Compiler pattern to add</h3>
+
+<pre><code><span class="kw">case</span> *script.<span class="fn">MemberAccess</span>:
+    t := callee.Object.(script.Expression).<span class="fn">GetType</span>()
+
+    <span class="kw">switch</span> t.Kind {
+    <span class="kw">case</span> script.TypeKind_Array:
+        <span class="kw">switch</span> callee.Field {
+        <span class="kw">case</span> <span class="str">"len"</span>:
+            <span class="kw">if</span> err := c.<span class="fn">Compile</span>(callee.Object); err != <span class="kw">nil</span> {
+                <span class="kw">return</span> err
+            }
+            c.<span class="fn">emit</span>(<span class="str">"i32.load"</span>)
+            c.<span class="fn">emit</span>(<span class="str">"i64.extend_i32_s"</span>)
+        <span class="kw">default</span>:
+            <span class="cmt">// ... append, remove — Task B</span>
+        }
+    <span class="kw">case</span> script.TypeKind_String:
+        <span class="kw">switch</span> callee.Field {
+        <span class="kw">case</span> <span class="str">"len"</span>:
+            <span class="kw">if</span> err := c.<span class="fn">Compile</span>(callee.Object); err != <span class="kw">nil</span> {
+                <span class="kw">return</span> err
+            }
+            c.<span class="fn">emit</span>(<span class="str">"i32.const 4"</span>)
+            c.<span class="fn">emit</span>(<span class="str">"i32.sub"</span>)
+            c.<span class="fn">emit</span>(<span class="str">"i32.load"</span>)
+            c.<span class="fn">emit</span>(<span class="str">"i64.extend_i32_s"</span>)
+        }
+    <span class="kw">default</span>:
+        <span class="cmt">// existing struct method path</span>
+        def, ok := c.structs[t.Struct]
+        <span class="cmt">// ... rest of struct handling unchanged</span>
+    }
+</code></pre>
+
+<h3>Verification</h3>
+
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>() -&gt; i64 {
+    <span class="kw">let</span> arr: i64[] = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>];
+    <span class="kw">return</span> arr.<span class="fn">len</span>();     <span class="cmt">// expect 3</span>
+}</code></pre>
+
+<pre><code><span class="kw">fn</span> <span class="fn">main</span>() -&gt; i64 {
+    <span class="kw">let</span> s = <span class="str">"hello"</span>;
+    <span class="kw">return</span> s.<span class="fn">len</span>();        <span class="cmt">// expect 5</span>
+}</code></pre>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>5. <code>arr.append()</code> — growing a logical list</h2>
+
+<p><code>append</code> adds one element to the end of an array. In memory terms:</p>
+
+<ol>
+  <li>Read the current count from offset 0.</li>
+  <li>Calculate the write address: <code>base + 4 + count * elemSize</code>.</li>
+  <li>Store the new element there.</li>
+  <li>Increment the count at offset 0.</li>
+</ol>
+
+<p>There is a critical constraint: the allocation made by the array literal only covers <code>4 + initialCount * elemSize</code> bytes. Appending beyond that overwrites adjacent heap memory.</p>
+
+<div class="warn">
+  <strong>No bounds checking (yet)</strong> — plex has no safety net here. Calling <code>arr.append(x)</code> when the array is full corrupts the heap silently. Defensive usage: allocate the array with extra capacity upfront. A future lesson could add a capacity/length split (like Go slices), but for now we implement the fast, unsafe version.
+</div>
+
+<p>The WAT is tricky because you need the <em>old</em> length (for the write address) and then immediately increment it. Use a local temp or the transaction pattern. The simplest approach compiles the object twice (once to read length, once as the store base):</p>
+
+<pre><code><span class="kw">case</span> <span class="str">"append"</span>:
+    <span class="cmt">// element type comes from the array type</span>
+    elemType := <span class="fn">getWasmType</span>(t.Element)
+    elemSize := <span class="fn">sizeOf</span>(elemType)
+
+    <span class="cmt">// need a temp local to hold array ptr (used 3 times)</span>
+    tmpName := fmt.<span class="fn">Sprintf</span>(<span class="str">"__append_tmp%d"</span>, c.tempVars)
+    c.tempVars++
+    c.locals = <span class="fn">append</span>(c.locals, Local{Name: tmpName, Type: <span class="str">"i32"</span>})
+
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(callee.Object); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.tee $%s"</span>, tmpName)) <span class="cmt">// save ptr, keep on stack</span>
+
+    <span class="cmt">// read old count</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, tmpName))
+    c.<span class="fn">emit</span>(<span class="str">"i32.load"</span>)                <span class="cmt">// old count on stack</span>
+
+    <span class="cmt">// compute write address: ptr + 4 + oldCount*elemSize</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"i32.const %d"</span>, elemSize))
+    c.<span class="fn">emit</span>(<span class="str">"i32.mul"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 4"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, tmpName))
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)                <span class="cmt">// final write address on stack</span>
+
+    <span class="cmt">// compile element value (second operand to store)</span>
+    <span class="kw">if</span> err := c.<span class="fn">Compile</span>(n.Args[<span class="num">0</span>]); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    c.<span class="fn">emit</span>(elemType + <span class="str">".store"</span>)      <span class="cmt">// write element</span>
+
+    <span class="cmt">// increment count: ptr, old count+1, store</span>
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, tmpName))
+    c.<span class="fn">emit</span>(fmt.<span class="fn">Sprintf</span>(<span class="str">"local.get $%s"</span>, tmpName))
+    c.<span class="fn">emit</span>(<span class="str">"i32.load"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.const 1"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.add"</span>)
+    c.<span class="fn">emit</span>(<span class="str">"i32.store"</span>)               <span class="cmt">// update count</span></code></pre>
+
+<div class="task">
+  <strong>Task B</strong>
+  Implement <code>arr.append(elem)</code> using the pattern above. Verify with a test that creates a 2-element array, appends a third, then checks <code>arr.len() == 3</code> and <code>arr[2] == expectedValue</code>.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. <code>arr.len()</code> emits <code>i64.extend_i32_s</code> after <code>i32.load</code>. Why?</p>
+    <label><input type="radio" name="q1" value="a"> a) WAT requires extending before any arithmetic</label>
+    <label><input type="radio" name="q1" value="b"> b) The count is stored as i32 in memory, but plex integers are i64 — mismatched stack types cause validation errors</label>
+    <label><input type="radio" name="q1" value="c"> c) <code>i32.load</code> always produces i64 output</label>
+    <label><input type="radio" name="q1" value="d"> d) It converts the pointer to a count</label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. Why does the string pointer still point to the data (not to the length field) after the layout change?</p>
+    <label><input type="radio" name="q2" value="a"> a) Because WAT doesn't allow negative offsets</label>
+    <label><input type="radio" name="q2" value="b"> b) So that the host <code>print</code> function continues to receive a pointer to the first character without any change on the host side</label>
+    <label><input type="radio" name="q2" value="c"> c) Because storing the length at negative offsets is faster</label>
+    <label><input type="radio" name="q2" value="d"> d) So that string indexing (<code>s[i]</code>) doesn't need to add an offset</label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. <code>arr.append(x)</code> after the implementation: what happens if you append to a full array?</p>
+    <label><input type="radio" name="q3" value="a"> a) The compiler detects the overflow at compile time</label>
+    <label><input type="radio" name="q3" value="b"> b) The runtime panics with an index out of bounds error</label>
+    <label><input type="radio" name="q3" value="c"> c) The write silently corrupts adjacent heap memory</label>
+    <label><input type="radio" name="q3" value="d"> d) WAT automatically reallocates the array</label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. Why is the length prefix stored in <em>little-endian</em> in the WAT data segment?</p>
+    <label><input type="radio" name="q4" value="a"> a) WAT requires big-endian for data but little-endian for loads — the conversion happens automatically</label>
+    <label><input type="radio" name="q4" value="b"> b) WebAssembly defines its memory as little-endian; <code>i32.load</code> reads 4 bytes in little-endian order, so the data must match</label>
+    <label><input type="radio" name="q4" value="c"> c) Little-endian data compresses better in the binary format</label>
+    <label><input type="radio" name="q4" value="d"> d) It's just convention — either order works with any WAT implementation</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+</div>
+
+<button onclick="checkQuiz()">Check answers</button>
+<div class="score-box" id="score" style="display:none"></div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Summary</h2>
+
+<table>
+  <tr><th>Change</th><th>Files</th><th>Why</th></tr>
+  <tr><td>Array/string type switch before struct lookup</td><td><code>compiler.go</code></td><td>Intercept built-in methods the typechecker already approves</td></tr>
+  <tr><td><code>arr.len()</code>: i32.load + extend</td><td><code>compiler.go</code></td><td>Length is at offset 0, already there from literal construction</td></tr>
+  <tr><td>String prepass: offset += 4, dataPtr += 4+len+1</td><td><code>compiler.go</code></td><td>Reserve 4 bytes before data for the length field</td></tr>
+  <tr><td>String emission: write little-endian length then data</td><td><code>compiler.go</code></td><td>Populate the length field so str.len() can load it</td></tr>
+  <tr><td><code>str.len()</code>: sub 4, i32.load + extend</td><td><code>compiler.go</code></td><td>Length is at ptr−4 (same O(1) cost as arr.len)</td></tr>
+  <tr><td><code>arr.append(elem)</code>: write then increment count</td><td><code>compiler.go</code></td><td>Adds element to end; caller is responsible for capacity</td></tr>
+</table>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent. Good follow-up threads: how would you implement <code>arr.remove(i)</code> (requires shifting elements left)? How would you add a separate <em>capacity</em> field to avoid silent heap corruption on append?
+</p>
+
+<div class="nav">
+  <a href="0019-break-and-ternary.html">← Lesson 19: Break &amp; Ternary</a>
+</div>
+
+<script>
+const answers = { q1:'b', q2:'b', q3:'c', q4:'b' };
+const explanations = {
+  q1: "Correct. The WAT value stack is strongly typed. i32.load produces an i32; plex integers are i64. If you try to use an i32 where an i64 is expected — for example, comparing with an i64 variable — the WAT validator rejects the module. i64.extend_i32_s makes the types agree.",
+  q2: "Correct. Keeping the pointer pointed at the data means host code (JavaScript) that calls print with a string pointer continues to work without modification. The length lives just before the pointer, accessed as ptr−4 only inside the compiled module.",
+  q3: "Correct. There is no bounds check in either the compiler or the WAT runtime. The store instruction writes to whatever address it's given. If that address falls inside another live allocation, you corrupt it silently. This is the same behaviour as an out-of-bounds write in C.",
+  q4: "Correct. The WebAssembly spec mandates little-endian memory access. i32.load reads four bytes starting at the given address and interprets them as a little-endian 32-bit integer. If you wrote big-endian bytes in the data segment, i32.load would return the wrong value."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => {
+      r.parentElement.classList.remove('correct','wrong');
+    });
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>

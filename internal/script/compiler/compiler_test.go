@@ -171,3 +171,57 @@ func TestTernary(t *testing.T) {
 		},
 	}, func(ctx context.Context, r wazero.Runtime) {})
 }
+
+func TestStringLen(t *testing.T) {
+	src := `
+		fn test(): int {
+			let s = "Hello";
+			return s.len();	
+		}
+	`
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "test",
+			args: []uint64{},
+			want: []uint64{5},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}
+
+func TestArrayLen(t *testing.T) {
+	src := `
+		fn test(): int {
+			let s: int[] = [1,2];
+			return s.len();	
+		}
+	`
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "test",
+			args: []uint64{},
+			want: []uint64{2},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}
+
+func TestArrayAppend(t *testing.T) {
+	src := `
+		fn test(): int {
+			let s: int[] = [1,2];
+
+			s.append(3);
+
+			return s.len();	
+		}
+	`
+
+	validateByRun(t, src, []testRun{
+		{
+			fn:   "test",
+			args: []uint64{},
+			want: []uint64{3},
+		},
+	}, func(ctx context.Context, r wazero.Runtime) {})
+}

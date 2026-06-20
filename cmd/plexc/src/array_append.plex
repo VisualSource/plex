@@ -1,0 +1,7 @@
+fn test(): int {
+	let s: int[] = [1,2];
+
+	s.append(3);
+
+	return s.len();	
+}
