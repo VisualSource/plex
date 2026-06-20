@@ -14,6 +14,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 	height := 480
 
 	mainFrame := NewFrame(logger, ctx)
+	defer mainFrame.Destroy()
 	mainFrame.width = width
 	mainFrame.height = height
 
@@ -24,6 +25,7 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>Document</title>
 		<style>
+			script { display: none; }
 			* { font-size: 22px; }
 			div { display: block; padding-left: 12px; padding-right: 12px; padding-top: 12px; padding-bottom: 12px; }
 			head { display: none; background-color: gray; }
@@ -41,6 +43,14 @@ func StartPlex(ctx context.Context, logger *slog.Logger, window *app.Window, rem
 			button:hover { background-color: blue; }
 			input { display: block; height: 40px; width: 100px; background-color: green; }
 		</style>
+		<script>
+			import print from "plex:console";
+			
+			fn main(){
+				let msg = "Hello, Word";
+				print(msg);
+			}
+		</script>
 	</head>
 	<body>
 		<div class="a">

@@ -23,10 +23,14 @@ import (
 	"github.com/VisualSource/plex/internal/layouts"
 	"github.com/VisualSource/plex/internal/layouts/styletree"
 	"github.com/VisualSource/plex/internal/layouts/widgets"
+	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 )
 
 type FrameConfig struct{}
-
+type scriptEvent struct {
+	Type string
+}
 type Frame struct {
 	width, height int
 
@@ -47,17 +51,28 @@ type Frame struct {
 
 	shaper *text.Shaper
 	state  *widgets.WidgetState
+
+	wasm []api.Module
+
+	scriptChannal chan scriptEvent
+
+	scriptRuntime wazero.Runtime
 }
 
 func NewFrame(logger *slog.Logger, ctx context.Context) *Frame {
 	shaper := text.NewShaper(text.WithCollection(gofont.Collection()))
+
+	runtime := wazero.NewRuntime(ctx)
+
 	return &Frame{
-		ctx:       ctx,
-		logger:    logger,
-		cssom:     &cssom.Cssom{},
-		shaper:    shaper,
-		state:     widgets.NewWidgetState(shaper),
-		cssParser: css_parser.NewCssParser(),
+		scriptChannal: make(chan scriptEvent),
+		scriptRuntime: runtime,
+		ctx:           ctx,
+		logger:        logger,
+		cssom:         &cssom.Cssom{},
+		shaper:        shaper,
+		state:         widgets.NewWidgetState(shaper),
+		cssParser:     css_parser.NewCssParser(),
 	}
 }
 
@@ -134,13 +149,37 @@ func (f *Frame) Load(stream io.Reader) error {
 		mu sync.Mutex
 	)
 
+	envBuilder := f.scriptRuntime.NewHostModuleBuilder("env").NewFunctionBuilder()
+	printFn := api.GoModuleFunc(func(ctx context.Context, mod api.Module, stack []uint64) {
+		mem := mod.Memory()
+		offset := api.DecodeU32(stack[0])
+
+		strLen, outOfRange := mem.ReadUint32Le(offset)
+		if !outOfRange {
+			return
+		}
+
+		str, outOfRange := mem.Read(offset+4, strLen)
+		if !outOfRange {
+			return
+		}
+
+		f.logger.InfoContext(ctx, string(str))
+	})
+
+	_, err = envBuilder.WithGoModuleFunction(printFn, []api.ValueType{api.ValueTypeI32},
+		[]api.ValueType{}).Export("print").Instantiate(f.ctx)
+	if err != nil {
+		f.logger.ErrorContext(f.ctx, err.Error())
+	}
+
 	for _, contentItem := range externalContent {
 		switch contentItem.Tag() {
 		case "script":
-			if !metadata.NoScript {
+			if metadata.NoScript {
 				continue
 			}
-
+			f.logger.Debug("loading plex script")
 			node := contentItem.(dom.ElementNode)
 
 			srcAttribute := node.GetAttribute("src")
@@ -152,30 +191,46 @@ func (f *Frame) Load(stream io.Reader) error {
 				}
 
 				wg.Go(func() {
-					_, err := fetchResource(f.ctx, client, uri, func(r io.Reader) (any, error) {
-						return nil, nil
-					}, metadata.RelativeFileImport)
+					program, err := fetchResource[[]byte](f.ctx, client, uri, parseScript, metadata.RelativeFileImport)
 					if err != nil {
+						f.logger.Error(err.Error())
 						return
 					}
 
-					//TODO: parse and compile script
+					module, err := f.scriptRuntime.Instantiate(f.ctx, program)
+					if err != nil {
+						f.logger.Error(err.Error())
+						return
+					}
 
+					mu.Lock()
+					f.wasm = append(f.wasm, module)
+					mu.Unlock()
 				})
 			} else {
+
 				scriptText := getTextContent(node)
 				if scriptText == "" {
+					f.logger.Debug("empty script content")
 					continue
 				}
 
 				wg.Go(func() {
-					select {
-					case <-f.ctx.Done():
-
-					default:
-						//TODO: parse and compile script
-
+					program, err := parseScript(strings.NewReader(scriptText))
+					if err != nil {
+						f.logger.Error("failed to parse script", slog.Any("error", err))
+						return
 					}
+
+					module, err := f.scriptRuntime.Instantiate(f.ctx, program)
+					if err != nil {
+						f.logger.Error(err.Error())
+						return
+					}
+
+					mu.Lock()
+					f.wasm = append(f.wasm, module)
+					mu.Unlock()
 				})
 			}
 		case "style":
@@ -190,6 +245,7 @@ func (f *Frame) Load(stream io.Reader) error {
 
 				sheet, err := parseCss(strings.NewReader(styleText))
 				if err != nil {
+					f.logger.Error(err.Error())
 					return
 				}
 
@@ -254,7 +310,37 @@ func (f *Frame) Load(stream io.Reader) error {
 	f.paint = tree
 	f.layout = layouts.NewLayoutTree(f.paint, &layouts.Context{Shaper: f.shaper}, float64(f.width), float64(f.height))
 
+	go func() {
+		// env state
+		f.logger.Debug("Starting script event loop")
+
+		for _, module := range f.wasm {
+			exports := module.ExportedFunctionDefinitions()
+			if _, ok := exports["main"]; ok {
+				if _, err := module.ExportedFunction("main").Call(f.ctx); err != nil {
+					f.logger.ErrorContext(f.ctx, err.Error())
+				}
+			}
+		}
+
+		for {
+			select {
+			case <-f.ctx.Done():
+				return
+			case message := <-f.scriptChannal:
+				switch message.Type {
+
+				}
+			}
+		}
+	}()
+
 	return nil
+}
+
+func (f *Frame) Destroy() {
+	close(f.scriptChannal)
+	f.scriptRuntime.Close(f.ctx)
 }
 
 func (f *Frame) Render(gtx layout.Context) {

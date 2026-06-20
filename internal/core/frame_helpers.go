@@ -7,10 +7,14 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/VisualSource/plex/internal/css/cssom"
 	css_parser "github.com/VisualSource/plex/internal/css/parser"
 	"github.com/VisualSource/plex/internal/dom"
+	"github.com/VisualSource/plex/internal/script"
+	"github.com/VisualSource/plex/internal/script/compiler"
 	"github.com/VisualSource/plex/internal/utils"
 )
 
@@ -27,6 +31,42 @@ func parseCss(reader io.Reader) (*cssom.Stylesheet, error) {
 	//TODO: load linked stylesheet via @import
 
 	return cssomSheet, nil
+}
+
+func parseScript(reader io.Reader) ([]byte, error) {
+	program, err := script.Parse(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	wat, err := compiler.CompileProgram(program)
+	if err != nil {
+		return nil, err
+	}
+
+	tempDir := os.TempDir()
+	tmpFile, err := os.CreateTemp(tempDir, "script.*.wat")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tmpFile.WriteString(wat); err != nil {
+		return nil, err
+	}
+
+	inputFile := tmpFile.Name()
+	outputFile := strings.Replace(inputFile, "wat", "wasm", 1)
+
+	cmd := exec.Command("wat2wasm", tmpFile.Name(), "-o", outputFile) // when able replace this with binrary wasm so we do have to pass it to wat2wasm
+	cmdOutput, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, errors.Join(err, errors.New(string(cmdOutput)))
+	}
+	wasm, err := os.ReadFile(outputFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return wasm, nil
 }
 
 func fetchResource[T any](ctx context.Context, client *http.Client, url *url.URL, handler func(io.Reader) (T, error), allowRelativeFileImport bool) (T, error) {
