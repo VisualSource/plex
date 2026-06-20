@@ -11,7 +11,7 @@ import (
 
 func TestCompilerFunctionCall(t *testing.T) {
 	src := `
-		fn add(a: float, b: float): int { return a + b; }
+		fn add(a: float, b: float): float { return a + b; }
 		fn double(x: float): float { return add(x,x); }	
 	`
 
@@ -95,7 +95,7 @@ func TestAlloc(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	snapshot, err := os.ReadFile("testdata/struct.wat")
+	snapshot, err := os.ReadFile("testdata/alloc.wat")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestArray(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	snapshot, err := os.ReadFile("testdata/struct.wat")
+	snapshot, err := os.ReadFile("testdata/array.wat")
 	if err != nil {
 		t.Fatal(err)
 	}

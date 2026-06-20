@@ -1,5 +1,3 @@
-import print from "plex:console";
-
 fn main(){
     let a: int[] = [1,2];
 
