@@ -396,10 +396,10 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 				return fdef.ReturnType
 			}
 
-			c.error(n, fmt.Errorf("unknown callable %T", callee))
+			c.error(n, fmt.Errorf("unknown callable %s", callee.GetType()))
 			return nil
 		default:
-			c.error(n, fmt.Errorf("unknown callable %T", callee))
+			c.error(n, fmt.Errorf("unknown callable"))
 			return nil
 		}
 	default:
@@ -501,6 +501,12 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 			return exp
 		}
 
+		if t == nil {
+			t = &script.Type{
+				Kind: script.TypeKind_Unknown,
+			}
+		}
+
 		c.scope.Set(n.Name, t)
 		n.SetType(t)
 		return t
@@ -554,13 +560,13 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		rt := c.checkStmt(n.Value)
 
 		if (c.expectedReturn == nil || c.expectedReturn.Kind == script.TypeKind_Void) && !(rt == nil || rt.Kind == script.TypeKind_Void) {
-			c.error(n, fmt.Errorf("was expecting return to be void but was given %T", rt.Kind))
+			c.error(n, fmt.Errorf("was expecting return to be void but was given %s", rt.Kind))
 			return nil
 		} else if !isSameType(rt, c.expectedReturn) {
 			if rt != nil {
-				c.error(n, fmt.Errorf("was expecting return to be %T but was given %T", c.expectedReturn.Kind, rt.Kind))
+				c.error(n, fmt.Errorf("was expecting return to be %s but was given %s", c.expectedReturn, rt))
 			} else {
-				c.error(n, fmt.Errorf("was expecting return to be %T but not was given", c.expectedReturn.Kind))
+				c.error(n, fmt.Errorf("was expecting return to be %s but not was given", c.expectedReturn))
 			}
 
 			return nil

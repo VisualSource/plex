@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 15 – Type-Directed Code Generation</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 840px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat-instr { color: #ffa657; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .good { color: var(--green); }
+  .bad  { color: var(--accent); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; letter-spacing: 0.05em; }
+  .compare > div pre { margin: 0; border: none; background: none; padding: 0; font-size: 0.85em; }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label input { margin-right: 8px; }
+  .reveal-btn { background: var(--accent); color: #fff; border: none; padding: 8px 18px; border-radius: 5px; cursor: pointer; font-size: 0.9em; margin-top: 10px; }
+  .answer { display: none; margin-top: 10px; padding: 10px 14px; background: #0e1e0e; border-left: 3px solid var(--green); border-radius: 0 5px 5px 0; font-size: 0.9em; color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); font-size: 0.9em; }
+  .tag { display: inline-block; background: var(--border); color: var(--blue); padding: 2px 9px; border-radius: 3px; font-size: 0.8em; margin-right: 4px; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li { padding: 3px 0; }
+  .checklist li::before { content: "☐ "; color: var(--yellow); }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); padding: 8px 12px; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); font-family: "Fira Code", monospace; font-size: 0.85em; }
+  td:first-child { font-family: Georgia, serif; font-size: 0.9em; }
+  .flow { display: flex; align-items: center; gap: 12px; margin: 1.4em 0; flex-wrap: wrap; }
+  .flow-box { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px 16px; font-size: 0.88em; text-align: center; min-width: 100px; }
+  .flow-arrow { color: var(--muted); font-size: 1.4em; }
+  .flow-box.highlight { border-color: var(--accent); background: #1e0a10; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2.5em 0; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 15 — Type-Directed Code Generation</h1>
+<p><span class="tag">compiler</span><span class="tag">WAT</span><span class="tag">annotated AST</span><span class="tag">snapshot testing</span></p>
+
+<p>Your typechecker now annotates every node in the AST with a type. That information is there for a reason: the compiler is supposed to use it. When it doesn't, the generated code is wrong — not "prints an error" wrong, but "silently produces invalid WebAssembly" wrong.</p>
+
+<p>This lesson tracks down exactly that class of bug in <code>compiler.go</code>, explains why it happens, and teaches you how to fix it systematically.</p>
+
+<h2>1. The Flow: Annotated AST → Code Gen</h2>
+
+<p>Remind yourself of what the compiler pipeline looks like after adding the typechecker:</p>
+
+<div class="flow">
+  <div class="flow-box">Source text</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Parser<br><small>builds AST</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box highlight">Typechecker<br><small>annotates AST</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">Compiler<br><small>reads annotations</small></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box">WAT output</div>
+</div>
+
+<p>The typechecker calls <code>n.SetType(t)</code> on each AST node. The compiler calls <code>n.GetType()</code> to retrieve it. This is the contract: typechecker provides, compiler consumes.</p>
+
+<p>When the compiler <em>ignores</em> <code>GetType()</code> and hardcodes an instruction instead, it has broken that contract.</p>
+
+<h2>2. The Bug: Arrays with Hardcoded <code>f64</code></h2>
+
+<p>Look at the array literal code in <code>compiler.go</code>:</p>
+
+<pre><code><span class="kw">case</span> *script.ArrayLiteral:
+    <span class="cmt">// ...</span>
+    elemSize := <span class="num">8</span> <span class="cmt">// f64 element size in bytes</span>
+    totalSize := <span class="num">4</span> + len(n.Elements)*elemSize
+
+    <span class="cmt">// ...allocate, store length...</span>
+
+    <span class="kw">for</span> i, v := <span class="kw">range</span> n.Elements {
+        offset := <span class="num">4</span> + i*elemSize
+        <span class="cmt">// ...emit address arithmetic...</span>
+        <span class="kw">if</span> err := c.Compile(v); err != nil {
+            <span class="kw">return</span> err
+        }
+        c.emit(<span class="str">"f64.store"</span>)  <span class="cmt">// ← HARDCODED</span>
+    }</code></pre>
+
+<p>And the array access code:</p>
+
+<pre><code><span class="kw">case</span> *script.ArrayAccess:
+    <span class="cmt">// ...address arithmetic...</span>
+    c.emit(<span class="str">"i32.const 8"</span>)   <span class="cmt">// ← HARDCODED size</span>
+    c.emit(<span class="str">"i32.mul"</span>)
+    c.emit(<span class="str">"i32.add"</span>)
+    c.emit(<span class="str">"f64.load"</span>)      <span class="cmt">// ← HARDCODED</span></code></pre>
+
+<p>Now watch what the compiler produces for <code>int[]</code>:</p>
+
+<pre><code>let a: int[] = [1, 2];
+</code></pre>
+
+<p>Integer literals are typed as <code>TypeKind_Int</code>, which maps to <code>i64</code> in WAT. But the compiler emits:</p>
+
+<pre><code><span class="wat-instr">i64.const</span> 1      <span class="cmt">;; ✅ correct: element is i64</span>
+<span class="wat-instr">f64.store</span>        <span class="cmt">;; ❌ wrong: can't store i64 as f64</span></code></pre>
+
+<p>WebAssembly is <a href="https://webassembly.github.io/spec/core/valid/instructions.html#store-instructions" target="_blank">strongly typed at the instruction level</a>. A <code>f64.store</code> instruction expects an <code>f64</code> value on the stack. Pushing an <code>i64</code> and then calling <code>f64.store</code> is a type error that WebAssembly runtimes <em>will</em> reject at validation time. The program won't even start.</p>
+
+<div class="warn">
+  <strong>Silent wrongness:</strong> The typechecker caught this at the plex level. But the compiler lost the information on the way to WAT. Without running the WAT through a validator, this bug is invisible — the output is text, it looks plausible, and no Go test catches it until you validate or execute the WAT.
+</div>
+
+<h2>3. The Fix: Ask the Type</h2>
+
+<p>The information you need is already there. After the typechecker runs, <code>n.GetType()</code> on an <code>ArrayLiteral</code> returns a <code>*Type</code> with <code>Kind == TypeKind_Array</code> and <code>Element</code> set to the element type. The element type is exactly what you need to pick the right store instruction.</p>
+
+<p>The pattern is:</p>
+
+<pre><code><span class="kw">case</span> *script.ArrayLiteral:
+    t := n.GetType()           <span class="cmt">// *Type{Kind: Array, Element: *Type{Kind: Int}}</span>
+    <span class="kw">if</span> t == nil {
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"array literal has no type"</span>)
+    }
+    wasmElem := getWasmType(t.Element)   <span class="cmt">// "i64"</span>
+    elemSize := sizeOf(wasmElem)         <span class="cmt">// 8</span>
+
+    <span class="cmt">// ... then use wasmElem + ".store" instead of "f64.store" ...</span></code></pre>
+
+<p>And for access:</p>
+
+<pre><code><span class="kw">case</span> *script.ArrayAccess:
+    t := n.GetType()           <span class="cmt">// element type (already unwrapped by typechecker)</span>
+    <span class="kw">if</span> t == nil {
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"array access has no type"</span>)
+    }
+    wasmElem := getWasmType(t)
+    elemSize := sizeOf(wasmElem)
+
+    <span class="cmt">// ... use elemSize for stride, wasmElem + ".load" instead of "f64.load" ...</span></code></pre>
+
+<div class="insight">
+  <strong>General principle:</strong> Any time you see a hardcoded WAT type string (<code>"f64.store"</code>, <code>"i32.const 8"</code>) in code that handles heterogeneous data, ask: "should this be driven by a call to <code>getWasmType</code>?" The typechecker did the work of figuring out the type. The compiler should use it.
+</div>
+
+<h2>4. Snapshot Testing in Compilers</h2>
+
+<p>Three of the four compiler tests use snapshot files — they compile a program and check the output matches a saved <code>.wat</code> file. This is called <strong>snapshot testing</strong> (sometimes "golden file testing").</p>
+
+<p>It's popular in compilers because the output can be large and changing it manually is tedious. Instead of writing expected output by hand, you:</p>
+<ol>
+  <li>Run the compiler once to produce output you believe is correct</li>
+  <li>Save it as the snapshot</li>
+  <li>From then on, the test fails if the output ever changes unexpectedly</li>
+</ol>
+
+<p>The workflow when you change the compiler intentionally:</p>
+<ol>
+  <li>Make the change</li>
+  <li>Run the tests — they fail (snapshot is stale)</li>
+  <li>Inspect the diff: is the new output <em>correct</em>?</li>
+  <li>If yes: regenerate the snapshot and commit it</li>
+  <li>If no: fix the compiler, repeat</li>
+</ol>
+
+<p>The current state in plex is messier: <code>TestAlloc</code> and <code>TestArray</code> both compare against <code>testdata/struct.wat</code>, which is a copy-paste error. They each need their own snapshot file. And <code>TestStructGenAndCtor</code> fails because its snapshot is missing a trailing newline.</p>
+
+<h3>When to update vs when to fix</h3>
+
+<table>
+  <tr><th>Situation</th><th>Action</th></tr>
+  <tr><td>You changed the compiler intentionally and the output is correct</td><td>Update the snapshot</td></tr>
+  <tr><td>A refactor changed formatting but not semantics</td><td>Update the snapshot</td></tr>
+  <tr><td>The output changed and you're not sure why</td><td>Investigate before updating</td></tr>
+  <tr><td>The output is semantically wrong (wrong WAT type)</td><td>Fix the compiler, then update the snapshot</td></tr>
+  <tr><td>The snapshot file doesn't even match the test</td><td>Fix the test, create the right snapshot</td></tr>
+</table>
+
+<hr>
+
+<div class="quiz-section">
+  <h3>Check Your Understanding</h3>
+
+  <div class="q">
+    <p>1. After the typechecker runs, what does <code>n.GetType()</code> return on an <code>ArrayLiteral</code> node for <code>[1, 2, 3]</code>?</p>
+    <label><input type="radio" name="q1"> <code>&amp;Type{Kind: TypeKind_Int}</code></label>
+    <label><input type="radio" name="q1"> <code>&amp;Type{Kind: TypeKind_Array, Element: &amp;Type{Kind: TypeKind_Int}}</code></label>
+    <label><input type="radio" name="q1"> <code>nil</code> — arrays don't get types until access time</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ <code>&amp;Type{Kind: TypeKind_Array, Element: &amp;Type{Kind: TypeKind_Int}}</code>. The typechecker sets the type on the ArrayLiteral node itself. The element type is in <code>.Element</code>. For array access nodes, <code>GetType()</code> returns the element type directly (already unwrapped).</div>
+  </div>
+
+  <div class="q">
+    <p>2. Why does <code>f64.store</code> on an <code>i64</code> value cause a WebAssembly validation error?</p>
+    <label><input type="radio" name="q2"> WebAssembly doesn't allow storing integers in memory</label>
+    <label><input type="radio" name="q2"> <code>f64.store</code> expects the value on the stack to be <code>f64</code>; an <code>i64</code> is a type mismatch</label>
+    <label><input type="radio" name="q2"> Only WASM runtimes that support strict mode will reject it</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ Every WAT store instruction is typed. <code>f64.store</code> pops an address (<code>i32</code>) and a value (<code>f64</code>) from the stack. Pushing an <code>i64</code> and then calling <code>f64.store</code> is a static type error that the WASM validator rejects before execution.</div>
+  </div>
+
+  <div class="q">
+    <p>3. You fix the array bug and the snapshot test fails. Is that expected?</p>
+    <label><input type="radio" name="q3"> No — the fix should make the test pass automatically</label>
+    <label><input type="radio" name="q3"> Yes — the snapshot records the old (wrong) output, so the correct fix changes the output and breaks the snapshot</label>
+    <label><input type="radio" name="q3"> Yes — snapshot tests always fail after any change</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ Expected. The snapshot captured the buggy output. Now that the compiler emits the correct instructions, the output differs. Your job is to inspect the new output, confirm it's correct, and update the snapshot file.</div>
+  </div>
+</div>
+
+<hr>
+
+<h2>Your Tasks</h2>
+
+<div class="task">
+  <strong>Task 1 — Fix <code>TestCompilerFunctionCall</code></strong>
+  The test source declares <code>fn add(a: float, b: float): int</code> but the body <code>return a + b</code> produces a <code>float</code>. The typechecker now catches this, so compilation fails. Fix the return type annotation in the test source to <code>float</code>.
+  <ul class="checklist">
+    <li>In <code>compiler_test.go</code>, change <code>): int</code> to <code>): float</code> for <code>add</code></li>
+    <li>Run the test — it should pass (the test checks substrings of the WAT, not a snapshot)</li>
+  </ul>
+</div>
+
+<div class="task">
+  <strong>Task 2 — Fix the array literal compilation</strong>
+  In <code>compiler.go</code>, the <code>ArrayLiteral</code> case hardcodes <code>elemSize := 8</code> and <code>c.emit("f64.store")</code>. Fix it to use the element type from the annotated AST.
+  <ul class="checklist">
+    <li>Add <code>t := n.GetType()</code> and a nil check</li>
+    <li>Derive <code>wasmElem := getWasmType(t.Element)</code></li>
+    <li>Derive <code>elemSize := sizeOf(wasmElem)</code></li>
+    <li>Replace <code>"f64.store"</code> with <code>wasmElem + ".store"</code></li>
+  </ul>
+</div>
+
+<div class="task">
+  <strong>Task 3 — Fix the array access compilation</strong>
+  The <code>ArrayAccess</code> case hardcodes <code>"i32.const 8"</code> and <code>"f64.load"</code>. Fix it with the same pattern.
+  <ul class="checklist">
+    <li>Add <code>t := n.GetType()</code> (this is the element type)</li>
+    <li>Derive <code>wasmElem</code> and <code>elemSize</code></li>
+    <li>Emit <code>fmt.Sprintf("i32.const %d", elemSize)</code> instead of hardcoded <code>8</code></li>
+    <li>Emit <code>wasmElem + ".load"</code> instead of <code>"f64.load"</code></li>
+  </ul>
+</div>
+
+<div class="task">
+  <strong>Task 4 — Fix the snapshot tests</strong>
+  Three tests need snapshot file fixes:
+  <ul class="checklist">
+    <li><strong><code>TestStructGenAndCtor</code></strong>: Run <code>go test</code>, capture the actual output, and update <code>testdata/struct.wat</code> to match (add trailing newline)</li>
+    <li><strong><code>TestAlloc</code></strong>: Change the snapshot file reference from <code>"testdata/struct.wat"</code> to <code>"testdata/alloc.wat"</code> and create that file with the correct output</li>
+    <li><strong><code>TestArray</code></strong>: Same — use <code>"testdata/array.wat"</code> and create it</li>
+    <li>Run all compiler tests. All four should pass.</li>
+  </ul>
+  <p><strong>Tip:</strong> To capture the compiler output into a snapshot file from within a test, temporarily add <code>os.WriteFile("testdata/array.wat", []byte(result), 0644)</code>, run once, then remove that line and commit the generated file.</p>
+</div>
+
+<hr>
+
+<h2>Going Deeper</h2>
+
+<ul>
+  <li><a href="https://webassembly.github.io/spec/core/valid/instructions.html#memory-instructions" target="_blank">WebAssembly Store/Load Validation Rules</a> — the spec that describes why types must match</li>
+  <li><a href="https://jestjs.io/docs/snapshot-testing" target="_blank">Snapshot Testing</a> (Jest docs) — the same concept, explained in a JavaScript context</li>
+  <li><a href="https://tigerbeetle.com/blog/2023-07-11-we-put-a-distributed-system-in-your-snapshot-tests/" target="_blank">TigerBeetle on snapshot tests</a> — an interesting case study of snapshot testing in a systems project</li>
+</ul>
+
+<hr>
+
+<p><em>💬 Ask me anything — if you're unsure whether the WAT output for a fixed test looks correct, or want to understand how <code>sizeOf</code> should work for structs inside arrays, just ask.</em></p>
+
+<div class="nav">
+  <a href="0014-type-error-diagnostics.html">← Lesson 14: Diagnostics</a>
+  <a href="../reference/">Reference docs →</a>
+</div>
+
+</body>
+</html>

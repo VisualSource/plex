@@ -6,7 +6,6 @@ import (
 
 	"github.com/VisualSource/plex/internal/script"
 	"github.com/VisualSource/plex/internal/script/typeschecker"
-	"github.com/kr/pretty"
 )
 
 func TestCheck(t *testing.T) {
@@ -24,8 +23,6 @@ func TestCheck(t *testing.T) {
 	if err = typeschecker.Check(output); err != nil {
 		t.Fatal(err)
 	}
-
-	pretty.Printf("%# v", output)
 }
 
 func TestUsingImportVars(t *testing.T) {
@@ -46,8 +43,6 @@ func TestUsingImportVars(t *testing.T) {
 	if err = typeschecker.Check(output); err != nil {
 		t.Fatal(err)
 	}
-
-	pretty.Printf("%# v", output)
 }
 
 func TestStructImpl(t *testing.T) {
@@ -71,7 +66,7 @@ func TestStructImpl(t *testing.T) {
 	}
 
 	fn main(){
-		let point = Point(1,1);
+		let point = Point(1.0,1.0);
 
 		point.getX();
 	}
@@ -85,8 +80,6 @@ func TestStructImpl(t *testing.T) {
 	if err = typeschecker.Check(output); err != nil {
 		t.Fatal(err)
 	}
-
-	pretty.Printf("%# v", output)
 }
 
 func TestArray(t *testing.T) {
@@ -110,7 +103,4 @@ func TestArray(t *testing.T) {
 	if err = typeschecker.Check(output); err != nil {
 		t.Fatal(err)
 	}
-
-	pretty.Printf("%# v", output)
-
 }

@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 14 – Type Error Diagnostics: Making Errors That Help</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --border: #0f3460;
+    --text: #e0e0e0;
+    --muted: #9e9e9e;
+    --accent: #e94560;
+    --green: #4caf50;
+    --yellow: #ffd54f;
+    --blue: #64b5f6;
+    --purple: #ce93d8;
+    --orange: #ffb74d;
+    --code-bg: #0d1117;
+    --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 840px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; color: #c9d1d9; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .good { color: var(--green); }
+  .bad { color: var(--accent); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; letter-spacing: 0.05em; }
+  .compare > div pre { margin: 0; border: none; background: none; padding: 0; font-size: 0.85em; }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label input { margin-right: 8px; }
+  .reveal-btn { background: var(--accent); color: #fff; border: none; padding: 8px 18px; border-radius: 5px; cursor: pointer; font-size: 0.9em; margin-top: 10px; }
+  .answer { display: none; margin-top: 10px; padding: 10px 14px; background: #0e1e0e; border-left: 3px solid var(--green); border-radius: 0 5px 5px 0; font-size: 0.9em; color: var(--muted); }
+  .nav { display: flex; justify-content: space-between; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); font-size: 0.9em; }
+  .tag { display: inline-block; background: var(--border); color: var(--blue); padding: 2px 9px; border-radius: 3px; font-size: 0.8em; margin-right: 4px; }
+  .checklist { list-style: none; padding: 0; }
+  .checklist li::before { content: "☐ "; color: var(--yellow); }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); padding: 8px 12px; text-align: left; border-bottom: 2px solid var(--border); }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  code.bad { color: var(--accent); background: var(--code-bg); }
+  code.good { color: var(--green); background: var(--code-bg); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 14 — Type Error Diagnostics: Making Errors That Help</h1>
+<p><span class="tag">typechecker</span><span class="tag">diagnostics</span><span class="tag">error design</span></p>
+
+<p>Your typechecker can now catch real mistakes. But right now, when it does, it says this:</p>
+
+<pre><code class="bad">1:36-48:1 | was expecting return to be script.TypeKind but was given script.TypeKind</code></pre>
+
+<p>Both sides say the same thing. The error is <em>technically correct</em> — there is a mismatch — but it gives you zero information about what the actual types are. This is one of the most underrated problems in compiler construction: <strong>an error that doesn't help you fix anything is worse than no error</strong>.</p>
+
+<p>In this lesson you will:</p>
+<ul>
+  <li>Understand <em>why</em> the message is broken (a Go format verb trap)</li>
+  <li>Add a <code>String()</code> method to your <code>Type</code> struct for rich type descriptions</li>
+  <li>Learn what makes a good type error message (and what makes a bad one)</li>
+  <li>Fix two cascading-error patterns that produce misleading second errors</li>
+</ul>
+
+<h2>1. The Bug: <code>%T</code> vs <code>%v</code></h2>
+
+<p>Go's <code>fmt</code> package has several format verbs for printing values. Three are easy to confuse:</p>
+
+<table>
+  <tr><th>Verb</th><th>What it prints</th><th>Example for <code>TypeKind_Float</code></th></tr>
+  <tr><td><code>%T</code></td><td>The <strong>Go type name</strong> of the variable</td><td><code>script.TypeKind</code></td></tr>
+  <tr><td><code>%v</code></td><td>The <strong>default value</strong> (calls <code>String()</code> if available)</td><td><code>TypeKind_Float</code></td></tr>
+  <tr><td><code>%s</code></td><td>The <strong>string representation</strong> (calls <code>String()</code>)</td><td><code>TypeKind_Float</code></td></tr>
+</table>
+
+<p><code>%T</code> is for introspection — "what Go type is this variable?". When you write <code>%T</code> for a <code>script.TypeKind</code>, every single value of that type prints as <code>script.TypeKind</code>, because they all have the same Go type. The actual value is irrelevant to <code>%T</code>.</p>
+
+<p>The fix in <code>typecheck.go</code> is to change <code>%T</code> → <code>%s</code>:</p>
+
+<div class="compare">
+  <div>
+    <h4 class="bad">❌ Before</h4>
+    <pre><code>fmt.Errorf(
+  "was expecting return to be %T but was given %T",
+  c.expectedReturn.Kind,
+  rt.Kind,
+)</code></pre>
+  </div>
+  <div>
+    <h4 class="good">✅ After</h4>
+    <pre><code>fmt.Errorf(
+  "was expecting return to be %s but was given %s",
+  c.expectedReturn.Kind,
+  rt.Kind,
+)</code></pre>
+  </div>
+</div>
+
+<p>This already works because <code>TypeKind</code> has a <code>String()</code> method. But we can do better.</p>
+
+<h2>2. The Type Struct Needs a <code>String()</code></h2>
+
+<p>Your <code>TypeKind.String()</code> only describes the <em>kind</em>, not the full type. Consider what a user sees if their error involves an array or a nullable struct:</p>
+
+<pre><code class="bad">was expecting return to be TypeKind_Array but was given TypeKind_Struct</code></pre>
+
+<p>Which array? Which struct? The <code>Type</code> struct holds all that information — but there's no <code>String()</code> on it, so it never gets used in error messages.</p>
+
+<p>Here's the gap. Your <code>Type</code> struct in <code>types.go</code>:</p>
+
+<pre><code>type Type struct {
+    Kind     TypeKind  // e.g. TypeKind_Array
+    Element  *Type     // set when Kind == TypeKind_Array
+    Struct   string    // set when Kind == TypeKind_Struct
+    Nullable bool
+}</code></pre>
+
+<p>A good <code>String()</code> should produce human-readable output that mirrors what a user would write in plex source code:</p>
+
+<table>
+  <tr><th>Type value</th><th>Good String()</th></tr>
+  <tr><td><code>Kind: Int</code></td><td><code>int</code></td></tr>
+  <tr><td><code>Kind: Float</code></td><td><code>float</code></td></tr>
+  <tr><td><code>Kind: Array, Element: {Kind: Int}</code></td><td><code>int[]</code></td></tr>
+  <tr><td><code>Kind: Struct, Struct: "Point"</code></td><td><code>Point</code></td></tr>
+  <tr><td><code>Kind: Array, Element: {Kind: Struct, Struct: "Point"}, Nullable: true</code></td><td><code>Point[]?</code></td></tr>
+</table>
+
+<div class="insight">
+  <strong>Principle:</strong> Error messages should use the language's own syntax, not the compiler's internal representation. <code>int[]</code> is what a plex developer wrote and recognizes — <code>TypeKind_Array(element=TypeKind_Int)</code> is noise.
+</div>
+
+<h2>3. Cascading Errors</h2>
+
+<p>When a typechecker hits one error, it often produces several more from the same root cause. This makes errors hard to read. Here's the pattern you have now:</p>
+
+<pre><code>fn main(){
+    let point = Point(1, 1);  // ❌ int literal given where float expected
+    point.getX();              // ❌ "unknown identifier: point"
+}</code></pre>
+
+<p>The second error is fake. <code>point</code> <em>is</em> declared — but the init failed type-checking, so the variable was stored with a <code>nil</code> type. When the checker later looks it up, it gets <code>nil</code> and reports "unknown identifier".</p>
+
+<p>This is called a <strong>cascading error</strong>. Rust's compiler, Elm's compiler, and the TypeScript compiler all invest heavily in suppressing these, because they obscure the real problem.</p>
+
+<p>The underlying rule: <strong>if you store <code>nil</code> into a scope entry, any later use of that name will fail with a misleading message</strong>.</p>
+
+<p>There are two common fixes:</p>
+
+<ol>
+  <li><strong>Sentinel type</strong>: Instead of <code>nil</code>, store a special <code>TypeKind_Unknown</code> type. Then propagate it silently — if either operand is <code>Unknown</code>, return <code>Unknown</code> without reporting a new error. (Your <code>TypeKind_Unknown</code> constant already exists for exactly this reason.)</li>
+  <li><strong>Early bail-out</strong>: After a type error in a statement, skip checking downstream statements that depend on it.</li>
+</ol>
+
+<p>The sentinel approach is generally better because it keeps the checker running and can surface multiple independent errors in one pass.</p>
+
+<h2>4. What Makes a Good Type Error?</h2>
+
+<p>This is an active area of compiler research. Some principles from real compilers:</p>
+
+<ul>
+  <li><strong>Show both sides</strong>: "expected X, got Y" is good. Missing either side is not.</li>
+  <li><strong>Use source types</strong>: Write the types in the language's own syntax, not the implementation's internal names.</li>
+  <li><strong>Point to the source</strong>: You're already doing this with positions in your <code>TypeError</code>.</li>
+  <li><strong>First error wins</strong>: When cascading is a risk, report fewer errors, not more. The real error is usually the first one.</li>
+  <li><strong>Don't editorialize</strong>: "was expecting X" is fine. "You made a mistake: was expecting X" is noise.</li>
+</ul>
+
+<p>Rust and Elm are famous for their error messages. Elm in particular pioneered the idea that <a href="https://elm-lang.org/news/compiler-errors-for-humans" target="_blank">"compiler errors for humans"</a> is a product feature worth investing in.</p>
+
+<h2>5. The Int/Float Literal Problem</h2>
+
+<p>The <code>TestStructImpl</code> test fails because it writes <code>Point(1, 1)</code>, but <code>Point</code> expects <code>float</code> fields. Your checker infers <code>1</code> as <code>TypeKind_Int</code>, and <code>1.0</code> as <code>TypeKind_Float</code>. They don't match.</p>
+
+<p>This is a real design question. Languages take different approaches:</p>
+
+<table>
+  <tr><th>Language</th><th>Approach</th></tr>
+  <tr><td>Go</td><td>Untyped numeric constants — <code>1</code> can satisfy <code>float64</code> at the call site. Typed at the point of use.</td></tr>
+  <tr><td>Rust</td><td>Type inference — the compiler infers the numeric type from context, but you must be explicit if inference can't resolve it.</td></tr>
+  <tr><td>TypeScript</td><td>Structural subtyping — numbers are just <code>number</code>. No int vs float distinction.</td></tr>
+  <tr><td>C</td><td>Implicit widening — <code>int</code> silently promotes to <code>double</code>.</td></tr>
+  <tr><td>plex (now)</td><td>Strict literal typing — <code>1</code> is always <code>int</code>, <code>1.0</code> is always <code>float</code>. No implicit conversion.</td></tr>
+</table>
+
+<p>For plex targeting WebAssembly, strict literal typing is actually the right call: <code>i32.const 1</code> and <code>f64.const 1.0</code> are different instructions, and requiring the programmer to be explicit keeps the mapping from plex types to WAT types unambiguous. The fix for the test is to write <code>Point(1.0, 1.0)</code>.</p>
+
+<div class="insight">
+  <strong>Design note:</strong> Your type system is "strict structural" — no implicit numeric widening, equality by structure. This is a conscious choice, not an oversight. It makes the compiler simpler and the compiler output predictable.
+</div>
+
+<hr>
+
+<div class="quiz-section">
+  <h3>Check Your Understanding</h3>
+
+  <div class="q">
+    <p>1. You write <code>fmt.Errorf("got type %T", myTypeKind)</code>. What does it print?</p>
+    <label><input type="radio" name="q1"> The kind name, e.g. <code>TypeKind_Float</code></label>
+    <label><input type="radio" name="q1"> The Go type name, e.g. <code>script.TypeKind</code></label>
+    <label><input type="radio" name="q1"> The numeric value, e.g. <code>5</code></label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ The Go type name: <code>script.TypeKind</code>. <code>%T</code> prints the type of the variable, not its value. It ignores any <code>String()</code> method.</div>
+  </div>
+
+  <div class="q">
+    <p>2. Why should you store <code>TypeKind_Unknown</code> instead of <code>nil</code> when a type-check fails?</p>
+    <label><input type="radio" name="q2"> To avoid a nil pointer panic in the checker</label>
+    <label><input type="radio" name="q2"> So downstream checks know "a type exists but is broken", suppressing cascading errors</label>
+    <label><input type="radio" name="q2"> Both of the above</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ Both. A nil pointer causes panics if unchecked. And by propagating Unknown silently, you prevent fake "unknown identifier" errors that confuse the user about what actually went wrong.</div>
+  </div>
+
+  <div class="q">
+    <p>3. Why does plex require <code>1.0</code> instead of allowing <code>1</code> where a <code>float</code> is expected?</p>
+    <label><input type="radio" name="q3"> Because the typechecker hasn't been updated yet</label>
+    <label><input type="radio" name="q3"> Because WAT has distinct const instructions per type — the compiler needs to know which one to emit</label>
+    <label><input type="radio" name="q3"> Because integer literals can't represent floating-point values</label>
+    <button class="reveal-btn" onclick="this.nextElementSibling.style.display='block'">Reveal</button>
+    <div class="answer">✅ The WAT instruction set has separate <code>i32.const</code>, <code>i64.const</code>, <code>f32.const</code>, <code>f64.const</code> opcodes. The type must be resolved before code generation so the compiler knows which opcode to emit. Requiring explicit literals keeps that resolution trivial.</div>
+  </div>
+</div>
+
+<hr>
+
+<h2>Your Tasks</h2>
+
+<div class="task">
+  <strong>Task 1 — Fix the format verbs</strong>
+  In <code>internal/script/typeschecker/typecheck.go</code>, find every <code>%T</code> that's being used to print a <code>TypeKind</code> or <code>*Type</code> value. Change them to <code>%s</code>. Run the tests to see the error messages become readable.
+  <ul class="checklist">
+    <li>Find the <code>ReturnStatement</code> case in <code>checkStmt</code></li>
+    <li>Change both <code>%T</code> to <code>%s</code></li>
+    <li>Run <code>go test ./internal/script/typeschecker/...</code> and read the error for <code>TestCompilerFunctionCall</code></li>
+  </ul>
+</div>
+
+<div class="task">
+  <strong>Task 2 — Add <code>Type.String()</code></strong>
+  In <code>internal/script/types.go</code>, add a <code>String()</code> method on <code>*Type</code> that produces plex-style type names. Use recursion for arrays.
+  <pre><code>func (t *Type) String() string {
+    // "int", "float", "Point", "int[]", "Point[]?", "void"
+    // Hint: handle nil receiver gracefully
+}</code></pre>
+  Then update your error messages to use the full <code>*Type</code> where you currently use <code>.Kind</code>.
+</div>
+
+<div class="task">
+  <strong>Task 3 — Fix the cascading nil-type error</strong>
+  In <code>checkStmt</code>, the <code>VariableDeclaration</code> case calls <code>c.scope.Set(n.Name, t)</code> even when <code>t</code> is <code>nil</code>. When <code>t</code> is nil, store a sentinel instead:
+  <pre><code>if t == nil {
+    t = &script.Type{Kind: script.TypeKind_Unknown}
+}
+c.scope.Set(n.Name, t)</code></pre>
+  Then in <code>checkExpression</code> for <code>Identifier</code>, suppress the error if the stored type is <code>TypeKind_Unknown</code> — just return <code>nil</code> silently, since the root error was already reported.
+</div>
+
+<div class="task">
+  <strong>Task 4 — Fix the test</strong>
+  In <code>typecheck_test.go</code>, change <code>Point(1,1)</code> to <code>Point(1.0,1.0)</code> to use float literals where float is expected. Run the tests. <code>TestStructImpl</code> should pass.
+</div>
+
+<hr>
+
+<h2>Going Deeper</h2>
+
+<ul>
+  <li><a href="https://elm-lang.org/news/compiler-errors-for-humans" target="_blank">Compiler Errors for Humans</a> — Evan Czaplicki (Elm creator) on why errors are a product feature</li>
+  <li><a href="https://rustc-dev-guide.rust-lang.org/diagnostics.html" target="_blank">rustc Diagnostics Guide</a> — how Rust's compiler formats and structures its errors</li>
+  <li><a href="https://www.cs.cornell.edu/courses/cs4120/2023sp/notes.html" target="_blank">Cornell CS4120</a> — compiler course notes covering error recovery in type checkers</li>
+</ul>
+
+<hr>
+
+<p><em>💬 Ask me anything — if a task is confusing or you want to understand why the sentinel approach is better than early bail-out, just ask.</em></p>
+
+<div class="nav">
+  <a href="0013-scope-chains-and-push-pop.html">← Lesson 13: Scope Chains</a>
+  <a href="../reference/">Reference docs →</a>
+</div>
+
+</body>
+</html>
