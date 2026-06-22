@@ -5,3 +5,9 @@ type funcSig struct {
 	params  []byte
 	results []byte
 }
+
+type exportEntry struct {
+	name string
+	kind byte
+	idx  uint32
+}

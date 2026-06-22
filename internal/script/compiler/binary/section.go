@@ -77,3 +77,19 @@ func encodeCodeSection(funcs []*script.FunctionDeclaration) ([]byte, error) {
 	}
 	return section(SectionCode, body), nil
 }
+
+func encodeName(buf []byte, s string) []byte {
+	buf = AppendULEB128(buf, uint32(len(s)))
+	return append(buf, s...)
+}
+
+func encodeExportSection(exports []exportEntry) []byte {
+	var body []byte
+	body = AppendULEB128(body, uint32(len(exports)))
+	for _, e := range exports {
+		body = encodeName(body, e.name)
+		body = append(body, e.kind)
+		body = AppendULEB128(body, e.idx)
+	}
+	return section(SectionExport, body)
+}

@@ -40,7 +40,7 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			v, _ := strconv.ParseFloat(n.Value, 64)
 			b.buf = append(b.buf, OpF64Const)
 			var raw [8]byte
-			binary.LittleEndian.AppendUint64(raw[:], math.Float64bits(v))
+			binary.LittleEndian.PutUint64(raw[:], math.Float64bits(v))
 			b.buf = append(b.buf, raw[:]...)
 		default:
 			return fmt.Errorf("unsupported number type %s", t)

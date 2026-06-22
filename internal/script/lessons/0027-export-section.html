@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 27 – The Export Section: First Runnable .wasm</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat { color: #ffa657; }
+  .ty  { color: #ce93d8; }
+  .byte{ color: #ffd54f; }
+  .err { color: var(--accent); }
+  .ok  { color: var(--green); }
+  .hl  { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #111827; }
+  .bytemap { display: grid; grid-template-columns: 160px 1fr; gap: 6px 14px; margin: 1.2em 0; font-family: monospace; font-size: 0.88em; }
+  .bytemap .b { color: var(--yellow); }
+  .bytemap .d { color: var(--muted); font-family: Georgia, serif; }
+  .roadmap { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; margin: 1.4em 0; font-size: 0.9em; align-items: center; }
+  .roadmap .num { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--blue); font-family: monospace; }
+  .roadmap .name { font-family: monospace; }
+  .roadmap .tag { color: var(--muted); font-size: 0.85em; font-style: italic; text-align: right; }
+  .roadmap .done { color: var(--green); }
+  .roadmap .done .num { color: var(--green); border-color: var(--green); }
+  .roadmap .current { color: var(--yellow); }
+  .roadmap .current .num { color: var(--yellow); border-color: var(--yellow); }
+  .victory { background: linear-gradient(135deg, #0e1a2a 0%, #1a3a1a 100%); border: 1px solid var(--green); border-radius: 8px; padding: 18px 22px; margin: 2em 0; }
+  .victory strong { color: var(--green); display: block; margin-bottom: 6px; font-size: 1.05em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 27 – The Export Section</h1>
+<p><em>The smallest section in the spec, and the one that makes everything else callable. By the end of this lesson, a plex program runs through your binary backend with zero <code>wat2wasm</code> involved.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>Two lingering bugs in the Code section</li>
+    <li>Where we are on the roadmap</li>
+    <li>What "export" actually means in WASM</li>
+    <li>The Export section anatomy</li>
+    <li>Encoding strings — the <code>name</code> type</li>
+    <li>The implementation</li>
+    <li>Verification — first run through wazero</li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. Two lingering bugs</h2>
+
+<p>I read your lesson-26 output. Two small bugs that are silently lurking — fix before adding more on top.</p>
+
+<div class="warn">
+  <strong>(a) <code>AppendUint64</code> silently zeroes every f64 constant — <a href="../internal/script/compiler/binary/body.go">body.go:43</a></strong>
+  <p>Current code:</p>
+<pre><code><span class="kw">var</span> raw [<span class="num">8</span>]<span class="kw">byte</span>
+binary.LittleEndian.<span class="fn">AppendUint64</span>(raw[:], math.<span class="fn">Float64bits</span>(v))   <span class="err">// ✗</span>
+b.buf = <span class="kw">append</span>(b.buf, raw[:]...)</code></pre>
+  <p><code>binary.LittleEndian.AppendUint64(s, v)</code> <em>returns</em> a new slice — like Go's built-in <code>append</code>, it does not modify the slice you passed in. Since <code>raw</code> is a fixed-size array and <code>raw[:]</code> already has <code>len == cap == 8</code>, the function allocates a new backing array, writes the bytes there, and you throw it away. <code>raw</code> stays zero-filled, so every f64 literal in the emitted <code>.wasm</code> is 0.0.</p>
+  <p>The right primitive is <a href="https://pkg.go.dev/encoding/binary#ByteOrder">PutUint64</a>, which writes in place:</p>
+<pre><code><span class="kw">var</span> raw [<span class="num">8</span>]<span class="kw">byte</span>
+binary.LittleEndian.<span class="fn">PutUint64</span>(raw[:], math.<span class="fn">Float64bits</span>(v))    <span class="ok">// ✓</span>
+b.buf = <span class="kw">append</span>(b.buf, raw[:]...)</code></pre>
+  <p>Worth a unit test: encode a body containing <code>f64.const 1.0</code> and assert the byte sequence includes <code>44 00 00 00 00 00 00 F0 3F</code> (1.0 in little-endian IEEE-754 is the trailing 8 bytes after the opcode).</p>
+</div>
+
+<div class="warn">
+  <strong>(b) Methods still pass <code>m.Name</code> as <code>implName</code> — <a href="../internal/script/compiler/binary/helpers.go">helpers.go:24</a></strong>
+  <p>Currently <code>signatureOf(m, m.Name)</code> for methods. The <em>implicit self</em> check now fires correctly (any non-empty string makes <code>implName != ""</code> true), but the generated symbol name is <code>__methodName__methodName</code> instead of the WAT backend's <code>__StructName__methodName</code> (see <a href="../internal/script/compiler/compiler.go">compiler.go:289-294</a>). Fix:</p>
+<pre><code><span class="kw">case</span> *script.StructImplStatement:
+    <span class="kw">for</span> _, m := <span class="kw">range</span> n.Methods {
+        sig, err := <span class="fn">signatureOf</span>(m, n.Name)    <span class="ok">// ← n.Name, not m.Name</span>
+        ...</code></pre>
+  <p>Bug is dormant right now (we don't look up methods by name yet), but it'll surface in lesson 28 the instant you emit a function call to a method.</p>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. Where we are</h2>
+
+<div class="roadmap">
+  <div class="num done">24</div><div class="name done">Module skeleton + LEB128</div><div class="tag done">✓ done</div>
+  <div class="num done">25</div><div class="name done">Type section</div><div class="tag done">✓ done</div>
+  <div class="num done">26</div><div class="name done">Function + Code sections</div><div class="tag done">✓ done</div>
+  <div class="num current">27</div><div class="name current">Export section</div><div class="tag current">← you are here</div>
+  <div class="num">28</div><div class="name">More opcodes — locals &amp; arithmetic</div><div class="tag">+ - * / params</div>
+  <div class="num">29</div><div class="name">Memory + Data sections</div><div class="tag">strings, heap</div>
+  <div class="num">30</div><div class="name">Control flow + globals</div><div class="tag">block / loop / br + state</div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. What "export" actually means</h2>
+
+<p>A WASM module is a black box. Type, Function, Code — everything you've built so far — describes <em>what the module contains</em>. None of it tells the host (the embedder, e.g. wazero) <em>what it can do with it</em>. Exports are the public surface of the module.</p>
+
+<p>An export is a (name, kind, idx) triple. The <em>name</em> is the string the host uses to look something up. The <em>kind</em> is one of four things — function, table, memory, or global. The <em>idx</em> identifies which entry of that kind (so funcidx <code>0</code> means the first function in the module). Without an export, that funcidx is internally addressable (you can call it from another function in the module) but completely invisible to the outside world.</p>
+
+<div class="insight">
+  <strong>The WAT analog</strong>
+  Look at <a href="../internal/script/compiler/compiler.go">compiler.go:319-321</a>. The line <code>(export "name" (func $name))</code> is what becomes a single Export-section entry in the binary. Plex currently exports every top-level function and no methods — that's the policy your binary backend should match.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>4. Export section anatomy</h2>
+
+<pre><code><span class="byte">[id=07]</span> <span class="byte">[size]</span> <span class="byte">vec(export)</span></code></pre>
+
+<p>And each <code>export</code> is:</p>
+
+<pre><code><span class="byte">[name : vec(byte)]</span>   <span class="cmt">; UTF-8 bytes, length-prefixed</span>
+<span class="byte">[kind : 1 byte]</span>      <span class="cmt">; 0x00=func, 0x01=table, 0x02=mem, 0x03=global</span>
+<span class="byte">[idx  : uleb128]</span>     <span class="cmt">; index into the appropriate index space</span></code></pre>
+
+<p>That's it. Three fields per export. The whole section can be just a few dozen bytes for a typical module. Worked example — exporting a function named <code>add</code> at funcidx 0:</p>
+
+<div class="bytemap">
+  <div class="b">03</div><div class="d">name length (uleb128): 3</div>
+  <div class="b">61 64 64</div><div class="d">"add" as UTF-8</div>
+  <div class="b">00</div><div class="d">kind = func</div>
+  <div class="b">00</div><div class="d">funcidx = 0</div>
+</div>
+
+<p>Six bytes for one export. The export-name "add" happens to fit in a single uleb128 byte for its length; names longer than 127 bytes spill into two bytes for the length prefix, but the encoding rule is the same.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>5. Encoding strings — the <code>name</code> type</h2>
+
+<p>WASM has no separate "string" type at the binary level. Anywhere a string appears — export names, import module/field, custom-section data — it's encoded as <code>vec(byte)</code>: a uleb128 length, then UTF-8 bytes. The same primitive will be reused in lessons 29 (data segments — string literals into linear memory) and any future Import work.</p>
+
+<div class="task">
+  <strong>Task 1 — add a <code>name</code> helper to <a href="../internal/script/compiler/binary/section.go">section.go</a></strong>
+<pre><code><span class="cmt">// encodeName encodes a Go string as a length-prefixed UTF-8 byte sequence —</span>
+<span class="cmt">// the WASM `name` type, identical in shape to vec(byte).</span>
+<span class="kw">func</span> <span class="fn">encodeName</span>(buf []<span class="kw">byte</span>, s <span class="kw">string</span>) []<span class="kw">byte</span> {
+    buf = <span class="fn">AppendULEB128</span>(buf, <span class="kw">uint32</span>(<span class="kw">len</span>(s)))
+    <span class="kw">return</span> <span class="kw">append</span>(buf, s...)
+}</code></pre>
+  <p>One-liner. But it'll appear in three more places before this is over — worth extracting now rather than inlining.</p>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>6. The implementation</h2>
+
+<div class="task">
+  <strong>Task 2 — export-kind constants</strong>
+  <p>Add to <a href="../internal/script/compiler/binary/opcodes.go">opcodes.go</a> (or a new <code>kinds.go</code>):</p>
+<pre><code><span class="kw">const</span> (
+    ExportFunc   <span class="kw">byte</span> = <span class="num">0x00</span>
+    ExportTable  <span class="kw">byte</span> = <span class="num">0x01</span>
+    ExportMemory <span class="kw">byte</span> = <span class="num">0x02</span>
+    ExportGlobal <span class="kw">byte</span> = <span class="num">0x03</span>
+)</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 3 — decide what to export</strong>
+  <p>Mirror the WAT backend's behaviour: top-level <code>*FunctionDeclaration</code> nodes get exported with their declared name. Methods do not — they're internal.</p>
+  <p>You already collect <code>funcs []*script.FunctionDeclaration</code> in <a href="../internal/script/compiler/binary/helpers.go">collectSignatures</a>, but it mixes top-level functions and methods. The funcidx of an entry equals its position in that slice — so what you need now is "is this entry a top-level export, and if so what's its name?" Easiest path: track a parallel <code>exports []exportEntry</code> while you collect:</p>
+<pre><code><span class="kw">type</span> exportEntry <span class="kw">struct</span> {
+    name <span class="kw">string</span>
+    kind <span class="kw">byte</span>
+    idx  <span class="kw">uint32</span>
+}
+
+<span class="kw">func</span> <span class="fn">collectSignatures</span>(p *script.Program) (
+    []funcSig, []*script.FunctionDeclaration, []exportEntry, <span class="kw">error</span>,
+) {
+    <span class="kw">var</span> sigs   []funcSig
+    <span class="kw">var</span> funcs  []*script.FunctionDeclaration
+    <span class="kw">var</span> exports []exportEntry
+
+    <span class="kw">for</span> _, stmt := <span class="kw">range</span> p.Stmts {
+        <span class="kw">switch</span> n := stmt.(<span class="kw">type</span>) {
+        <span class="kw">case</span> *script.FunctionDeclaration:
+            sig, err := <span class="fn">signatureOf</span>(n, <span class="str">""</span>)
+            <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, <span class="kw">nil</span>, <span class="kw">nil</span>, err }
+            <span class="hl">            exports = <span class="kw">append</span>(exports, exportEntry{
+                name: n.Name,
+                kind: ExportFunc,
+                idx:  <span class="kw">uint32</span>(<span class="kw">len</span>(funcs)),     <span class="cmt">// funcidx == position in funcs</span>
+            })</span>
+            sigs  = <span class="kw">append</span>(sigs,  sig)
+            funcs = <span class="kw">append</span>(funcs, n)
+
+        <span class="kw">case</span> *script.StructImplStatement:
+            <span class="kw">for</span> _, m := <span class="kw">range</span> n.Methods {
+                sig, err := <span class="fn">signatureOf</span>(m, n.Name)   <span class="cmt">// ← n.Name (bug fix from §1b)</span>
+                <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, <span class="kw">nil</span>, <span class="kw">nil</span>, err }
+                sigs  = <span class="kw">append</span>(sigs,  sig)
+                funcs = <span class="kw">append</span>(funcs, m)
+                <span class="cmt">// methods are NOT exported</span>
+            }
+        }
+    }
+    <span class="kw">return</span> sigs, funcs, exports, <span class="kw">nil</span>
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 4 — emit the Export section</strong>
+  <p>Add to <a href="../internal/script/compiler/binary/section.go">section.go</a>:</p>
+<pre><code><span class="kw">func</span> <span class="fn">encodeExportSection</span>(exports []exportEntry) []<span class="kw">byte</span> {
+    <span class="kw">var</span> body []<span class="kw">byte</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="kw">uint32</span>(<span class="kw">len</span>(exports)))
+    <span class="kw">for</span> _, e := <span class="kw">range</span> exports {
+        body = <span class="fn">encodeName</span>(body, e.name)
+        body = <span class="kw">append</span>(body, e.kind)
+        body = <span class="fn">AppendULEB128</span>(body, e.idx)
+    }
+    <span class="kw">return</span> <span class="fn">section</span>(SectionExport, body)
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 5 — wire it in, between Code and… well, before the next lesson's sections</strong>
+  <p>Section order matters — Export (id 7) comes <em>before</em> Code (id 10). Update <a href="../internal/script/compiler/binary/module.go">module.go</a>:</p>
+<pre><code><span class="kw">if</span> <span class="kw">len</span>(sigs) > <span class="num">0</span> {
+    out = <span class="kw">append</span>(out, <span class="fn">encodeTypeSection</span>(sigs)...)
+    out = <span class="kw">append</span>(out, <span class="fn">encodeFunctionSection</span>(sigs)...)
+    <span class="hl">    <span class="kw">if</span> <span class="kw">len</span>(exports) > <span class="num">0</span> {
+        out = <span class="kw">append</span>(out, <span class="fn">encodeExportSection</span>(exports)...)
+    }</span>
+    code, err := <span class="fn">encodeCodeSection</span>(funcs)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+    out = <span class="kw">append</span>(out, code...)
+}</code></pre>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>7. Verification — the first real run</h2>
+
+<p>This is the moment the binary backend actually <em>runs</em>. Write a parallel test helper next to <a href="../internal/script/compiler/helpers_test.go">validateByRun</a>, but skipping the wat2wasm shell-out and calling the binary backend directly:</p>
+
+<div class="task">
+  <strong>Task 6 — <code>compiler/binary/end_to_end_test.go</code></strong>
+<pre><code><span class="kw">package</span> binary_wasm
+
+<span class="kw">import</span> (
+    <span class="str">"context"</span>
+    <span class="str">"strings"</span>
+    <span class="str">"testing"</span>
+
+    <span class="str">"github.com/tetratelabs/wazero"</span>
+    <span class="str">"github.com/VisualSource/plex/internal/script"</span>
+)
+
+<span class="kw">func</span> <span class="fn">TestEndToEnd_FortyTwo</span>(t *testing.T) {
+    src := `
+        fn forty_two(): i64 {
+            return 42;
+        }
+    `
+
+    ast, err := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    wasm, err := <span class="fn">CompileProgram</span>(ast.(*script.Program))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    got, err := mod.<span class="fn">ExportedFunction</span>(<span class="str">"forty_two"</span>).<span class="fn">Call</span>(ctx)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"call: %v"</span>, err) }
+
+    <span class="kw">if</span> got[<span class="num">0</span>] != <span class="num">42</span> {
+        t.<span class="fn">Fatalf</span>(<span class="str">"forty_two() = %d, want 42"</span>, got[<span class="num">0</span>])
+    }
+}</code></pre>
+</div>
+
+<p>Run it:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_FortyTwo -v</code></pre>
+
+<p>If wazero's <code>Instantiate</code> errors, the message is usually precise — "section X has invalid Y" — and a hexdump of the offending region (<code>xxd ./dist/forty_two.wasm</code>) will tell you exactly which byte is wrong. Common failures:</p>
+
+<ul>
+  <li><strong>"unexpected section id"</strong> → your sections are out of order. Type → Function → Export → Code.</li>
+  <li><strong>"function count mismatch"</strong> → Function and Code sections have different vec counts.</li>
+  <li><strong>"could not find export"</strong> → name UTF-8 bytes wrong, or kind/idx byte wrong, or the entire Export section is being skipped (<code>len(exports) == 0</code> guard).</li>
+</ul>
+
+<div class="victory">
+  <strong>✓ The win</strong>
+  When the test passes, your binary backend has done end-to-end what the WAT backend has been doing all along — taken plex source, produced a runnable <code>.wasm</code>, and executed it in a real runtime. No <code>wat2wasm</code>. No external tool. The bytes between <code>version</code> and EOF are entirely your code's work. Everything from here is more sections and more opcodes on the same foundation.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why is the <code>name</code> type in WASM encoded as a length-prefixed byte sequence rather than null-terminated?</p>
+    <label><input type="radio" name="q1" value="a"> a) Null-terminated strings are deprecated in modern formats</label>
+    <label><input type="radio" name="q1" value="b"> b) Names can contain any UTF-8 byte including <code>0x00</code>, and a length prefix means the decoder doesn't have to scan to find the end — fixed cost vs O(n)</label>
+    <label><input type="radio" name="q1" value="c"> c) Because LEB128 cannot represent 0</label>
+    <label><input type="radio" name="q1" value="d"> d) The spec author copied it from Java class files</label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. A module declares 5 functions (3 top-level + 2 methods on a struct). How many entries does the Export section contain?</p>
+    <label><input type="radio" name="q2" value="a"> a) 5 — one per function</label>
+    <label><input type="radio" name="q2" value="b"> b) 3 — only top-level functions are exported in plex</label>
+    <label><input type="radio" name="q2" value="c"> c) 1 — the module exports a single namespace</label>
+    <label><input type="radio" name="q2" value="d"> d) 0 — exports are optional</label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. After this lesson the section order in your <code>.wasm</code> is Type → Function → Export → Code. Why does Export come <em>before</em> Code in the byte stream?</p>
+    <label><input type="radio" name="q3" value="a"> a) Because Export is smaller and goes first by convention</label>
+    <label><input type="radio" name="q3" value="b"> b) Because each section has a fixed id and the spec requires non-Custom sections to appear in ascending id order; Export is id 7, Code is id 10</label>
+    <label><input type="radio" name="q3" value="c"> c) Code depends on Export — the body references export indices</label>
+    <label><input type="radio" name="q3" value="d"> d) Otherwise the engine wouldn't know any functions are exported until it had parsed all bodies</label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. <code>AppendUint64</code> was the bug in lesson 26's <code>f64.const</code>. Why does <code>binary.LittleEndian.PutUint64(raw[:], v)</code> work where <code>AppendUint64</code> didn't?</p>
+    <label><input type="radio" name="q4" value="a"> a) <code>AppendUint64</code> uses big-endian internally</label>
+    <label><input type="radio" name="q4" value="b"> b) <code>PutUint64</code> writes the bytes <em>into</em> the slice in place; <code>AppendUint64</code> returns a new slice whose return value was being discarded</label>
+    <label><input type="radio" name="q4" value="c"> c) <code>PutUint64</code> is faster, so it succeeds before any race condition</label>
+    <label><input type="radio" name="q4" value="d"> d) <code>AppendUint64</code> requires a 16-byte slice</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+
+  <div class="q" id="q5">
+    <p>5. Two top-level plex functions both named <code>area</code> are declared. The Export section will:</p>
+    <label><input type="radio" name="q5" value="a"> a) Skip the second one and only export the first</label>
+    <label><input type="radio" name="q5" value="b"> b) Contain two entries with identical names — the module is well-formed at the binary level, but <code>module.ExportedFunction("area")</code> will return the last one (or behavior is engine-defined)</label>
+    <label><input type="radio" name="q5" value="c"> c) Refuse to encode and return an error</label>
+    <label><input type="radio" name="q5" value="d"> d) Concatenate the bodies — the second area becomes a continuation</label>
+    <div class="feedback" id="f5"></div>
+  </div>
+</div>
+
+<button onclick="checkQuiz()">Check answers</button>
+<div class="score-box" id="score" style="display:none"></div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>What you changed</h2>
+
+<table>
+  <tr><th>File</th><th>Change</th></tr>
+  <tr><td>binary_wasm/body.go</td><td>Fix <code>AppendUint64</code> → <code>PutUint64</code> for f64 constants.</td></tr>
+  <tr><td>binary_wasm/helpers.go</td><td>Pass <code>n.Name</code> (struct name), not <code>m.Name</code>, as <code>implName</code> for methods. Extend signature to also return <code>[]exportEntry</code>.</td></tr>
+  <tr><td>binary_wasm/opcodes.go</td><td>Add <code>ExportFunc/Table/Memory/Global</code> kind constants.</td></tr>
+  <tr><td>binary_wasm/structs.go</td><td>Add <code>exportEntry</code> struct.</td></tr>
+  <tr><td>binary_wasm/section.go</td><td>Add <code>encodeName</code> helper and <code>encodeExportSection</code>.</td></tr>
+  <tr><td>binary_wasm/module.go</td><td>Receive exports from collect, emit Export section between Function and Code.</td></tr>
+  <tr><td>binary_wasm/end_to_end_test.go</td><td>New — <code>TestEndToEnd_FortyTwo</code> instantiates and calls the module directly via wazero.</td></tr>
+</table>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent. Good follow-up threads:
+  Why is the kind tag a single byte instead of folded into the export name's namespace?
+  How would Import sections (lesson topic) compare structurally to Export — what mirrors and what differs?
+  Should plex eventually have an <code>export</code> keyword (like the comment in compiler.go:319 suggests) so only marked functions become public surface?
+</p>
+
+<p style="margin-top:1em; color: var(--muted); font-size:0.9em">
+  References:
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html#export-section">Spec §5.5.10 — Export Section</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc">Spec §5.5.10 — Export Descriptors</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/values.html#binary-name">Spec §5.2.4 — Names</a>,
+  <a href="https://pkg.go.dev/github.com/tetratelabs/wazero">wazero — Go runtime docs</a>.
+</p>
+
+<div class="nav">
+  <a href="0026-function-and-code-sections.html">← Lesson 26: Function + Code Sections</a>
+</div>
+
+<script>
+const answers = { q1:'b', q2:'b', q3:'b', q4:'b', q5:'b' };
+const explanations = {
+  q1: "Correct. Names are UTF-8 and any byte value (including 0x00) is valid as part of the encoding. A length prefix lets the decoder skip past the name in fixed time without scanning byte-by-byte for a terminator. The length-prefix-everywhere pattern also means the file is robust to truncation: you can detect a partial name immediately.",
+  q2: "Correct. The plex backend's current policy exports only top-level functions — methods are internal. (Compare compiler.go:318-321 in the WAT backend.) The Export section is purely a *policy* layer; nothing stops you from also exporting methods if you wanted, but neither WAT nor binary backend does so today.",
+  q3: "Correct. The binary format requires non-Custom sections to appear in ascending id order (§5.5). It's a static invariant. The reason behind it is single-pass parsing without a need for backreferences — when an engine sees the Code section, it has already validated the Type, Function, Memory, Global, and Export sections. Custom sections (id 0) are the exception — they can appear anywhere.",
+  q4: "Correct. binary.LittleEndian.PutUint64(dst, v) writes 8 bytes into dst[0..7] with no return. AppendUint64(dst, v) follows Go's append convention — it appends to dst and *returns* the (possibly newly-allocated) result. Calling it without using the return value is the same mistake as `append(s, x)` without `s = append(s, x)`: the operation is performed but the local view never sees it.",
+  q5: "Correct. The binary format doesn't enforce unique export names — a well-formed module can contain duplicates. Most runtimes (wazero included) either return the last one or fail noisily on lookup, but the *encoding* is valid. This is why a real production compiler validates duplicate exports as a semantic error before emitting bytes."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => r.parentElement.classList.remove('correct','wrong'));
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>

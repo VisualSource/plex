@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 28 – Params, Identifiers &amp; Binary Arithmetic</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat { color: #ffa657; }
+  .ty  { color: #ce93d8; }
+  .byte{ color: #ffd54f; }
+  .err { color: var(--accent); }
+  .ok  { color: var(--green); }
+  .hl  { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #111827; }
+  .roadmap { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; margin: 1.4em 0; font-size: 0.9em; align-items: center; }
+  .roadmap .num { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--blue); font-family: monospace; }
+  .roadmap .name { font-family: monospace; }
+  .roadmap .tag { color: var(--muted); font-size: 0.85em; font-style: italic; text-align: right; }
+  .roadmap .done { color: var(--green); }
+  .roadmap .done .num { color: var(--green); border-color: var(--green); }
+  .roadmap .current { color: var(--yellow); }
+  .roadmap .current .num { color: var(--yellow); border-color: var(--yellow); }
+  .opcode-table td:first-child { font-family: monospace; color: var(--yellow); width: 80px; }
+  .opcode-table td:nth-child(2) { font-family: monospace; color: var(--purple); }
+  .stackviz { display: grid; grid-template-columns: 200px 1fr 1fr; gap: 8px 14px; font-family: monospace; font-size: 0.85em; margin: 1.2em 0; align-items: center; }
+  .stackviz .lab { color: var(--muted); }
+  .stackviz .ins { color: var(--yellow); }
+  .stackviz .stk { color: var(--green); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 28 – Params, Identifiers &amp; Binary Arithmetic</h1>
+<p><em>From <code>return 42</code> to <code>return a + b</code>. You'll teach the walker to read params off the operand stack and string opcodes together by type.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>Where we are on the roadmap</li>
+    <li>Stack discipline — the mental model</li>
+    <li>The local index space (params, then locals)</li>
+    <li>The new opcodes</li>
+    <li>The implementation: symbol table + two AST cases</li>
+    <li>Verification</li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. Where we are</h2>
+
+<div class="roadmap">
+  <div class="num done">24</div><div class="name done">Module skeleton + LEB128</div><div class="tag done">✓ done</div>
+  <div class="num done">25</div><div class="name done">Type section</div><div class="tag done">✓ done</div>
+  <div class="num done">26</div><div class="name done">Function + Code sections</div><div class="tag done">✓ done</div>
+  <div class="num done">27</div><div class="name done">Export section</div><div class="tag done">✓ first runnable .wasm</div>
+  <div class="num current">28</div><div class="name current">Params + arithmetic</div><div class="tag current">← you are here</div>
+  <div class="num">29</div><div class="name">Local variables (let)</div><div class="tag">populating the locals vec</div>
+  <div class="num">30</div><div class="name">Comparison + boolean ops</div><div class="tag">eq, lt, and/or</div>
+  <div class="num">31</div><div class="name">Control flow opcodes</div><div class="tag">block/loop/br/if-else</div>
+  <div class="num">32</div><div class="name">Memory + Data sections</div><div class="tag">strings, heap</div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. Stack discipline</h2>
+
+<p>WebAssembly is a <strong>stack machine</strong>. Every instruction either pushes values onto the operand stack, pops values off, or both. <code>i64.const 42</code> pushes one i64. <code>i64.add</code> pops two i64s and pushes their sum. <code>return</code> pops the function's result value off the stack and exits.</p>
+
+<p>Compiling an expression tree to a stack machine has one big simplification: <strong>walk the children left-to-right, then emit the operator</strong>. The natural recursion order produces the right operand order on the stack — no temporaries, no register allocation, no instruction scheduling.</p>
+
+<p>A worked example — compiling <code>a + b</code> where <code>a, b: i64</code> are params at indices 0 and 1:</p>
+
+<div class="stackviz">
+  <div class="lab">step</div><div class="ins">emit</div><div class="stk">operand stack after</div>
+  <div class="lab">walk left  (a)</div><div class="ins">local.get 0</div><div class="stk">[a]</div>
+  <div class="lab">walk right (b)</div><div class="ins">local.get 1</div><div class="stk">[a, b]</div>
+  <div class="lab">emit operator</div><div class="ins">i64.add</div><div class="stk">[a+b]</div>
+</div>
+
+<p>The <code>return</code> instruction then pops <code>[a+b]</code> and exits. Three opcodes, one expression — the recursion mirrors the AST exactly. (See <a href="https://webassembly.github.io/spec/core/exec/instructions.html">spec §4.4 Instructions</a> for the stack-effect notation each opcode uses.)</p>
+
+<div class="insight">
+  <strong>Stack vs register</strong>
+  A register-based VM would have to choose where intermediate results live (<code>r0 = a; r1 = b; r0 = r0 + r1</code>). A stack VM elides that choice — the stack <em>is</em> the storage, and instruction order alone determines it. This is why WASM bytecode is so compact: no register operands ever appear in the encoding.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. The local index space</h2>
+
+<p>WASM treats parameters and locals as one flat array, indexed by a single uleb128:</p>
+
+<pre><code>local 0 ... local (N-1)         <span class="cmt">; the params, in declaration order</span>
+local N ... local (N+M-1)       <span class="cmt">; then the body's declared locals</span></code></pre>
+
+<p>For now your binary backend has only params — locals come in lesson 29. So for <code>fn add(a: i64, b: i64): i64</code>:</p>
+
+<table>
+  <tr><th>idx</th><th>name</th><th>type</th></tr>
+  <tr><td>0</td><td>a</td><td>i64</td></tr>
+  <tr><td>1</td><td>b</td><td>i64</td></tr>
+</table>
+
+<p>For a method <code>fn area(self, r: i64): i64</code> (one declared param plus implicit <code>self</code>):</p>
+
+<table>
+  <tr><th>idx</th><th>name</th><th>type</th></tr>
+  <tr><td>0</td><td>self</td><td>i32</td></tr>
+  <tr><td>1</td><td>r</td><td>i64</td></tr>
+</table>
+
+<p>The Identifier case in <code>bodyEncoder.walk</code> needs a <strong>symbol table</strong> — a per-function <code>map[string]uint32</code> from name → local index — built once when entering the function.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>4. The new opcodes</h2>
+
+<p>Three groups: locals access (you already declared <code>OpLocalGet</code> in lesson 26), integer arithmetic, and float arithmetic. The pattern is "one opcode per (type, operator) pair" — there's no <em>generic</em> add.</p>
+
+<table class="opcode-table">
+  <tr><th>Byte</th><th>Mnemonic</th><th>Description</th></tr>
+  <tr><td>0x20</td><td>local.get</td><td>Push local <em>idx</em>. Immediate: uleb128 local index.</td></tr>
+  <tr><td>0x6A</td><td>i32.add</td><td>Pop 2 i32, push i32 sum</td></tr>
+  <tr><td>0x6B</td><td>i32.sub</td><td>Pop 2 i32, push i32 difference</td></tr>
+  <tr><td>0x6C</td><td>i32.mul</td><td>Pop 2 i32, push i32 product</td></tr>
+  <tr><td>0x6D</td><td>i32.div_s</td><td>Pop 2 i32, push signed i32 quotient. Traps on /0.</td></tr>
+  <tr><td>0x6F</td><td>i32.rem_s</td><td>Pop 2 i32, push signed i32 remainder. Traps on /0.</td></tr>
+  <tr><td>0x7C</td><td>i64.add</td><td>Pop 2 i64, push i64 sum</td></tr>
+  <tr><td>0x7D</td><td>i64.sub</td><td>…</td></tr>
+  <tr><td>0x7E</td><td>i64.mul</td><td>…</td></tr>
+  <tr><td>0x7F</td><td>i64.div_s</td><td>Pop 2 i64, push signed i64 quotient. Traps on /0.</td></tr>
+  <tr><td>0x81</td><td>i64.rem_s</td><td>Pop 2 i64, push signed i64 remainder. Traps on /0.</td></tr>
+  <tr><td>0xA0</td><td>f64.add</td><td>Pop 2 f64, push f64 sum</td></tr>
+  <tr><td>0xA1</td><td>f64.sub</td><td>…</td></tr>
+  <tr><td>0xA2</td><td>f64.mul</td><td>…</td></tr>
+  <tr><td>0xA3</td><td>f64.div</td><td>Pop 2 f64, push f64 quotient. <strong>Does not trap</strong> — IEEE-754 yields ±Inf or NaN.</td></tr>
+</table>
+
+<div class="warn">
+  <strong>Three things to internalise</strong>
+  <ul>
+    <li><strong>No generic add.</strong> The opcode encodes both the operation <em>and</em> the operand type. The type-checker pass guarantees both operands have the same type; the binary emitter just dispatches on that type.</li>
+    <li><strong>Integer divide has signed and unsigned variants.</strong> <code>div_s</code> treats operands as two's complement; <code>div_u</code> treats them as unsigned. Plex doesn't (yet) have unsigned integers — always emit <code>_s</code>. Same for <code>rem_s</code>.</li>
+    <li><strong>Float div does not trap on zero.</strong> Integer division by zero is a trap (the engine aborts execution). Float division by zero produces infinity or NaN — that's IEEE-754. If plex ever wants checked float division, you'll add that in the source language, not at the WASM level.</li>
+  </ul>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>5. The implementation</h2>
+
+<div class="task">
+  <strong>Task 1 — extend <a href="../internal/script/compiler/binary/opcodes.go">opcodes.go</a></strong>
+<pre><code><span class="kw">const</span> (
+    OpEnd      <span class="kw">byte</span> = <span class="num">0x0B</span>
+    OpReturn   <span class="kw">byte</span> = <span class="num">0x0F</span>
+    OpLocalGet <span class="kw">byte</span> = <span class="num">0x20</span>
+    OpI32Const <span class="kw">byte</span> = <span class="num">0x41</span>
+    OpI64Const <span class="kw">byte</span> = <span class="num">0x42</span>
+    OpF64Const <span class="kw">byte</span> = <span class="num">0x44</span>
+
+    <span class="cmt">// new this lesson</span>
+    OpI32Add <span class="kw">byte</span> = <span class="num">0x6A</span>
+    OpI32Sub <span class="kw">byte</span> = <span class="num">0x6B</span>
+    OpI32Mul <span class="kw">byte</span> = <span class="num">0x6C</span>
+    OpI32DivS <span class="kw">byte</span> = <span class="num">0x6D</span>
+    OpI32RemS <span class="kw">byte</span> = <span class="num">0x6F</span>
+
+    OpI64Add <span class="kw">byte</span> = <span class="num">0x7C</span>
+    OpI64Sub <span class="kw">byte</span> = <span class="num">0x7D</span>
+    OpI64Mul <span class="kw">byte</span> = <span class="num">0x7E</span>
+    OpI64DivS <span class="kw">byte</span> = <span class="num">0x7F</span>
+    OpI64RemS <span class="kw">byte</span> = <span class="num">0x81</span>
+
+    OpF64Add <span class="kw">byte</span> = <span class="num">0xA0</span>
+    OpF64Sub <span class="kw">byte</span> = <span class="num">0xA1</span>
+    OpF64Mul <span class="kw">byte</span> = <span class="num">0xA2</span>
+    OpF64Div <span class="kw">byte</span> = <span class="num">0xA3</span>
+)</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 2 — record method-ness on <code>funcSig</code> in <a href="../internal/script/compiler/binary/structs.go">structs.go</a></strong>
+  <p>The bodyEncoder needs to know if it should reserve index 0 for an implicit <code>self</code>. Easiest path — add a flag at signature-collection time:</p>
+<pre><code><span class="kw">type</span> funcSig <span class="kw">struct</span> {
+    name     <span class="kw">string</span>
+    params   []<span class="kw">byte</span>
+    results  []<span class="kw">byte</span>
+    isMethod <span class="kw">bool</span>     <span class="cmt">// ← new</span>
+}</code></pre>
+  <p>Set it in <a href="../internal/script/compiler/binary/helpers.go">helpers.go</a> — <code>signatureOf</code> already takes <code>implName</code>; it can just write <code>isMethod: implName != ""</code> into the returned struct.</p>
+</div>
+
+<div class="task">
+  <strong>Task 3 — give <code>bodyEncoder</code> a symbol table in <a href="../internal/script/compiler/binary/body.go">body.go</a></strong>
+<pre><code><span class="kw">type</span> bodyEncoder <span class="kw">struct</span> {
+    buf    []<span class="kw">byte</span>
+    locals <span class="kw">map</span>[<span class="kw">string</span>]<span class="kw">uint32</span>     <span class="cmt">// ← new: name → local idx</span>
+}
+
+<span class="kw">func</span> <span class="fn">newBodyEncoder</span>(f *script.FunctionDeclaration, sig funcSig) *bodyEncoder {
+    b := &amp;bodyEncoder{locals: <span class="kw">map</span>[<span class="kw">string</span>]<span class="kw">uint32</span>{}}
+    <span class="kw">var</span> idx <span class="kw">uint32</span>
+    <span class="kw">if</span> sig.isMethod {
+        b.locals[<span class="str">"self"</span>] = idx
+        idx++
+    }
+    <span class="kw">for</span> _, p := <span class="kw">range</span> f.Params {
+        b.locals[p.Name] = idx
+        idx++
+    }
+    <span class="kw">return</span> b
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 4 — handle <code>*script.Identifier</code> in <code>walk</code></strong>
+<pre><code><span class="kw">case</span> *script.Identifier:
+    idx, ok := b.locals[n.Value]
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unknown identifier %q (only params resolvable so far; let-bindings arrive in lesson 29)"</span>, n.Value)
+    }
+    b.buf = <span class="kw">append</span>(b.buf, OpLocalGet)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, idx)
+    <span class="kw">return</span> <span class="kw">nil</span></code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 5 — handle <code>*script.BinaryExpression</code> in <code>walk</code></strong>
+  <p>Walk left, walk right, dispatch on (type, operator) to a single opcode. The result type lives on the BinaryExpression node itself (the typechecker filled it in).</p>
+<pre><code><span class="kw">case</span> *script.BinaryExpression:
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Left);  err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Right); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+
+    t := n.<span class="fn">GetType</span>()
+    <span class="kw">if</span> t == <span class="kw">nil</span> {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"no type on binary expression"</span>)
+    }
+
+    op, err := <span class="fn">arithOpcode</span>(t.Kind, n.Operator)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    b.buf = <span class="kw">append</span>(b.buf, op)
+    <span class="kw">return</span> <span class="kw">nil</span></code></pre>
+  <p>And the dispatch table:</p>
+<pre><code><span class="kw">func</span> <span class="fn">arithOpcode</span>(k script.TypeKind, op script.TokenType) (<span class="kw">byte</span>, <span class="kw">error</span>) {
+    <span class="kw">switch</span> k {
+    <span class="kw">case</span> script.TypeKind_I32:
+        <span class="kw">switch</span> op {
+        <span class="kw">case</span> script.TokenType_Plus:    <span class="kw">return</span> OpI32Add,  <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Minus:   <span class="kw">return</span> OpI32Sub,  <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Star:    <span class="kw">return</span> OpI32Mul,  <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Slash:   <span class="kw">return</span> OpI32DivS, <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Percent: <span class="kw">return</span> OpI32RemS, <span class="kw">nil</span>
+        }
+    <span class="kw">case</span> script.TypeKind_Int, script.TypeKind_I64:
+        <span class="kw">switch</span> op {
+        <span class="kw">case</span> script.TokenType_Plus:    <span class="kw">return</span> OpI64Add,  <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Minus:   <span class="kw">return</span> OpI64Sub,  <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Star:    <span class="kw">return</span> OpI64Mul,  <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Slash:   <span class="kw">return</span> OpI64DivS, <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Percent: <span class="kw">return</span> OpI64RemS, <span class="kw">nil</span>
+        }
+    <span class="kw">case</span> script.TypeKind_Float, script.TypeKind_F64:
+        <span class="kw">switch</span> op {
+        <span class="kw">case</span> script.TokenType_Plus:    <span class="kw">return</span> OpF64Add, <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Minus:   <span class="kw">return</span> OpF64Sub, <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Star:    <span class="kw">return</span> OpF64Mul, <span class="kw">nil</span>
+        <span class="kw">case</span> script.TokenType_Slash:   <span class="kw">return</span> OpF64Div, <span class="kw">nil</span>
+        <span class="cmt">// no f64.rem — IEEE-754 has no remainder opcode in WASM</span>
+        }
+    }
+    <span class="kw">return</span> <span class="num">0</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"no opcode for %s %v"</span>, k, op)
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 6 — wire the new constructor through <a href="../internal/script/compiler/binary/section.go">encodeCodeEntry</a></strong>
+  <p>It needs both the function declaration and its signature now:</p>
+<pre><code><span class="kw">func</span> <span class="fn">encodeCodeEntry</span>(f *script.FunctionDeclaration, sig funcSig) ([]<span class="kw">byte</span>, <span class="kw">error</span>) {
+    <span class="kw">var</span> body []<span class="kw">byte</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="num">0</span>)   <span class="cmt">// locals vec still empty — lesson 29 fills it</span>
+
+    enc := <span class="fn">newBodyEncoder</span>(f, sig)   <span class="cmt">// ← uses sig.isMethod + f.Params</span>
+    <span class="kw">if</span> err := enc.<span class="fn">walk</span>(f.Body); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+    body = <span class="kw">append</span>(body, enc.buf...)
+    body = <span class="kw">append</span>(body, OpEnd)
+
+    <span class="kw">var</span> entry []<span class="kw">byte</span>
+    entry = <span class="fn">AppendULEB128</span>(entry, <span class="kw">uint32</span>(<span class="kw">len</span>(body)))
+    entry = <span class="kw">append</span>(entry, body...)
+    <span class="kw">return</span> entry, <span class="kw">nil</span>
+}</code></pre>
+  <p>And update <code>encodeCodeSection</code> to walk both <code>funcs</code> and <code>sigs</code> in lockstep (they're collected in the same order, so indexing by <code>i</code> is safe).</p>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>6. Verification</h2>
+
+<p>Extend your end-to-end test with two cases — one for arithmetic on params, one for a slightly fancier expression to make sure the recursion order is right (subtraction is non-commutative; if you accidentally swap left/right the test will catch it).</p>
+
+<div class="task">
+  <strong>Task 7 — add to <a href="../internal/script/compiler/binary/end_to_end_test.go">end_to_end_test.go</a></strong>
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_Add</span>(t *testing.T) {
+    src := `
+        fn add(a: i64, b: i64): i64 {
+            return a + b;
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"add"</span>, []<span class="kw">uint64</span>{<span class="num">7</span>, <span class="num">35</span>}, <span class="num">42</span>)
+}
+
+<span class="kw">func</span> <span class="fn">TestEndToEnd_Sub</span>(t *testing.T) {
+    src := `
+        fn sub3(a: i64, b: i64, c: i64): i64 {
+            return a - b - c;
+        }
+    `
+    <span class="cmt">// (100 - 50) - 8 = 42; if left/right were swapped you'd get</span>
+    <span class="cmt">// 100 - (50 - 8) = 58 — useful canary for the walk order.</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"sub3"</span>, []<span class="kw">uint64</span>{<span class="num">100</span>, <span class="num">50</span>, <span class="num">8</span>}, <span class="num">42</span>)
+}
+
+<span class="kw">func</span> <span class="fn">runOne</span>(t *testing.T, src, fn <span class="kw">string</span>, args []<span class="kw">uint64</span>, want <span class="kw">uint64</span>) {
+    t.<span class="fn">Helper</span>()
+    ast, err := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+    wasm, err := binary_wasm.<span class="fn">CompileProgram</span>(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    got, err := mod.<span class="fn">ExportedFunction</span>(fn).<span class="fn">Call</span>(ctx, args...)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"call: %v"</span>, err) }
+    <span class="kw">if</span> got[<span class="num">0</span>] != want {
+        t.<span class="fn">Fatalf</span>(<span class="str">"%s%v = %d, want %d"</span>, fn, args, got[<span class="num">0</span>], want)
+    }
+}</code></pre>
+</div>
+
+<p>Run with <code>-v</code> for the full picture:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<p>The disassembly of <code>add</code> should be:</p>
+
+<pre><code><span class="num">000xx</span> &lt;add&gt;:
+ ...: <span class="byte">20 00</span>      | local.get <span class="num">0</span>
+ ...: <span class="byte">20 01</span>      | local.get <span class="num">1</span>
+ ...: <span class="byte">7c</span>         | i64.add
+ ...: <span class="byte">0f</span>         | return
+ ...: <span class="byte">0b</span>         | end</code></pre>
+
+<p>Notice the byte sequence mirrors the recursion: walk-left (<code>local.get 0</code>), walk-right (<code>local.get 1</code>), emit operator (<code>i64.add</code>).</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. For a method <code>fn area(self, r: i64): i64</code>, the identifier <code>r</code> in the body compiles to which opcode sequence?</p>
+    <label><input type="radio" name="q1" value="a"> a) <code>local.get 0</code></label>
+    <label><input type="radio" name="q1" value="b"> b) <code>local.get 1</code></label>
+    <label><input type="radio" name="q1" value="c"> c) <code>local.get 2</code></label>
+    <label><input type="radio" name="q1" value="d"> d) <code>global.get $r</code></label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. Why does WASM use type-prefixed opcodes (<code>i32.add</code>, <code>i64.add</code>, <code>f64.add</code>) instead of one polymorphic <code>add</code>?</p>
+    <label><input type="radio" name="q2" value="a"> a) Smaller binaries — type-prefix avoids a per-value type tag on the stack</label>
+    <label><input type="radio" name="q2" value="b"> b) Backwards compatibility with x86 assembly</label>
+    <label><input type="radio" name="q2" value="c"> c) Polymorphism is computationally undecidable</label>
+    <label><input type="radio" name="q2" value="d"> d) The spec authors disliked generics</label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. Why must the binary emitter walk <code>BinaryExpression.Left</code> before <code>BinaryExpression.Right</code>?</p>
+    <label><input type="radio" name="q3" value="a"> a) The AST's <code>Left</code> field is allocated first</label>
+    <label><input type="radio" name="q3" value="b"> b) Because the operator pops in stack order — the second-pushed becomes the right operand. For non-commutative ops (sub, div, rem), reversing yields the wrong answer</label>
+    <label><input type="radio" name="q3" value="c"> c) Left-to-right is required by the WASM spec for all instructions</label>
+    <label><input type="radio" name="q3" value="d"> d) Because Go's range iterates left-to-right</label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. <code>i64.div_s</code> exists, but <code>i64.div</code> does not. Why?</p>
+    <label><input type="radio" name="q4" value="a"> a) The spec is incomplete and <code>i64.div</code> is being added later</label>
+    <label><input type="radio" name="q4" value="b"> b) For integer types, the operands' bit patterns are ambiguous — they could be interpreted as signed or unsigned. The opcode disambiguates: <code>_s</code> = signed two's-complement, <code>_u</code> = unsigned</label>
+    <label><input type="radio" name="q4" value="c"> c) Division on integers is forbidden in WebAssembly</label>
+    <label><input type="radio" name="q4" value="d"> d) <code>i64.div</code> would conflict with <code>f64.div</code>'s opcode byte</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+
+  <div class="q" id="q5">
+    <p>5. Calling <code>i64.div_s</code> with the right operand equal to 0 results in:</p>
+    <label><input type="radio" name="q5" value="a"> a) A returned value of 0</label>
+    <label><input type="radio" name="q5" value="b"> b) A trap — the engine aborts the function (in wazero, <code>Call</code> returns an error)</label>
+    <label><input type="radio" name="q5" value="c"> c) A NaN value pushed on the stack</label>
+    <label><input type="radio" name="q5" value="d"> d) Silent overflow — the result wraps to <code>i64.MIN</code></label>
+    <div class="feedback" id="f5"></div>
+  </div>
+</div>
+
+<button onclick="checkQuiz()">Check answers</button>
+<div class="score-box" id="score" style="display:none"></div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>What you changed</h2>
+
+<table>
+  <tr><th>File</th><th>Change</th></tr>
+  <tr><td>binary_wasm/opcodes.go</td><td>Add 15 arithmetic opcodes — 5 i32, 5 i64, 4 f64, plus rem variants for ints.</td></tr>
+  <tr><td>binary_wasm/structs.go</td><td>Add <code>isMethod bool</code> to <code>funcSig</code>.</td></tr>
+  <tr><td>binary_wasm/helpers.go</td><td>Set <code>isMethod: implName != ""</code> in <code>signatureOf</code>'s return.</td></tr>
+  <tr><td>binary_wasm/body.go</td><td>Add <code>locals map[string]uint32</code> to <code>bodyEncoder</code>; constructor <code>newBodyEncoder(f, sig)</code>; <code>walk</code> cases for <code>*Identifier</code> and <code>*BinaryExpression</code>; <code>arithOpcode</code> dispatch.</td></tr>
+  <tr><td>binary_wasm/section.go</td><td><code>encodeCodeEntry</code> now takes <code>(f, sig)</code>; <code>encodeCodeSection</code> threads <code>sigs</code> in lockstep with <code>funcs</code>.</td></tr>
+  <tr><td>binary_wasm/end_to_end_test.go</td><td>Add <code>TestEndToEnd_Add</code>, <code>TestEndToEnd_Sub</code>, and a <code>runOne</code> helper.</td></tr>
+</table>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent. Good follow-up threads:
+  Why does WASM only have <code>div_s</code> and <code>div_u</code> for integers but a single <code>div</code> for floats?
+  Would a register-based bytecode produce smaller code in some cases — or larger? When?
+  How would unary minus (e.g. <code>-x</code>) compile in this stack model — and why is there no <code>i64.neg</code> opcode? (Hint: <code>i64.const 0; local.get x; i64.sub</code>.)
+</p>
+
+<p style="margin-top:1em; color: var(--muted); font-size:0.9em">
+  References:
+  <a href="https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions">Spec §5.4.5 — Numeric Instructions</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/instructions.html#variable-instructions">Spec §5.4.3 — Variable Instructions</a>,
+  <a href="https://webassembly.github.io/spec/core/exec/instructions.html#exec-binop">Spec §4.4.1 — Binary operations</a>,
+  <a href="https://pengowray.github.io/wasm-ops/">wasm-ops opcode reference</a>.
+</p>
+
+<div class="nav">
+  <a href="0027-export-section.html">← Lesson 27: Export Section</a>
+</div>
+
+<script>
+const answers = { q1:'b', q2:'a', q3:'b', q4:'b', q5:'b' };
+const explanations = {
+  q1: "Correct. Methods get an implicit self at local index 0. Declared params follow in order. So self=0, r=1. The symbol table built by newBodyEncoder reflects this: when sig.isMethod is true, self is inserted at index 0 before iterating f.Params.",
+  q2: "Correct. With type-prefixed opcodes the operand stack stores raw bit patterns — no type tag needed per value, no runtime type check on each operation. The engine knows from the opcode alone how to interpret the bytes. This is a major reason WASM bytecode is so compact (often smaller than equivalent x86 machine code for simple functions).",
+  q3: "Correct. Subtraction, division, and remainder are non-commutative — a-b ≠ b-a. The stack discipline says the second push is the *top* (and therefore the right operand). So if you walk Right first, the operator pops them in the wrong order. The TestEndToEnd_Sub test is a deliberate canary: 100-50-8 = 42 in left-assoc order, 58 if you swapped.",
+  q4: "Correct. An i64 value is just 64 bits — the engine has no way to know if you mean two's-complement or unsigned interpretation. So the *operation* carries that distinction. WASM has many of these split opcodes (lt_s/lt_u, gt_s/gt_u, etc.). Floats don't need this — IEEE-754 has only one division. Plex doesn't have unsigned ints yet, so always emitting _s is fine.",
+  q5: "Correct. Integer div_s and rem_s trap on divide-by-zero (and also on signed overflow: MIN / -1). The engine aborts the function; wazero translates this into a Go error from Call(). Floats are different — IEEE-754 says x/0 = ±Inf and 0/0 = NaN; no trap, just keep going. This is a deliberate WASM design choice — make traps explicit and predictable, leave IEEE behavior alone for floats."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => r.parentElement.classList.remove('correct','wrong'));
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>

@@ -13,7 +13,7 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		return nil, err
 	}
 
-	sigs, funcs, err := collectSignatures(node)
+	sigs, funcs, exports, err := collectSignatures(node)
 	if err != nil {
 		return nil, err
 	}
@@ -25,6 +25,10 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 	if len(sigs) > 0 {
 		out = append(out, encodeTypeSection(sigs)...)
 		out = append(out, encodeFunctionSection(sigs)...)
+
+		if len(exports) > 0 {
+			out = append(out, encodeExportSection(exports)...)
+		}
 
 		code, err := encodeCodeSection(funcs)
 		if err != nil {
