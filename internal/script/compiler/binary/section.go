@@ -1,5 +1,7 @@
 package binary_wasm
 
+import "github.com/VisualSource/plex/internal/script"
+
 const (
 	SectionType     = 1
 	SectionImport   = 2
@@ -32,4 +34,46 @@ func encodeTypeSection(sigs []funcSig) []byte {
 	}
 
 	return section(SectionType, body)
+}
+
+func encodeFunctionSection(sigs []funcSig) []byte {
+	var body []byte
+	body = AppendULEB128(body, uint32(len(sigs)))
+	for i := range sigs {
+		body = AppendULEB128(body, uint32(i))
+	}
+	return section(SectionFunction, body)
+}
+
+func encodeCodeEntry(f *script.FunctionDeclaration) ([]byte, error) {
+	var body []byte
+
+	body = AppendULEB128(body, 0)
+
+	enc := &bodyEncoder{}
+	if err := enc.walk(f.Body); err != nil {
+		return nil, err
+	}
+
+	body = append(body, enc.buf...)
+	body = append(body, OpEnd)
+
+	var entry []byte
+	entry = AppendULEB128(entry, uint32(len(body)))
+	entry = append(entry, body...)
+
+	return entry, nil
+}
+
+func encodeCodeSection(funcs []*script.FunctionDeclaration) ([]byte, error) {
+	var body []byte
+	body = AppendULEB128(body, uint32(len(funcs)))
+	for _, f := range funcs {
+		entry, err := encodeCodeEntry(f)
+		if err != nil {
+			return nil, err
+		}
+		body = append(body, entry...)
+	}
+	return section(SectionCode, body), nil
 }

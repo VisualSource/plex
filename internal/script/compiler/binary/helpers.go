@@ -6,28 +6,32 @@ import (
 	"github.com/VisualSource/plex/internal/script"
 )
 
-func collectSignatures(p *script.Program) ([]funcSig, error) {
+func collectSignatures(p *script.Program) ([]funcSig, []*script.FunctionDeclaration, error) {
 	var out []funcSig
+	var funcs []*script.FunctionDeclaration
 	for _, stmt := range p.Stmts {
 		switch n := stmt.(type) {
 		case *script.FunctionDeclaration:
 			sig, err := signatureOf(n, "")
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			out = append(out, sig)
+
+			funcs = append(funcs, n)
 		case *script.StructImplStatement:
 			for _, m := range n.Methods {
 				sig, err := signatureOf(m, m.Name)
 				if err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 				out = append(out, sig)
+				funcs = append(funcs, m)
 			}
 		}
 	}
 
-	return out, nil
+	return out, funcs, nil
 }
 
 func signatureOf(f *script.FunctionDeclaration, implName string) (funcSig, error) {
