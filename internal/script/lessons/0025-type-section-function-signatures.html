@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 25 – The Type Section: Encoding Function Signatures</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat { color: #ffa657; }
+  .ty  { color: #ce93d8; }
+  .byte{ color: #ffd54f; }
+  .err { color: var(--accent); }
+  .ok  { color: var(--green); }
+  .hl  { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #111827; }
+  .bytemap { display: grid; grid-template-columns: 160px 1fr; gap: 6px 14px; margin: 1.2em 0; font-family: monospace; font-size: 0.88em; }
+  .bytemap .b { color: var(--yellow); }
+  .bytemap .d { color: var(--muted); font-family: Georgia, serif; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; font-family: monospace; }
+  .roadmap { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; margin: 1.4em 0; font-size: 0.9em; align-items: center; }
+  .roadmap .num { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--blue); font-family: monospace; }
+  .roadmap .name { font-family: monospace; }
+  .roadmap .tag { color: var(--muted); font-size: 0.85em; font-style: italic; text-align: right; }
+  .roadmap .done { color: var(--green); }
+  .roadmap .done .num { color: var(--green); border-color: var(--green); }
+  .roadmap .current { color: var(--yellow); }
+  .roadmap .current .num { color: var(--yellow); border-color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 25 – The Type Section</h1>
+<p><em>The first real section. You'll teach the binary how to spell <code>(i64, i64) → i64</code>.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>Where we are on the roadmap</li>
+    <li>The section wrapper pattern</li>
+    <li>The <code>vec(T)</code> primitive</li>
+    <li>Encoding value types and function types</li>
+    <li>Walking the AST for signatures</li>
+    <li>Verification with <code>wasm-objdump</code></li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. Where we are</h2>
+
+<div class="roadmap">
+  <div class="num done">24</div><div class="name done">Module skeleton + LEB128</div><div class="tag done">✓ done</div>
+  <div class="num current">25</div><div class="name current">Type section</div><div class="tag current">← you are here</div>
+  <div class="num">26</div><div class="name">Function + Code sections</div><div class="tag">function bodies</div>
+  <div class="num">27</div><div class="name">Export section</div><div class="tag">runnable end-to-end</div>
+  <div class="num">28</div><div class="name">Control-flow opcodes</div><div class="tag">block / loop / br</div>
+  <div class="num">29</div><div class="name">Memory + Data sections</div><div class="tag">strings, heap</div>
+  <div class="num">30</div><div class="name">Global section</div><div class="tag">module-level state</div>
+</div>
+
+<p>The compiler already emits the 8-byte header. After this lesson, every plex function's signature will be present in the binary — but the bodies are still missing, so the file won't yet be runnable. That's by design: the Type section is consumed by Function (lesson 26) <em>and</em> Import sections, so it has to come first.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. The section wrapper</h2>
+
+<p>Every section, regardless of id, has the same outer layout:</p>
+
+<pre><code><span class="byte">[id : 1 byte]</span> <span class="byte">[size : uleb128]</span> <span class="byte">[body : <em>size</em> bytes]</span></code></pre>
+
+<p>The <code>size</code> field counts only the bytes of the body, not the id or size itself. This is what makes the format <strong>streamable</strong>: an engine can skip a section it doesn't care about (custom sections, especially) by reading the id, reading the length, and seeking past it. No nested parsing required to know where the next section starts.</p>
+
+<div class="insight">
+  <strong>One helper, every section</strong>
+  Every future lesson appends one more section. Write the wrapper once, write its body in each lesson. The wrapper itself never changes.
+</div>
+
+<div class="task">
+  <strong>Task 1 — section helper in <code>binary/section.go</code></strong>
+<pre><code><span class="kw">package</span> binary
+
+<span class="kw">const</span> (
+    SectionType     = <span class="num">1</span>
+    SectionImport   = <span class="num">2</span>
+    SectionFunction = <span class="num">3</span>
+    SectionMemory   = <span class="num">5</span>
+    SectionGlobal   = <span class="num">6</span>
+    SectionExport   = <span class="num">7</span>
+    SectionCode     = <span class="num">10</span>
+    SectionData     = <span class="num">11</span>
+)
+
+<span class="cmt">// section returns [id, uleb128(len(body)), body...]</span>
+<span class="kw">func</span> <span class="fn">section</span>(id <span class="kw">byte</span>, body []<span class="kw">byte</span>) []<span class="kw">byte</span> {
+    out := []<span class="kw">byte</span>{id}
+    out = <span class="fn">AppendULEB128</span>(out, <span class="kw">uint32</span>(<span class="kw">len</span>(body)))
+    <span class="kw">return</span> <span class="kw">append</span>(out, body...)
+}</code></pre>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. The <code>vec(T)</code> primitive</h2>
+
+<p>The spec uses one notation everywhere: <code>vec(T)</code>. It means <strong>a uleb128 count followed by that many <code>T</code>s</strong>. There's no separator, no terminator — the count tells the decoder when to stop. The Type section, for example, is a <code>vec(functype)</code>; each <code>functype</code> contains a <code>vec(valtype)</code> for parameters and another <code>vec(valtype)</code> for results.</p>
+
+<p>It's so universal that thinking in terms of <code>vec</code> rather than "a length and then some bytes" makes the spec much easier to read. See <a href="https://webassembly.github.io/spec/core/binary/conventions.html#vectors">§5.1.3 Vectors</a>.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>4. Encoding value types and function types</h2>
+
+<p>A <strong>value type</strong> (<code>valtype</code>) is a single byte:</p>
+
+<table>
+  <tr><th>Byte</th><th>Type</th><th>plex source</th></tr>
+  <tr><td><code>0x7F</code></td><td>i32</td><td><code>i32</code>, <code>bool</code>, <code>string</code>, <code>array</code>, <code>struct</code> (pointers)</td></tr>
+  <tr><td><code>0x7E</code></td><td>i64</td><td><code>i64</code>, <code>int</code></td></tr>
+  <tr><td><code>0x7D</code></td><td>f32</td><td><code>f32</code></td></tr>
+  <tr><td><code>0x7C</code></td><td>f64</td><td><code>f64</code>, <code>float</code></td></tr>
+</table>
+
+<p>The plex compiler already does this mapping in <a href="../internal/script/compiler/helpers.go">helpers.go</a> — <code>getWasmType</code> returns the WAT-string version (<code>"i64"</code>); you need the byte version. The mapping is identical otherwise.</p>
+
+<p>A <strong>function type</strong> (<code>functype</code>) is the tag byte <code>0x60</code> followed by two vecs:</p>
+
+<pre><code><span class="byte">0x60</span> <span class="byte">vec(valtype)<sub>params</sub></span> <span class="byte">vec(valtype)<sub>results</sub></span></code></pre>
+
+<p>Worked example — the signature of a plex function <code>fn add(a: i64, b: i64): i64</code>:</p>
+
+<div class="bytemap">
+  <div class="b">60</div><div class="d">functype tag</div>
+  <div class="b">02</div><div class="d">uleb128: 2 params</div>
+  <div class="b">7E 7E</div><div class="d">i64, i64</div>
+  <div class="b">01</div><div class="d">uleb128: 1 result</div>
+  <div class="b">7E</div><div class="d">i64</div>
+</div>
+
+<p>Total: 7 bytes for a binary-form signature. (Currently WebAssembly MVP allows at most one result; multi-value, enabled in modern engines, lifts this — but the encoding shape is unchanged: just a longer vec.)</p>
+
+<div class="warn">
+  <strong>Void return → empty vec, not absent vec</strong>
+  A plex function with no <code>ReturnType</code> has an empty result vec — one byte of <code>0x00</code> (the count), zero valtype bytes after it. Don't omit the vec entirely. The decoder counts bytes.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>5. Walking the AST for signatures</h2>
+
+<p>You need every function the program declares. In plex's AST that means:</p>
+
+<ul>
+  <li>Top-level <code>*script.FunctionDeclaration</code> nodes in <code>Program.Stmts</code></li>
+  <li>Methods inside <code>*script.StructImplStatement.Methods</code> — each is also a <code>*FunctionDeclaration</code>, but a method has an implicit <code>self: i32</code> prepended to its params (see how the WAT compiler does this in <a href="../internal/script/compiler/compiler.go">compiler.go:264-268</a>)</li>
+</ul>
+
+<div class="task">
+  <strong>Task 2 — value-type helper in <code>binary/types.go</code></strong>
+<pre><code><span class="kw">package</span> binary
+
+<span class="kw">import</span> <span class="str">"github.com/VisualSource/plex/internal/script"</span>
+
+<span class="kw">const</span> (
+    ValI32 <span class="kw">byte</span> = <span class="num">0x7F</span>
+    ValI64 <span class="kw">byte</span> = <span class="num">0x7E</span>
+    ValF32 <span class="kw">byte</span> = <span class="num">0x7D</span>
+    ValF64 <span class="kw">byte</span> = <span class="num">0x7C</span>
+)
+
+<span class="kw">func</span> <span class="fn">valType</span>(t *script.Type) <span class="kw">byte</span> {
+    <span class="kw">switch</span> t.Kind {
+    <span class="kw">case</span> script.TypeKind_Int, script.TypeKind_I64:
+        <span class="kw">return</span> ValI64
+    <span class="kw">case</span> script.TypeKind_Float, script.TypeKind_F64:
+        <span class="kw">return</span> ValF64
+    <span class="kw">case</span> script.TypeKind_F32:
+        <span class="kw">return</span> ValF32
+    <span class="kw">default</span>:
+        <span class="cmt">// i32, bool, string, array, struct, void → all i32-shaped (void</span>
+        <span class="cmt">// is filtered upstream so it never reaches here)</span>
+        <span class="kw">return</span> ValI32
+    }
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 3 — collect signatures in <code>binary/module.go</code></strong>
+  <p>Walk <code>Program.Stmts</code> in order. For each function (top-level or method) build a <code>functype</code>. Keep them in declaration order — that order <em>is</em> the type index, and lesson 26 will look up by index.</p>
+<pre><code><span class="kw">type</span> funcSig <span class="kw">struct</span> {
+    name     <span class="kw">string</span>     <span class="cmt">// "add" or "__Vec2__length"</span>
+    params   []<span class="kw">byte</span>     <span class="cmt">// encoded valtype bytes</span>
+    results  []<span class="kw">byte</span>
+}
+
+<span class="kw">func</span> <span class="fn">collectSignatures</span>(p *script.Program) ([]funcSig, <span class="kw">error</span>) {
+    <span class="kw">var</span> out []funcSig
+    <span class="kw">for</span> _, stmt := <span class="kw">range</span> p.Stmts {
+        <span class="kw">switch</span> n := stmt.(<span class="kw">type</span>) {
+        <span class="kw">case</span> *script.FunctionDeclaration:
+            sig, err := <span class="fn">signatureOf</span>(n, <span class="str">""</span>)
+            <span class="kw">if</span> err != <span class="kw">nil</span> {
+                <span class="kw">return</span> <span class="kw">nil</span>, err
+            }
+            out = <span class="kw">append</span>(out, sig)
+        <span class="kw">case</span> *script.StructImplStatement:
+            <span class="kw">for</span> _, m := <span class="kw">range</span> n.Methods {
+                sig, err := <span class="fn">signatureOf</span>(m, n.Name)
+                <span class="kw">if</span> err != <span class="kw">nil</span> {
+                    <span class="kw">return</span> <span class="kw">nil</span>, err
+                }
+                out = <span class="kw">append</span>(out, sig)
+            }
+        }
+    }
+    <span class="kw">return</span> out, <span class="kw">nil</span>
+}
+
+<span class="kw">func</span> <span class="fn">signatureOf</span>(f *script.FunctionDeclaration, implName <span class="kw">string</span>) (funcSig, <span class="kw">error</span>) {
+    <span class="kw">var</span> params []<span class="kw">byte</span>
+    <span class="kw">if</span> implName != <span class="str">""</span> {
+        params = <span class="kw">append</span>(params, ValI32)   <span class="cmt">// implicit self</span>
+    }
+    <span class="kw">for</span> _, p := <span class="kw">range</span> f.Params {
+        t := p.<span class="fn">GetType</span>()
+        <span class="kw">if</span> t == <span class="kw">nil</span> {
+            <span class="kw">return</span> funcSig{}, fmt.<span class="fn">Errorf</span>(<span class="str">"no type on param %s"</span>, p.Name)
+        }
+        params = <span class="kw">append</span>(params, <span class="fn">valType</span>(t))
+    }
+
+    <span class="kw">var</span> results []<span class="kw">byte</span>
+    <span class="kw">if</span> f.ReturnType != <span class="kw">nil</span> {
+        results = <span class="kw">append</span>(results, <span class="fn">valType</span>(f.ReturnType.<span class="fn">GetType</span>()))
+    }
+
+    name := f.Name
+    <span class="kw">if</span> implName != <span class="str">""</span> {
+        name = fmt.<span class="fn">Sprintf</span>(<span class="str">"__%s__%s"</span>, implName, f.Name)
+    }
+    <span class="kw">return</span> funcSig{name: name, params: params, results: results}, <span class="kw">nil</span>
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 4 — emit the Type section</strong>
+  <p>The Type section body is <code>vec(functype)</code>. Each functype is <code>0x60 vec(params) vec(results)</code>:</p>
+<pre><code><span class="kw">func</span> <span class="fn">encodeTypeSection</span>(sigs []funcSig) []<span class="kw">byte</span> {
+    <span class="kw">var</span> body []<span class="kw">byte</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="kw">uint32</span>(<span class="kw">len</span>(sigs)))    <span class="cmt">// outer vec count</span>
+    <span class="kw">for</span> _, s := <span class="kw">range</span> sigs {
+        body = <span class="kw">append</span>(body, <span class="num">0x60</span>)                          <span class="cmt">// functype tag</span>
+        body = <span class="fn">AppendULEB128</span>(body, <span class="kw">uint32</span>(<span class="kw">len</span>(s.params)))
+        body = <span class="kw">append</span>(body, s.params...)
+        body = <span class="fn">AppendULEB128</span>(body, <span class="kw">uint32</span>(<span class="kw">len</span>(s.results)))
+        body = <span class="kw">append</span>(body, s.results...)
+    }
+    <span class="kw">return</span> <span class="fn">section</span>(SectionType, body)
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 5 — wire it into <code>CompileProgram</code></strong>
+<pre><code><span class="kw">func</span> <span class="fn">CompileProgram</span>(node script.AstNode) ([]<span class="kw">byte</span>, <span class="kw">error</span>) {
+    prog, ok := node.(*script.Program)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"root node is not *Program"</span>)
+    }
+
+    sigs, err := <span class="fn">collectSignatures</span>(prog)
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+
+    <span class="kw">var</span> out []<span class="kw">byte</span>
+    out = <span class="kw">append</span>(out, magic...)
+    out = <span class="kw">append</span>(out, version...)
+    <span class="kw">if</span> <span class="kw">len</span>(sigs) > <span class="num">0</span> {
+        out = <span class="kw">append</span>(out, <span class="fn">encodeTypeSection</span>(sigs)...)
+    }
+    <span class="hl">    <span class="cmt">// later: function, code, export, …</span></span>
+    <span class="kw">return</span> out, <span class="kw">nil</span>
+}</code></pre>
+  <p>Storing <code>sigs</code> in a field on a forthcoming <code>moduleEncoder</code> struct will pay off in lesson 26 — for now, returning it from a free function and threading it through is fine.</p>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>6. Verification</h2>
+
+<p>Pick a small plex file with a handful of typed functions — <code>internal/script/compiler/testdata/bool_test.wat</code> tells you what plex source <em>looks like</em> in WAT; use one of the <code>.plex</code> files in your test data (or write one inline). Then:</p>
+
+<pre><code>go run ./cmd/plexc -file my.plex -target wasm-bin
+wasm-objdump -x ./dist/my.wasm</code></pre>
+
+<p>Expected output (something like):</p>
+
+<pre><code>Section Details:
+
+Type[<span class="num">3</span>]:
+ - type[<span class="num">0</span>] (i64, i64) -&gt; i64
+ - type[<span class="num">1</span>] () -&gt; i64
+ - type[<span class="num">2</span>] (i32, i64) -&gt; ()</code></pre>
+
+<p>The number of types should equal the number of functions in the source, and each signature should match. If <code>wasm-objdump</code> complains about an invalid file, run with <code>-d</code> to get the dump up to the failure point — usually a uleb128 size that doesn't match the body length.</p>
+
+<div class="warn">
+  <strong>The file is not yet runnable</strong>
+  Loading this <code>.wasm</code> in a runtime (e.g. wazero) will fail validation: declaring types is fine, but as soon as we add the Function section (lesson 26), it must be paired with a Code section of the same length. Right now <code>wasm-objdump</code> just inspects the bytes — it doesn't require a complete, valid module. Use <code>-x</code>, not <code>-d</code>, for inspection at this stage.
+</div>
+
+<div class="insight">
+  <strong>About deduplication</strong>
+  Two functions with the same signature share a type. A real production emitter dedupes — only one functype entry per unique signature, with each function pointing to the right index. We're <em>not</em> doing that yet. Each function gets its own type entry; the indices are simply <code>0, 1, 2, …</code> in declaration order. This is wasteful but correct, and the simpler indexing makes lesson 26 (Function + Code) much easier to write. We'll add a dedup pass after the whole pipeline runs end-to-end.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why does the section header use a length-prefix instead of a sentinel byte to mark the end of the body?</p>
+    <label><input type="radio" name="q1" value="a"> a) Sentinel bytes would clash with valid valtype encodings</label>
+    <label><input type="radio" name="q1" value="b"> b) So an engine can skip an unwanted section in one seek — without parsing its contents</label>
+    <label><input type="radio" name="q1" value="c"> c) Length prefixes are mandated by ISO/IEC for binary formats</label>
+    <label><input type="radio" name="q1" value="d"> d) Because LEB128 cannot represent 0</label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. A plex function <code>fn nothing()</code> with no params and no return type encodes as which functype bytes?</p>
+    <label><input type="radio" name="q2" value="a"> a) <code>60</code></label>
+    <label><input type="radio" name="q2" value="b"> b) <code>60 00 00</code></label>
+    <label><input type="radio" name="q2" value="c"> c) <code>60 00 01 40</code></label>
+    <label><input type="radio" name="q2" value="d"> d) <code>00 00</code></label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. The plex method <code>fn area(): i64</code> declared inside <code>impl Circle</code> has how many parameters in its WASM functype?</p>
+    <label><input type="radio" name="q3" value="a"> a) 0 — the method body uses no params</label>
+    <label><input type="radio" name="q3" value="b"> b) 1 — the implicit <code>self</code> pointer (i32)</label>
+    <label><input type="radio" name="q3" value="c"> c) 2 — <code>self</code> plus a hidden return-pointer</label>
+    <label><input type="radio" name="q3" value="d"> d) It depends on how many fields the struct has</label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. After this lesson, why does <code>wasm-objdump -x</code> succeed but loading the same file in wazero would fail?</p>
+    <label><input type="radio" name="q4" value="a"> a) <code>wasm-objdump</code> uses a different spec version</label>
+    <label><input type="radio" name="q4" value="b"> b) wazero validates the whole module (e.g. that Function and Code sections agree); <code>wasm-objdump -x</code> only parses the section headers it's asked to display</label>
+    <label><input type="radio" name="q4" value="c"> c) wazero needs an export named <code>main</code></label>
+    <label><input type="radio" name="q4" value="d"> d) <code>wasm-objdump</code> silently corrects invalid files</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+
+  <div class="q" id="q5">
+    <p>5. Two plex functions <code>fn add(a: i64, b: i64): i64</code> and <code>fn sub(a: i64, b: i64): i64</code> are emitted by this lesson as how many Type-section entries?</p>
+    <label><input type="radio" name="q5" value="a"> a) 1 — the signatures are identical so they share an entry</label>
+    <label><input type="radio" name="q5" value="b"> b) 2 — we don't dedupe yet; each function gets its own entry</label>
+    <label><input type="radio" name="q5" value="c"> c) 0 — the Type section is empty without Code</label>
+    <label><input type="radio" name="q5" value="d"> d) 4 — one per param plus one per return</label>
+    <div class="feedback" id="f5"></div>
+  </div>
+</div>
+
+<button onclick="checkQuiz()">Check answers</button>
+<div class="score-box" id="score" style="display:none"></div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>What you changed</h2>
+
+<table>
+  <tr><th>File</th><th>Change</th></tr>
+  <tr><td>compiler/binary/section.go</td><td>New — section-id constants, <code>section(id, body)</code> wrapper helper</td></tr>
+  <tr><td>compiler/binary/types.go</td><td>New — <code>ValI32/64/F32/F64</code> constants, <code>valType(*script.Type) byte</code></td></tr>
+  <tr><td>compiler/binary/module.go</td><td>Added <code>collectSignatures</code>, <code>signatureOf</code>, <code>encodeTypeSection</code>; wired into <code>CompileProgram</code></td></tr>
+</table>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent. Good follow-up threads:
+  Why is <code>vec</code> count-prefixed instead of zero-terminated like a C string?
+  How would the encoding change if WASM ever allowed function types to have generic parameters?
+  Where in <a href="../internal/script/compiler/compiler.go">compiler.go</a> does the WAT backend build the equivalent of <code>functype</code> — and how does its representation differ?
+</p>
+
+<p style="margin-top:1em; color: var(--muted); font-size:0.9em">
+  References:
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html#type-section">Spec §5.5.4 — Type Section</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/types.html#binary-functype">Spec §5.3.5 — Function Types</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/types.html#binary-valtype">Spec §5.3.1 — Value Types</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/conventions.html#vectors">Spec §5.1.3 — Vectors</a>.
+</p>
+
+<div class="nav">
+  <a href="0024-wasm-binary-module-skeleton.html">← Lesson 24: Module Skeleton &amp; LEB128</a>
+</div>
+
+<script>
+const answers = { q1:'b', q2:'b', q3:'b', q4:'b', q5:'b' };
+const explanations = {
+  q1: "Correct. Length-prefixing makes the file streamable and lets an engine skip sections it doesn't care about — most importantly the Custom section, which can contain anything (debug info, names, vendor metadata). With a length the engine reads id, length, then seeks past the body. A sentinel would require parsing every byte of the body to find the end, defeating the purpose.",
+  q2: "Correct. The functype tag is 0x60, then two vecs: 0 params (one byte of count 0x00, zero valtype bytes), 0 results (one byte of count 0x00, zero valtype bytes). Total: 60 00 00. Each vec must be present, even if empty.",
+  q3: "Correct. Methods get an implicit self pointer as their first parameter — 4 bytes wide (an i32 index into linear memory). Look at compiler.go lines 264–268: the WAT backend writes `(param $self i32)` before any declared params. The binary backend does the symmetric thing — prepends 0x7F to the params vec when implName is non-empty.",
+  q4: "Correct. wasm-objdump -x parses sections individually, focused on showing what's there. wazero (like any conformant runtime) runs full validation: types must be well-formed, the count of entries in Function and Code must match, declared memory sizes must be sane, and so on. Today our file has Type but neither Function nor Code — perfectly inspectable, but not instantiable.",
+  q5: "Correct. This lesson does not dedupe — that's a follow-up optimization. Each function declaration produces a new entry in the Type section. The two add/sub functions get type indices 0 and 1 even though their functypes are byte-for-byte identical. Lesson 26 will rely on this 1:1 mapping when emitting the Function section."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => r.parentElement.classList.remove('correct','wrong'));
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 26 – Function + Code Sections: First Opcodes</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat { color: #ffa657; }
+  .ty  { color: #ce93d8; }
+  .byte{ color: #ffd54f; }
+  .err { color: var(--accent); }
+  .ok  { color: var(--green); }
+  .hl  { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #111827; }
+  .bytemap { display: grid; grid-template-columns: 160px 1fr; gap: 6px 14px; margin: 1.2em 0; font-family: monospace; font-size: 0.88em; }
+  .bytemap .b { color: var(--yellow); }
+  .bytemap .d { color: var(--muted); font-family: Georgia, serif; }
+  .roadmap { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; margin: 1.4em 0; font-size: 0.9em; align-items: center; }
+  .roadmap .num { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--blue); font-family: monospace; }
+  .roadmap .name { font-family: monospace; }
+  .roadmap .tag { color: var(--muted); font-size: 0.85em; font-style: italic; text-align: right; }
+  .roadmap .done { color: var(--green); }
+  .roadmap .done .num { color: var(--green); border-color: var(--green); }
+  .roadmap .current { color: var(--yellow); }
+  .roadmap .current .num { color: var(--yellow); border-color: var(--yellow); }
+  .opcode-table td:first-child { font-family: monospace; color: var(--yellow); width: 70px; }
+  .opcode-table td:nth-child(2) { font-family: monospace; color: var(--purple); width: 110px; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 26 – Function + Code Sections: First Opcodes</h1>
+<p><em>You'll write the first byte of actual executable WebAssembly. By the end of this lesson the body of a plex function lives in your <code>.wasm</code>.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>Two cleanups from lesson 25 before we go further</li>
+    <li>Where we are on the roadmap</li>
+    <li>The Function section — a vec of typeidx</li>
+    <li>The Code section anatomy</li>
+    <li>Your first six opcodes</li>
+    <li>The expression walker</li>
+    <li>Verification</li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. Two cleanups first</h2>
+
+<p>While preparing this lesson I noticed two small but compounding issues in your <a href="../internal/script/compiler/binary/">binary_wasm</a> package. Worth fixing before adding more bytes on top of them.</p>
+
+<div class="warn">
+  <strong>(a) <code>SectionMemory</code> id is wrong in <a href="../internal/script/compiler/binary/section.go">section.go</a></strong>
+  <p>Currently <code>SectionMemory = 4</code>. Per the <a href="https://webassembly.github.io/spec/core/binary/modules.html">spec §5.5</a>, id 4 is the Table section and id 5 is Memory. The current constants will silently produce an invalid module when memory lands in lesson 29. Fix:</p>
+<pre><code>SectionType     = <span class="num">1</span>
+SectionImport   = <span class="num">2</span>
+SectionFunction = <span class="num">3</span>
+SectionTable    = <span class="num">4</span>   <span class="cmt">// ← add</span>
+SectionMemory   = <span class="num">5</span>   <span class="cmt">// ← was 4</span>
+SectionGlobal   = <span class="num">6</span>
+SectionExport   = <span class="num">7</span>
+SectionStart    = <span class="num">8</span>   <span class="cmt">// optional, but worth declaring</span>
+SectionElement  = <span class="num">9</span>
+SectionCode     = <span class="num">10</span>
+SectionData     = <span class="num">11</span></code></pre>
+</div>
+
+<div class="warn">
+  <strong>(b) Inverted <code>implName</code> check in <a href="../internal/script/compiler/binary/helpers.go">helpers.go</a></strong>
+  <p>The condition that prepends the implicit <code>self</code> param to methods is reversed:</p>
+<pre><code><span class="kw">if</span> implName == <span class="str">""</span> {                <span class="cmt">// ← wrong: this fires for top-level fns</span>
+    params = <span class="kw">append</span>(params, ValI32)
+}</code></pre>
+  <p>It should be the opposite — top-level functions get no <code>self</code>; methods do:</p>
+<pre><code><span class="kw">if</span> implName != <span class="str">""</span> {                <span class="cmt">// ← correct</span>
+    params = <span class="kw">append</span>(params, ValI32)
+}</code></pre>
+  <p>Symmetrically in <a href="../internal/script/compiler/binary/helpers.go">collectSignatures</a>: when iterating over methods inside <code>*StructImplStatement</code>, you're passing <code>m.Name</code> as the implName. It should be <code>n.Name</code> — the struct's name. Otherwise the symbol comes out as <code>__methodName__methodName</code>, and (once the cleanup in (a) is applied) the implicit-self check still won't work because the per-method name is non-empty but not the struct.</p>
+<pre><code><span class="kw">case</span> *script.StructImplStatement:
+    <span class="kw">for</span> _, m := <span class="kw">range</span> n.Methods {
+        sig, err := <span class="fn">signatureOf</span>(m, n.Name)    <span class="cmt">// ← was m.Name</span>
+        ...</code></pre>
+</div>
+
+<p>Re-run <code>wasm-objdump -x</code> after these fixes; a struct with one method should show one type with two params (the first being i32 self), and any top-level function should now have its declared params only.</p>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. Where we are</h2>
+
+<div class="roadmap">
+  <div class="num done">24</div><div class="name done">Module skeleton + LEB128</div><div class="tag done">✓ done</div>
+  <div class="num done">25</div><div class="name done">Type section</div><div class="tag done">✓ done</div>
+  <div class="num current">26</div><div class="name current">Function + Code sections</div><div class="tag current">← you are here</div>
+  <div class="num">27</div><div class="name">Export section</div><div class="tag">first runnable .wasm</div>
+  <div class="num">28</div><div class="name">More opcodes — locals &amp; arithmetic</div><div class="tag">params, +, -, etc.</div>
+  <div class="num">29</div><div class="name">Memory + Data sections</div><div class="tag">strings, heap</div>
+  <div class="num">30</div><div class="name">Control flow + globals</div><div class="tag">block / loop / br + state</div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. The Function section</h2>
+
+<p>The Function section (id <code>3</code>) is comically simple: for each function, say which Type-section entry holds its signature. Since lesson 25 emits one type per function in declaration order with no dedup, function <code>i</code>'s typeidx is just <code>i</code>.</p>
+
+<pre><code><span class="byte">[id=03]</span> <span class="byte">[size]</span> <span class="byte">vec(typeidx)</span></code></pre>
+
+<p>For a program with three functions, the Function section body is literally <code>03 00 01 02</code> — count of 3, followed by indices 0, 1, 2.</p>
+
+<div class="task">
+  <strong>Task 1 — add <code>encodeFunctionSection</code> to <a href="../internal/script/compiler/binary/section.go">section.go</a></strong>
+<pre><code><span class="kw">func</span> <span class="fn">encodeFunctionSection</span>(sigs []funcSig) []<span class="kw">byte</span> {
+    <span class="kw">var</span> body []<span class="kw">byte</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="kw">uint32</span>(<span class="kw">len</span>(sigs)))
+    <span class="kw">for</span> i := <span class="kw">range</span> sigs {
+        body = <span class="fn">AppendULEB128</span>(body, <span class="kw">uint32</span>(i))   <span class="cmt">// typeidx == funcidx (no dedup)</span>
+    }
+    <span class="kw">return</span> <span class="fn">section</span>(SectionFunction, body)
+}</code></pre>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>4. The Code section anatomy</h2>
+
+<p>The Code section (id <code>10</code>) holds the actual bytecode. It's a <code>vec(code)</code> where each <code>code</code> entry is:</p>
+
+<pre><code><span class="byte">[size : uleb128]</span>                <span class="cmt">; total bytes of locals + body</span>
+<span class="byte">[locals : vec((count, valtype))]</span> <span class="cmt">; RLE-grouped local declarations</span>
+<span class="byte">[body : instr*]</span>                  <span class="cmt">; opcodes</span>
+<span class="byte">[0x0B : end]</span>                     <span class="cmt">; terminator — part of body in the size count</span></code></pre>
+
+<p>Three things to internalise here:</p>
+
+<ol>
+  <li><strong>The size is doubly nested.</strong> Each code entry has its own <code>size</code>, and the whole Code section has its own <code>size</code> in the wrapper. You'll build the inner one by encoding the entry's bytes to a temporary buffer and prefixing <code>len(buf)</code>.</li>
+  <li><strong>Locals are run-length encoded.</strong> If you have three consecutive i64 locals followed by two i32 locals, the encoding is two groups: <code>(3, 0x7E), (2, 0x7F)</code> — not five separate entries. The decoder reads <code>vec_count</code> groups; the total number of locals is the sum of the counts. This matters for naming/indexing: locals are indexed <em>flatly</em> by their position in the (params ++ locals) sequence, even though they're grouped in the encoding.</li>
+  <li><strong>Function params are NOT in the locals vec.</strong> Params live in the Type section's functype. The Code section's <code>locals</code> only contains additional locals declared inside the function body. But for <code>local.get/set</code>, the indices count params first, then locals — so a function with 2 params and one i32 local would refer to the local as index <code>2</code>.</li>
+</ol>
+
+<div class="insight">
+  <strong>Every body ends with <code>0x0B</code></strong>
+  The <code>end</code> opcode (<code>0x0B</code>) terminates every function body. It's also the terminator for <code>block</code>, <code>loop</code>, and <code>if</code> instructions (you'll meet those in lesson 30). It's how the decoder knows where structured constructs close — no length prefix on individual instructions.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>5. Your first six opcodes</h2>
+
+<p>This lesson keeps the opcode set minimal — just enough to compile the simplest function imaginable, like <code>fn forty_two(): i64 { return 42; }</code>. Lesson 28 adds the rest (binary operators, locals, function calls).</p>
+
+<table class="opcode-table">
+  <tr><th>Byte</th><th>Mnemonic</th><th>Description &amp; immediates</th></tr>
+  <tr><td>0x0B</td><td>end</td><td>Terminator — closes a function body, block, loop, or if. No immediate.</td></tr>
+  <tr><td>0x0F</td><td>return</td><td>Returns the top of the stack as the function result. No immediate.</td></tr>
+  <tr><td>0x20</td><td>local.get</td><td>Push the value of local <em>idx</em>. Immediate: 1× uleb128 local index.</td></tr>
+  <tr><td>0x41</td><td>i32.const</td><td>Push a constant. Immediate: 1× <strong>signed</strong> LEB128 i32.</td></tr>
+  <tr><td>0x42</td><td>i64.const</td><td>Push a constant. Immediate: 1× <strong>signed</strong> LEB128 i64.</td></tr>
+  <tr><td>0x44</td><td>f64.const</td><td>Push a constant. Immediate: 8 raw little-endian IEEE-754 bytes (<em>not</em> LEB128).</td></tr>
+</table>
+
+<div class="warn">
+  <strong>i*.const uses <em>signed</em> LEB128 — f*.const does not</strong>
+  Integer constants in WASM are signed-LEB128-encoded so that negative literals don't blow up to 5 bytes. Float constants are raw little-endian IEEE-754 bytes (4 for f32, 8 for f64). Mixing these up is the most common new-emitter bug — every spec example will look "the same" but the encoding rule differs.
+</div>
+
+<div class="insight">
+  <strong>Why is there both <code>return</code> and <code>end</code>?</strong>
+  <code>end</code> closes a structured-control block. <code>return</code> early-exits the function. A function body whose final expression already has the right type can omit <code>return</code> — the stack value is taken as the result when <code>end</code> is reached. Plex always emits an explicit <code>return</code> in the WAT backend, and we'll do the same in the binary backend for consistency.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>6. The expression walker</h2>
+
+<p>The skeleton mirrors what the WAT backend's <code>Compile</code> switch does in <a href="../internal/script/compiler/compiler.go">compiler.go</a>, but instead of <code>c.emit("i64.const", n.Value)</code> we <strong>append bytes</strong>. The recursion structure is identical.</p>
+
+<div class="task">
+  <strong>Task 2 — create <code>internal/script/compiler/binary_wasm/opcodes.go</code></strong>
+<pre><code><span class="kw">package</span> binary_wasm
+
+<span class="kw">const</span> (
+    OpEnd      <span class="kw">byte</span> = <span class="num">0x0B</span>
+    OpReturn   <span class="kw">byte</span> = <span class="num">0x0F</span>
+    OpLocalGet <span class="kw">byte</span> = <span class="num">0x20</span>
+    OpI32Const <span class="kw">byte</span> = <span class="num">0x41</span>
+    OpI64Const <span class="kw">byte</span> = <span class="num">0x42</span>
+    OpF64Const <span class="kw">byte</span> = <span class="num">0x44</span>
+)</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 3 — create the body emitter in <code>binary_wasm/body.go</code></strong>
+<pre><code><span class="kw">package</span> binary_wasm
+
+<span class="kw">import</span> (
+    <span class="str">"encoding/binary"</span>
+    <span class="str">"fmt"</span>
+    <span class="str">"math"</span>
+    <span class="str">"strconv"</span>
+
+    <span class="str">"github.com/VisualSource/plex/internal/script"</span>
+)
+
+<span class="kw">type</span> bodyEncoder <span class="kw">struct</span> {
+    buf []<span class="kw">byte</span>
+}
+
+<span class="kw">func</span> (b *bodyEncoder) <span class="fn">walk</span>(node script.AstNode) <span class="kw">error</span> {
+    <span class="kw">switch</span> n := node.(<span class="kw">type</span>) {
+
+    <span class="kw">case</span> *script.Block:
+        <span class="kw">for</span> _, s := <span class="kw">range</span> n.Stmts {
+            <span class="kw">if</span> err := b.<span class="fn">walk</span>(s); err != <span class="kw">nil</span> {
+                <span class="kw">return</span> err
+            }
+        }
+
+    <span class="kw">case</span> *script.NumberLiteral:
+        t := n.<span class="fn">GetType</span>()
+        <span class="kw">if</span> t == <span class="kw">nil</span> {
+            <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"no type on number %s"</span>, n.Value)
+        }
+        <span class="kw">switch</span> t.Kind {
+        <span class="kw">case</span> script.TypeKind_I32:
+            v, _ := strconv.<span class="fn">ParseInt</span>(n.Value, <span class="num">10</span>, <span class="num">32</span>)
+            b.buf = <span class="kw">append</span>(b.buf, OpI32Const)
+            b.buf = <span class="fn">AppendSLEB128</span>(b.buf, v)
+        <span class="kw">case</span> script.TypeKind_Int, script.TypeKind_I64:
+            v, _ := strconv.<span class="fn">ParseInt</span>(n.Value, <span class="num">10</span>, <span class="num">64</span>)
+            b.buf = <span class="kw">append</span>(b.buf, OpI64Const)
+            b.buf = <span class="fn">AppendSLEB128</span>(b.buf, v)
+        <span class="kw">case</span> script.TypeKind_Float, script.TypeKind_F64:
+            v, _ := strconv.<span class="fn">ParseFloat</span>(n.Value, <span class="num">64</span>)
+            b.buf = <span class="kw">append</span>(b.buf, OpF64Const)
+            <span class="kw">var</span> raw [<span class="num">8</span>]<span class="kw">byte</span>
+            binary.LittleEndian.<span class="fn">PutUint64</span>(raw[:], math.<span class="fn">Float64bits</span>(v))
+            b.buf = <span class="kw">append</span>(b.buf, raw[:]...)
+        <span class="kw">default</span>:
+            <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unsupported number type %s"</span>, t.Kind)
+        }
+
+    <span class="kw">case</span> *script.ReturnStatement:
+        <span class="kw">if</span> n.Value != <span class="kw">nil</span> {
+            <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Value); err != <span class="kw">nil</span> {
+                <span class="kw">return</span> err
+            }
+        }
+        b.buf = <span class="kw">append</span>(b.buf, OpReturn)
+
+    <span class="kw">default</span>:
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"binary_wasm: unhandled AST node %T (extend the walker in body.go)"</span>, n)
+    }
+    <span class="kw">return</span> <span class="kw">nil</span>
+}</code></pre>
+  <p>The <code>default</code> error is deliberately noisy — it tells you exactly which node type to handle next when you encounter a richer plex file. Each new node added in later lessons fits the same pattern: recurse on children, then append the corresponding opcode bytes.</p>
+</div>
+
+<div class="task">
+  <strong>Task 4 — encode one code entry, then the whole Code section, in <code>binary_wasm/section.go</code></strong>
+<pre><code><span class="kw">func</span> <span class="fn">encodeCodeEntry</span>(f *script.FunctionDeclaration) ([]<span class="kw">byte</span>, <span class="kw">error</span>) {
+    <span class="kw">var</span> body []<span class="kw">byte</span>
+
+    <span class="cmt">// Locals — empty for now. Lesson 28 fills this from f.Body's</span>
+    <span class="cmt">// VariableDeclaration nodes, RLE-grouped by valtype.</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="num">0</span>)
+
+    <span class="cmt">// The instructions themselves.</span>
+    enc := &amp;bodyEncoder{}
+    <span class="kw">if</span> err := enc.<span class="fn">walk</span>(f.Body); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+    body = <span class="kw">append</span>(body, enc.buf...)
+
+    <span class="cmt">// Every body terminates with `end`.</span>
+    body = <span class="kw">append</span>(body, OpEnd)
+
+    <span class="cmt">// The entry is its own length-prefixed sub-record:</span>
+    <span class="kw">var</span> entry []<span class="kw">byte</span>
+    entry = <span class="fn">AppendULEB128</span>(entry, <span class="kw">uint32</span>(<span class="kw">len</span>(body)))
+    entry = <span class="kw">append</span>(entry, body...)
+    <span class="kw">return</span> entry, <span class="kw">nil</span>
+}
+
+<span class="kw">func</span> <span class="fn">encodeCodeSection</span>(funcs []*script.FunctionDeclaration) ([]<span class="kw">byte</span>, <span class="kw">error</span>) {
+    <span class="kw">var</span> body []<span class="kw">byte</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="kw">uint32</span>(<span class="kw">len</span>(funcs)))
+    <span class="kw">for</span> _, f := <span class="kw">range</span> funcs {
+        entry, err := <span class="fn">encodeCodeEntry</span>(f)
+        <span class="kw">if</span> err != <span class="kw">nil</span> {
+            <span class="kw">return</span> <span class="kw">nil</span>, err
+        }
+        body = <span class="kw">append</span>(body, entry...)
+    }
+    <span class="kw">return</span> <span class="fn">section</span>(SectionCode, body), <span class="kw">nil</span>
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 5 — collect function declarations alongside signatures, wire both sections in</strong>
+  <p>Update <a href="../internal/script/compiler/binary/helpers.go">collectSignatures</a> to also return the matching <code>*FunctionDeclaration</code> nodes in the same order — or return them from a new <code>collectFunctions</code> helper. Then in <a href="../internal/script/compiler/binary/module.go">module.go</a>:</p>
+<pre><code><span class="kw">if</span> <span class="kw">len</span>(sigs) > <span class="num">0</span> {
+    out = <span class="kw">append</span>(out, <span class="fn">encodeTypeSection</span>(sigs)...)
+    out = <span class="kw">append</span>(out, <span class="fn">encodeFunctionSection</span>(sigs)...)
+    <span class="hl">    code, err := <span class="fn">encodeCodeSection</span>(funcs)
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+    out = <span class="kw">append</span>(out, code...)</span>
+}</code></pre>
+  <p><strong>Section order matters:</strong> Type, then Function, then Code. The spec lays this out in <a href="https://webassembly.github.io/spec/core/binary/modules.html">§5.5</a>. The runtime relies on this ordering to know what Function entries refer to.</p>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>7. Verification</h2>
+
+<p>Write the smallest possible plex source file:</p>
+
+<pre><code><span class="cmt">// dist/forty_two.plex</span>
+<span class="kw">fn</span> <span class="fn">forty_two</span>(): i64 {
+    <span class="kw">return</span> <span class="num">42</span>;
+}</code></pre>
+
+<p>Build and inspect:</p>
+
+<pre><code>go run ./cmd/plexc -file ./forty_two.plex -target wasm-bin
+wasm-objdump -x ./dist/forty_two.wasm   <span class="cmt"># show sections</span>
+wasm-objdump -d ./dist/forty_two.wasm   <span class="cmt"># disassemble bodies</span></code></pre>
+
+<p>Expected (with -d):</p>
+
+<pre><code>Code Disassembly:
+
+<span class="num">000020</span> &lt;forty_two&gt;:
+ <span class="num">000022</span>: <span class="byte">42 2a</span>                      | i64.const <span class="num">42</span>
+ <span class="num">000024</span>: <span class="byte">0f</span>                         | return
+ <span class="num">000025</span>: <span class="byte">0b</span>                         | end</code></pre>
+
+<p>Notice the byte sequence: <code>42</code> is <code>OpI64Const</code>, <code>2a</code> is the SLEB128 encoding of 42, <code>0f</code> is <code>OpReturn</code>, <code>0b</code> is <code>OpEnd</code>. Now diff against the WAT backend's output:</p>
+
+<pre><code><span class="cmt"># Generate WAT and binary side by side</span>
+go run ./cmd/plexc -file ./forty_two.plex -target wasm-wat
+wat2wasm ./dist/forty_two.wat -o ./dist/forty_two_via_wat.wasm
+diff &lt;(xxd ./dist/forty_two.wasm) &lt;(xxd ./dist/forty_two_via_wat.wasm)</code></pre>
+
+<p>The diff may show a few bytes — the WAT backend may include a name-debug Custom section that we're not emitting. That's expected. The Type, Function, and Code sections should be byte-identical.</p>
+
+<div class="warn">
+  <strong>The file is still not runnable</strong>
+  <code>wasm-objdump</code> can disassemble it, but loading it in wazero will fail: there's no Export section yet, so even though <code>forty_two</code> exists inside the module, the host has no way to call it. <strong>That's the entirety of lesson 27.</strong> One small section, then the first real "hello world" of your binary backend.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. The Function section's body for a module with four functions (and no signature dedup) is which byte sequence?</p>
+    <label><input type="radio" name="q1" value="a"> a) <code>04 00 01 02 03</code> — count 4, then typeidx 0,1,2,3</label>
+    <label><input type="radio" name="q1" value="b"> b) <code>00 01 02 03</code> — just the indices, count is implicit</label>
+    <label><input type="radio" name="q1" value="c"> c) <code>04 60 60 60 60</code> — count, then a functype tag per function</label>
+    <label><input type="radio" name="q1" value="d"> d) <code>03 04</code> — section id then function count</label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. Why is each Code entry length-prefixed with its <em>own</em> size, when the surrounding Code section already has a size in its outer wrapper?</p>
+    <label><input type="radio" name="q2" value="a"> a) Historical accident — the spec is internally redundant</label>
+    <label><input type="radio" name="q2" value="b"> b) So a tool (or streaming decoder) can skip an individual function's body without parsing every opcode in it</label>
+    <label><input type="radio" name="q2" value="c"> c) To detect when a function body has been corrupted</label>
+    <label><input type="radio" name="q2" value="d"> d) Because LEB128 cannot represent the size of the whole section</label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. A function has 3 i64 params and declares 2 i32 locals in its body. <code>local.get 4</code> refers to:</p>
+    <label><input type="radio" name="q3" value="a"> a) An out-of-range index — only 2 locals exist</label>
+    <label><input type="radio" name="q3" value="b"> b) The 2nd declared local (i32) — params occupy indices 0,1,2; locals 3,4</label>
+    <label><input type="radio" name="q3" value="c"> c) The 4th declared local — counting from 1</label>
+    <label><input type="radio" name="q3" value="d"> d) A type-mismatch error at load time</label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. Which immediate-encoding statement is correct?</p>
+    <label><input type="radio" name="q4" value="a"> a) <code>i32.const</code> uses uleb128; <code>f64.const</code> uses sleb128</label>
+    <label><input type="radio" name="q4" value="b"> b) <code>i32.const</code> uses sleb128; <code>f64.const</code> uses 8 raw little-endian IEEE-754 bytes</label>
+    <label><input type="radio" name="q4" value="c"> c) Both use sleb128 — the difference is just the opcode byte</label>
+    <label><input type="radio" name="q4" value="d"> d) Both use 8-byte fixed-width — variable-width would slow the engine</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+
+  <div class="q" id="q5">
+    <p>5. Locals in the Code section are RLE-grouped <code>(count, valtype)</code>. If a function declares <code>i64 a, i64 b, i32 c, i32 d, i64 e</code>, how many groups does the locals vec contain?</p>
+    <label><input type="radio" name="q5" value="a"> a) 1 — there's one vec total</label>
+    <label><input type="radio" name="q5" value="b"> b) 3 — runs of identical types: (2,i64), (2,i32), (1,i64)</label>
+    <label><input type="radio" name="q5" value="c"> c) 5 — one group per local regardless of type</label>
+    <label><input type="radio" name="q5" value="d"> d) 2 — one for i64s, one for i32s, regardless of order</label>
+    <div class="feedback" id="f5"></div>
+  </div>
+</div>
+
+<button onclick="checkQuiz()">Check answers</button>
+<div class="score-box" id="score" style="display:none"></div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>What you changed</h2>
+
+<table>
+  <tr><th>File</th><th>Change</th></tr>
+  <tr><td>binary_wasm/section.go</td><td>Fix <code>SectionMemory</code> id (was 4, should be 5); add <code>SectionTable</code>=4, <code>SectionStart</code>=8, <code>SectionElement</code>=9. Add <code>encodeFunctionSection</code> and <code>encodeCodeSection</code>.</td></tr>
+  <tr><td>binary_wasm/helpers.go</td><td>Flip the <code>implName == ""</code> check; pass <code>n.Name</code> (not <code>m.Name</code>) as implName when iterating method declarations.</td></tr>
+  <tr><td>binary_wasm/opcodes.go</td><td>New — opcode constants for end, return, local.get, i32.const, i64.const, f64.const.</td></tr>
+  <tr><td>binary_wasm/body.go</td><td>New — <code>bodyEncoder</code> with <code>walk</code> covering Block, NumberLiteral, ReturnStatement; noisy default for unsupported nodes.</td></tr>
+  <tr><td>binary_wasm/module.go</td><td>Collect function declarations alongside signatures; emit Type → Function → Code in order.</td></tr>
+</table>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent. Good follow-up threads:
+  Why does WASM use a stack-based instruction set instead of a register-based one?
+  How does the engine know <em>which</em> local an index refers to without an explicit type tag on each opcode?
+  When would emitting both <code>return</code> and an implicit-result-via-<code>end</code> matter (hint: control-flow blocks with multiple exit points)?
+</p>
+
+<p style="margin-top:1em; color: var(--muted); font-size:0.9em">
+  References:
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html#function-section">Spec §5.5.6 — Function Section</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html#code-section">Spec §5.5.13 — Code Section</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/instructions.html">Spec §5.4 — Instruction encoding</a>,
+  <a href="https://pengowray.github.io/wasm-ops/">wasm-ops opcode reference</a>.
+</p>
+
+<div class="nav">
+  <a href="0025-type-section-function-signatures.html">← Lesson 25: Type Section</a>
+</div>
+
+<script>
+const answers = { q1:'a', q2:'b', q3:'b', q4:'b', q5:'b' };
+const explanations = {
+  q1: "Correct. The Function section body is vec(typeidx) — a uleb128 count followed by that many typeidx values, each itself a uleb128. With no dedup and one type entry per function, the typeidx for function i is just i. Don't confuse this with the wrapping section header, which also has a size byte preceding the body.",
+  q2: "Correct. The per-entry size is what makes individual function bodies skippable. Disassemblers, JIT engines doing on-demand compilation, and the Web's streaming compilation all benefit. The pattern repeats everywhere in WASM: any variable-sized record that might be skipped gets its own length prefix.",
+  q3: "Correct. Locals are flat-indexed across (params ++ locals): params first, in their declaration order; then the body's locals in their declaration order. local.get 4 in a function with 3 params + 2 locals means the 2nd local (since indices 0,1,2 are params; 3,4 are locals). The RLE encoding in the binary doesn't change the flat indexing — it's purely an encoding optimization.",
+  q4: "Correct. Integer constants use signed LEB128 — variable-width, so small positives and small negatives both encode in 1-2 bytes. Float constants use fixed-width raw IEEE-754: 4 bytes for f32, 8 for f64, little-endian. There's no benefit to variable-width for floats (their bit patterns are essentially random) and a big simplicity win for engines.",
+  q5: "Correct. RLE means runs of *consecutive* identical types collapse into a single group. The order is preserved: (2, i64) then (2, i32) then (1, i64) → three groups. If the declaration order were rearranged to be `i64 a, i64 b, i64 e, i32 c, i32 d`, you'd get only two groups — but that would also change the local indices, which the rest of the body refers to."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => r.parentElement.classList.remove('correct','wrong'));
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>

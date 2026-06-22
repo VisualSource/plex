@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 24 – WASM Binary: Module Skeleton &amp; LEB128</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw  { color: #ff7b72; }
+  .fn  { color: #d2a8ff; }
+  .str { color: #a5d6ff; }
+  .cmt { color: #8b949e; font-style: italic; }
+  .num { color: #79c0ff; }
+  .wat { color: #ffa657; }
+  .ty  { color: #ce93d8; }
+  .byte{ color: #ffd54f; }
+  .err { color: var(--accent); }
+  .ok  { color: var(--green); }
+  .hl  { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  button { background: var(--accent); border: none; color: #fff; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 1em; margin-top: 4px; }
+  button:hover { opacity: 0.85; }
+  .nav { display: flex; gap: 16px; margin-top: 3em; padding-top: 1.2em; border-top: 1px solid var(--border); }
+  .nav a { color: var(--muted); font-size: 0.9em; }
+  .toc { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin: 1.6em 0; }
+  .toc h3 { margin-top: 0; }
+  .toc ol { margin: 0; padding-left: 1.4em; }
+  .toc li { margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin: 1.4em 0; font-size: 0.9em; }
+  th { background: var(--surface); color: var(--blue); text-align: left; padding: 8px 12px; border: 1px solid var(--border); }
+  td { padding: 8px 12px; border: 1px solid var(--border); vertical-align: top; }
+  tr:nth-child(even) { background: #111827; }
+  .roadmap { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 14px; margin: 1.4em 0; font-size: 0.9em; align-items: center; }
+  .roadmap .num { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--blue); font-family: monospace; }
+  .roadmap .name { font-family: monospace; }
+  .roadmap .tag { color: var(--muted); font-size: 0.85em; font-style: italic; text-align: right; }
+  .roadmap .current { color: var(--yellow); }
+  .bytemap { display: grid; grid-template-columns: 96px 1fr; gap: 6px 14px; margin: 1.2em 0; font-family: monospace; font-size: 0.88em; }
+  .bytemap .b { color: var(--byte, #ffd54f); }
+  .bytemap .d { color: var(--muted); font-family: Georgia, serif; }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 24 – WASM Binary: Module Skeleton &amp; LEB128</h1>
+<p><em>From emitting text and shelling out to <code>wat2wasm</code>, to writing the bytes yourself. Step one: the eight bytes that make a valid (empty) module.</em></p>
+
+<div class="toc">
+  <h3>This lesson</h3>
+  <ol>
+    <li>The shape of a <code>.wasm</code> file (and the roadmap to get there)</li>
+    <li>The 8-byte module skeleton</li>
+    <li>LEB128 — the encoding everything else is built on</li>
+    <li>Implementation: a new <code>binary</code> sub-package</li>
+    <li>Verification with <code>wat2wasm</code> and <code>wasm-objdump</code></li>
+    <li>Quiz</li>
+  </ol>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>1. The shape of a <code>.wasm</code> file</h2>
+
+<p>You've been emitting WAT — the human-readable text format — then piping it through <code>wat2wasm</code> to produce the binary. The binary format isn't a compressed version of the text: it's a structured, length-prefixed format made of <strong>sections</strong>. Every section has the same outer shape:</p>
+
+<pre><code><span class="byte">[section_id]</span> <span class="byte">[section_size]</span> <span class="byte">[section_body...]</span></code></pre>
+
+<p>That repeating pattern is the whole file, after an 8-byte header. The <a href="https://webassembly.github.io/spec/core/binary/modules.html">core spec § 5.5 Modules</a> defines the section IDs:</p>
+
+<table>
+  <tr><th>ID</th><th>Section</th><th>What's in it</th></tr>
+  <tr><td>0</td><td>Custom</td><td>Names, debug info, anything ignored by the engine</td></tr>
+  <tr><td>1</td><td>Type</td><td>Function signatures: <code>(i32, i32) → i32</code></td></tr>
+  <tr><td>2</td><td>Import</td><td>Functions/globals imported from host</td></tr>
+  <tr><td>3</td><td>Function</td><td>For each function, which type it has (index into Type)</td></tr>
+  <tr><td>4</td><td>Table</td><td>Function tables (for <code>call_indirect</code>)</td></tr>
+  <tr><td>5</td><td>Memory</td><td>Linear memory declarations (page count)</td></tr>
+  <tr><td>6</td><td>Global</td><td>Module-level globals + their init expressions</td></tr>
+  <tr><td>7</td><td>Export</td><td>What's visible to the host (functions, memory, globals)</td></tr>
+  <tr><td>8</td><td>Start</td><td>Optional auto-run function</td></tr>
+  <tr><td>9</td><td>Element</td><td>Function-table initializers</td></tr>
+  <tr><td>10</td><td>Code</td><td>The actual bytecode of every function body</td></tr>
+  <tr><td>11</td><td>Data</td><td>Initial bytes copied into linear memory (string literals!)</td></tr>
+</table>
+
+<p>Sections appear <strong>in this numeric order</strong> (custom sections can be sprinkled anywhere). Compare this to the plex compiler's current WAT output — every <code>(func ...)</code>, <code>(memory ...)</code>, <code>(global ...)</code>, <code>(export ...)</code> form lands in one of these sections. The mapping is direct: WAT is a sugar for this layout.</p>
+
+<div class="insight">
+  <strong>The roadmap</strong><br>
+  This lesson lays the foundation: write the 8-byte header, and master LEB128 so every later section can be encoded. The next several lessons each tackle one section.
+</div>
+
+<div class="roadmap">
+  <div class="num current">24</div><div class="name current">Module skeleton + LEB128</div><div class="tag current">← you are here</div>
+  <div class="num">25</div><div class="name">Type + Function sections</div><div class="tag">function signatures</div>
+  <div class="num">26</div><div class="name">Code section + opcodes</div><div class="tag">i32.const, return, locals</div>
+  <div class="num">27</div><div class="name">Export section</div><div class="tag">making functions callable</div>
+  <div class="num">28</div><div class="name">Memory + Data sections</div><div class="tag">strings and the heap</div>
+  <div class="num">29</div><div class="name">Global section</div><div class="tag">module-level state</div>
+  <div class="num">30</div><div class="name">Control-flow opcodes</div><div class="tag">block/loop/br/br_if/if-else</div>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>2. The 8-byte module skeleton</h2>
+
+<p>The entire prelude of every <code>.wasm</code> file is fixed and identical:</p>
+
+<div class="bytemap">
+  <div class="b">00 61 73 6D</div><div class="d">magic — ASCII <code>\0asm</code> (read left-to-right)</div>
+  <div class="b">01 00 00 00</div><div class="d">version — little-endian uint32, currently <code>1</code></div>
+</div>
+
+<p>That's it. An empty <code>.wasm</code> file is exactly these 8 bytes — and it's a perfectly valid WebAssembly module (one with no types, no functions, no exports). The runtime will load it; there's just nothing to do. See the <a href="https://webassembly.github.io/spec/core/binary/modules.html#binary-module">binary module grammar</a>.</p>
+
+<div class="warn">
+  <strong>Endianness trap</strong>
+  The 4 magic bytes are written in source order — they spell <code>\0asm</code> when you read the file with <code>xxd</code>. The version is a little-endian <code>u32</code>, so version <code>1</code> appears as <code>01 00 00 00</code>, <em>not</em> <code>00 00 00 01</code>. Most fixed-width integers in WASM are little-endian. Most <em>variable</em>-width integers, by contrast, use LEB128 — next.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>3. LEB128 — the encoding everything else uses</h2>
+
+<p>Almost every length, index, and count in a <code>.wasm</code> file is a <strong>LEB128</strong>-encoded integer. (Long name: Little Endian Base 128. Came from DWARF; reused by WASM.) Two variants exist — unsigned (<code>uleb128</code>) and signed (<code>sleb128</code>). Section sizes, vector lengths, type indices: unsigned. Things like <code>i32.const</code> immediates: signed.</p>
+
+<p>The encoding rule for <strong>unsigned</strong> LEB128:</p>
+
+<ol>
+  <li>Take the integer's bits, split into 7-bit groups, least-significant group first.</li>
+  <li>For each group except the last, set the high bit to <code>1</code> (continuation).</li>
+  <li>The last group has its high bit set to <code>0</code> (terminator).</li>
+</ol>
+
+<p>So the value <code>0</code> encodes as a single byte <code>0x00</code>. The value <code>624485</code> = <code>0x98765</code> = binary <code>10011000_01110110_0101</code>, split into 7-bit groups (LSB first): <code>1100101</code>, <code>0001110</code>, <code>0100110</code>. Flag the continuation bits: <code>0xE5</code>, <code>0x8E</code>, <code>0x26</code> — the canonical LEB128 example from the <a href="https://en.wikipedia.org/wiki/LEB128">Wikipedia article</a>.</p>
+
+<div class="compare">
+  <div>
+    <h4>Decimal → uleb128</h4>
+<pre style="margin:0;font-size:0.85em"><code><span class="num">0</span>     → <span class="byte">00</span>
+<span class="num">63</span>    → <span class="byte">3F</span>           <span class="cmt">; fits in 7 bits</span>
+<span class="num">127</span>   → <span class="byte">7F</span>
+<span class="num">128</span>   → <span class="byte">80 01</span>        <span class="cmt">; needs continuation</span>
+<span class="num">255</span>   → <span class="byte">FF 01</span>
+<span class="num">624485</span> → <span class="byte">E5 8E 26</span></code></pre>
+  </div>
+  <div>
+    <h4>Decimal → sleb128</h4>
+<pre style="margin:0;font-size:0.85em"><code><span class="num">0</span>    → <span class="byte">00</span>
+<span class="num">63</span>   → <span class="byte">3F</span>
+<span class="num">64</span>   → <span class="byte">C0 00</span>  <span class="cmt">; sign-bit collides → 2 bytes</span>
+-<span class="num">1</span>   → <span class="byte">7F</span>     <span class="cmt">; all-ones, sign-extended</span>
+-<span class="num">64</span>  → <span class="byte">40</span>
+-<span class="num">65</span>  → <span class="byte">BF 7F</span></code></pre>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Why LEB128?</strong>
+  Most integers in a wasm file are small (a count of 3 fields, a local index of 7, a section size of 142 bytes). Fixed 4-byte ints would waste 3 bytes on each. LEB128 uses 1 byte for values 0-127, 2 for 128-16383, and so on — paying only for the bits you need. The cost is decoders must loop bit-by-bit instead of reading a fixed-width word.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>4. Implementation: a new <code>binary</code> sub-package</h2>
+
+<p>Leave the existing WAT-emitting <a href="../internal/script/compiler/compiler.go">compiler.go</a> untouched. We're adding a parallel binary backend, not replacing it. This lets us run both side-by-side and diff outputs while building confidence.</p>
+
+<div class="task">
+  <strong>Task 1 — create <code>internal/script/compiler/binary/leb128.go</code></strong>
+  <p>Two helpers — they will be used by every section in every future lesson:</p>
+<pre><code><span class="kw">package</span> binary
+
+<span class="kw">func</span> <span class="fn">AppendULEB128</span>(buf []<span class="kw">byte</span>, v <span class="kw">uint32</span>) []<span class="kw">byte</span> {
+    <span class="kw">for</span> {
+        b := <span class="kw">byte</span>(v &amp; <span class="num">0x7F</span>)
+        v >>= <span class="num">7</span>
+        <span class="kw">if</span> v != <span class="num">0</span> {
+            buf = <span class="kw">append</span>(buf, b|<span class="num">0x80</span>)   <span class="cmt">// continuation bit</span>
+        } <span class="kw">else</span> {
+            <span class="kw">return</span> <span class="kw">append</span>(buf, b)        <span class="cmt">// final group, top bit clear</span>
+        }
+    }
+}
+
+<span class="kw">func</span> <span class="fn">AppendSLEB128</span>(buf []<span class="kw">byte</span>, v <span class="kw">int64</span>) []<span class="kw">byte</span> {
+    <span class="kw">for</span> {
+        b := <span class="kw">byte</span>(v) &amp; <span class="num">0x7F</span>
+        signBit := b &amp; <span class="num">0x40</span>
+        v >>= <span class="num">7</span>                       <span class="cmt">// arithmetic shift in Go for signed</span>
+        done := (v == <span class="num">0</span> &amp;&amp; signBit == <span class="num">0</span>) ||
+                (v == -<span class="num">1</span> &amp;&amp; signBit != <span class="num">0</span>)
+        <span class="kw">if</span> done {
+            <span class="kw">return</span> <span class="kw">append</span>(buf, b)
+        }
+        buf = <span class="kw">append</span>(buf, b|<span class="num">0x80</span>)
+    }
+}</code></pre>
+  <p>The signed version's termination condition is the subtle one. You stop when the remaining bits are all-zero (positive) <em>and</em> the high bit of the last group is 0, OR all-ones (negative) <em>and</em> the high bit of the last group is 1. That guarantees the decoder can sign-extend correctly. See <a href="https://webassembly.github.io/spec/core/binary/values.html#integers">spec §5.2.2</a>.</p>
+</div>
+
+<div class="task">
+  <strong>Task 2 — unit-test the encoders</strong>
+  <p>Drop this into <code>leb128_test.go</code> — these are the canonical reference values:</p>
+<pre><code><span class="kw">func</span> <span class="fn">TestULEB128</span>(t *testing.T) {
+    <span class="kw">cases</span> := []<span class="kw">struct</span> {
+        in   <span class="kw">uint32</span>
+        want []<span class="kw">byte</span>
+    }{
+        {<span class="num">0</span>,      []<span class="kw">byte</span>{<span class="num">0x00</span>}},
+        {<span class="num">63</span>,     []<span class="kw">byte</span>{<span class="num">0x3F</span>}},
+        {<span class="num">127</span>,    []<span class="kw">byte</span>{<span class="num">0x7F</span>}},
+        {<span class="num">128</span>,    []<span class="kw">byte</span>{<span class="num">0x80</span>, <span class="num">0x01</span>}},
+        {<span class="num">624485</span>, []<span class="kw">byte</span>{<span class="num">0xE5</span>, <span class="num">0x8E</span>, <span class="num">0x26</span>}},
+    }
+    <span class="kw">for</span> _, c := <span class="kw">range</span> cases {
+        got := <span class="fn">AppendULEB128</span>(<span class="kw">nil</span>, c.in)
+        <span class="kw">if</span> !bytes.<span class="fn">Equal</span>(got, c.want) {
+            t.<span class="fn">Errorf</span>(<span class="str">"uleb(%d) = % x, want % x"</span>, c.in, got, c.want)
+        }
+    }
+}</code></pre>
+  <p>Mirror it for signed with <code>{0, [00]}</code>, <code>{-1, [7F]}</code>, <code>{63, [3F]}</code>, <code>{64, [C0 00]}</code>, <code>{-64, [40]}</code>, <code>{-65, [BF 7F]}</code>.</p>
+</div>
+
+<div class="task">
+  <strong>Task 3 — create <code>internal/script/compiler/binary/module.go</code></strong>
+  <p>The module entry point. For this lesson it only emits the 8-byte header:</p>
+<pre><code><span class="kw">package</span> binary
+
+<span class="kw">import</span> <span class="str">"github.com/VisualSource/plex/internal/script"</span>
+
+<span class="kw">var</span> magic   = []<span class="kw">byte</span>{<span class="num">0x00</span>, <span class="num">0x61</span>, <span class="num">0x73</span>, <span class="num">0x6D</span>}   <span class="cmt">// "\0asm"</span>
+<span class="kw">var</span> version = []<span class="kw">byte</span>{<span class="num">0x01</span>, <span class="num">0x00</span>, <span class="num">0x00</span>, <span class="num">0x00</span>}   <span class="cmt">// 1 (little-endian u32)</span>
+
+<span class="kw">func</span> <span class="fn">CompileProgram</span>(node script.AstNode) ([]<span class="kw">byte</span>, <span class="kw">error</span>) {
+    <span class="kw">var</span> out []<span class="kw">byte</span>
+    out = <span class="kw">append</span>(out, magic...)
+    out = <span class="kw">append</span>(out, version...)
+    <span class="cmt">// sections will be appended here in later lessons</span>
+    <span class="kw">return</span> out, <span class="kw">nil</span>
+}</code></pre>
+</div>
+
+<div class="task">
+  <strong>Task 4 — wire it into <a href="../cmd/plexc/main.go">cmd/plexc/main.go</a></strong>
+  <p>The flag <code>-target wasm-bin</code> is already declared but unhandled (the default branch reports <em>unknown</em>). Add the case:</p>
+<pre><code><span class="kw">import</span> binarycompiler <span class="str">"github.com/VisualSource/plex/internal/script/compiler/binary"</span>
+
+<span class="cmt">// inside the switch:</span>
+<span class="kw">case</span> <span class="str">"wasm-bin"</span>:
+    result, err := binarycompiler.<span class="fn">CompileProgram</span>(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        fmt.<span class="fn">Printf</span>(<span class="str">"error: %s"</span>, err.<span class="fn">Error</span>())
+        <span class="kw">return</span>
+    }
+    out := filepath.<span class="fn">Join</span>(<span class="str">"./dist/"</span>, name+<span class="str">".wasm"</span>)
+    <span class="kw">if</span> err := os.<span class="fn">WriteFile</span>(out, result, <span class="num">0644</span>); err != <span class="kw">nil</span> {
+        fmt.<span class="fn">Println</span>(err.<span class="fn">Error</span>())
+    }</code></pre>
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>5. Verification</h2>
+
+<p>Build and run it on any plex source file — the parser still runs end-to-end, the binary backend just ignores the AST for now:</p>
+
+<pre><code>go run ./cmd/plexc -file ./examples/hello.plex -target wasm-bin
+xxd ./dist/hello.wasm</code></pre>
+
+<p>Expected output — exactly 8 bytes:</p>
+
+<pre><code>00000000: <span class="byte">0061 736d 0100 0000</span>                       .asm....</code></pre>
+
+<p>Now confirm a real WASM toolchain agrees this is valid. The classic check is to round-trip through <code>wasm-objdump</code> (from <a href="https://github.com/WebAssembly/wabt">wabt</a>, the same package as <code>wat2wasm</code>):</p>
+
+<pre><code>wasm-objdump -h ./dist/hello.wasm</code></pre>
+
+<p>It should print the file's section table — empty, but the magic and version are recognised. A second confirmation: have <code>wat2wasm</code> compile an empty WAT module and diff the bytes:</p>
+
+<pre><code>echo <span class="str">"(module)"</span> | wat2wasm - -o /tmp/empty.wasm
+diff &lt;(xxd /tmp/empty.wasm) &lt;(xxd ./dist/hello.wasm)
+<span class="cmt"># → no diff</span></code></pre>
+
+<div class="insight">
+  <strong>The win</strong>
+  You can now produce a <code>.wasm</code> file that any WebAssembly engine on Earth will accept. It does nothing — but the contract is established. Every later lesson appends a few more bytes between <code>version</code> and the end of the file.
+</div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why is the WASM version field encoded as <code>01 00 00 00</code> instead of <code>00 00 00 01</code>?</p>
+    <label><input type="radio" name="q1" value="a"> a) Because WASM strings are stored in reverse</label>
+    <label><input type="radio" name="q1" value="b"> b) Because fixed-width integers in the binary format are little-endian — the least-significant byte comes first</label>
+    <label><input type="radio" name="q1" value="c"> c) Because LEB128 always pads to four bytes</label>
+    <label><input type="radio" name="q1" value="d"> d) Because the parser reads the file from the back</label>
+    <div class="feedback" id="f1"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. The value <code>200</code> encoded as unsigned LEB128 is:</p>
+    <label><input type="radio" name="q2" value="a"> a) <code>C8</code></label>
+    <label><input type="radio" name="q2" value="b"> b) <code>C8 01</code></label>
+    <label><input type="radio" name="q2" value="c"> c) <code>48 81</code></label>
+    <label><input type="radio" name="q2" value="d"> d) <code>00 C8</code></label>
+    <div class="feedback" id="f2"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. You're encoding a section that contains 130 bytes of body. How many bytes does the LEB128-encoded <em>section_size</em> field take, and what's the byte sequence?</p>
+    <label><input type="radio" name="q3" value="a"> a) 1 byte: <code>82</code></label>
+    <label><input type="radio" name="q3" value="b"> b) 2 bytes: <code>82 01</code></label>
+    <label><input type="radio" name="q3" value="c"> c) 4 bytes: <code>82 00 00 00</code></label>
+    <label><input type="radio" name="q3" value="d"> d) 2 bytes: <code>01 82</code></label>
+    <div class="feedback" id="f3"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. Why does the signed LEB128 termination check both <code>v == 0 &amp;&amp; signBit == 0</code> <em>and</em> <code>v == -1 &amp;&amp; signBit != 0</code>?</p>
+    <label><input type="radio" name="q4" value="a"> a) Because positive numbers always need more bytes than negative ones</label>
+    <label><input type="radio" name="q4" value="b"> b) Because the encoder must guarantee the decoder can sign-extend — the final group's high bit must already match the value's sign, otherwise an extra byte is needed</label>
+    <label><input type="radio" name="q4" value="c"> c) Because Go's right-shift operator behaves differently for signed and unsigned</label>
+    <label><input type="radio" name="q4" value="d"> d) Because <code>-1</code> is a special case in the WebAssembly spec</label>
+    <div class="feedback" id="f4"></div>
+  </div>
+
+  <div class="q" id="q5">
+    <p>5. After this lesson the generated <code>.wasm</code> file has no Type, Function, or Code sections. Why does a WASM runtime still consider it a valid module?</p>
+    <label><input type="radio" name="q5" value="a"> a) The runtime silently inserts a default empty function</label>
+    <label><input type="radio" name="q5" value="b"> b) The grammar makes every section optional — a module with only the 8-byte header is well-formed, just inert</label>
+    <label><input type="radio" name="q5" value="c"> c) The runtime is being lenient and would error in strict mode</label>
+    <label><input type="radio" name="q5" value="d"> d) Because <code>wat2wasm</code> auto-fixes invalid files</label>
+    <div class="feedback" id="f5"></div>
+  </div>
+</div>
+
+<button onclick="checkQuiz()">Check answers</button>
+<div class="score-box" id="score" style="display:none"></div>
+
+<!-- ──────────────────────────────────────────────────── -->
+<h2>What you changed</h2>
+
+<table>
+  <tr><th>File</th><th>Change</th></tr>
+  <tr><td>compiler/binary/leb128.go</td><td>New — <code>AppendULEB128</code>, <code>AppendSLEB128</code></td></tr>
+  <tr><td>compiler/binary/leb128_test.go</td><td>New — canonical encoding test cases</td></tr>
+  <tr><td>compiler/binary/module.go</td><td>New — <code>CompileProgram</code>, emits magic + version</td></tr>
+  <tr><td>cmd/plexc/main.go</td><td>Wire up the <code>wasm-bin</code> target case</td></tr>
+</table>
+
+<p style="margin-top:2em; color: var(--muted); font-size:0.9em">
+  Questions? Ask your agent — it's your teacher. Good follow-up threads:
+  Why does the spec mandate the section <em>order</em> when each section is length-prefixed and self-describing?
+  How does a streaming decoder benefit from LEB128 over fixed-width ints?
+  When (if ever) is it worth keeping a WAT-emitting compiler alongside the binary one?
+</p>
+
+<p style="margin-top:1em; color: var(--muted); font-size:0.9em">
+  References used in this lesson:
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html">Spec §5.5 — Binary modules</a>,
+  <a href="https://webassembly.github.io/spec/core/binary/values.html#integers">Spec §5.2.2 — Integer encoding</a>,
+  <a href="https://en.wikipedia.org/wiki/LEB128">Wikipedia — LEB128</a>,
+  <a href="https://github.com/WebAssembly/wabt">wabt — wat2wasm / wasm-objdump</a>.
+</p>
+
+<div class="nav">
+  <a href="0023-continue-statement.html">← Lesson 23: The continue Statement</a>
+</div>
+
+<script>
+const answers = { q1:'b', q2:'b', q3:'b', q4:'b', q5:'b' };
+const explanations = {
+  q1: "Correct. The version field is a fixed-width 32-bit unsigned integer, stored little-endian. The value 1 has its only set bit in the least-significant byte, so that byte comes first in the file. Note this is the opposite policy from the magic number, which is stored as a fixed byte sequence (not an integer) — \\0asm reads left-to-right in source order.",
+  q2: "Correct. 200 in binary is 11001000. The low 7 bits are 1001000 = 0x48. The remaining bit is 1. So we emit 0x48 | 0x80 = 0xC8 (continuation), then 0x01 (terminator). Byte order is little-endian: low group first.",
+  q3: "Correct. 130 = 0x82. Low 7 bits: 0000010 = 0x02; that needs a continuation byte. Wait — let's redo: 130 in binary is 10000010. Low 7 bits are 0000010 = 0x02. With continuation bit set, that's 0x82. Remaining high bit is 1 → second byte 0x01 (terminator). So: 82 01.",
+  q4: "Correct. In signed LEB128, the high bit of the final group must equal the sign bit of the original number, because that's what the decoder sign-extends from. If you stop when v == 0 but the last group's high bit happens to be 1, the decoder will sign-extend a *negative* number — wrong. So in that case an extra zero byte must be emitted. Symmetric reasoning for negative values when the high bit is 0.",
+  q5: "Correct. The binary grammar (spec §5.5) lists every section as optional. A file containing only the magic and version is a valid module with an empty Type vec, empty Function vec, empty Code vec, and so on. It loads, it instantiates, it exports nothing — perfectly inert and perfectly legal."
+};
+
+function checkQuiz() {
+  let score = 0;
+  const total = Object.keys(answers).length;
+  for (const [id, correct] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name=${id}]:checked`);
+    const feedback = document.getElementById('f' + id.slice(1));
+    document.querySelectorAll(`input[name=${id}]`).forEach(r => r.parentElement.classList.remove('correct','wrong'));
+    if (sel) {
+      if (sel.value === correct) {
+        score++;
+        sel.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--green)';
+        feedback.textContent = '✓ ' + explanations[id];
+      } else {
+        sel.parentElement.classList.add('wrong');
+        const correctEl = document.querySelector(`input[name=${id}][value=${correct}]`);
+        if (correctEl) correctEl.parentElement.classList.add('correct');
+        feedback.style.display = 'block';
+        feedback.style.color = 'var(--accent)';
+        feedback.textContent = '✗ ' + explanations[id];
+      }
+    }
+  }
+  const box = document.getElementById('score');
+  box.style.display = 'block';
+  box.textContent = `Score: ${score} / ${total}`;
+  box.style.color = score === total ? 'var(--green)' : score >= total/2 ? 'var(--yellow)' : 'var(--accent)';
+}
+</script>
+
+</body>
+</html>
