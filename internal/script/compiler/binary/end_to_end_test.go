@@ -7,6 +7,7 @@ import (
 	"github.com/VisualSource/plex/internal/script"
 	binary_wasm "github.com/VisualSource/plex/internal/script/compiler/binary"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 )
 
 func TestEndToEnd_FortyTwo(t *testing.T) {
@@ -160,6 +161,23 @@ func TestEndToEnd_ShortCircuitOr(t *testing.T) {
 
 	// a=false: RHS runs. 10/100 = 0, 0 > 0 = false
 	runOne(t, src, "safe_or", []uint64{0, 100}, 0)
+}
+
+func TestEndToEnd_UnaryMinus(t *testing.T) {
+	src := `
+        fn neg_then_add(x: i64, y: i64): i64 {
+            return -x + y;
+        }
+        fn double_neg(x: i64): i64 {
+            return -(-x);          // should equal x
+        }
+        fn unary_plus(x: i64): i64 {
+            return +x;             // no-op
+        }
+    `
+	runOne(t, src, "neg_then_add", []uint64{10, 3}, api.EncodeI64(-7))
+	runOne(t, src, "double_neg", []uint64{42}, 42)
+	runOne(t, src, "unary_plus", []uint64{7}, 7)
 }
 
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {

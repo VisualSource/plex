@@ -248,6 +248,39 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		default:
 			return fmt.Errorf("unsupported callee type %T", n.Callee)
 		}
+	case *script.UnaryExpression:
+		if n.Operator == script.TokenType_Plus {
+			return b.walk(n.Operand)
+		}
+
+		if n.Operator != script.TokenType_Minus {
+			return fmt.Errorf("unsupported unary operator %v", n.Operator)
+		}
+
+		t := n.Operand.GetType()
+		if t == nil {
+			return fmt.Errorf("no type on unary operand")
+		}
+
+		switch t.Kind {
+		case script.TypeKind_F64, script.TypeKind_Float:
+			if err := b.walk(n.Operand); err != nil {
+				return err
+			}
+			b.buf = append(b.buf, OpF64NEg)
+			return nil
+		case script.TypeKind_I64, script.TypeKind_Int:
+			b.buf = append(b.buf, OpI64Const)
+			b.buf = AppendULEB128(b.buf, 0)
+			if err := b.walk(n.Operand); err != nil {
+				return err
+			}
+			b.buf = append(b.buf, OpI64Sub)
+			return nil
+		default:
+			return fmt.Errorf("unary minus not supported for type %s", t)
+		}
+
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}

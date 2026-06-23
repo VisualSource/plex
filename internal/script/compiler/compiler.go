@@ -188,6 +188,8 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return errors.ErrUnsupported
 		}
 	case *script.BinaryExpression:
+		// short circuit here
+
 		if err := c.Compile(n.Left); err != nil {
 			return err
 		}

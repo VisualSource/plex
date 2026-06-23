@@ -58,6 +58,8 @@ const (
 	OpI64DivS byte = 0x7F
 	OpI64RemS byte = 0x81
 
+	OpF64NEg byte = 0x9A
+
 	OpF64Add byte = 0xA0
 	OpF64Sub byte = 0xA1
 	OpF64Mul byte = 0xA2
