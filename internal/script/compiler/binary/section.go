@@ -45,10 +45,10 @@ func encodeFunctionSection(sigs []funcSig) []byte {
 	return section(SectionFunction, body)
 }
 
-func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32) ([]byte, error) {
+func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32, strs *stringTable) ([]byte, error) {
 	var body []byte
 
-	enc := newBodyEncoder(f, sig, funcIndices)
+	enc := newBodyEncoder(f, sig, funcIndices, strs)
 
 	body = AppendULEB128(body, uint32(len(enc.localTypes)))
 
@@ -72,13 +72,13 @@ func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map
 	return entry, nil
 }
 
-func encodeCodeSection(funcs []*script.FunctionDeclaration, sigs []funcSig, funcIndices map[string]uint32) ([]byte, error) {
+func encodeCodeSection(funcs []*script.FunctionDeclaration, sigs []funcSig, funcIndices map[string]uint32, strings *stringTable) ([]byte, error) {
 	var body []byte
 	body = AppendULEB128(body, uint32(len(funcs)))
 	for i, f := range funcs {
 		sig := sigs[i]
 
-		entry, err := encodeCodeEntry(f, sig, funcIndices)
+		entry, err := encodeCodeEntry(f, sig, funcIndices, strings)
 		if err != nil {
 			return nil, err
 		}
@@ -101,4 +101,32 @@ func encodeExportSection(exports []exportEntry) []byte {
 		body = AppendULEB128(body, e.idx)
 	}
 	return section(SectionExport, body)
+}
+
+func encodeMemorySection() []byte {
+	var body []byte
+	body = AppendULEB128(body, 1)
+	body = append(body, 0x00)
+	body = AppendULEB128(body, 1)
+	return section(SectionMemory, body)
+}
+
+func encodeDataSection(st *stringTable) []byte {
+	var body []byte
+	body = AppendULEB128(body, uint32(len(st.entries)))
+	for _, e := range st.entries {
+		body = AppendULEB128(body, 0)
+		body = append(body, OpI32Const)
+		body = AppendSLEB128(body, int64(e.offset))
+		body = append(body, OpEnd)
+
+		n := len(e.value)
+		bytes := []byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)}
+		bytes = append(bytes, e.value...)
+
+		body = AppendULEB128(body, uint32(len(bytes)))
+		body = append(body, bytes...)
+	}
+
+	return section(SectionData, body)
 }

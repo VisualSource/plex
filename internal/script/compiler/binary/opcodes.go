@@ -25,6 +25,8 @@ const (
 	OpLocalGet byte = 0x20
 	OpLocalSet byte = 0x21
 	OpLocalTee byte = 0x22
+	OpI32Load  byte = 0x28
+	OpI32Store byte = 0x36
 
 	BlockTypeEmpty byte = 0x40
 

@@ -13,9 +13,14 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		return nil, err
 	}
 
+	strings := collectStrings(node)
 	sigs, funcs, exports, err := collectSignatures(node)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(strings.entries) > 0 {
+		exports = append(exports, exportEntry{name: "memory", kind: ExportMemory, idx: 0})
 	}
 
 	funcIndexes := make(map[string]uint32, len(sigs))
@@ -31,16 +36,24 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		out = append(out, encodeTypeSection(sigs)...)
 		out = append(out, encodeFunctionSection(sigs)...)
 
+		if len(strings.entries) > 0 {
+			out = append(out, encodeMemorySection()...)
+		}
+
 		if len(exports) > 0 {
 			out = append(out, encodeExportSection(exports)...)
 		}
 
-		code, err := encodeCodeSection(funcs, sigs, funcIndexes)
+		code, err := encodeCodeSection(funcs, sigs, funcIndexes, strings)
 		if err != nil {
 			return nil, err
 		}
 
 		out = append(out, code...)
+
+		if len(strings.entries) > 0 {
+			out = append(out, encodeDataSection(strings)...)
+		}
 	}
 
 	// sections will be appended here in later lessons

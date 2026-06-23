@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 36 – Linear Memory and String Literals</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 880px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .memory-strip { display: flex; gap: 2px; margin: 1.2em 0; font-family: "Fira Code", monospace; font-size: 0.82em; }
+  .mem-cell { background: var(--surface); border: 1px solid var(--border); padding: 8px 10px; text-align: center; min-width: 38px; }
+  .mem-cell.len { background: #14223a; border-color: var(--blue); color: var(--blue); }
+  .mem-cell.data { background: #1e1e0e; border-color: var(--yellow); color: var(--yellow); }
+  .mem-cell .addr { display: block; font-size: 0.7em; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 36 – Linear Memory and String Literals</h1>
+
+<p><strong>Goal:</strong> emit a memory section and a data section, lay out string literals at known offsets, and make <code>fn greet(): string { return "hello"; }</code> produce an exported memory that the host can read.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/section.go">section.go</a> &middot;
+  <a href="../compiler/binary/helpers.go">helpers.go</a> &middot;
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/module.go">module.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What WASM Calls "Memory"</h2>
+
+<p>WebAssembly modules can declare at most one <strong>linear memory</strong>: a contiguous, byte-addressable array of bytes, sized in 64 KiB pages. Code reads and writes it with <code>i32.load</code> and <code>i32.store</code> (and their typed cousins), using an i32 address. There is no garbage collector; the address space is the program's to manage.</p>
+
+<table>
+  <tr><th>Section</th><th>ID</th><th>Purpose</th></tr>
+  <tr><td>Memory</td><td><code>0x05</code></td><td>Declares the memory's size limits (min/max in pages).</td></tr>
+  <tr><td>Data</td><td><code>0x0B</code></td><td>Preloads bytes at fixed offsets when the module is instantiated.</td></tr>
+  <tr><td>Export</td><td><code>0x07</code></td><td>You already build this — gains a new entry of kind <code>0x02</code> (memory).</td></tr>
+</table>
+
+<div class="insight">
+<strong>Why preload bytes at instantiation?</strong> The data section is WASM's equivalent of <code>.rodata</code> in a binary. String literals don't appear at runtime out of thin air — the host writes them into linear memory once, when the module is instantiated, and the rest of the program just reads them. This makes string literals zero-cost at runtime (no allocator, no copy).
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>String Layout</h2>
+
+<p>Match the WAT compiler's layout (<a href="../compiler/compiler.go">compiler.go:1086-1099</a>): each string is laid out as a <strong>4-byte little-endian length</strong> followed by the raw UTF-8 bytes. A "string" in plex is therefore an <code>i32</code> pointer to the length-prefix byte. Reading the string is reading 4 bytes for the length, then that many bytes after.</p>
+
+<p>Memory layout of <code>"hello"</code> placed at offset 0:</p>
+
+<div class="memory-strip">
+  <div class="mem-cell len">05<span class="addr">@0</span></div>
+  <div class="mem-cell len">00<span class="addr">@1</span></div>
+  <div class="mem-cell len">00<span class="addr">@2</span></div>
+  <div class="mem-cell len">00<span class="addr">@3</span></div>
+  <div class="mem-cell data">'h'<span class="addr">@4</span></div>
+  <div class="mem-cell data">'e'<span class="addr">@5</span></div>
+  <div class="mem-cell data">'l'<span class="addr">@6</span></div>
+  <div class="mem-cell data">'l'<span class="addr">@7</span></div>
+  <div class="mem-cell data">'o'<span class="addr">@8</span></div>
+</div>
+
+<p>The "value" of the string literal <code>"hello"</code> at the WASM level is the i32 <code>0</code> — the address of the length-prefix byte. A second literal <code>"world"</code> would sit at offset 9 (right after <code>'o'</code>) and its value would be the i32 <code>9</code>.</p>
+
+<div class="warn">
+<strong>Length prefix, not null terminator.</strong> Plex strings carry their length explicitly. This is the same choice as Pascal strings and the bedrock of Go strings — O(1) length, safe with embedded zero bytes. C-style null-terminated strings would also work but require a scan to compute length.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Section Encodings</h2>
+
+<h3>Memory section (id 5)</h3>
+
+<p>The body is a vector of memories. We always emit exactly one memory with a minimum of one page and no maximum. The flags byte selects the limits form: <code>0x00</code> means "min only", <code>0x01</code> means "min and max".</p>
+
+<div class="diagram">
+<span class="cmt">; memory section, 1 memory, min=1 page, no max</span>
+<span class="byte">05</span>          <span class="cmt">; section id</span>
+<span class="byte">03</span>          <span class="cmt">; section body length (3 bytes)</span>
+<span class="byte">01</span>          <span class="cmt">; one memory entry</span>
+<span class="byte">00</span>          <span class="cmt">; limits flag: min only</span>
+<span class="byte">01</span>          <span class="cmt">; min = 1 page</span>
+</div>
+
+<h3>Data section (id 11)</h3>
+
+<p>A vector of data segments. Each <em>active</em> segment has:</p>
+<ol>
+  <li>A memory index (ULEB128) — always <code>0</code> since there's only one memory.</li>
+  <li>An offset expression — a constant <code>i32.const N</code> followed by <code>end</code>.</li>
+  <li>A byte vector — ULEB128 length followed by the raw bytes.</li>
+</ol>
+
+<div class="diagram">
+<span class="cmt">; data section with one segment for "hello" at offset 0</span>
+<span class="byte">0B</span>          <span class="cmt">; section id</span>
+<span class="byte">..</span>          <span class="cmt">; section body length</span>
+<span class="byte">01</span>          <span class="cmt">; one data segment</span>
+<span class="byte">00</span>          <span class="cmt">; memory index 0</span>
+<span class="byte">41 00 0B</span>    <span class="cmt">; offset expr: i32.const 0; end</span>
+<span class="byte">09</span>          <span class="cmt">; vec length: 9 bytes (4 length + 5 chars)</span>
+<span class="byte">05 00 00 00</span> <span class="cmt">; little-endian length prefix = 5</span>
+<span class="byte">68 65 6C 6C 6F</span> <span class="cmt">; "hello"</span>
+</div>
+
+<div class="insight">
+<strong>The offset expression is a real WASM expression.</strong> Not a raw integer — a constant initialiser instruction stream terminated by <code>end</code>. This is the same shape as globals and element segments use. For now you only ever emit <code>OpI32Const, &lt;leb&gt;, OpEnd</code> — three bytes plus the LEB.
+</div>
+
+<h3>Export entry for memory</h3>
+
+<p>To let the host read memory, add an export of kind <code>0x02</code> (memory) referring to memory index 0:</p>
+
+<div class="diagram">
+<span class="byte">06</span>          <span class="cmt">; name length: 6</span>
+<span class="byte">"memory"</span>     <span class="cmt">; name bytes</span>
+<span class="byte">02</span>          <span class="cmt">; kind: memory</span>
+<span class="byte">00</span>          <span class="cmt">; memory index 0</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Constants</h3>
+
+<p>Add the section ID and export kind you'll need in <a href="../compiler/binary/section.go">section.go</a> if not already present (the file already defines <code>SectionData = 11</code> and <code>SectionMemory = 5</code> — see <a href="../compiler/binary/section.go">section.go:5-17</a>), and <code>ExportMemory = 0x02</code> is already in <a href="../compiler/binary/opcodes.go">opcodes.go:67</a>.</p>
+
+<p>No new opcode is strictly needed for this lesson — we only use <code>OpI32Const</code> and <code>OpEnd</code>, which already exist. Add <code>OpI32Load = 0x28</code> and <code>OpI32Store = 0x36</code> now, though — the next lesson will need them.</p>
+
+<pre><code>OpI32Load  <span class="ty">byte</span> = <span class="byte">0x28</span>
+OpI32Store <span class="ty">byte</span> = <span class="byte">0x36</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Collect strings</h3>
+
+<p>Add to <a href="../compiler/binary/helpers.go">helpers.go</a> a pass that walks the AST and assigns each unique string literal a stable offset. Keep it simple — a slice plus a name→offset map. Strings are pooled (de-duplicated) so identical literals share storage:</p>
+
+<pre><code><span class="kw">type</span> <span class="ty">stringEntry</span> <span class="kw">struct</span> {
+    value  <span class="ty">string</span>
+    offset <span class="ty">uint32</span>
+}
+
+<span class="kw">type</span> <span class="ty">stringTable</span> <span class="kw">struct</span> {
+    entries []<span class="ty">stringEntry</span>
+    byValue <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>
+    next    <span class="ty">uint32</span>
+}
+
+<span class="kw">func</span> (st *<span class="ty">stringTable</span>) <span class="fn">add</span>(v <span class="ty">string</span>) <span class="ty">uint32</span> {
+    <span class="kw">if</span> off, ok := st.byValue[v]; ok {
+        <span class="kw">return</span> off
+    }
+    off := st.next
+    st.entries = <span class="fn">append</span>(st.entries, <span class="ty">stringEntry</span>{v, off})
+    <span class="kw">if</span> st.byValue == <span class="kw">nil</span> {
+        st.byValue = <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>{}
+    }
+    st.byValue[v] = off
+    st.next += <span class="ty">uint32</span>(<span class="num">4</span> + <span class="fn">len</span>(v))
+    <span class="kw">return</span> off
+}
+
+<span class="kw">func</span> <span class="fn">collectStrings</span>(p *<span class="ty">script.Program</span>) *<span class="ty">stringTable</span> {
+    st := &amp;<span class="ty">stringTable</span>{}
+    <span class="kw">var</span> walk <span class="kw">func</span>(<span class="ty">script.AstNode</span>)
+    walk = <span class="kw">func</span>(n <span class="ty">script.AstNode</span>) {
+        <span class="kw">switch</span> v := n.(<span class="kw">type</span>) {
+        <span class="kw">case</span> *<span class="ty">script.StringLiteral</span>:
+            st.<span class="fn">add</span>(v.Value)
+        <span class="kw">case</span> *<span class="ty">script.Program</span>:
+            <span class="kw">for</span> _, s := <span class="kw">range</span> v.Stmts { <span class="fn">walk</span>(s) }
+        <span class="kw">case</span> *<span class="ty">script.FunctionDeclaration</span>:
+            <span class="fn">walk</span>(v.Body)
+        <span class="kw">case</span> *<span class="ty">script.Block</span>:
+            <span class="kw">for</span> _, s := <span class="kw">range</span> v.Stmts { <span class="fn">walk</span>(s) }
+        <span class="kw">case</span> *<span class="ty">script.ReturnStatement</span>:
+            <span class="kw">if</span> v.Value != <span class="kw">nil</span> { <span class="fn">walk</span>(v.Value) }
+        <span class="kw">case</span> *<span class="ty">script.VariableDeclaration</span>:
+            <span class="kw">if</span> v.Init != <span class="kw">nil</span> { <span class="fn">walk</span>(v.Init) }
+        <span class="kw">case</span> *<span class="ty">script.BinaryExpression</span>:
+            <span class="fn">walk</span>(v.Left); <span class="fn">walk</span>(v.Right)
+        <span class="kw">case</span> *<span class="ty">script.IfStatement</span>:
+            <span class="fn">walk</span>(v.Condition); <span class="fn">walk</span>(v.Body)
+            <span class="kw">if</span> v.Else != <span class="kw">nil</span> { <span class="fn">walk</span>(v.Else) }
+        <span class="kw">case</span> *<span class="ty">script.WhileStatement</span>:
+            <span class="fn">walk</span>(v.Condition); <span class="fn">walk</span>(v.Body)
+        <span class="kw">case</span> *<span class="ty">script.FunctionCall</span>:
+            <span class="kw">for</span> _, a := <span class="kw">range</span> v.Args { <span class="fn">walk</span>(a) }
+        }
+    }
+    <span class="fn">walk</span>(p)
+    <span class="kw">return</span> st
+}</code></pre>
+
+<div class="warn">
+<strong>Walking is conservative.</strong> Don't worry about hitting every AST node — anything you miss simply won't pool its strings, and at worst the test won't find one. The cases above cover everything the current binary backend already compiles.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Encode the memory section</h3>
+
+<p>In <a href="../compiler/binary/section.go">section.go</a>:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">encodeMemorySection</span>() []<span class="ty">byte</span> {
+    <span class="kw">var</span> body []<span class="ty">byte</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="num">1</span>)   <span class="cmt">// one memory</span>
+    body = <span class="fn">append</span>(body, <span class="num">0x00</span>)        <span class="cmt">// limits flag: min only</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="num">1</span>)   <span class="cmt">// min = 1 page</span>
+    <span class="kw">return</span> <span class="fn">section</span>(<span class="ty">SectionMemory</span>, body)
+}</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 4 — Encode the data section</h3>
+
+<pre><code><span class="kw">func</span> <span class="fn">encodeDataSection</span>(st *<span class="ty">stringTable</span>) []<span class="ty">byte</span> {
+    <span class="kw">var</span> body []<span class="ty">byte</span>
+    body = <span class="fn">AppendULEB128</span>(body, <span class="ty">uint32</span>(<span class="fn">len</span>(st.entries)))
+    <span class="kw">for</span> _, e := <span class="kw">range</span> st.entries {
+        body = <span class="fn">AppendULEB128</span>(body, <span class="num">0</span>)              <span class="cmt">// memory index 0</span>
+        body = <span class="fn">append</span>(body, <span class="ty">OpI32Const</span>)            <span class="cmt">// offset expr begin</span>
+        body = <span class="fn">AppendSLEB128</span>(body, <span class="ty">int64</span>(e.offset))
+        body = <span class="fn">append</span>(body, <span class="ty">OpEnd</span>)                  <span class="cmt">// offset expr end</span>
+
+        <span class="cmt">// bytes: 4-byte LE length prefix + raw bytes</span>
+        n := <span class="fn">len</span>(e.value)
+        bytes := []<span class="ty">byte</span>{<span class="ty">byte</span>(n), <span class="ty">byte</span>(n &gt;&gt; <span class="num">8</span>), <span class="ty">byte</span>(n &gt;&gt; <span class="num">16</span>), <span class="ty">byte</span>(n &gt;&gt; <span class="num">24</span>)}
+        bytes = <span class="fn">append</span>(bytes, e.value...)
+
+        body = <span class="fn">AppendULEB128</span>(body, <span class="ty">uint32</span>(<span class="fn">len</span>(bytes)))
+        body = <span class="fn">append</span>(body, bytes...)
+    }
+    <span class="kw">return</span> <span class="fn">section</span>(<span class="ty">SectionData</span>, body)
+}</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 5 — Add the memory export</h3>
+
+<p>Extend <code>encodeExportSection</code>'s caller (or the export collection step) to include one extra <code>exportEntry</code> when strings exist:</p>
+
+<pre><code>exports = <span class="fn">append</span>(exports, <span class="ty">exportEntry</span>{
+    name: <span class="str">"memory"</span>,
+    kind: <span class="ty">ExportMemory</span>,
+    idx:  <span class="num">0</span>,
+})</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 6 — Handle <code>*script.StringLiteral</code> in <code>walk</code></h3>
+
+<p>The encoder needs access to the string table at the time it walks function bodies. The simplest threading: store it on the <code>bodyEncoder</code> and pass through <code>newBodyEncoder</code>, parallel to how <code>funcIndices</code> is plumbed.</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.StringLiteral</span>:
+    off, ok := b.strings.byValue[n.Value]
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"string %q not in table"</span>, n.Value)
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Const</span>)
+    b.buf = <span class="fn">AppendSLEB128</span>(b.buf, <span class="ty">int64</span>(off))
+    <span class="kw">return nil</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 7 — Wire it all into <code>CompileProgram</code></h3>
+
+<p>In <a href="../compiler/binary/module.go">module.go</a>:</p>
+
+<pre><code>strings := <span class="fn">collectStrings</span>(node)
+
+<span class="kw">if</span> <span class="fn">len</span>(strings.entries) &gt; <span class="num">0</span> {
+    exports = <span class="fn">append</span>(exports, <span class="ty">exportEntry</span>{name: <span class="str">"memory"</span>, kind: <span class="ty">ExportMemory</span>, idx: <span class="num">0</span>})
+}
+
+<span class="cmt">// ... existing emission of type, function, export, code sections ...</span>
+
+<span class="kw">if</span> <span class="fn">len</span>(strings.entries) &gt; <span class="num">0</span> {
+    out = <span class="fn">append</span>(out, <span class="fn">encodeMemorySection</span>()...)
+    out = <span class="fn">append</span>(out, <span class="fn">encodeDataSection</span>(strings)...)
+}</code></pre>
+
+<div class="warn">
+<strong>Section order matters.</strong> The WASM binary format mandates a fixed order: type, import, function, table, memory, global, export, start, element, code, data. The validator rejects out-of-order sections. Memory (5) must precede export (7); data (11) goes last. Pass <code>strings</code> into <code>encodeCodeSection</code> so function bodies can resolve string literals — and emit the memory section <em>before</em> the export section.
+</div>
+
+<p>The cleanest sequence:</p>
+
+<div class="diagram">
+type (1)
+function (3)
+memory (5)        <span class="cmt">; new</span>
+export (7)        <span class="cmt">; now includes memory export</span>
+code (10)
+data (11)         <span class="cmt">; new</span>
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 8 — The test</h3>
+
+<p>The existing <code>runOne</code> helper compares a single uint64 return. For strings we want to inspect memory. Add a new test that calls the function, reads the returned i32 as a pointer, then reads the prefixed bytes from memory:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_StringLiteral</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn greet(): string {
+            return "hello";
+        }
+    `
+    ast, err := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+    wasm, err := binary_wasm.<span class="fn">CompileProgram</span>(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    got, err := mod.<span class="fn">ExportedFunction</span>(<span class="str">"greet"</span>).<span class="fn">Call</span>(ctx)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"call: %v"</span>, err) }
+
+    ptr := <span class="ty">uint32</span>(got[<span class="num">0</span>])
+    mem := mod.<span class="fn">Memory</span>()
+
+    lenBytes, _ := mem.<span class="fn">Read</span>(ptr, <span class="num">4</span>)
+    n := <span class="ty">uint32</span>(lenBytes[<span class="num">0</span>]) | <span class="ty">uint32</span>(lenBytes[<span class="num">1</span>])&lt;&lt;<span class="num">8</span> | <span class="ty">uint32</span>(lenBytes[<span class="num">2</span>])&lt;&lt;<span class="num">16</span> | <span class="ty">uint32</span>(lenBytes[<span class="num">3</span>])&lt;&lt;<span class="num">24</span>
+    <span class="kw">if</span> n != <span class="num">5</span> { t.<span class="fn">Fatalf</span>(<span class="str">"length = %d, want 5"</span>, n) }
+
+    data, _ := mem.<span class="fn">Read</span>(ptr+<span class="num">4</span>, n)
+    <span class="kw">if</span> <span class="ty">string</span>(data) != <span class="str">"hello"</span> {
+        t.<span class="fn">Fatalf</span>(<span class="str">"data = %q, want %q"</span>, <span class="ty">string</span>(data), <span class="str">"hello"</span>)
+    }
+}</code></pre>
+
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_StringLiteral -v</code></pre>
+
+<p class="ok">The full suite should still pass — runs that don't use strings won't emit memory or data sections, so nothing changes for them.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What You Just Built</h2>
+
+<p>Three new concepts landed at once:</p>
+<ul>
+  <li><strong>Compile-time data placement.</strong> The compiler decides where each string lives <em>before</em> any code runs. Offsets are baked into <code>i32.const</code> instructions and into the data section's offset expressions.</li>
+  <li><strong>Module-level state shared with bodies.</strong> The string table is built once and threaded into every <code>bodyEncoder</code> — the same threading pattern as <code>funcIndices</code> from lesson 32.</li>
+  <li><strong>The host as an inspection point.</strong> Until now, every test could see what the WASM did through its return value alone. Now the test reaches <em>into</em> linear memory — the same channel through which a real browser or runtime would read a result.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Why does the data section's offset use an <em>expression</em> ending in <code>end</code> rather than a raw integer?</p>
+  <label><input type="radio" name="q1" value="a"> Constant initialisers in WASM (data offsets, global init, element offsets) all share one shape — a tiny instruction stream — so the format scales to e.g. <code>global.get</code>-based offsets without redesign.</label>
+  <label><input type="radio" name="q1" value="b"> The validator runs the offset expression during instantiation, so it has to be valid bytecode.</label>
+  <label><input type="radio" name="q1" value="c"> An integer encoded directly would conflict with the section length prefix.</label>
+  <label><input type="radio" name="q1" value="d"> WASM has no integer encoding shorter than an instruction stream.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. Why pool (de-duplicate) string literals by value?</p>
+  <label><input type="radio" name="q2" value="a"> The WASM spec forbids overlapping data segments.</label>
+  <label><input type="radio" name="q2" value="b"> Identical string values can share storage and a single offset, saving binary size and memory. Equality of identical literals also becomes a pointer compare.</label>
+  <label><input type="radio" name="q2" value="c"> Without pooling, the validator rejects the module.</label>
+  <label><input type="radio" name="q2" value="d"> Pooling is required for the string table to fit in a single 64 KiB page.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. What goes wrong if the memory section is emitted <em>after</em> the export section in the binary?</p>
+  <label><input type="radio" name="q3" value="a"> The module compiles fine; section order is informational.</label>
+  <label><input type="radio" name="q3" value="b"> The validator rejects the module — the spec mandates a fixed order so the format is single-pass parseable.</label>
+  <label><input type="radio" name="q3" value="c"> Memory is silently ignored unless it precedes the code section.</label>
+  <label><input type="radio" name="q3" value="d"> Only the data section requires a fixed position; the rest is flexible.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. What is the runtime value of the plex expression <code>"hello"</code> after this lesson?</p>
+  <label><input type="radio" name="q4" value="a"> A reference object containing the bytes and a length.</label>
+  <label><input type="radio" name="q4" value="b"> A 64-bit integer containing the bytes packed little-endian.</label>
+  <label><input type="radio" name="q4" value="c"> An i32 pointer into linear memory — the address of the 4-byte length prefix.</label>
+  <label><input type="radio" name="q4" value="d"> A null-terminated byte sequence on the value stack.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>String length and indexing.</strong> Now that strings live in memory, <code>s.len()</code> compiles to <code>i32.load</code> at the pointer; <code>s[i]</code> to <code>i32.const 4; i32.add; i32.const i; i32.add; i32.load8_u</code>. Tiny code, big unlock — and you already added <code>OpI32Load</code>.</li>
+  <li><strong>Heap and arrays.</strong> Strings are static (data section); arrays are dynamic and need a bump allocator and a heap-pointer global. Lesson 9 covered this for the WAT backend.</li>
+  <li><strong>Struct layout.</strong> Once the heap is live, structs are just typed offsets from a base pointer.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/modules.html#memory-section" target="_blank">WebAssembly Core Spec §5.5.8 — Memory Section</a></p>
+<p><a href="https://webassembly.github.io/spec/core/binary/modules.html#data-section" target="_blank">WebAssembly Core Spec §5.5.14 — Data Section</a></p>
+<p><a href="https://webassembly.github.io/spec/core/binary/modules.html#sections" target="_blank">WebAssembly Core Spec §5.5.2 — Section Order</a> — the formal order constraint.</p>
+<p><a href="https://pkg.go.dev/github.com/tetratelabs/wazero/api#Memory" target="_blank">wazero — <code>api.Memory</code></a> — the Read/Write surface for host-side memory inspection.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can dump the bytes of a compiled module side-by-side with the section layout, explain how WASM pages relate to physical pages, or sketch how the same data section would carry array literals later.
+</p>
+
+<script>
+const ANSWERS = { q1: 'a', q2: 'b', q3: 'b', q4: 'c' };
+const FEEDBACK = {
+  q1: {
+    a: "Correct — the expression form generalises. Data offsets, global initialisers, element offsets all share it, so future extensions (like <code>global.get</code> offsets) don't break the format.",
+    b: "Close, but the deeper reason is generality: any constant expression works, not just the validator's checks.",
+    c: "No — the length prefix is independent and unambiguous.",
+    d: "No — LEB128 is shorter; the expression form is a design choice, not a fallback."
+  },
+  q2: {
+    a: "No — the spec doesn't forbid overlap, though it would be weird.",
+    b: "Correct — and as a bonus, two literals with the same value have the same pointer, so equality is a pointer compare. Identity coincides with equality.",
+    c: "No — duplicate strings in distinct segments are valid.",
+    d: "No — page limits are unrelated to pooling."
+  },
+  q3: {
+    a: "No — section order is normative.",
+    b: "Correct — the spec lists sections in order and validators reject out-of-order or duplicated sections. Single-pass parsing depends on it.",
+    c: "No — memory isn't silently ignored; the validator errors out.",
+    d: "No — all sections have an enforced order."
+  },
+  q4: {
+    a: "No — there are no boxed reference objects at the WASM level.",
+    b: "No — strings are not packed into integers; they live in memory.",
+    c: "Correct — the value is an <code>i32</code> address into linear memory, pointing at the 4-byte length prefix. <code>greet()</code> returns 0 (or whichever offset the pool assigned) — not the bytes themselves.",
+    d: "No — values on the stack are typed scalars (i32/i64/f32/f64), not byte sequences."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>

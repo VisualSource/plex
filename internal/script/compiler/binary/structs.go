@@ -17,3 +17,29 @@ type loopEntry struct {
 	blockLabel uint32
 	loopLabel  uint32
 }
+
+type stringEntry struct {
+	value  string
+	offset uint32
+}
+
+type stringTable struct {
+	entries []stringEntry
+	byValue map[string]uint32
+	next    uint32
+}
+
+func (st *stringTable) add(v string) uint32 {
+	if off, ok := st.byValue[v]; ok {
+		return off
+	}
+
+	off := st.next
+	st.entries = append(st.entries, stringEntry{v, off})
+	if st.byValue == nil {
+		st.byValue = make(map[string]uint32)
+	}
+	st.byValue[v] = off
+	st.next += uint32(4 + len(v))
+	return off
+}

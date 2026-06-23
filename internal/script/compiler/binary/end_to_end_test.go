@@ -180,6 +180,48 @@ func TestEndToEnd_UnaryMinus(t *testing.T) {
 	runOne(t, src, "unary_plus", []uint64{7}, 7)
 }
 
+func TestEndToEnd_StringLiteral(t *testing.T) {
+	src := `
+        fn greet(): string {
+            return "hello";
+        }
+    `
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wasm, err := binary_wasm.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+	mod, err := r.Instantiate(ctx, wasm)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	got, err := mod.ExportedFunction("greet").Call(ctx)
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+
+	ptr := api.DecodeU32(got[0])
+	mem := mod.Memory()
+
+	n, _ := mem.ReadUint32Le(ptr)
+	if n != 5 {
+		t.Fatalf("length = %d, want 5", n)
+	}
+
+	data, _ := mem.Read(ptr+4, n)
+	if string(data) != "hello" {
+		t.Fatalf("data = %q, want %q", string(data), "hello")
+	}
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

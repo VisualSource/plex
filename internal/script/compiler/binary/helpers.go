@@ -68,3 +68,48 @@ func signatureOf(f *script.FunctionDeclaration, implName string) (funcSig, error
 
 	return funcSig{name, params, results, isMethod}, nil
 }
+
+func collectStrings(p *script.Program) *stringTable {
+	st := new(stringTable)
+	var walk func(script.AstNode)
+	walk = func(n script.AstNode) {
+		switch v := n.(type) {
+		case *script.StringLiteral:
+			st.add(v.Value)
+		case *script.Program:
+			for _, s := range v.Stmts {
+				walk(s)
+			}
+		case *script.FunctionDeclaration:
+			walk(v.Body)
+		case *script.Block:
+			for _, sg := range v.Stmts {
+				walk(sg)
+			}
+		case *script.ReturnStatement:
+			if v.Value != nil {
+				walk(v.Value)
+			}
+		case *script.VariableDeclaration:
+			if v.Init != nil {
+				walk(v.Init)
+			}
+		case *script.BinaryExpression:
+			walk(v.Left)
+			walk(v.Right)
+		case *script.IfStatement:
+			walk(v.Condition)
+			walk(v.Body)
+			if v.Else != nil {
+				walk(v.Else)
+			}
+		case *script.FunctionCall:
+			for _, a := range v.Args {
+				walk(a)
+			}
+		}
+	}
+
+	walk(p)
+	return st
+}

@@ -18,10 +18,12 @@ type bodyEncoder struct {
 	loopStack  []loopEntry
 
 	funcIndices map[string]uint32
+
+	strings *stringTable
 }
 
-func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32) *bodyEncoder {
-	b := &bodyEncoder{locals: make(map[string]uint32), funcIndices: funcIndices}
+func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32, strings *stringTable) *bodyEncoder {
+	b := &bodyEncoder{locals: make(map[string]uint32), funcIndices: funcIndices, strings: strings}
 	var idx uint32
 	if sig.isMethod {
 		b.locals["self"] = idx
@@ -280,7 +282,15 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		default:
 			return fmt.Errorf("unary minus not supported for type %s", t)
 		}
+	case *script.StringLiteral:
+		off, ok := b.strings.byValue[n.Value]
+		if !ok {
+			return fmt.Errorf("string %s not int table", n.Value)
+		}
 
+		b.buf = append(b.buf, OpI32Const)
+		b.buf = AppendSLEB128(b.buf, int64(off))
+		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}
