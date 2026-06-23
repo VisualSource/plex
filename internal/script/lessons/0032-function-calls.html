@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 32 – Function Calls: call funcidx</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .stack { color: #79c0ff; font-size: 0.82em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 32 – Function Calls: <code>call funcidx</code></h1>
+
+<p><strong>Goal:</strong> compile <code>square(a) + square(b)</code> to valid WASM binary. By the end, <code>sum_squares(3, 4) = 25</code> — the 3-4-5 triangle, proven by your compiler.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/module.go">module.go</a> &middot;
+  <a href="../compiler/binary/section.go">section.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Big Idea: The Stack Is the Calling Convention</h2>
+
+<p>WASM function calls have no hidden complexity: push the arguments onto the value stack left-to-right, then emit <code>call funcidx</code>. The engine pops the arguments, runs the callee, and pushes the return value (if any). Your recursive <code>walk</code> already does everything needed — just emit each argument expression in order, then emit the <code>call</code>.</p>
+
+<div class="diagram">
+<span class="cmt">; sum_squares(3, 4)  →  square(3) + square(4)</span>
+
+<span class="cmt">; square(a): walk arg 'a', then call</span>
+<span class="byte">20 00</span>     <span class="cmt">; local.get 0     (a)            stack: [a]</span>
+<span class="byte">10 00</span>     <span class="cmt">; call 0          (square)       stack: [a*a]</span>
+
+<span class="cmt">; square(b): walk arg 'b', then call</span>
+<span class="byte">20 01</span>     <span class="cmt">; local.get 1     (b)            stack: [a*a, b]</span>
+<span class="byte">10 00</span>     <span class="cmt">; call 0          (square)       stack: [a*a, b*b]</span>
+
+<span class="cmt">; add the results</span>
+<span class="byte">7C</span>        <span class="cmt">; i64.add                        stack: [a*a + b*b]</span>
+<span class="byte">0F</span>        <span class="cmt">; return</span>
+</div>
+
+<p>The only non-obvious thing is the <em>funcidx</em>: WASM identifies functions by their position in the function section (0-indexed), not by name. So before emitting any bytecode, you need a map from function name to its index — built once from the <code>sigs</code> slice you already have.</p>
+
+<table>
+  <tr><th>Instruction</th><th>Encoding</th><th>Stack effect</th></tr>
+  <tr><td><code>call funcidx</code></td><td><code>0x10</code> + ULEB128 u32</td><td>pops N args, pushes 0 or 1 result</td></tr>
+</table>
+
+<div class="insight">
+<strong>Names don't exist at runtime.</strong> The WASM binary format has no symbol table for internal calls. Names → indices is a compile-time-only mapping. The export section (which you built in lesson 27) is the one place names appear — but only for functions the host wants to call from outside.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Threading the Function Index Map</h2>
+
+<p>The change touches the data flow from <code>CompileProgram</code> down to <code>bodyEncoder</code>. Here's the full path:</p>
+
+<div class="diagram">
+CompileProgram
+  <span class="arrow">→</span> collectSignatures  <span class="cmt">// already returns []funcSig with .name fields</span>
+  <span class="arrow">→</span> build funcIndices   <span class="cmt">// NEW: map[string]uint32 from sigs[i].name → i</span>
+  <span class="arrow">→</span> encodeCodeSection(funcs, sigs, funcIndices)
+      <span class="arrow">→</span> encodeCodeEntry(f, sig, funcIndices)
+          <span class="arrow">→</span> newBodyEncoder(f, sig, funcIndices)
+              <span class="arrow">→</span> b.funcIndices = funcIndices
+</div>
+
+<p>The map itself is tiny — one allocation, shared read-only across all function bodies.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Add the opcode</h3>
+
+<p>Open <a href="../compiler/binary/opcodes.go">opcodes.go</a>. Add:</p>
+
+<pre><code>OpCall <span class="ty">byte</span> = <span class="byte">0x10</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Add <code>funcIndices</code> to <code>bodyEncoder</code></h3>
+
+<p>Open <a href="../compiler/binary/body.go">body.go</a>. Extend the struct and constructor:</p>
+
+<pre><code><span class="kw">type</span> <span class="ty">bodyEncoder</span> <span class="kw">struct</span> {
+    buf         []<span class="ty">byte</span>
+    locals      <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>
+    localTypes  []<span class="ty">byte</span>
+    blockDepth  <span class="ty">int</span>
+    loopStack   []<span class="ty">loopEntry</span>
+<span class="hl">    funcIndices <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span></span>
+}
+
+<span class="kw">func</span> <span class="fn">newBodyEncoder</span>(f *<span class="ty">script.FunctionDeclaration</span>, sig <span class="ty">funcSig</span>, funcIndices <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>) *<span class="ty">bodyEncoder</span> {
+    b := &amp;<span class="ty">bodyEncoder</span>{locals: <span class="fn">make</span>(<span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>), funcIndices: funcIndices}
+    <span class="cmt">// ... rest unchanged ...</span>
+}</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Handle <code>*script.FunctionCall</code> in <code>walk</code></h3>
+
+<p>The AST node is <code>FunctionCall{Callee AstNode, Args []AstNode}</code>. For direct calls, <code>Callee</code> is an <code>*script.Identifier</code>. Walk each argument in order (left-to-right), then emit <code>call</code>:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.FunctionCall</span>:
+    <span class="kw">for</span> _, arg := <span class="kw">range</span> n.Args {
+        <span class="kw">if</span> err := b.<span class="fn">walk</span>(arg); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> err
+        }
+    }
+    id, ok := n.Callee.(*<span class="ty">script.Identifier</span>)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unsupported callee type %T"</span>, n.Callee)
+    }
+    idx, ok := b.funcIndices[id.Value]
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unknown function %s"</span>, id.Value)
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpCall</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, idx)
+    <span class="kw">return nil</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 4 — Thread <code>funcIndices</code> through the call chain</h3>
+
+<p>In <a href="../compiler/binary/section.go">section.go</a>, update the two encoding functions to accept and forward the map:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">encodeCodeEntry</span>(f *<span class="ty">script.FunctionDeclaration</span>, sig <span class="ty">funcSig</span>, funcIndices <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>) ([]<span class="ty">byte</span>, <span class="ty">error</span>) {
+    enc := <span class="fn">newBodyEncoder</span>(f, sig, funcIndices)
+    <span class="cmt">// ... rest unchanged ...</span>
+}
+
+<span class="kw">func</span> <span class="fn">encodeCodeSection</span>(funcs []*<span class="ty">script.FunctionDeclaration</span>, sigs []<span class="ty">funcSig</span>, funcIndices <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>) ([]<span class="ty">byte</span>, <span class="ty">error</span>) {
+    <span class="cmt">// ... pass funcIndices to encodeCodeEntry ...</span>
+}</code></pre>
+
+<p>In <a href="../compiler/binary/module.go">module.go</a>, build the map after <code>collectSignatures</code> and thread it in:</p>
+
+<pre><code>sigs, funcs, exports, err := <span class="fn">collectSignatures</span>(node)
+<span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return nil</span>, err }
+
+<span class="hl">funcIndices := <span class="fn">make</span>(<span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>, <span class="fn">len</span>(sigs))</span>
+<span class="hl"><span class="kw">for</span> i, s := <span class="kw">range</span> sigs {</span>
+<span class="hl">    funcIndices[s.name] = <span class="ty">uint32</span>(i)</span>
+<span class="hl">}</span>
+
+<span class="cmt">// ...later...</span>
+code, err := <span class="fn">encodeCodeSection</span>(funcs, sigs, funcIndices)</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 5 — Write the test</h3>
+
+<p>Add to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>. Two functions where the second calls the first — and the result is provable by the Pythagorean theorem:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_FunctionCall</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn square(x: i64): i64 {
+            <span class="kw">return</span> x * x;
+        }
+        fn sum_squares(a: i64, b: i64): i64 {
+            <span class="kw">return</span> square(a) + square(b);
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"sum_squares"</span>, []<span class="ty">uint64</span>{<span class="num">3</span>, <span class="num">4</span>}, <span class="num">25</span>)   <span class="cmt">// 3²+4²=25</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"sum_squares"</span>, []<span class="ty">uint64</span>{<span class="num">5</span>, <span class="num">12</span>}, <span class="num">169</span>) <span class="cmt">// 5²+12²=169=13²</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"square"</span>,      []<span class="ty">uint64</span>{<span class="num">7</span>},      <span class="num">49</span>)  <span class="cmt">// direct call too</span>
+}</code></pre>
+
+<p>Run with:</p>
+<pre><code>go test ./compiler/binary/... -run TestEndToEnd -v</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What About the Function Index Order?</h2>
+
+<p>The index assigned to a function is its position in <code>sigs</code>, which is the order <code>collectSignatures</code> encounters it in the AST — i.e., source order. So in the test above, <code>square</code> gets index 0 and <code>sum_squares</code> gets index 1. The <code>call 0</code> inside <code>sum_squares</code> correctly refers to <code>square</code>.</p>
+
+<div class="warn">
+<strong>Forward references work fine.</strong> WASM validates function indices at module load time, not at parse time. A function can call another that appears later in the source — as long as the index is correct when the module is instantiated. Your map is built from the complete <code>sigs</code> slice before any body is encoded, so forward references are handled automatically.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. What does the <code>call</code> instruction use to identify the target function in WASM binary?</p>
+  <label><input type="radio" name="q1" value="a"> The function's name as a null-terminated string</label>
+  <label><input type="radio" name="q1" value="b"> The function's position index in the function section</label>
+  <label><input type="radio" name="q1" value="c"> A pointer to the function's code in the code section</label>
+  <label><input type="radio" name="q1" value="d"> A hash of the function's type signature</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. For <code>square(a) + square(b)</code>, in what order are instructions emitted?</p>
+  <label><input type="radio" name="q2" value="a"> push a, push b, call square twice, add</label>
+  <label><input type="radio" name="q2" value="b"> push a, call square, push b, call square, add</label>
+  <label><input type="radio" name="q2" value="c"> call square with a, call square with b, add</label>
+  <label><input type="radio" name="q2" value="d"> add both args first, then call square once</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. Why must the <code>funcIndices</code> map be built <em>before</em> any function body is encoded?</p>
+  <label><input type="radio" name="q3" value="a"> To validate that all called functions have matching type signatures</label>
+  <label><input type="radio" name="q3" value="b"> So a function can call another that appears later in the source</label>
+  <label><input type="radio" name="q3" value="c"> To avoid emitting duplicate function entries in the module</label>
+  <label><input type="radio" name="q3" value="d"> Because the WASM spec requires function indices to be sorted</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. After <code>call square</code> executes (square returns one i64), what is the state of the value stack?</p>
+  <label><input type="radio" name="q4" value="a"> The argument is still on the stack; call does not consume it</label>
+  <label><input type="radio" name="q4" value="b"> The stack is empty; return values are stored in a register</label>
+  <label><input type="radio" name="q4" value="c"> The argument is replaced by the return value on the stack</label>
+  <label><input type="radio" name="q4" value="d"> Both the argument and the return value are on the stack</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Recursion</strong> — function calls already support it (a function can call itself by its own index). A <code>fib(n)</code> test would confirm it.</li>
+  <li><strong>Call expressions as statements</strong> — if <code>FunctionCall</code> appears as a statement whose result is discarded, the unused return value needs a <code>drop</code> (0x1A) to keep the stack balanced. The WASM validator will reject unbalanced stacks.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Source</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions" target="_blank">WebAssembly Core Spec §5.4.1 — Control Instructions</a> — defines <code>call</code> (0x10) and its funcidx operand encoding.</p>
+
+<p><a href="https://webassembly.github.io/spec/core/valid/instructions.html#call" target="_blank">WebAssembly Core Spec §3.3.5 — Validation of call</a> — shows how the validator checks that the stack has the right argument types before <code>call</code> and the right result type after.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can explain funcidx resolution, help debug a "unknown function" error, or walk through what happens to the stack during a nested call.
+</p>
+<p style="color: var(--muted); font-size: 0.85em;">
+  Prev: <a href="0031-while-loops.html">Lesson 31 — While Loops</a>
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'b', q4: 'c' };
+const explanations = {
+  q1: 'Correct — WASM uses a u32 function index, not a name. The index is the function\'s 0-based position in the function section. Names only exist in the export section, which is only for host-callable functions.',
+  q2: 'Correct — each argument sub-expression is fully evaluated and pushed before the call. So: push a → call square (pops a, pushes a²) → push b → call square (pops b, pushes b²) → i64.add.',
+  q3: 'Correct — building the map from the complete signature list first means any function can reference any other by name, regardless of source order. Without this, a function calling a later-defined function would fail at compile time.',
+  q4: 'Correct — call pops all argument values and pushes the return value. The argument is consumed. The stack net effect is: remove N args, push M results (where M is 0 or 1 in WASM MVP).'
+};
+const wrong = {
+  q1: 'WASM binary has no string-based call. The call instruction takes a u32 funcidx. Function names only appear in the export section for external callers.',
+  q2: 'WASM is a stack machine. Each full argument expression is walked and its result pushed before moving to the next argument or emitting call.',
+  q3: 'The key reason is forward references. If function B at index 1 calls function A at index 0, A\'s index must be known when B\'s body is encoded — which requires the full index map to exist first.',
+  q4: 'call pops its arguments and pushes the return value. The argument is gone; the return value takes its place. No argument lingers; no register is involved.'
+};
+
+let answered = {};
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    if (answered[qid]) return;
+    answered[qid] = true;
+    const correct = answers[qid] === this.value;
+    this.closest('label').classList.add(correct ? 'correct' : 'wrong');
+    const fb = document.getElementById(qid + '-fb');
+    fb.style.display = 'block';
+    fb.style.color = correct ? 'var(--green)' : 'var(--accent)';
+    fb.textContent = correct ? '✓ ' + explanations[qid] : '✗ ' + wrong[qid];
+    if (Object.keys(answered).length === Object.keys(answers).length) {
+      const box = document.getElementById('score-box');
+      const n = Object.entries(answered).filter(([k]) => answers[k] === document.querySelector(`input[name=${k}]:checked`)?.value).length;
+      box.style.display = 'block';
+      box.innerHTML = `Score: <strong>${n} / ${Object.keys(answers).length}</strong> — ${n === Object.keys(answers).length ? 'All correct. Implement it.' : 'Review highlighted answers, then implement.'}`;
+    }
+  });
+});
+</script>
+</body>
+</html>
