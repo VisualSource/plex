@@ -234,13 +234,14 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-entry.loopLabel)
 		return nil
 	case *script.FunctionCall:
-		for _, arg := range n.Args {
-			if err := b.walk(arg); err != nil {
-				return err
-			}
-		}
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:
+			for _, arg := range n.Args {
+				if err := b.walk(arg); err != nil {
+					return err
+				}
+			}
+
 			if layout, ok := b.structs[callee.Value]; ok {
 				return b.walkStructConstructor(layout, n.Args)
 			}
@@ -281,6 +282,11 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 					return fmt.Errorf("string has no method %s", callee.Field)
 				}
 			case script.TypeKind_Array:
+				for _, arg := range n.Args {
+					if err := b.walk(arg); err != nil {
+						return err
+					}
+				}
 				switch callee.Field {
 				case "len":
 					if err := b.walk(callee.Object); err != nil {
@@ -296,6 +302,24 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 				default:
 					return fmt.Errorf("array has no method %s", callee.Field)
 				}
+			case script.TypeKind_Struct:
+				// Method dispatch: push receiver, then args, then call __Struct__method.
+				if err := b.walk(callee.Object); err != nil {
+					return err
+				}
+				for _, arg := range n.Args {
+					if err := b.walk(arg); err != nil {
+						return err
+					}
+				}
+				mangled := fmt.Sprintf("__%s__%s", objType.Struct, callee.Field)
+				idx, ok := b.funcIndices[mangled]
+				if !ok {
+					return fmt.Errorf("struct %s has no method %s", objType.Struct, callee.Field)
+				}
+				b.buf = append(b.buf, OpCall)
+				b.buf = AppendULEB128(b.buf, idx)
+				return nil
 			default:
 				return fmt.Errorf("method calls on %s not supported", objType)
 			}

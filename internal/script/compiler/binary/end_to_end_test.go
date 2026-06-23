@@ -552,6 +552,33 @@ func TestEndToEnd_StructFields(t *testing.T) {
 	runOne(t, src, "mutate_y", nil, api.EncodeF64(99.0))
 }
 
+func TestEndToEnd_StructMethods(t *testing.T) {
+	src := `
+        struct Point {
+            x: f64;
+            y: f64;
+        }
+        impl Point {
+            fn distance_squared(): f64 {
+                return self.x * self.x + self.y * self.y;
+            }
+            fn scale(factor: f64): f64 {
+                return self.x * factor + self.y * factor;
+            }
+        }
+        fn d_sq(): f64 {
+            let p = Point(3.0, 4.0);
+            return p.distance_squared();  // 9 + 16 = 25
+        }
+        fn scaled(): f64 {
+            let p = Point(2.0, 3.0);
+            return p.scale(10.0);          // 20 + 30 = 50
+        }
+    `
+	runOne(t, src, "d_sq", nil, api.EncodeF64(25.0))
+	runOne(t, src, "scaled", nil, api.EncodeF64(50.0))
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

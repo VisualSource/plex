@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 45 – Struct Methods and the Implicit Self</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 45 – Struct Methods and the Implicit Self</h1>
+
+<p><strong>Goal:</strong> compile <code>p.distance_squared()</code> to a call into a struct method. Most of the work is already done — the surprise of this lesson is how little new code you need.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Surprise</h2>
+
+<p>Read these three facts and notice what they imply:</p>
+
+<ol>
+  <li><a href="../compiler/binary/helpers.go">helpers.go:32-65</a> — <code>collectSignatures</code> already iterates <code>*script.StructImplStatement</code>, calls <code>signatureOf</code> with an <code>implName</code>, and emits one funcSig per method.</li>
+  <li><a href="../compiler/binary/helpers.go">helpers.go:67-93</a> — <code>signatureOf</code> with a non-empty <code>implName</code>:
+    <ul>
+      <li>Prepends <code>ValI32</code> (the implicit <code>self: i32</code>) to the params byte vector.</li>
+      <li>Mangles the function name to <code>__StructName__methodName</code>.</li>
+      <li>Sets <code>isMethod = true</code>.</li>
+    </ul>
+  </li>
+  <li><a href="../compiler/binary/body.go">body.go:27-38</a> — <code>newBodyEncoder</code> already inspects <code>sig.isMethod</code> and assigns <code>b.locals["self"] = 0</code> before walking the params.</li>
+</ol>
+
+<p>The combined effect: methods are <strong>already being compiled as fully-formed WASM functions</strong>. They have their proper signatures (<code>(i32, params...) → result</code>), they have <code>self</code> as local 0, their bodies are walked by the same encoder that walks any function. Inside a method body, <code>self</code> is just a local; <code>self.x</code> is the bare <code>MemberAccess</code> case from lesson 44.</p>
+
+<p>The only missing piece is the <em>call site</em>. When source says <code>p.distance_squared()</code>, the parser produces:</p>
+
+<div class="diagram">
+FunctionCall
+├── Callee: <span class="ty">MemberAccess</span>
+│   ├── Object: <span class="ty">Identifier</span> "p"   <span class="cmt">; type: Struct{Point}</span>
+│   └── Field:  <span class="str">"distance_squared"</span>
+└── Args:   []
+</div>
+
+<p>And the binary backend's <code>FunctionCall.Callee = MemberAccess</code> arm currently only handles <code>String.len()</code> and <code>Array.len()</code>. The struct case errors with "method calls on Struct not supported".</p>
+
+<div class="insight">
+<strong>This is what "infrastructure pays off" looks like.</strong> Every previous lesson added a tiny piece: signature mangling (collectSignatures), self in scope (newBodyEncoder), field access (lesson 44). None of those changes were specifically about methods. But each one was *method-shaped* — designed to compose. Today you write maybe 15 lines and everything snaps together.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Call-Site Codegen</h2>
+
+<p>Method dispatch is "function call with a receiver argument prepended". The bytecode shape:</p>
+
+<div class="diagram">
+<span class="cmt">; p.distance_squared(other) for some method (self: i32, other: i32) → f64</span>
+walk(p)               <span class="cmt">; → i32 self            stack: [self]</span>
+walk(other)           <span class="cmt">; → i32 other           stack: [self, other]</span>
+<span class="byte">10 idx</span>                <span class="cmt">; call idx (mangled "__Point__distance_squared")</span>
+</div>
+
+<p>The order matches the signature: implicit <code>self</code> first, then explicit args. No new opcode, no allocator trick — just <code>OpCall</code> with the mangled-name funcidx.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Add a struct arm under MemberAccess</h3>
+
+<p>In <a href="../compiler/binary/body.go">body.go</a>, find the <code>case *script.MemberAccess:</code> branch inside <code>FunctionCall</code>'s <code>callee</code> type-switch. After the <code>TypeKind_String</code> and <code>TypeKind_Array</code> cases, add:</p>
+
+<pre><code><span class="kw">case</span> <span class="ty">script.TypeKind_Struct</span>:
+    <span class="cmt">// Method dispatch: push receiver, then args, then call __Struct__method.</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(callee.Object); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    <span class="kw">for</span> _, arg := <span class="kw">range</span> n.Args {
+        <span class="kw">if</span> err := b.<span class="fn">walk</span>(arg); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> err
+        }
+    }
+    mangled := fmt.<span class="fn">Sprintf</span>(<span class="str">"__%s__%s"</span>, objType.Struct, callee.Field)
+    idx, ok := b.funcIndices[mangled]
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"struct %s has no method %s"</span>, objType.Struct, callee.Field)
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpCall</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, idx)
+    <span class="kw">return nil</span></code></pre>
+
+<div class="warn">
+<strong>Watch the args loop.</strong> The existing <code>FunctionCall</code> case currently walks args at the top of the arm (before the type-switch on callee). For the struct-method dispatch you need the args walked <em>after</em> the receiver — which means you either need a different code path (the one above, which walks args itself), or you have to be careful that the top-of-arm loop doesn't double-walk. Check your <code>FunctionCall</code> case carefully: if args are walked once before the type switch, remove the inner loop in the struct arm above. Conversely, if you delete the top loop, every callee branch needs to walk args itself. The clean shape is "each branch handles its own argument walking".
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Test</h3>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_StructMethods</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        struct Point {
+            x: f64;
+            y: f64;
+        }
+        impl Point {
+            fn distance_squared(): f64 {
+                return self.x * self.x + self.y * self.y;
+            }
+            fn scale(factor: f64): f64 {
+                return self.x * factor + self.y * factor;
+            }
+        }
+        fn d_sq(): f64 {
+            let p = Point(3.0, 4.0);
+            return p.distance_squared();  <span class="cmt">// 9 + 16 = 25</span>
+        }
+        fn scaled(): f64 {
+            let p = Point(2.0, 3.0);
+            return p.scale(10.0);          <span class="cmt">// 20 + 30 = 50</span>
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"d_sq"</span>,   <span class="kw">nil</span>, api.<span class="fn">EncodeF64</span>(<span class="num">25.0</span>))
+    <span class="fn">runOne</span>(t, src, <span class="str">"scaled"</span>, <span class="kw">nil</span>, api.<span class="fn">EncodeF64</span>(<span class="num">50.0</span>))
+}</code></pre>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<p class="ok"><code>distance_squared</code> exercises <code>self.x</code> field reads inside a method body — the bare-MemberAccess case from lesson 44 doing real work. <code>scale</code> adds a parameter so the receiver-then-args ordering is meaningfully tested.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What You Just Pulled Together</h2>
+
+<p>Five distinct subsystems collaborated to produce <code>p.distance_squared()</code>:</p>
+
+<table>
+  <tr><th>Subsystem</th><th>Did what</th></tr>
+  <tr><td>Parser</td><td>Recognised <code>impl Point { fn ... }</code> as <code>StructImplStatement</code>; <code>p.method()</code> as <code>FunctionCall{Callee: MemberAccess}</code>.</td></tr>
+  <tr><td>Typechecker</td><td>Tagged <code>self</code> with the struct's type inside the method's scope; tagged the call expression with the method's return type.</td></tr>
+  <tr><td>collectSignatures</td><td>Mangled the method name to <code>__Point__distance_squared</code>, prepended <code>i32</code> self-param, added to the function vec.</td></tr>
+  <tr><td>newBodyEncoder</td><td>Registered <code>self</code> as local 0 when <code>sig.isMethod</code> was true.</td></tr>
+  <tr><td>Today's code</td><td>Looked up the mangled name in <code>funcIndices</code>, emitted receiver-then-args-then-call.</td></tr>
+</table>
+
+<div class="insight">
+<strong>This is one of the most satisfying shapes in compiler engineering.</strong> A feature that <em>seems</em> like it needs work across every stage instead turns out to be already-implemented except for one call-site arm. The previous lessons did the hard work; today just connects the wire. When a feature lands this small, it usually means previous design decisions were good — the abstractions were carved at the right joints.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Why is <code>self</code> at local index 0 inside every method body?</p>
+  <label><input type="radio" name="q1" value="a"> The method's signature implicitly prepends <code>self: i32</code> as the first parameter. WASM assigns parameters indices 0..N-1 starting from the left, so the receiver always lands at 0.</label>
+  <label><input type="radio" name="q1" value="b"> WASM has a dedicated <code>self</code> register at index 0.</label>
+  <label><input type="radio" name="q1" value="c"> Source code declares <code>self</code> as the first local; the compiler doesn't synthesise it.</label>
+  <label><input type="radio" name="q1" value="d"> The host (wazero) injects <code>self</code> into local 0 at call time.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. The method's <em>callee</em> is a <code>MemberAccess</code>, but the compiled call uses an absolute funcidx via <code>OpCall</code> (0x10). Why not a more dynamic dispatch?</p>
+  <label><input type="radio" name="q2" value="a"> The receiver's struct type is known at compile time (typechecker reported it), so the exact target method is known too. No vtable needed; the funcidx is a compile-time constant. WASM also has <code>call_indirect</code> for dynamic dispatch, but plex has no interface/trait/inheritance constructs that would need it.</label>
+  <label><input type="radio" name="q2" value="b"> Plex doesn't support dynamic dispatch at the runtime level.</label>
+  <label><input type="radio" name="q2" value="c"> WASM's <code>OpCall</code> can resolve method names at runtime.</label>
+  <label><input type="radio" name="q2" value="d"> Dynamic dispatch requires the host runtime to maintain a method table.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. <code>self.x</code> inside a method body works through which lesson's code?</p>
+  <label><input type="radio" name="q3" value="a"> Lesson 44's bare <code>*script.MemberAccess</code> case. <code>self</code> is an Identifier of type <code>Struct{Point}</code> (a local); <code>self.x</code> is a MemberAccess on that local; field offset is looked up in the struct layout; typed load at <code>offset=0</code>.</label>
+  <label><input type="radio" name="q3" value="b"> A special "self.field" instruction emitted by today's lesson.</label>
+  <label><input type="radio" name="q3" value="c"> WASM's <code>local.get_field</code> opcode.</label>
+  <label><input type="radio" name="q3" value="d"> The typechecker rewrites <code>self.x</code> into a global access before codegen.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. Why is <code>__Point__distance_squared</code> name-mangled this way, instead of using e.g. a struct-method table or a separate namespace?</p>
+  <label><input type="radio" name="q4" value="a"> Mangling reuses the existing single-namespace <code>funcIndices</code> map. The double-underscore prefix can't collide with source identifiers (plex doesn't allow leading underscores in function names). No new infrastructure needed.</label>
+  <label><input type="radio" name="q4" value="b"> WASM requires a single flat function namespace.</label>
+  <label><input type="radio" name="q4" value="c"> Mangling is faster than table lookup.</label>
+  <label><input type="radio" name="q4" value="d"> Wazero needs mangled names for its debugger.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Methods that mutate the struct.</strong> <code>fn move(dx: f64) { self.x = self.x + dx; }</code> — should work today since <code>self</code> is an i32 pointer and <code>self.x = ...</code> is just a `MemberAssignment` lesson 44 already handles. Write a test to confirm.</li>
+  <li><strong>Methods calling methods.</strong> <code>self.helper()</code> dispatches the same way as <code>p.helper()</code> — the receiver is just whichever expression is on the left of the dot. Test it with a chained call.</li>
+  <li><strong>Factor the heap-allocator pattern.</strong> Four sites now (strings, arrays, structs, plus any future closure environments). When you find a fourth-shape variant, pull <code>(b *bodyEncoder).emitHeapAlloc(size uint32) (tmp uint32)</code> into a helper.</li>
+  <li><strong>Bounds-check elimination, alignment padding, sorting algorithms.</strong> Backlog items from earlier lessons. All compile-time-only work; none changes the language surface.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://en.wikipedia.org/wiki/This_(computer_programming)" target="_blank">`this`/`self` (Wikipedia)</a> — how various languages model the receiver argument. Plex's choice (explicit <code>self: i32</code> as a synthesised first param) matches Rust's convention; Python makes it user-visible; Java keeps it implicit.</p>
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions" target="_blank">WebAssembly Core Spec §5.4.1 — Control Instructions</a> — see <code>call_indirect</code> (0x11) for the indirect-dispatch counterpart, when plex eventually grows interfaces.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can sketch <code>call_indirect</code> for a hypothetical plex trait system, contrast plex's monomorphic dispatch with Rust's trait objects, or dump the byte sequence of a chained <code>self.helper().also()</code>.
+</p>
+
+<script>
+const ANSWERS = { q1: 'a', q2: 'a', q3: 'a', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "Correct — <code>signatureOf</code> prepends <code>ValI32</code> to the params byte vector when <code>implName != \"\"</code>. Index 0 is where the first param always lives.",
+    b: "No — WASM has no special registers; everything is locals.",
+    c: "No — source doesn't declare <code>self</code>; the compiler synthesises it.",
+    d: "No — wazero invokes the function with whatever args the caller provides; it doesn't inject anything."
+  },
+  q2: {
+    a: "Correct — static dispatch suffices when the runtime type is known statically, which plex's type system guarantees. <code>call_indirect</code> is in the spec for cases plex hasn't introduced yet.",
+    b: "Partially — plex doesn't, but WASM does (via <code>call_indirect</code>). The right answer is about why plex can use static dispatch in this case.",
+    c: "No — <code>OpCall</code> takes a static funcidx; runtime name resolution would need a different mechanism.",
+    d: "No — host runtimes don't maintain WASM method tables."
+  },
+  q3: {
+    a: "Correct — the lesson-44 case treats <code>self</code> like any other struct-typed local. No method-specific machinery required at the field-access level.",
+    b: "No — there's no special instruction for self-field access.",
+    c: "No — WASM has no such opcode.",
+    d: "No — the typechecker tags types but doesn't rewrite node shapes."
+  },
+  q4: {
+    a: "Correct — mangling is the simplest way to make struct methods coexist with free functions in one funcidx map. Same trick C++ uses for overloaded names (with much more elaborate mangling schemes).",
+    b: "Half-true: WASM has one flat function index space, but it doesn't <em>require</em> mangling per se — you could keep methods in a separate map. Mangling is the simplest way to reuse one map.",
+    c: "No — table lookup vs string formatting isn't a performance bottleneck.",
+    d: "No — wazero doesn't impose name conventions; the name section is optional."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>
