@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 49 – arr.append in the Binary Backend</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .dim   { color: #555; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 49 – arr.append in the Binary Backend</h1>
+
+<p><em>Previous: <a href="0048-ternary-and-type-casts.html">Lesson 48 – Ternary Expressions and Type Casts</a></em></p>
+
+<p>
+The binary backend handles <code>arr.len()</code> but not <code>arr.append(elem)</code>.
+<code>append</code> mutates the array in place — it writes a new element at the next slot
+and increments the stored length. Two things make it interesting to implement:
+</p>
+
+<ol>
+  <li>It needs a <strong>synthetic temporary local</strong> to hold the array pointer (not declared in source)</li>
+  <li>It requires careful <strong>address arithmetic</strong> on linear memory</li>
+</ol>
+
+<h2>Array Memory Layout — Quick Recap</h2>
+
+<p>
+From <a href="0040-array-literals-and-bump-allocation.html">Lesson 40</a>, an <code>int[]</code> of length 3 at address <code>ptr</code> looks like this:
+</p>
+
+<div class="diagram">
+ptr+0  <span class="byte">[ len: i32 = 3 ]</span>   <span class="cmt">← 4 bytes, length field</span>
+ptr+4  <span class="byte">[ elem[0]: 8 bytes ]</span>
+ptr+12 <span class="byte">[ elem[1]: 8 bytes ]</span>
+ptr+20 <span class="byte">[ elem[2]: 8 bytes ]</span>
+ptr+28 <span class="arrow">← write_addr for append</span>  (ptr + 4 + len*8)
+</div>
+
+<p>
+To append a fourth element: write it at <code>ptr + 4 + len*elemSize</code>, then
+increment the length stored at <code>ptr</code>.
+</p>
+
+<h3>Element sizes</h3>
+
+<table>
+  <tr><th>Plex type</th><th>Element size (bytes)</th><th>Store opcode</th></tr>
+  <tr><td>int, i64, f64, float</td><td>8</td><td>i64.store / f64.store</td></tr>
+  <tr><td>i32, bool, string, array, struct</td><td>4</td><td>i32.store</td></tr>
+</table>
+
+<h2>The Synthetic Local Problem</h2>
+
+<p>
+The address arithmetic uses the array pointer twice (once to compute the write address,
+once to update the length). Rather than walk the callee expression twice — which would
+double all side effects — the encoder saves the pointer to a <strong>synthetic local</strong>
+with <code>local.tee</code>.
+</p>
+
+<p>
+The challenge: WASM binary format requires the locals vector to appear <em>before</em>
+the function body bytes. But we only know we need a synthetic local when we encounter
+the <code>append</code> call during the body walk.
+</p>
+
+<p>
+<a href="../compiler/binary/section.go"><code>section.go:encodeCodeEntry</code></a> already solves this with a deliberate two-phase approach:
+</p>
+
+<pre><code><span class="cmt">// Walk first so synthetic locals land in enc.localTypes BEFORE
+// we serialise the locals vec.</span>
+<span class="kw">if</span> err := enc.walk(f.Body); err != nil { <span class="kw">return</span> nil, err }
+
+body = AppendULEB128(body, uint32(len(enc.localTypes)))
+<span class="kw">for</span> _, vt := range enc.localTypes {
+    ...
+}
+body = append(body, enc.buf...)  <span class="cmt">// body comes AFTER locals vec</span></code></pre>
+
+<p>
+So: <strong>walk happens first, then the locals vector is serialised</strong>. Any
+<code>addSyntheticLocal</code> calls during the walk accumulate into <code>enc.localTypes</code>
+just in time. The <code>addSyntheticLocal</code> helper already exists in
+<a href="../compiler/binary/body.go"><code>body.go</code></a>:
+</p>
+
+<pre><code><span class="kw">func</span> (b *bodyEncoder) <span class="fn">addSyntheticLocal</span>(vt byte) uint32 {
+    idx := uint32(len(b.locals))
+    b.locals[fmt.Sprintf(<span class="str">"__synth_%d"</span>, idx)] = idx
+    b.localTypes = append(b.localTypes, vt)
+    <span class="kw">return</span> idx
+}</code></pre>
+
+<div class="insight">
+  <strong>Key insight:</strong> The walk-before-encode trick is the enabling pattern for all
+  inline code generation that needs temporaries. You will use <code>addSyntheticLocal</code>
+  again for <code>arr.remove</code> (next lesson), and you could use it for any future
+  built-in that needs scratch space.
+</div>
+
+<h2>The Full Append Sequence</h2>
+
+<p>
+Here is the full stack trace for <code>arr.append(elem)</code> where arr is <code>int[]</code>
+(elemSize = 8):
+</p>
+
+<div class="diagram">
+<span class="cmt">phase 1: save pointer, compute write address</span>
+walk(callee.Object)         <span class="arrow">→</span> [ptr]
+<span class="byte">local.tee</span> $arr             <span class="arrow">→</span> [ptr]          <span class="dim">saves to local, keeps on stack</span>
+<span class="byte">local.get</span> $arr             <span class="arrow">→</span> [ptr, ptr]
+<span class="byte">i32.load</span> align=2 offset=0  <span class="arrow">→</span> [ptr, len]
+<span class="byte">i32.const</span> &lt;elemSize&gt;       <span class="arrow">→</span> [ptr, len, 8]
+<span class="byte">i32.mul</span>                     <span class="arrow">→</span> [ptr, len*8]
+<span class="byte">i32.const</span> 4                 <span class="arrow">→</span> [ptr, len*8, 4]
+<span class="byte">i32.add</span>                     <span class="arrow">→</span> [ptr, offset]      <span class="dim">offset = 4 + len*8</span>
+<span class="byte">local.get</span> $arr             <span class="arrow">→</span> [ptr, offset, ptr]
+<span class="byte">i32.add</span>                     <span class="arrow">→</span> [ptr, write_addr]
+
+<span class="cmt">phase 2: store the element</span>
+walk(arg[0])                <span class="arrow">→</span> [ptr, write_addr, elem]
+<span class="byte">i64.store</span> align=3 offset=0 <span class="arrow">→</span> [ptr]               <span class="dim">write_addr and elem consumed</span>
+
+<span class="cmt">phase 3: increment length</span>
+<span class="byte">local.get</span> $arr             <span class="arrow">→</span> [ptr, ptr]
+<span class="byte">local.get</span> $arr             <span class="arrow">→</span> [ptr, ptr, ptr]
+<span class="byte">i32.load</span> align=2 offset=0  <span class="arrow">→</span> [ptr, ptr, len]
+<span class="byte">i32.const</span> 1                <span class="arrow">→</span> [ptr, ptr, len, 1]
+<span class="byte">i32.add</span>                     <span class="arrow">→</span> [ptr, ptr, new_len]
+<span class="byte">i32.store</span> align=2 offset=0 <span class="arrow">→</span> [ptr]               <span class="dim">ptr is the address, new_len the value</span>
+</div>
+
+<div class="warn">
+  <strong>Why is there a stray [ptr] at the end?</strong>
+  The original <code>local.tee</code> pushed ptr on the stack but the store sequences consumed
+  additional copies via <code>local.get</code>. The initial ptr sits underneath everything
+  and is never explicitly popped. Since <code>append</code> has type <code>void</code>, the
+  block walker doesn't emit <code>OpDrop</code>. This is valid WASM: at a <code>return</code>
+  or function-end, the validator checks only the topmost return-count values — values below
+  are unreachable from that point and are not a validation error.
+</div>
+
+<h2>Implementation Task</h2>
+
+<div class="task">
+  <strong>Task — one helper, one case</strong>
+
+  <p><strong>1. Add an <code>elemSizeOf</code> helper in <code>body.go</code></strong> (or inline it — your call):</p>
+  <pre><code><span class="kw">func</span> <span class="fn">elemSizeOf</span>(t *script.Type) uint32 {
+    <span class="kw">switch</span> t.Kind {
+    <span class="kw">case</span> script.TypeKind_I64, script.TypeKind_Int,
+         script.TypeKind_F64, script.TypeKind_Float:
+        <span class="kw">return</span> <span class="num">8</span>
+    <span class="kw">default</span>:
+        <span class="kw">return</span> <span class="num">4</span>  <span class="cmt">// i32, bool, pointers (struct/array/string)</span>
+    }
+}</code></pre>
+
+  <p><strong>2. In the array method switch inside <code>FunctionCall → MemberAccess → TypeKind_Array</code>,
+  replace the <code>default: return error</code> with an <code>"append"</code> case:</strong></p>
+
+  <pre><code><span class="kw">case</span> <span class="str">"append"</span>:
+    arr := b.addSyntheticLocal(ValI32)
+
+    <span class="cmt">// save ptr, keep on stack</span>
+    <span class="kw">if</span> err := b.walk(callee.Object); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    b.buf = append(b.buf, OpLocalTee)
+    b.buf = AppendULEB128(b.buf, arr)
+
+    <span class="cmt">// compute write_addr = ptr + 4 + len*elemSize</span>
+    eType := objType.Element
+    eSize := elemSizeOf(eType)
+    b.buf = append(b.buf, OpLocalGet)
+    b.buf = AppendULEB128(b.buf, arr)
+    b.buf = append(b.buf, OpI32Load)
+    b.buf = AppendULEB128(b.buf, 2)
+    b.buf = AppendULEB128(b.buf, 0)
+    b.buf = append(b.buf, OpI32Const)
+    b.buf = AppendULEB128(b.buf, eSize)
+    b.buf = append(b.buf, OpI32Mul)
+    b.buf = append(b.buf, OpI32Const, 4)
+    b.buf = append(b.buf, OpI32Add)
+    b.buf = append(b.buf, OpLocalGet)
+    b.buf = AppendULEB128(b.buf, arr)
+    b.buf = append(b.buf, OpI32Add)
+
+    <span class="cmt">// store the new element</span>
+    <span class="kw">if</span> err := b.walk(n.Args[0]); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    stOp, stAlign := storeOpcode(eType.Kind)
+    b.buf = append(b.buf, stOp)
+    b.buf = AppendULEB128(b.buf, uint32(stAlign))
+    b.buf = AppendULEB128(b.buf, 0)
+
+    <span class="cmt">// increment length at ptr</span>
+    b.buf = append(b.buf, OpLocalGet)
+    b.buf = AppendULEB128(b.buf, arr)
+    b.buf = append(b.buf, OpLocalGet)
+    b.buf = AppendULEB128(b.buf, arr)
+    b.buf = append(b.buf, OpI32Load)
+    b.buf = AppendULEB128(b.buf, 2)
+    b.buf = AppendULEB128(b.buf, 0)
+    b.buf = append(b.buf, OpI32Const, 1)
+    b.buf = append(b.buf, OpI32Add)
+    b.buf = append(b.buf, OpI32Store)
+    b.buf = AppendULEB128(b.buf, 2)
+    b.buf = AppendULEB128(b.buf, 0)
+    <span class="kw">return nil</span></code></pre>
+
+  <p>
+  <strong>Watch the order:</strong> the <code>walk(callee.Object)</code> call in the append case
+  comes <em>after</em> <code>addSyntheticLocal</code>, not before. The synthetic local must be
+  allocated first so its index is stable when later <code>local.tee</code>/<code>local.get</code>
+  opcodes reference it.
+  </p>
+</div>
+
+<div class="warn">
+  <strong>One more thing:</strong> the existing array method dispatch pre-walks all args before
+  the method switch. The append case walks <code>n.Args[0]</code> itself at the right point
+  in the instruction stream. Delete or skip the pre-walk for the <code>"append"</code> case
+  to avoid walking the argument twice. The cleanest approach: move the arg pre-walk inside
+  the <code>"len"</code> case (the only one that currently needs it evaluated before the object).
+  Or restructure so append is a separate branch before the default arg pre-walk.
+</div>
+
+<h2>Tests to Add</h2>
+
+<p>Add to <a href="../compiler/binary/end_to_end_test.go"><code>end_to_end_test.go</code></a>:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_ArrayAppend</span>(t *testing.T) {
+    src := <span class="str">`
+        fn grow(): int {
+            let arr: int[] = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>];
+            arr.append(<span class="num">4</span>);
+            return arr.len();
+        }
+        fn grow_read(): int {
+            let arr: int[] = [<span class="num">10</span>, <span class="num">20</span>];
+            arr.append(<span class="num">30</span>);
+            return arr[<span class="num">2</span>];
+        }
+        fn grow_twice(): int {
+            let arr: int[] = [<span class="num">1</span>];
+            arr.append(<span class="num">2</span>);
+            arr.append(<span class="num">3</span>);
+            return arr[<span class="num">0</span>] + arr[<span class="num">1</span>] + arr[<span class="num">2</span>]; <span class="cmt">// 1 + 2 + 3 = 6</span>
+        }
+    `</span>
+    runOne(t, src, <span class="str">"grow"</span>,       nil, <span class="num">4</span>)
+    runOne(t, src, <span class="str">"grow_read"</span>,  nil, <span class="num">30</span>)
+    runOne(t, src, <span class="str">"grow_twice"</span>, nil, <span class="num">6</span>)
+}</code></pre>
+
+<p>
+<code>grow_twice</code> verifies that appending multiple times works correctly — each append
+must see the <em>current</em> length, not a stale value.
+</p>
+
+<h2>Why Pre-walking Args Breaks Append</h2>
+
+<p>
+The current array dispatch code pre-walks all <code>n.Args</code> before entering the method switch.
+This made sense for <code>"len"</code> (which ignores args) but breaks <code>"append"</code>:
+the argument must be on the stack <em>after</em> the write address, not before.
+</p>
+
+<p>
+Stepping back: this is a general tension in compiler dispatch code. When you handle multiple
+operations through a single switch, the argument evaluation order matters and varies per case.
+The clean fix is <strong>not</strong> to pre-evaluate args for the whole switch — evaluate them
+inside each case, exactly when needed.
+</p>
+
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why call <code>addSyntheticLocal</code> before walking the callee expression for append?</p>
+    <label><input type="radio" name="q1" value="a"> The callee walk modifies localTypes, so the index would shift</label>
+    <label><input type="radio" name="q1" value="b"> <code>local.tee</code> needs the local index known before any bytes are emitted</label>
+    <label><input type="radio" name="q1" value="c"> The synthetic local must be listed in the locals vec before all source-declared locals</label>
+    <label><input type="radio" name="q1" value="d"> <code>addSyntheticLocal</code> flushes the local to WASM immediately, so it must be first</label>
+    <div class="feedback" id="q1-fb"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. For an <code>int[]</code> at ptr with current length 2, what is the write address for the next append?</p>
+    <label><input type="radio" name="q2" value="a"> ptr + 4 + 2*4 = ptr + 12</label>
+    <label><input type="radio" name="q2" value="b"> ptr + 4 + 2*8 = ptr + 20</label>
+    <label><input type="radio" name="q2" value="c"> ptr + 2*8 = ptr + 16</label>
+    <label><input type="radio" name="q2" value="d"> ptr + 4 + 2   = ptr + 6</label>
+    <div class="feedback" id="q2-fb"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. In the instruction sequence for the length update, the first two operations are <code>local.get $arr; local.get $arr</code>. Why two, not one?</p>
+    <label><input type="radio" name="q3" value="a"> The first is the store destination (ptr), the second is consumed by i32.load to get the current length</label>
+    <label><input type="radio" name="q3" value="b"> WASM requires duplicating locals before arithmetic operations</label>
+    <label><input type="radio" name="q3" value="c"> The first load gets the element type; the second gets the pointer</label>
+    <label><input type="radio" name="q3" value="d"> One is for alignment checking, one for the actual load</label>
+    <div class="feedback" id="q3-fb"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. What is <code>local.tee</code>'s stack effect compared to <code>local.set</code>?</p>
+    <label><input type="radio" name="q4" value="a"> <code>local.tee</code> saves the value and pops it; <code>local.set</code> saves and keeps it</label>
+    <label><input type="radio" name="q4" value="b"> Both pop the value; <code>local.tee</code> also pushes a second copy immediately after</label>
+    <label><input type="radio" name="q4" value="c"> <code>local.tee</code> saves to local and keeps the value on the stack; <code>local.set</code> pops it</label>
+    <label><input type="radio" name="q4" value="d"> They have the same stack effect; <code>local.tee</code> is just an alias for atomic writes</label>
+    <div class="feedback" id="q4-fb"></div>
+  </div>
+
+  <div class="score-box" id="score"></div>
+</div>
+
+<h2>Primary Source</h2>
+<p>
+  <a href="https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions">
+    WebAssembly Spec — Memory Instructions
+  </a> — the store instruction semantics (operand order: address, then value) and local.tee behavior.
+</p>
+
+<hr style="margin-top:3em; border-color: var(--border);">
+<p style="color:var(--muted); font-size:0.9em;">
+  Questions? Ask your teacher agent — paste any part of the lesson or your code and ask for clarification.
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'a', q4: 'c' };
+const explanations = {
+  q1: { b: 'Correct — the local index is embedded in the local.tee opcode\'s operand. That index is computed when addSyntheticLocal runs, so it must run before any bytes that reference the local are emitted.', wrong: 'Not quite — the index is needed before the local.tee byte is written into buf, so addSyntheticLocal must be called first.' },
+  q2: { b: 'Correct — int elements are i64 (8 bytes each). Write addr = ptr + 4 + 2*8 = ptr + 20.', wrong: 'Check the element size — int/i64 elements are 8 bytes, not 4.' },
+  q3: { a: 'Correct — the i32.store needs TWO values: address (ptr) and value (new_len). The sequence local.get/local.get/i32.load/i32.const 1/i32.add puts ptr on the stack twice: once to load the current len, once as the store destination.', wrong: 'Think about what i32.store consumes: it needs both an address AND a value on the stack. You need ptr twice — once consumed by i32.load, once by i32.store.' },
+  q4: { c: 'Correct — local.tee (0x22) is "set and keep": it saves the top of stack to a local AND leaves the value on the stack. local.set (0x21) saves and pops. local.tee is equivalent to local.set followed by local.get.', wrong: 'Not quite — local.tee saves to the local AND keeps the value on the stack. local.set pops it. That\'s the whole difference.' },
+};
+
+let score = 0, answered = 0, total = Object.keys(answers).length;
+
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    const labels = document.querySelectorAll(`[name=${qid}]`);
+    if (document.querySelector(`#${qid} label.correct, #${qid} label.wrong`)) return;
+
+    const correct = answers[qid];
+    const isCorrect = this.value === correct;
+    if (isCorrect) score++;
+    answered++;
+
+    labels.forEach(r => {
+      const lbl = r.closest('label');
+      if (r.value === correct) lbl.className = 'correct';
+      else if (r.checked)      lbl.className = 'wrong';
+    });
+
+    const fb = document.getElementById(`${qid}-fb`);
+    const exp = explanations[qid];
+    fb.textContent = isCorrect ? exp[correct] : exp.wrong;
+    fb.style.display = 'block';
+    fb.style.color = isCorrect ? 'var(--green)' : 'var(--accent)';
+
+    if (answered === total) {
+      document.getElementById('score').textContent = `Score: ${score} / ${total}`;
+    }
+  });
+});
+</script>
+</body>
+</html>
