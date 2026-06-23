@@ -394,11 +394,15 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			return fmt.Errorf("array access has no element type")
 		}
 
-		elemSize := elemSizeOf(elemType.Kind)
-		loadOp, loadAlign := loadOpcode(elemType.Kind)
+		arrBase := b.addSyntheticLocal(ValI32)
+		arrIdx := b.addSyntheticLocal(ValI32)
+
 		if err := b.walk(n.Target); err != nil {
 			return err
 		}
+
+		b.buf = append(b.buf, OpLocalSet)
+		b.buf = AppendULEB128(b.buf, arrBase)
 
 		if err := b.walk(n.Index); err != nil {
 			return err
@@ -406,10 +410,41 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 
 		b.buf = append(b.buf, OpI32WrapI64)
 
+		b.buf = append(b.buf, OpLocalSet)
+		b.buf = AppendULEB128(b.buf, arrIdx)
+
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrIdx)
+
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrBase)
+
+		b.buf = append(b.buf, OpI32Load)
+		b.buf = AppendULEB128(b.buf, 2)
+		b.buf = AppendULEB128(b.buf, 0)
+
+		b.buf = append(b.buf, OpI32GeU)
+
+		b.buf = append(b.buf, OpIf, BlockTypeEmpty)
+
+		b.blockDepth++
+		b.buf = append(b.buf, OpUnreachable)
+		b.buf = append(b.buf, OpEnd)
+		b.blockDepth--
+
+		elemSize := elemSizeOf(elemType.Kind)
+		loadOp, loadAlign := loadOpcode(elemType.Kind)
+
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrBase)
+
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrIdx)
+
 		b.buf = append(b.buf, OpI32Const)
 		b.buf = AppendSLEB128(b.buf, int64(elemSize))
-		b.buf = append(b.buf, OpI32Mul)
 
+		b.buf = append(b.buf, OpI32Mul)
 		b.buf = append(b.buf, OpI32Add)
 
 		b.buf = append(b.buf, loadOp)
@@ -422,13 +457,18 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		if elemType == nil {
 			return fmt.Errorf("array assignment target has no element type")
 		}
-
 		elemSize := elemSizeOf(elemType.Kind)
 		storeOp, storeAlign := storeOpcode(elemType.Kind)
+
+		arrBase := b.addSyntheticLocal(ValI32)
+		arrIdx := b.addSyntheticLocal(ValI32)
 
 		if err := b.walk(n.Target.Target); err != nil {
 			return err
 		}
+
+		b.buf = append(b.buf, OpLocalSet)
+		b.buf = AppendULEB128(b.buf, arrBase)
 
 		if err := b.walk(n.Target.Index); err != nil {
 			return err
@@ -436,10 +476,37 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 
 		b.buf = append(b.buf, OpI32WrapI64)
 
+		b.buf = append(b.buf, OpLocalSet)
+		b.buf = AppendULEB128(b.buf, arrIdx)
+
+		// start bounds check
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrIdx)
+
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrBase)
+
+		b.buf = append(b.buf, OpI32Load)
+		b.buf = AppendULEB128(b.buf, 2)
+		b.buf = AppendULEB128(b.buf, 0)
+		b.buf = append(b.buf, OpI32GeU)
+
+		b.buf = append(b.buf, OpIf, BlockTypeEmpty)
+		b.blockDepth++
+		b.buf = append(b.buf, OpUnreachable)
+		b.buf = append(b.buf, OpEnd)
+		b.blockDepth--
+
+		// end bounds check
+
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrBase)
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrIdx)
+
 		b.buf = append(b.buf, OpI32Const)
 		b.buf = AppendSLEB128(b.buf, int64(elemSize))
 		b.buf = append(b.buf, OpI32Mul)
-
 		b.buf = append(b.buf, OpI32Add)
 
 		if err := b.walk(n.Value); err != nil {

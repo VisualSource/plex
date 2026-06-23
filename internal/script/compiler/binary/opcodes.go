@@ -51,6 +51,7 @@ const (
 	OpI32GtS byte = 0x4A
 	OpI32LeS byte = 0x4C
 	OpI32GeS byte = 0x4E
+	OpI32GeU      = 0x4F
 
 	OpI64Eq  byte = 0x51
 	OpI64Ne  byte = 0x52

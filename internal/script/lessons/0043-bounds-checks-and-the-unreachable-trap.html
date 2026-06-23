@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 43 – Bounds Checks and the Unreachable Trap</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 43 – Bounds Checks and the Unreachable Trap</h1>
+
+<p><strong>Goal:</strong> make <code>arr[100]</code> on a 3-element array <em>trap</em> instead of reading garbage. One new opcode you've technically used since lesson 28 (<code>unreachable</code>) finally earns its keep. Same shape for reads and writes.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Safety Gap WASM Won't Close For You</h2>
+
+<p>WASM gives you a lot of static safety for free. Stack types are checked. Function-call signatures are checked. Block-result types are checked. But <strong>memory addresses are checked only at the page-coarseness</strong>: if you load from an address inside your allocated memory, the engine doesn't care whether that address is "inside an array" or "between two arrays" — they're all just bytes.</p>
+
+<p>This means today's <code>arr[100]</code> on a 3-element i64 array at offset 0:</p>
+
+<ol>
+  <li>Computes <code>100 * 8 = 800</code> — the offset from the array's body.</li>
+  <li>Adds 4 (via memarg) — final address <code>804</code>.</li>
+  <li>Loads 8 bytes at address 804. Memory is zero-initialised but writable; the load returns whatever happens to be there — likely zero in this case, but completely undefined in general.</li>
+</ol>
+
+<div class="warn">
+<strong>This isn't an unsafe-language confession.</strong> Every systems language emits the same shape of bytecode at this layer. <em>C</em> would do exactly this. Safer languages — Rust, Go, Java, plex-after-this-lesson — emit a comparison and conditional trap <em>before</em> the load. The check costs three instructions and shifts the failure mode from "silent garbage" to "loud crash". That's the trade.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Unreachable Trap</h2>
+
+<table>
+  <tr><th>Opcode</th><th>Byte</th><th>Behaviour</th></tr>
+  <tr><td><code>unreachable</code></td><td><code>0x00</code></td><td>Traps unconditionally at runtime — wazero surfaces this as an error from <code>Call</code>.</td></tr>
+</table>
+
+<p>You've been emitting <code>OpUnreachable</code> since lesson 28 as a defensive byte after each function's <code>return</code> (<a href="../compiler/binary/section.go">section.go:69</a>). Today is the first time it appears in <em>live</em> code paths — reachable when a check fails.</p>
+
+<div class="insight">
+<strong>Why <code>unreachable</code> instead of a smarter "throw"?</strong> WASM has no built-in exception mechanism (well, there's a proposal-stage Exception Handling feature, but it's not in our toolchain). <code>unreachable</code> is the universal "this should never execute; abort the module" signal. Hosts (wazero, browsers, the spec) all agree on what it means: trap with no payload. That's enough to fail loudly; richer error reporting needs a host call, which plex doesn't have yet.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Bounds-Check Sequence</h2>
+
+<p>The check happens after we've computed the wrapped i32 index, before we use it. We need two values:</p>
+<ul>
+  <li>The wrapped index <code>i</code> (i32).</li>
+  <li>The array's length (i32), loaded via <code>i32.load offset=0</code> at the base pointer.</li>
+</ul>
+
+<p>Both need to be live at the comparison and still usable for the load/store that follows. The cleanest way is to stash the base and index in synthetic locals once and reload them as needed — same allocator-tmp pattern lesson 40 used.</p>
+
+<div class="diagram">
+<span class="cmt">; save base and idx into synthetic locals</span>
+walk(target)             <span class="cmt">; [base]</span>
+local.set arrBase        <span class="cmt">; []</span>
+walk(index)              <span class="cmt">; [idx_i64]</span>
+i32.wrap_i64             <span class="cmt">; [idx_i32]</span>
+local.set arrIdx         <span class="cmt">; []</span>
+
+<span class="cmt">; bounds: trap if idx >= len</span>
+local.get arrIdx         <span class="cmt">; [idx]</span>
+local.get arrBase        <span class="cmt">; [idx, base]</span>
+i32.load align=2 offset=0  <span class="cmt">; [idx, len]</span>
+i32.ge_u                 <span class="cmt">; [idx >= len ? 1 : 0]</span>
+if BlockTypeEmpty
+  unreachable
+end                      <span class="cmt">; []</span>
+
+<span class="cmt">; address = base + idx*sz, then load/store at offset=4</span>
+local.get arrBase
+local.get arrIdx
+i32.const elemSize
+i32.mul
+i32.add
+typed.load align=N offset=4   <span class="cmt">; (or typed.store after pushing value)</span>
+</div>
+
+<div class="insight">
+<strong>Unsigned compare catches negative indices for free.</strong> <code>i32.wrap_i64</code> keeps only the low 32 bits. If the user passed a negative i64 (e.g. <code>-1</code>), wrap yields <code>0xFFFFFFFF</code> — read as unsigned, that's the maximum u32. It's always &gt; any reasonable array length, so the bounds check trips and the program traps. One comparison covers both "too big" and "negative". This is a standard trick in bounds-checked languages.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<p>The shape repeats almost verbatim across <code>ArrayAccess</code> and <code>ArrayAssignment</code>. Two reasonable strategies:</p>
+
+<ul>
+  <li><strong>Inline both.</strong> Copy the 9-instruction prologue into each case. More bytes, no abstraction, easy to delete one if needed.</li>
+  <li><strong>Factor a helper.</strong> Write one method on <code>bodyEncoder</code> that emits the prologue and returns the two synthetic-local indices. Less duplication, but introduces a new helper for a single use-pair.</li>
+</ul>
+
+<p>For one extra call site, inline is cleaner. When the third indexed-load shape arrives (slices? string byte-at? structs with computed offsets?), refactor then. Today, copy.</p>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 1 — Refactor <code>*script.ArrayAccess</code></h3>
+
+<p>The current case in <a href="../compiler/binary/body.go">body.go</a> does the read in a single straight-line sequence. Replace it with the bounds-check-then-read shape:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.ArrayAccess</span>:
+    elemType := n.<span class="fn">GetType</span>()
+    <span class="kw">if</span> elemType == <span class="kw">nil</span> {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"array access has no element type"</span>)
+    }
+    elemSize := <span class="fn">elemSizeOf</span>(elemType.Kind)
+    loadOp, loadAlign := <span class="fn">loadOpcode</span>(elemType.Kind)
+
+<span class="hl">    arrBase := b.<span class="fn">addSyntheticLocal</span>(<span class="ty">ValI32</span>)</span>
+<span class="hl">    arrIdx := b.<span class="fn">addSyntheticLocal</span>(<span class="ty">ValI32</span>)</span>
+
+<span class="hl">    <span class="cmt">// stash base and wrapped idx</span></span>
+<span class="hl">    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Target); err != <span class="kw">nil</span> { <span class="kw">return</span> err }</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalSet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrBase)</span>
+<span class="hl">    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Index); err != <span class="kw">nil</span> { <span class="kw">return</span> err }</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32WrapI64</span>)</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalSet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrIdx)</span>
+
+<span class="hl">    <span class="cmt">// bounds: trap if idx >= len</span></span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrIdx)</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrBase)</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Load</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">2</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">0</span>)</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32GeU</span>)</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpIf</span>, <span class="ty">BlockTypeEmpty</span>)</span>
+<span class="hl">    b.blockDepth++</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpUnreachable</span>)</span>
+<span class="hl">    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpEnd</span>)</span>
+<span class="hl">    b.blockDepth--</span>
+
+    <span class="cmt">// address: base + idx*elemSize</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrBase)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrIdx)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Const</span>); b.buf = <span class="fn">AppendSLEB128</span>(b.buf, <span class="ty">int64</span>(elemSize))
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Mul</span>)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Add</span>)
+
+    <span class="cmt">// load at +4</span>
+    b.buf = <span class="fn">append</span>(b.buf, loadOp)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, loadAlign)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">4</span>)
+    <span class="kw">return nil</span></code></pre>
+
+<p>You'll need <code>OpI32GeU = 0x4F</code> in <a href="../compiler/binary/opcodes.go">opcodes.go</a> — add it next to the existing i32 comparison ops:</p>
+
+<pre><code>OpI32GeS <span class="ty">byte</span> = <span class="byte">0x4E</span>
+<span class="hl">OpI32GeU <span class="ty">byte</span> = <span class="byte">0x4F</span></span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Mirror in <code>*script.ArrayAssignment</code></h3>
+
+<p>Same bounds-check prologue, same locals, same comparison. The difference: walk the value between the address arithmetic and the store, and emit <code>storeOp</code> at the end:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.ArrayAssignment</span>:
+    elemType := n.Target.<span class="fn">GetType</span>()
+    elemSize := <span class="fn">elemSizeOf</span>(elemType.Kind)
+    storeOp, storeAlign := <span class="fn">storeOpcode</span>(elemType.Kind)
+
+    arrBase := b.<span class="fn">addSyntheticLocal</span>(<span class="ty">ValI32</span>)
+    arrIdx := b.<span class="fn">addSyntheticLocal</span>(<span class="ty">ValI32</span>)
+
+    <span class="cmt">// stash base and wrapped idx — same as ArrayAccess</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Target.Target); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalSet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrBase)
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Target.Index); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32WrapI64</span>)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalSet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrIdx)
+
+    <span class="cmt">// bounds check — same as ArrayAccess</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrIdx)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrBase)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Load</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">2</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">0</span>)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32GeU</span>)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpIf</span>, <span class="ty">BlockTypeEmpty</span>)
+    b.blockDepth++
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpUnreachable</span>)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpEnd</span>)
+    b.blockDepth--
+
+    <span class="cmt">// address = base + idx*elemSize</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrBase)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalGet</span>); b.buf = <span class="fn">AppendULEB128</span>(b.buf, arrIdx)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Const</span>); b.buf = <span class="fn">AppendSLEB128</span>(b.buf, <span class="ty">int64</span>(elemSize))
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Mul</span>)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Add</span>)
+
+    <span class="cmt">// push value, then store at +4</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Value); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    b.buf = <span class="fn">append</span>(b.buf, storeOp)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, storeAlign)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">4</span>)
+    <span class="kw">return nil</span></code></pre>
+
+<div class="warn">
+<strong>The duplication is real but bounded.</strong> Roughly twelve lines of bounds-check shared between the two arms. When the third indexed-access site arrives (likely struct field access with a runtime offset, or string byte-at), pull the prologue into a helper. Premature factoring at two call sites tends to hurt readability more than it helps; at three it pays off.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Tests</h3>
+
+<p>Two new tests: one verifies in-bounds still works (regression guard), one verifies out-of-bounds traps with a wazero error:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_BoundsInBounds</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn get_at(): int {
+            let arr = [10, 20, 30];
+            return arr[2];
+        }
+        fn set_at(): int {
+            let arr = [10, 20, 30];
+            arr[0] = 99;
+            return arr[0];
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"get_at"</span>, <span class="kw">nil</span>, <span class="num">30</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"set_at"</span>, <span class="kw">nil</span>, <span class="num">99</span>)
+}
+
+<span class="kw">func</span> <span class="fn">TestEndToEnd_BoundsOutOfRange</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn read_oob(): int {
+            let arr = [10, 20, 30];
+            return arr[100];
+        }
+        fn write_oob(): int {
+            let arr = [10, 20, 30];
+            arr[100] = 99;
+            return 0;
+        }
+    `
+    ast, err := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+    wasm, err := binary_wasm.<span class="fn">CompileProgram</span>(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    _, err = mod.<span class="fn">ExportedFunction</span>(<span class="str">"read_oob"</span>).<span class="fn">Call</span>(ctx)
+    <span class="kw">if</span> err == <span class="kw">nil</span> {
+        t.<span class="fn">Fatalf</span>(<span class="str">"expected a trap on out-of-bounds read; got nil error"</span>)
+    }
+
+    _, err = mod.<span class="fn">ExportedFunction</span>(<span class="str">"write_oob"</span>).<span class="fn">Call</span>(ctx)
+    <span class="kw">if</span> err == <span class="kw">nil</span> {
+        t.<span class="fn">Fatalf</span>(<span class="str">"expected a trap on out-of-bounds write; got nil error"</span>)
+    }
+}</code></pre>
+
+<p>Run:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<p class="ok">The error wazero returns from a tripped <code>unreachable</code> contains the word "unreachable" — the test just asserts <code>err != nil</code> so the exact message format can change without breaking it.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Cost — and Where It Goes</h2>
+
+<p>You added roughly nine instructions per array access: two saves, two loads, one length-load, one compare, an if-end pair, the unreachable, plus the locals you didn't have before. For an array access inside a tight loop, that's a real overhead.</p>
+
+<div class="insight">
+<strong>Real-world compilers earn this back via hoisting.</strong> Walk the loop. The array's length doesn't change. The check <code>idx &lt; len</code> reduces to "does the loop's index ever exceed <code>len</code>?", which the compiler can prove statically for many shapes (<code>for i in 0..len</code>, <code>while i &lt; arr.len()</code>). Once proven, the check is removed entirely. <em>Bounds-check elimination</em> (BCE) is a small but mature optimisation; Rust's <code>iter()</code>, Java's <code>System.arraycopy</code>, .NET's <code>Span&lt;T&gt;</code> all rely on it. Plex doesn't have BCE — yet — but the shape of the code you emit today is what a BCE pass would later eat.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. The bounds check uses <code>i32.ge_u</code>, not <code>i32.ge_s</code>. Why?</p>
+  <label><input type="radio" name="q1" value="a"> A negative wrapped i64 index ends up as a huge u32. <code>ge_u</code> treats it as huge and trips the bounds check. <code>ge_s</code> would see it as negative and (incorrectly) pass the check.</label>
+  <label><input type="radio" name="q1" value="b"> Unsigned comparisons are faster on most engines.</label>
+  <label><input type="radio" name="q1" value="c"> WASM only supports unsigned comparisons in bounds-check contexts.</label>
+  <label><input type="radio" name="q1" value="d"> The validator forbids signed comparisons on memory addresses.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. <code>unreachable</code> has been emitted by your encoder since lesson 28. What's different about today's use?</p>
+  <label><input type="radio" name="q2" value="a"> Lesson 28's <code>unreachable</code> is appended after every function's <code>return</code> — control flow can never reach it. Today's appears in a <em>reachable</em> path (inside an <code>if</code>), so it actually fires.</label>
+  <label><input type="radio" name="q2" value="b"> Lesson 28 used <code>unreachable</code> as a placeholder that the runtime quietly skips; today's is the "real" variant.</label>
+  <label><input type="radio" name="q2" value="c"> The opcode is identical but its byte encoding differs.</label>
+  <label><input type="radio" name="q2" value="d"> Lesson 28's <code>unreachable</code> only traps when the validator notices; today's traps unconditionally.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. Why is "save base + idx to synthetic locals first" cleaner than "duplicate the values on the stack"?</p>
+  <label><input type="radio" name="q3" value="a"> WASM has no general-purpose <code>dup</code> instruction. Reusing a value means either re-walking the producing expression (which may have side effects) or stashing in a local. Synthetic locals are the standard idiom.</label>
+  <label><input type="radio" name="q3" value="b"> Stack-based duplication is slower than local access.</label>
+  <label><input type="radio" name="q3" value="c"> WASM's stack is limited to four values deep.</label>
+  <label><input type="radio" name="q3" value="d"> The validator forbids reusing values across <code>if</code> blocks.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. Where would bounds-check <em>elimination</em> (BCE) plausibly remove the check today's code emits?</p>
+  <label><input type="radio" name="q4" value="a"> Inside <code>while i &lt; arr.len() { ... arr[i] ... }</code>, an optimiser can prove the loop body's <code>i</code> never exceeds <code>arr.len()</code>, making the bounds check provably redundant. Plex doesn't yet have such a pass; the bytecode you emit today is what BCE would later eat.</label>
+  <label><input type="radio" name="q4" value="b"> Bounds checks can never be eliminated — they're always required at runtime.</label>
+  <label><input type="radio" name="q4" value="c"> Wazero performs BCE automatically.</label>
+  <label><input type="radio" name="q4" value="d"> BCE happens inside the WASM validator before the module loads.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Struct literals and field access.</strong> Multi-stage shape similar to lesson 42 — new AST node, parser hook, typechecker arm, codegen case. The new wrinkle: a per-struct <em>field-offset table</em> built by the compiler from the struct declaration, used at every <code>obj.field</code> codegen site.</li>
+  <li><strong>String byte-at indexing.</strong> Currently the typechecker reports <code>s[i]</code> as <code>string</code>, which is awkward. Resolving the semantics (return a byte? a one-char substring?) is a typechecker decision before any codegen.</li>
+  <li><strong>Factor the bounds-check prologue.</strong> The third indexed site will trigger this. Reasonable shape: <code>(b *bodyEncoder).emitBoundsCheckedAddress(target, index AstNode, elemSize uint32) error</code> that emits everything through the <code>i32.add</code> and leaves the address on the stack.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions" target="_blank">WebAssembly Core Spec §5.4.1 — Control Instructions</a> — <code>unreachable</code> (0x00) is the first opcode the table lists.</p>
+<p><a href="https://en.wikipedia.org/wiki/Bounds-checking_elimination" target="_blank">Bounds-checking elimination (Wikipedia)</a> — the optimisation that earns back the cost of the checks you wrote today.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can show how a sufficiently smart compiler would eliminate the bounds check from a typical for-loop, contrast WASM's <code>unreachable</code>-as-trap with x86's <code>UD2</code>, or sketch the third-indexed-site factoring.
+</p>
+
+<script>
+const ANSWERS = { q1: 'a', q2: 'a', q3: 'a', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "Correct — that's the whole point. <code>wrap_i64</code> of a negative i64 yields a value with the high bit set; reading it as signed would be a large negative number (passing 'idx &lt; len'), reading it as unsigned is a huge positive number (failing 'idx &lt; len'). One comparison covers both directions.",
+    b: "No — signed and unsigned comparisons run in identical time on every plausible engine.",
+    c: "No — the spec offers both <code>_s</code> and <code>_u</code> in every relevant op; the choice is correctness, not availability.",
+    d: "No — there's no such validator rule."
+  },
+  q2: {
+    a: "Correct — lesson 28's <code>unreachable</code> was a defensive cap after <code>return</code>; control never gets there. Today's lives inside an <code>if</code>, on the reachable side of the conditional.",
+    b: "No — the spec doesn't have 'placeholder' vs 'real' variants of <code>unreachable</code>.",
+    c: "No — there's one opcode, encoded as 0x00.",
+    d: "No — <code>unreachable</code> always traps when reached; the validator's role is unchanged."
+  },
+  q3: {
+    a: "Correct — without a <code>dup</code> instruction (it isn't in the MVP), you either re-walk (potentially re-emitting side-effects) or use synthetic locals. The lesson-40 allocator-tmp pattern, repurposed.",
+    b: "No — engines optimise either form; performance isn't the principal driver.",
+    c: "No — the WASM stack can hold many values; that's not a constraint here.",
+    d: "No — there's no such validator rule."
+  },
+  q4: {
+    a: "Correct — BCE matches the loop's bound expression against the array's length expression and removes redundant checks when they coincide. The shape you emit today is exactly what such a pass would later optimise.",
+    b: "No — BCE is a mature optimisation in production compilers (Rust, Go, .NET).",
+    c: "No — wazero is an execution engine, not an optimising compiler. It runs the bytecode you give it.",
+    d: "No — the validator checks types and well-formedness; it doesn't run optimisations."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>

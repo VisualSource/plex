@@ -466,6 +466,61 @@ func TestEndToEnd_ArrayAssignment(t *testing.T) {
 	runOne(t, src, "sort_two", nil, 120)
 }
 
+func TestEndToEnd_BoundsInBounds(t *testing.T) {
+	src := `
+        fn get_at(): int {
+            let arr = [10, 20, 30];
+            return arr[2];
+        }
+        fn set_at(): int {
+            let arr = [10, 20, 30];
+            arr[0] = 99;
+            return arr[0];
+        }
+    `
+	runOne(t, src, "get_at", nil, 30)
+	runOne(t, src, "set_at", nil, 99)
+}
+
+func TestEndToEnd_BoundsOutOfRange(t *testing.T) {
+	src := `
+        fn read_oob(): int {
+            let arr = [10, 20, 30];
+            return arr[100];
+        }
+        fn write_oob(): int {
+            let arr = [10, 20, 30];
+            arr[100] = 99;
+            return 0;
+        }
+    `
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wasm, err := binary_wasm.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+	mod, err := r.Instantiate(ctx, wasm)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	_, err = mod.ExportedFunction("read_oob").Call(ctx)
+	if err == nil {
+		t.Fatalf("expected a trap on out-of-bounds read; got nil error")
+	}
+
+	_, err = mod.ExportedFunction("write_oob").Call(ctx)
+	if err == nil {
+		t.Fatalf("expected a trap on out-of-bounds write; got nil error")
+	}
+}
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))
