@@ -247,6 +247,37 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			b.buf = append(b.buf, OpCall)
 			b.buf = AppendULEB128(b.buf, idx)
 			return nil
+		case *script.MemberAccess:
+			objExpr, ok := callee.Object.(script.Expression)
+			if !ok {
+				return fmt.Errorf("number access object has no type")
+			}
+
+			objType := objExpr.GetType()
+			if objType == nil {
+				return fmt.Errorf("member access object type not set")
+			}
+
+			switch objType.Kind {
+			case script.TypeKind_String:
+				switch callee.Field {
+				case "len":
+					if err := b.walk(callee.Object); err != nil {
+						return err
+					}
+					b.buf = append(b.buf, OpI32Load)
+					b.buf = AppendULEB128(b.buf, 2)
+					b.buf = AppendULEB128(b.buf, 0)
+
+					b.buf = append(b.buf, OpI64ExtendI32S)
+					return nil
+				default:
+					return fmt.Errorf("string has no method %s", callee.Field)
+				}
+			default:
+				return fmt.Errorf("method calls on %s not supported", objType)
+			}
+
 		default:
 			return fmt.Errorf("unsupported callee type %T", n.Callee)
 		}

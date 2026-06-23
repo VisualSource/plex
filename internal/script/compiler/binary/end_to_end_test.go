@@ -222,6 +222,23 @@ func TestEndToEnd_StringLiteral(t *testing.T) {
 	}
 }
 
+func TestEndToEnd_StringLen(t *testing.T) {
+	src := `
+        fn measure(): int {
+            return "hello".len();
+        }
+        fn measure_world(): int {
+            return "wonderful".len();
+        }
+        fn measure_empty(): int {
+            return "".len();
+        }
+    `
+	runOne(t, src, "measure", nil, 5)
+	runOne(t, src, "measure_world", nil, 9)
+	runOne(t, src, "measure_empty", nil, 0)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

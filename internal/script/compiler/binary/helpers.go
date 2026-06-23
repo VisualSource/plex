@@ -104,9 +104,12 @@ func collectStrings(p *script.Program) *stringTable {
 				walk(v.Else)
 			}
 		case *script.FunctionCall:
+			walk(v.Callee)
 			for _, a := range v.Args {
 				walk(a)
 			}
+		case *script.MemberAccess:
+			walk(v.Object)
 		}
 	}
 

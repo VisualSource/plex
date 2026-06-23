@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 37 – String Length, i32.load, and the memarg Encoding</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 880px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .memory-strip { display: flex; gap: 2px; margin: 1.2em 0; font-family: "Fira Code", monospace; font-size: 0.82em; }
+  .mem-cell { background: var(--surface); border: 1px solid var(--border); padding: 8px 10px; text-align: center; min-width: 38px; }
+  .mem-cell.len { background: #14223a; border-color: var(--blue); color: var(--blue); }
+  .mem-cell.data { background: #1e1e0e; border-color: var(--yellow); color: var(--yellow); }
+  .mem-cell .addr { display: block; font-size: 0.7em; color: var(--muted); margin-top: 4px; }
+  .mem-cell.read { box-shadow: 0 0 0 2px var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 37 – String Length, <code>i32.load</code>, and the <code>memarg</code> Encoding</h1>
+
+<p><strong>Goal:</strong> compile <code>"hello".len()</code> to <code>5</code>. One opcode that already exists in your file (<code>OpI32Load</code>), one new opcode (<code>OpI64ExtendI32S</code>), and one new AST shape to walk (method-call-as-FunctionCall-over-MemberAccess).</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Shape You're Compiling</h2>
+
+<p>In plex, <code>s.len()</code> is parsed as a <code>FunctionCall</code> whose <code>Callee</code> is a <code>MemberAccess</code>:</p>
+
+<div class="diagram">
+FunctionCall
+├── Callee: <span class="ty">MemberAccess</span>
+│   ├── Object: <span class="ty">Identifier</span> "s"   <span class="cmt">; type: string</span>
+│   └── Field:  <span class="str">"len"</span>
+└── Args:   []
+</div>
+
+<p>The typechecker already gives the whole expression the type <code>Int</code> (see <a href="../typeschecker/typecheck.go">typecheck.go:373-382</a>), so the binary section will declare the return type as <code>i64</code>. The codegen just needs to produce an <code>i64</code> on the stack.</p>
+
+<p>Right now your encoder rejects this shape — see [body.go]'s FunctionCall case, which only handles <code>*script.Identifier</code> callees:</p>
+
+<pre><code><span class="kw">switch</span> callee := n.Callee.(<span class="kw">type</span>) {
+<span class="kw">case</span> *<span class="ty">script.Identifier</span>:
+    <span class="cmt">// emits OpCall + funcidx</span>
+<span class="kw">default</span>:
+    <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unsupported callee type %T"</span>, n.Callee)
+}</code></pre>
+
+<p>Today you add a <code>*script.MemberAccess</code> arm.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What <code>i32.load</code> Actually Encodes</h2>
+
+<p>The pointer is already a plain i32 — you push it with <code>walk(callee.Object)</code>, same path as a string literal. Then <code>i32.load</code> reads the first four bytes at that address. For your string layout, those four bytes <em>are</em> the length.</p>
+
+<div class="memory-strip">
+  <div class="mem-cell len read">05<span class="addr">@0</span></div>
+  <div class="mem-cell len read">00<span class="addr">@1</span></div>
+  <div class="mem-cell len read">00<span class="addr">@2</span></div>
+  <div class="mem-cell len read">00<span class="addr">@3</span></div>
+  <div class="mem-cell data">'h'<span class="addr">@4</span></div>
+  <div class="mem-cell data">'e'<span class="addr">@5</span></div>
+  <div class="mem-cell data">'l'<span class="addr">@6</span></div>
+  <div class="mem-cell data">'l'<span class="addr">@7</span></div>
+  <div class="mem-cell data">'o'<span class="addr">@8</span></div>
+</div>
+
+<p>The boxed cells are what <code>i32.load</code> reads. The pointer on the stack was the address of the first one; after the load, the stack has the integer <code>5</code>.</p>
+
+<h3>The memarg</h3>
+
+<p>Every WASM memory instruction (<code>i32.load</code>, <code>i64.store</code>, etc.) is followed by a <strong>memarg</strong> — two ULEB128s:</p>
+
+<table>
+  <tr><th>Field</th><th>Encoding</th><th>Meaning</th></tr>
+  <tr><td><code>align</code></td><td>ULEB128</td><td>Alignment <em>hint</em> as an exponent. <code>0</code>=byte, <code>1</code>=halfword, <code>2</code>=word, <code>3</code>=doubleword.</td></tr>
+  <tr><td><code>offset</code></td><td>ULEB128</td><td>Constant offset added to the i32 popped from the stack.</td></tr>
+</table>
+
+<div class="insight">
+<strong>Alignment is a hint, not a constraint.</strong> The validator rejects only the <em>upper bound</em> — <code>align</code> must not exceed the natural alignment of the access. For <code>i32.load</code> the natural alignment is 4 bytes, so <code>align ≤ 2</code> (i.e., 2² = 4). Engines may use the hint to skip alignment checks for faster code paths. Mismatched alignment is a performance issue, never a correctness one — the actual address can be any byte.
+</div>
+
+<p>For loading the length prefix you'll pass <code>align=2</code> (the natural 4-byte alignment) and <code>offset=0</code>:</p>
+
+<div class="diagram">
+<span class="byte">28 02 00</span>     <span class="cmt">; i32.load align=2 offset=0</span>
+</div>
+
+<h3>Why the i32 → i64 extend?</h3>
+
+<p>The typechecker says <code>s.len()</code> is <code>Int</code> — which your <a href="../compiler/binary/types.go">types.go</a> maps to <code>i64</code>. But <code>i32.load</code> pushes an <code>i32</code>. The validator counts types, so leaving an i32 on the stack when the caller expects i64 is rejected. WASM has explicit conversion opcodes:</p>
+
+<table>
+  <tr><th>Opcode</th><th>Byte</th><th>Behaviour</th></tr>
+  <tr><td><code>i64.extend_i32_s</code></td><td><code>0xAC</code></td><td>Sign-extend i32 to i64. Negative i32s become negative i64s.</td></tr>
+  <tr><td><code>i64.extend_i32_u</code></td><td><code>0xAD</code></td><td>Zero-extend i32 to i64. Treats the i32 as unsigned.</td></tr>
+</table>
+
+<p>String lengths are non-negative, but the WAT compiler uses <code>i64.extend_i32_s</code> (see <a href="../compiler/compiler.go">compiler.go:673</a>) — match that for consistency. The two behaviours coincide for values that fit in 31 bits, which any sane string length will.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Opcodes</h3>
+
+<p>Add to <a href="../compiler/binary/opcodes.go">opcodes.go</a>:</p>
+
+<pre><code>OpI64ExtendI32S <span class="ty">byte</span> = <span class="byte">0xAC</span></code></pre>
+
+<p><code>OpI32Load = 0x28</code> is already there from lesson 36.</p>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Handle <code>*script.MemberAccess</code> in <code>FunctionCall</code></h3>
+
+<p>Extend the type-switch on <code>n.Callee</code> in [body.go]'s <code>FunctionCall</code> arm. Walk the object first (it pushes the i32 pointer), then dispatch by the object's type + field:</p>
+
+<pre><code><span class="kw">switch</span> callee := n.Callee.(<span class="kw">type</span>) {
+<span class="kw">case</span> *<span class="ty">script.Identifier</span>:
+    <span class="cmt">// ... existing direct-call logic ...</span>
+<span class="hl"><span class="kw">case</span> *<span class="ty">script.MemberAccess</span>:</span>
+<span class="hl">    objExpr, ok := callee.Object.(<span class="ty">script.Expression</span>)</span>
+<span class="hl">    <span class="kw">if</span> !ok {</span>
+<span class="hl">        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"member access object has no type"</span>)</span>
+<span class="hl">    }</span>
+<span class="hl">    objType := objExpr.<span class="fn">GetType</span>()</span>
+<span class="hl">    <span class="kw">if</span> objType == <span class="kw">nil</span> {</span>
+<span class="hl">        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"member access object type not set"</span>)</span>
+<span class="hl">    }</span>
+<span class="hl"></span>
+<span class="hl">    <span class="kw">switch</span> objType.Kind {</span>
+<span class="hl">    <span class="kw">case</span> <span class="ty">script.TypeKind_String</span>:</span>
+<span class="hl">        <span class="kw">switch</span> callee.Field {</span>
+<span class="hl">        <span class="kw">case</span> <span class="str">"len"</span>:</span>
+<span class="hl">            <span class="kw">if</span> err := b.<span class="fn">walk</span>(callee.Object); err != <span class="kw">nil</span> {</span>
+<span class="hl">                <span class="kw">return</span> err</span>
+<span class="hl">            }</span>
+<span class="hl">            b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Load</span>)</span>
+<span class="hl">            b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">2</span>) <span class="cmt">// align = 2 (natural i32 alignment)</span></span>
+<span class="hl">            b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">0</span>) <span class="cmt">// offset = 0</span></span>
+<span class="hl">            b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI64ExtendI32S</span>)</span>
+<span class="hl">            <span class="kw">return nil</span></span>
+<span class="hl">        <span class="kw">default</span>:</span>
+<span class="hl">            <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"string has no method %s"</span>, callee.Field)</span>
+<span class="hl">        }</span>
+<span class="hl">    <span class="kw">default</span>:</span>
+<span class="hl">        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"method calls on %s not supported"</span>, objType.Kind)</span>
+<span class="hl">    }</span>
+<span class="kw">default</span>:
+    <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unsupported callee type %T"</span>, n.Callee)
+}</code></pre>
+
+<div class="warn">
+<strong>Args are ignored for <code>len</code>.</strong> The plex grammar still permits arguments syntactically, but <code>len</code> takes none. If you want to be strict, check <code>len(n.Args) == 0</code> here. If you want to be lenient (and let the typechecker catch the mistake earlier), don't bother. The current typechecker doesn't enforce arity on builtin methods either — flag for a future cleanup pass.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Test</h3>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_StringLen</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn measure(): int {
+            return "hello".len();
+        }
+        fn measure_world(): int {
+            return "wonderful".len();
+        }
+        fn measure_empty(): int {
+            return "".len();
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"measure"</span>,       <span class="kw">nil</span>, <span class="num">5</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"measure_world"</span>, <span class="kw">nil</span>, <span class="num">9</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"measure_empty"</span>, <span class="kw">nil</span>, <span class="num">0</span>)
+}</code></pre>
+
+<p>If your existing <code>runOne</code> takes <code>[]uint64</code> as the args slice, passing <code>nil</code> is valid (length 0). Run:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_StringLen -v</code></pre>
+
+<p class="ok">Three subcases. The empty-string case is a nice corner — it tests that a length-prefix of 0 still loads correctly (0 bytes following).</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What This Lesson Adds to Your Vocabulary</h2>
+
+<ul>
+  <li><strong>Method-call AST shape</strong> — <code>FunctionCall.Callee</code> can be a <code>MemberAccess</code>, not just an <code>Identifier</code>. This same arm will host array <code>.len()</code>, string indexing, and (eventually) struct method dispatch.</li>
+  <li><strong>The memarg encoding</strong> — every memory op carries align+offset. The two ULEBs are easy to forget; mismatched encoding produces validator errors of the form "out of bounds memory access" or "alignment must not be larger than natural".</li>
+  <li><strong>Sign-extension as type bridging</strong> — WASM has a small zoo of conversion opcodes (<code>extend</code>, <code>wrap</code>, <code>trunc</code>, <code>convert</code>). They're not "casts" in the language sense; they're how the stack machine reconciles types when one op produces a different width than the next consumes.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. <code>"hello"</code> is at offset 0. After the bytes <code>41 00 28 02 00</code> execute, what is on top of the value stack?</p>
+  <label><input type="radio" name="q1" value="a"> The bytes "hell" packed as an i32 (<code>0x6C6C6568</code>).</label>
+  <label><input type="radio" name="q1" value="b"> The i32 value <code>5</code> — the length prefix read from address 0.</label>
+  <label><input type="radio" name="q1" value="c"> The i32 pointer <code>0</code> — load doesn't advance the stack.</label>
+  <label><input type="radio" name="q1" value="d"> A runtime trap, because alignment must be 0 for a constant-address load.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. What does the <code>align</code> field of a memarg actually control?</p>
+  <label><input type="radio" name="q2" value="a"> The runtime address — it's added to the offset before the load.</label>
+  <label><input type="radio" name="q2" value="b"> An alignment <em>hint</em> for the engine, bounded above by the op's natural alignment. Mismatch is a performance concern, not a correctness one.</label>
+  <label><input type="radio" name="q2" value="c"> A required alignment — the validator rejects loads where address mod 2^align ≠ 0.</label>
+  <label><input type="radio" name="q2" value="d"> The number of bytes loaded — <code>i32.load</code> always loads 4 regardless of align.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. Why is <code>i64.extend_i32_s</code> needed after <code>i32.load</code> for <code>s.len()</code>?</p>
+  <label><input type="radio" name="q3" value="a"> The typechecker reports <code>Int</code> (i64) as the result of <code>len()</code>, but <code>i32.load</code> pushes i32. The validator counts types; an i32 where an i64 is expected is rejected.</label>
+  <label><input type="radio" name="q3" value="b"> Without it, the high 32 bits of the result would contain random memory.</label>
+  <label><input type="radio" name="q3" value="c"> WASM's stack is strictly i64; i32s must be widened immediately after every load.</label>
+  <label><input type="radio" name="q3" value="d"> The extend is purely cosmetic — it has no functional effect.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. Why is method-call dispatch in the <code>FunctionCall</code> arm, not in a <code>MemberAccess</code> arm of its own?</p>
+  <label><input type="radio" name="q4" value="a"> The parser emits <code>FunctionCall{Callee: MemberAccess}</code> for any <code>x.f(...)</code>. A bare <code>x.f</code> without parentheses would be a different AST shape (field access), so MemberAccess on its own means "value of a field", not "method".</label>
+  <label><input type="radio" name="q4" value="b"> WASM has a single dispatch instruction; the call site is the only valid place to emit it.</label>
+  <label><input type="radio" name="q4" value="c"> The typechecker only computes return types in <code>FunctionCall</code>; <code>MemberAccess</code> has no type information.</label>
+  <label><input type="radio" name="q4" value="d"> It's a stylistic choice; either location would work identically.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>String indexing</strong> — <code>s[i]</code> compiles to "address = ptr + 4 + i; load1_u". Needs <code>OpI32Load8U = 0x2D</code> and i64-from-i32 normalisation for the index. Tests already covered in lesson 8's WAT version.</li>
+  <li><strong>Comparison opcode completeness</strong> — i32 <code>lt/gt/le/ge</code> and the f64 comparison family are still missing. Mechanical but low-risk; worth landing before arrays.</li>
+  <li><strong>Heap + arrays</strong> — needs a heap-pointer global, a small bump allocator, and the array layout (4-byte length + elements). The first non-static memory use.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions" target="_blank">WebAssembly Core Spec §5.4.5 — Memory Instructions</a> — defines the memarg encoding and the full load/store family.</p>
+
+<p><a href="https://webassembly.github.io/spec/core/valid/instructions.html#xref-syntax-instructions-syntax-instr-memory-mathsf-load" target="_blank">WebAssembly Core Spec §3.3.7 — Load validation</a> — explains the alignment-hint upper-bound rule.</p>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions" target="_blank">WebAssembly Core Spec §5.4.6 — Numeric Instructions</a> — find <code>i64.extend_i32_s</code> (0xAC) and its zero-extending sibling (0xAD).</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can dump the byte sequence for <code>measure_world()</code> end-to-end, explain when zero-extend vs sign-extend matters, or sketch how <code>s[i]</code> will compose memarg with an arithmetic offset.
+</p>
+
+<script>
+const ANSWERS = { q1: 'b', q2: 'b', q3: 'a', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "Close — the four bytes at offset 0 happen to be the length, not the string content. The string content lives at offsets 4..8.",
+    b: "Correct — push i32.const 0, then i32.load (align=2, offset=0) reads four bytes at address 0. Those four bytes are the LE length prefix, value 5.",
+    c: "No — load consumes the address and pushes the loaded value. Net stack delta is zero, but the value on top is different.",
+    d: "No — alignment is a hint, not a constraint. A load at address 0 is naturally well-aligned anyway."
+  },
+  q2: {
+    a: "No — that's the <em>offset</em> field; align is separate.",
+    b: "Correct — align is a hint with an upper bound at the op's natural alignment. The address can be any byte; mismatch is a perf concern.",
+    c: "No — alignment is not required. Many WASM engines optimise aligned loads but accept unaligned ones.",
+    d: "No — the load width is fixed by the opcode (<code>i32.load</code> always loads 4 bytes); align doesn't change it."
+  },
+  q3: {
+    a: "Correct — the validator is strict about stack types, and the function's declared return is i64. <code>extend_i32_s</code> widens without changing the numeric value (for non-negative inputs).",
+    b: "Partially right in spirit but wrong mechanically — WASM stack values aren't 'partially populated registers'. The validator rejects the type mismatch before any of that matters.",
+    c: "No — the stack carries typed values of i32/i64/f32/f64 explicitly. i32 is a first-class stack type.",
+    d: "No — it's mandatory. Without it, the module fails validation."
+  },
+  q4: {
+    a: "Correct — the parser distinguishes <code>x.f</code> (a MemberAccess expression that evaluates to the field) from <code>x.f(...)</code> (a FunctionCall whose callee is a MemberAccess). Dispatch lives where the (...) is.",
+    b: "No — WASM has multiple call instructions (call, call_indirect, call_ref), and call sites don't constrain where dispatch logic is in your compiler.",
+    c: "No — MemberAccess does carry type information after typechecking.",
+    d: "No — putting it in MemberAccess would emit the call even for a bare field reference, which is wrong."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>

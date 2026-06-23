@@ -66,6 +66,8 @@ const (
 	OpF64Sub byte = 0xA1
 	OpF64Mul byte = 0xA2
 	OpF64Div byte = 0xA3
+
+	OpI64ExtendI32S byte = 0xAC
 )
 
 const (
