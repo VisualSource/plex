@@ -43,6 +43,16 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			if err := b.walk(s); err != nil {
 				return err
 			}
+			if expr, ok := s.(script.Expression); ok {
+				t := expr.GetType()
+				if t != nil && t.Kind != script.TypeKind_Void {
+					switch s.(type) {
+					case *script.VariableDeclaration, *script.AssignmentExpression, *script.ReturnStatement:
+					default:
+						b.buf = append(b.buf, OpDrop)
+					}
+				}
+			}
 		}
 		return nil
 	case *script.BooleanLiteral:
@@ -94,19 +104,27 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		b.buf = AppendULEB128(b.buf, idx)
 		return nil
 	case *script.BinaryExpression:
+		if n.Operator == script.TokenType_AND || n.Operator == script.TokenType_OR {
+			return b.walkShortCircuit(n)
+		}
+
 		if err := b.walk(n.Left); err != nil {
 			return err
 		}
 		if err := b.walk(n.Right); err != nil {
 			return err
 		}
-		t := n.GetType()
-		if t == nil {
-			return fmt.Errorf("no type on binary expression")
+		leftExpr, ok := n.Left.(script.Expression)
+		if !ok {
+			return fmt.Errorf("binary expression left has no type info")
+		}
+		opType := leftExpr.GetType()
+		if opType == nil {
+			return fmt.Errorf("no type on binary expression operand")
 		}
 
 		if isCmpOp(n.Operator) {
-			op, err := cmpOpcode(t.Kind, n.Operator)
+			op, err := cmpOpcode(opType.Kind, n.Operator)
 			if err != nil {
 				return err
 			}
@@ -114,7 +132,7 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			return nil
 		}
 
-		op, err := arithOpcode(t.Kind, n.Operator)
+		op, err := arithOpcode(opType.Kind, n.Operator)
 		if err != nil {
 			return err
 		}
@@ -257,4 +275,32 @@ func (b *bodyEncoder) collectLocals(node script.AstNode) {
 			b.collectLocals(n.Else)
 		}
 	}
+}
+
+func (b *bodyEncoder) walkShortCircuit(n *script.BinaryExpression) error {
+	if err := b.walk(n.Left); err != nil {
+		return err
+	}
+	b.buf = append(b.buf, OpIf, ValI32)
+	b.blockDepth++
+
+	if n.Operator == script.TokenType_AND {
+		// a && b  →  if a then b else 0
+		if err := b.walk(n.Right); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, OpElse)
+		b.buf = append(b.buf, OpI32Const, 0)
+	} else {
+		// a || b  →  if a then 1 else b
+		b.buf = append(b.buf, OpI32Const, 1)
+		b.buf = append(b.buf, OpElse)
+		if err := b.walk(n.Right); err != nil {
+			return err
+		}
+	}
+
+	b.buf = append(b.buf, OpEnd)
+	b.blockDepth--
+	return nil
 }

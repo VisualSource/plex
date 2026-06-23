@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 34 – Short-Circuit AND/OR and If-as-Expression</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 1.4em 0; }
+  .compare > div { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 14px 16px; }
+  .compare > div h4 { margin: 0 0 10px; font-size: 0.9em; letter-spacing: 0.05em; color: var(--yellow); }
+  .compare > div pre { margin: 0; border: none; background: none; padding: 0; font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 34 – Short-Circuit <code>&amp;&amp;</code>/<code>||</code> and If-as-Expression</h1>
+
+<p><strong>Goal:</strong> make <code>||</code> and <code>&amp;&amp;</code> truly lazy. Today, <code>false &amp;&amp; (10 / 0 == 0)</code> would trap your program even though the answer is provably false. By the end, the RHS only runs when it has to.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Bug You Already Wrote</h2>
+
+<p>Look at how <code>&amp;&amp;</code> and <code>||</code> compile right now. The <code>*script.BinaryExpression</code> case in <a href="../compiler/binary/body.go">body.go</a> walks <em>both</em> sides, then dispatches an opcode. For AND, that opcode is <code>i32.and</code>; for OR it's <code>i32.or</code> — both bitwise, both eager:</p>
+
+<div class="diagram">
+<span class="cmt">; a || b — current encoding</span>
+walk(a)            <span class="cmt">; → i32 (0 or 1)</span>
+walk(b)            <span class="cmt">; ← evaluated even if a was true!</span>
+<span class="byte">72</span>                 <span class="cmt">; i32.or  →  i32 (0 or 1)</span>
+</div>
+
+<p>Add this test to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a> — it should pass <em>after</em> today's work:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_ShortCircuitOr</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn safe_or(a: bool, b: i64): bool {
+            return a || (<span class="num">10</span> / b) &gt; <span class="num">0</span>;
+        }
+    `
+    <span class="cmt">// a=true: RHS must not be evaluated, even though 10/0 would trap</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"safe_or"</span>, []<span class="ty">uint64</span>{<span class="num">1</span>, <span class="num">0</span>}, <span class="num">1</span>)
+
+    <span class="cmt">// a=false: RHS runs. 10/5 = 2, 2 &gt; 0 = true</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"safe_or"</span>, []<span class="ty">uint64</span>{<span class="num">0</span>, <span class="num">5</span>}, <span class="num">1</span>)
+
+    <span class="cmt">// a=false: RHS runs. 10/100 = 0, 0 &gt; 0 = false</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"safe_or"</span>, []<span class="ty">uint64</span>{<span class="num">0</span>, <span class="num">100</span>}, <span class="num">0</span>)
+}</code></pre>
+
+<p>Run it now:</p>
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_ShortCircuitOr -v</code></pre>
+
+<p>You'll see the <code>a=true, b=0</code> case <em>panic the runtime</em>: <code>i64.div_s</code> traps on division by zero. Wazero will report something like <code>wasm error: integer divide by zero</code>. The fact that <code>a</code> was already true makes no difference — the current compiler evaluates both sides unconditionally.</p>
+
+<div class="insight">
+<strong>Why this matters beyond traps.</strong> Once plex grows side effects — prints, mutation, system calls — eagerness will become silently wrong, not loudly wrong. Today's div-by-zero is a free test oracle: a divergence between eager and lazy semantics that you can observe right now, without needing any new runtime features.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The WASM Tool for the Job: <code>if</code> as an Expression</h2>
+
+<p>You already use <code>if</code> as a statement in lesson 30. It has a hidden second mode: when given a non-empty block type, the <code>if</code> instruction <em>produces a value</em>.</p>
+
+<div class="compare">
+  <div>
+    <h4>if as statement (you have this)</h4>
+<pre><code><span class="byte">04 40</span>       <span class="cmt">; if &lt;empty&gt;</span>
+  ...        <span class="cmt">; body pushes nothing</span>
+<span class="byte">05</span>          <span class="cmt">; else</span>
+  ...
+<span class="byte">0B</span>          <span class="cmt">; end → stack unchanged</span></code></pre>
+  </div>
+  <div>
+    <h4>if as expression (today's new tool)</h4>
+<pre><code><span class="byte">04 7F</span>       <span class="cmt">; if (result i32)</span>
+  ...        <span class="cmt">; body must push 1 i32</span>
+<span class="byte">05</span>          <span class="cmt">; else</span>
+  ...        <span class="cmt">; else branch must also push 1 i32</span>
+<span class="byte">0B</span>          <span class="cmt">; end → stack +1 i32</span></code></pre>
+  </div>
+</div>
+
+<p>The byte <code>0x7F</code> is the same one your <code>types.go</code> calls <code>ValI32</code> — see <a href="../compiler/binary/types.go">types.go:6</a>. Block types and value types share the encoding by design: <a href="https://webassembly.github.io/spec/core/binary/instructions.html#binary-blocktype" target="_blank">block type</a> is either <code>0x40</code> (empty), a single byte for a value type, or a positive type index for multi-result blocks (which we don't need).</p>
+
+<div class="warn">
+<strong>Both branches must produce the result.</strong> The validator does not let one branch push and the other not. If you write <code>if (result i32) ... else ... end</code>, both <code>...</code> arms must leave exactly one i32 on the stack. This is what makes the rewrite below balanced.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Rewrite</h2>
+
+<p>Compile <code>a &amp;&amp; b</code> and <code>a || b</code> using <code>if</code> as an expression:</p>
+
+<div class="compare">
+  <div>
+    <h4><code>a &amp;&amp; b</code></h4>
+<pre><code>walk(a)
+<span class="byte">04 7F</span>       <span class="cmt">; if (result i32)</span>
+  walk(b)    <span class="cmt">; result = b only if a</span>
+<span class="byte">05</span>          <span class="cmt">; else</span>
+  <span class="byte">41 00</span>     <span class="cmt">; i32.const 0</span>
+<span class="byte">0B</span>          <span class="cmt">; end</span></code></pre>
+  </div>
+  <div>
+    <h4><code>a || b</code></h4>
+<pre><code>walk(a)
+<span class="byte">04 7F</span>       <span class="cmt">; if (result i32)</span>
+  <span class="byte">41 01</span>     <span class="cmt">; i32.const 1   (a was true)</span>
+<span class="byte">05</span>          <span class="cmt">; else</span>
+  walk(b)    <span class="cmt">; result = b only if !a</span>
+<span class="byte">0B</span>          <span class="cmt">; end</span></code></pre>
+  </div>
+</div>
+
+<p>Read both columns once and notice the symmetry: AND is "if true, then RHS, else false"; OR is "if true, then true, else RHS". The RHS appears in exactly the branch where it actually matters.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Special-case in <code>BinaryExpression</code></h3>
+
+<p>The current <code>*script.BinaryExpression</code> arm walks both sides <em>before</em> dispatching the opcode. For AND/OR we must <em>not</em> walk the right side first. Branch on the operator at the top of the case:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.BinaryExpression</span>:
+<span class="hl">    <span class="kw">if</span> n.Operator == <span class="ty">script.TokenType_AND</span> || n.Operator == <span class="ty">script.TokenType_OR</span> {</span>
+<span class="hl">        <span class="kw">return</span> b.<span class="fn">walkShortCircuit</span>(n)</span>
+<span class="hl">    }</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Left); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Right); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    <span class="cmt">// ... unchanged ...</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — The helper</h3>
+
+<p>Add <code>walkShortCircuit</code> as a method on <code>bodyEncoder</code>. It opens an <code>if (result i32)</code>, picks which side gets the constant short-circuit value, and emits <code>end</code>. Remember to bump <code>blockDepth</code> so any <code>break</code>/<code>continue</code> nested inside computes the right label depth:</p>
+
+<pre><code><span class="kw">func</span> (b *<span class="ty">bodyEncoder</span>) <span class="fn">walkShortCircuit</span>(n *<span class="ty">script.BinaryExpression</span>) <span class="ty">error</span> {
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Left); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpIf</span>, <span class="ty">ValI32</span>)
+    b.blockDepth++
+
+    <span class="kw">if</span> n.Operator == <span class="ty">script.TokenType_AND</span> {
+        <span class="cmt">// a &amp;&amp; b  →  if a then b else 0</span>
+        <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Right); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> err
+        }
+        b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpElse</span>)
+        b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Const</span>, <span class="num">0</span>)
+    } <span class="kw">else</span> {
+        <span class="cmt">// a || b  →  if a then 1 else b</span>
+        b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Const</span>, <span class="num">1</span>)
+        b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpElse</span>)
+        <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Right); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> err
+        }
+    }
+
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpEnd</span>)
+    b.blockDepth--
+    <span class="kw">return nil</span>
+}</code></pre>
+
+<div class="insight">
+<strong>Why <code>blockDepth++/--</code>?</strong> Same reason as the if-statement case from lesson 31: an <code>if</code> opens a label level. If a <code>break</code> or <code>continue</code> appears inside the short-circuited RHS (rare but possible), its emitted depth must account for the extra enclosing block. You already paid for this insight; you may as well honour it.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Re-run the test</h3>
+
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_ShortCircuitOr -v</code></pre>
+
+<p class="ok">All three subcases should pass. Run the full suite to confirm nothing regressed:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 4 — Symmetry test (optional but satisfying)</h3>
+
+<p>Add an AND counterpart so both directions are pinned:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_ShortCircuitAnd</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn safe_and(a: bool, b: i64): bool {
+            return a &amp;&amp; (<span class="num">10</span> / b) &gt; <span class="num">0</span>;
+        }
+    `
+    <span class="cmt">// a=false: short-circuit avoids the divide</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"safe_and"</span>, []<span class="ty">uint64</span>{<span class="num">0</span>, <span class="num">0</span>}, <span class="num">0</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"safe_and"</span>, []<span class="ty">uint64</span>{<span class="num">1</span>, <span class="num">5</span>},   <span class="num">1</span>) <span class="cmt">// true &amp;&amp; (10/5 &gt; 0) = true</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"safe_and"</span>, []<span class="ty">uint64</span>{<span class="num">1</span>, <span class="num">100</span>}, <span class="num">0</span>) <span class="cmt">// true &amp;&amp; (10/100 &gt; 0) = false</span>
+}</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What You Quietly Unlocked</h2>
+
+<p>This lesson introduced the <strong>if-as-expression</strong> pattern, which is the bedrock of a lot more than short-circuit:</p>
+
+<ul>
+  <li><strong>Ternaries</strong> (<code>cond ? a : b</code>) compile to the exact same shape — and plex already has a ternary statement in lesson 19 of the WAT backend.</li>
+  <li><strong>Multi-result blocks</strong> (block type as type index) generalise this further — the foundation for returning tuples in a future plex.</li>
+  <li><strong>Type-directed result encoding</strong>: the block-type byte will be <code>ValI64</code> or <code>ValF64</code> when the result is i64/f64 instead of bool. The current implementation hardcodes <code>ValI32</code> because AND/OR is always bool — fine for now, but worth noticing it's a special case of a general pattern.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Why does <code>i32.or</code> on two bools produce the right boolean answer but still be the wrong implementation of <code>||</code>?</p>
+  <label><input type="radio" name="q1" value="a"> <code>i32.or</code> produces the wrong bit pattern for true.</label>
+  <label><input type="radio" name="q1" value="b"> The result is correct, but both sides must be evaluated to feed the OR — losing laziness.</label>
+  <label><input type="radio" name="q1" value="c"> Because <code>i32.or</code> only works on i32 and would silently truncate i64 operands.</label>
+  <label><input type="radio" name="q1" value="d"> The validator forbids using <code>i32.or</code> on values produced by comparisons.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. What is the meaning of the second byte (<code>0x7F</code>) immediately after <code>0x04</code> in the encoding <code>04 7F ... 05 ... 0B</code>?</p>
+  <label><input type="radio" name="q2" value="a"> The block type — declares the if pushes one i32 result.</label>
+  <label><input type="radio" name="q2" value="b"> The maximum stack depth permitted inside the block.</label>
+  <label><input type="radio" name="q2" value="c"> The byte length of the if's body in bytes.</label>
+  <label><input type="radio" name="q2" value="d"> A constant value pushed before the if condition is evaluated.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. What does the validator require about the else branch of <code>if (result i32) ... else ... end</code>?</p>
+  <label><input type="radio" name="q3" value="a"> It is optional; if omitted, the result defaults to zero.</label>
+  <label><input type="radio" name="q3" value="b"> It must leave exactly one i32 on the stack — same as the then-branch.</label>
+  <label><input type="radio" name="q3" value="c"> It may push any value type as long as the function's return type matches.</label>
+  <label><input type="radio" name="q3" value="d"> It must be empty when the then-branch ends with a return.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. Why does the helper bump <code>blockDepth</code> when emitting the <code>if</code>?</p>
+  <label><input type="radio" name="q4" value="a"> So <code>break</code>/<code>continue</code> inside the RHS computes correct branch label depths.</label>
+  <label><input type="radio" name="q4" value="b"> Because the WASM validator counts the number of nested blocks against a stack-depth budget.</label>
+  <label><input type="radio" name="q4" value="c"> To prevent recursive calls inside the RHS from overflowing the call stack.</label>
+  <label><input type="radio" name="q4" value="d"> So that locals declared inside the RHS get the correct index.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Unary operators</strong> (<code>!x</code>, unary <code>-x</code>) — currently <em>no</em> <code>*script.UnaryExpression</code> case exists in <a href="../compiler/binary/body.go">body.go</a>. The fixes are tiny: <code>!</code> is <code>i32.eqz</code> (already in opcodes); unary minus on i64 is <code>i64.const 0; (operand); i64.sub</code> or for f64 the dedicated <code>f64.neg</code>.</li>
+  <li><strong>Fill out comparisons</strong> — i32 is missing &lt; &gt; &le; &ge; (only eq/ne today); f64 has no comparisons at all. Once they land, comparisons across all primitive types are uniform.</li>
+  <li><strong>Linear memory</strong> — the gateway to strings, then arrays, then structs.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#binary-blocktype" target="_blank">WebAssembly Core Spec §5.4.3 — Block Types</a> — defines the three forms of block type (empty, valtype, type index).</p>
+
+<p><a href="https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions" target="_blank">WebAssembly Core Spec §2.4.6 — Control Instructions</a> — formal semantics for <code>if</code>/<code>else</code>/<code>end</code> including how the block type drives the type-check.</p>
+
+<p><a href="https://en.wikipedia.org/wiki/Short-circuit_evaluation" target="_blank">Wikipedia — Short-circuit evaluation</a> — background on why most languages chose lazy <code>&amp;&amp;</code>/<code>||</code> and which didn't.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can walk the byte stream of a short-circuited <code>||</code>, explain why both branches need balanced types, or show how the same pattern would extend to a ternary expression.
+</p>
+
+<script>
+const ANSWERS = { q1: 'b', q2: 'a', q3: 'b', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "No — <code>i32.or</code> on two bool values (0 or 1) produces the correct boolean result.",
+    b: "Correct — the bug is laziness, not correctness. Both sides run regardless, so any traps or side effects in the RHS happen even when they shouldn't.",
+    c: "No — these are bools (i32), so the types match.",
+    d: "No — comparisons produce i32, which is what i32.or expects."
+  },
+  q2: {
+    a: "Correct — <code>0x7F</code> is the block-type byte for a single-i32 result. See <a href='../compiler/binary/types.go'>types.go:6</a>.",
+    b: "No — WASM doesn't bound stack depth per block in the encoding.",
+    c: "No — block bodies are not length-prefixed; they end with the <code>end</code> opcode.",
+    d: "No — the condition is already on the stack before <code>if</code>; nothing is pushed by the block type byte."
+  },
+  q3: {
+    a: "No — if the if produces a result, the else branch is required.",
+    b: "Correct — both branches must produce exactly the declared result type. The validator enforces this statically.",
+    c: "No — the if's own declared result type rules, not the function's.",
+    d: "No — <code>return</code> exits the function but doesn't change what the else branch must declare."
+  },
+  q4: {
+    a: "Correct — depth tracking is what makes break/continue compute the right br/br_if labels. Lesson 31 set this up.",
+    b: "No — WASM has no static stack-depth budget for blocks.",
+    c: "No — recursion depth is a runtime concern, unrelated to <code>blockDepth</code>.",
+    d: "No — local indices are decided by <code>collectLocals</code>, independent of block depth."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>

@@ -231,7 +231,10 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 		}
 
 		switch n.Operator {
-		case script.TokenType_AND, script.TokenType_OR:
+		case script.TokenType_AND, script.TokenType_OR,
+			script.TokenType_EqualEqual, script.TokenType_NotEqual,
+			script.TokenType_LessThen, script.TokenType_GreaterThen,
+			script.TokenType_LessThenOrEqual, script.TokenType_GreaterThenOrEqaul:
 			t := &script.Type{
 				Kind: script.TypeKind_Bool,
 			}

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 33 – Drop in the Binary Backend</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .stack-diagram { display: flex; gap: 14px; align-items: flex-end; margin: 1.4em 0; }
+  .stack-col { text-align: center; min-width: 110px; }
+  .stack-col .label { font-size: 0.78em; color: var(--muted); margin-bottom: 6px; font-style: italic; }
+  .stack-box { background: var(--surface); border: 1px solid var(--border); padding: 6px 10px; border-radius: 4px; margin-top: 4px; font-family: "Fira Code", monospace; font-size: 0.82em; }
+  .stack-box.bad { border-color: var(--accent); background: #1e0a10; color: var(--accent); }
+  .stack-box.ok { border-color: var(--green); background: #0e1e0e; color: var(--green); }
+  .stack-arrow { font-size: 1.6em; color: var(--muted); padding-bottom: 10px; }
+  .callout { background: #14223a; border: 1px dashed var(--blue); padding: 10px 16px; border-radius: 6px; margin: 1.4em 0; color: var(--muted); font-size: 0.92em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 33 – Drop in the Binary Backend</h1>
+
+<p><strong>Goal:</strong> make a statement-position call like <code>square(5);</code> compile to <em>valid</em> WASM. By the end, a call whose return value is discarded leaves the stack balanced — no validator errors, no leaked values.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<div class="callout">
+  This is the same conceptual lesson as <a href="0016-the-drop-problem.html">Lesson 16 — The Drop Problem</a>, but for the binary backend. You already solved this for the WAT compiler. Today is about recognising the same bug recurring in a new context and porting the fix.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Warm-up: Recursion Was Free</h2>
+
+<p>Before we get to the bug, a small celebration. Lesson 32's design — building <code>funcIndices</code> from the complete <code>sigs</code> slice <em>before</em> any body is encoded — quietly handed you recursion for free. Add this test to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a> and watch it pass without a line of new code in <code>body.go</code>:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_Recursion</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn fib(n: i64): i64 {
+            if n &lt; 2 { return n; }
+            return fib(n - 1) + fib(n - 2);
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"fib"</span>, []<span class="ty">uint64</span>{<span class="num">0</span>},  <span class="num">0</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"fib"</span>, []<span class="ty">uint64</span>{<span class="num">1</span>},  <span class="num">1</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"fib"</span>, []<span class="ty">uint64</span>{<span class="num">10</span>}, <span class="num">55</span>)
+}</code></pre>
+
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_Recursion -v</code></pre>
+
+<div class="insight">
+<strong>Why this works.</strong> When the encoder walks the body of <code>fib</code>, it looks up <code>fib</code> in <code>b.funcIndices</code>. The map was built from all signatures up front, so <code>fib</code>'s own index is already there. The validator accepts the self-reference at module-load time — there is no "function not yet defined" error in WASM the way there is in some single-pass C compilers.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Bug: a Latent Stack Leak</h2>
+
+<p>Now break the compiler. Add this test — it <em>should</em> work, but won't:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_CallAsStatement</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn square(x: i64): i64 {
+            return x * x;
+        }
+        fn warmup(n: i64): i64 {
+            square(n);          <span class="cmt">// result discarded — pure waste, but legal</span>
+            return n + <span class="num">1</span>;
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"warmup"</span>, []<span class="ty">uint64</span>{<span class="num">10</span>}, <span class="num">11</span>)
+}</code></pre>
+
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_CallAsStatement -v</code></pre>
+
+<p>Expected failure — something like:</p>
+
+<pre><code class="err">module[0].function[1]: invalid function: ...
+    type mismatch: ... has 1 value(s) ... expected 0</code></pre>
+
+<p>The validator is telling you the function body has a leftover <code>i64</code> on the stack that nobody consumed. You introduced it the moment you added <code>OpCall</code>.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Why It Happens</h2>
+
+<p>Every instruction in WASM has a known stack effect. A function whose declared result is <code>i64</code> must end with exactly one <code>i64</code> on the stack — nothing more, nothing less.</p>
+
+<div class="stack-diagram">
+  <div class="stack-col">
+    <div class="label">local.get n</div>
+    <div class="stack-box">i64 (n)</div>
+  </div>
+  <div class="stack-arrow">→</div>
+  <div class="stack-col">
+    <div class="label">call square</div>
+    <div class="stack-box bad">i64 (n*n) ← leaked</div>
+  </div>
+  <div class="stack-arrow">→</div>
+  <div class="stack-col">
+    <div class="label">local.get n / i64.const 1 / i64.add</div>
+    <div class="stack-box bad">i64 (n*n)</div>
+    <div class="stack-box">i64 (n+1)</div>
+  </div>
+  <div class="stack-arrow">→</div>
+  <div class="stack-col">
+    <div class="label">return</div>
+    <div class="stack-box bad">i64 leftover!</div>
+  </div>
+</div>
+
+<p>The <code>FunctionCall</code> node doesn't know whether its result will be consumed. The <em>parent</em> does. When a call appears inside <code>return foo(...)</code> or <code>x = foo(...)</code> or <code>foo(bar())</code>, the parent consumes the value naturally. When it appears as a top-level statement in a <code>Block</code>, nothing does.</p>
+
+<table>
+  <tr><th>Instruction</th><th>Encoding</th><th>Stack effect</th></tr>
+  <tr><td><code>drop</code></td><td><code>0x1A</code></td><td>pops 1 value of any type</td></tr>
+</table>
+
+<div class="insight">
+<strong>The pattern.</strong> When a statement is itself an expression that produces a value, emit <code>drop</code> after it. Walking <code>Block.Stmts</code> is the right place to decide this: the parent of every statement is a <code>Block</code>, and the <code>Block</code> case in <code>walk</code> already iterates them.
+</div>
+
+<p>This is the exact same fix the WAT compiler uses in <a href="../compiler/compiler.go">compiler.go</a> (the <code>case *script.Block</code> arm). Port the logic.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Add the opcode</h3>
+
+<p>In <a href="../compiler/binary/opcodes.go">opcodes.go</a>, add the parametric instruction group:</p>
+
+<pre><code>OpDrop <span class="ty">byte</span> = <span class="byte">0x1A</span></code></pre>
+
+<p>Per the spec, <code>drop</code> is in the <a href="https://webassembly.github.io/spec/core/binary/instructions.html#parametric-instructions" target="_blank">parametric instructions</a> group — instructions that operate on the stack without caring about value types.</p>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Extend the <code>Block</code> case in <code>walk</code></h3>
+
+<p>Open <a href="../compiler/binary/body.go">body.go</a>. The current <code>*script.Block</code> case walks each statement and stops. Add a post-walk check: if the statement satisfies <code>script.Expression</code>, has a non-void type, and isn't already a consumer (variable declaration, assignment, return), emit <code>drop</code>:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.Block</span>:
+    <span class="kw">for</span> _, s := <span class="kw">range</span> n.Stmts {
+        <span class="kw">if</span> err := b.<span class="fn">walk</span>(s); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> err
+        }
+<span class="hl">        <span class="kw">if</span> expr, ok := s.(<span class="ty">script.Expression</span>); ok {</span>
+<span class="hl">            t := expr.<span class="fn">GetType</span>()</span>
+<span class="hl">            <span class="kw">if</span> t != <span class="kw">nil</span> &amp;&amp; t.Kind != <span class="ty">script.TypeKind_Void</span> {</span>
+<span class="hl">                <span class="kw">switch</span> s.(<span class="kw">type</span>) {</span>
+<span class="hl">                <span class="kw">case</span> *<span class="ty">script.VariableDeclaration</span>, *<span class="ty">script.AssignmentExpression</span>, *<span class="ty">script.ReturnStatement</span>:</span>
+<span class="hl">                    <span class="cmt">// already consume their value via local.set / return</span></span>
+<span class="hl">                <span class="kw">default</span>:</span>
+<span class="hl">                    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpDrop</span>)</span>
+<span class="hl">                }</span>
+<span class="hl">            }</span>
+<span class="hl">        }</span>
+    }
+    <span class="kw">return nil</span></code></pre>
+
+<div class="warn">
+<strong>Why exclude <code>VariableDeclaration</code> and <code>AssignmentExpression</code>?</strong> Both already emit a <code>local.set</code> after their RHS, which itself pops the value. Adding <code>drop</code> on top would pop the <em>next</em> value down — corrupting the stack instead of cleaning it. <code>ReturnStatement</code> is excluded because <code>return</code> consumes its operand by transferring it to the caller.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Re-run the test</h3>
+
+<pre><code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_CallAsStatement -v</code></pre>
+
+<p class="ok">Should now print <code>--- PASS</code>. And run the full suite one more time to confirm nothing else broke:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Shape of Stack Discipline</h2>
+
+<p>Notice that the binary backend now follows the same rule the WAT compiler does, expressed in the same place (the <code>Block</code> case). The shape of correct codegen for a stack machine is invariant across textual and binary backends — only the byte encoding differs.</p>
+
+<p>This is one of the satisfying realisations of compiler construction: <strong>the IR isn't the WAT, and it isn't the bytes — it's the stack discipline itself</strong>. WAT is just one notation for it; LEB128-encoded opcodes are another.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Why did lesson 32's function-call test pass even though the drop bug already existed?</p>
+  <label><input type="radio" name="q1" value="a"> The test only called functions in expression position, where the parent consumes the value.</label>
+  <label><input type="radio" name="q1" value="b"> wazero is more permissive than the spec says; another runtime would have failed it.</label>
+  <label><input type="radio" name="q1" value="c"> The return opcode automatically drops leftover values from the stack.</label>
+  <label><input type="radio" name="q1" value="d"> The validator only checks function-call instructions when in debug mode.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. Why is the drop decision made in the <code>*script.Block</code> case rather than inside the <code>*script.FunctionCall</code> case?</p>
+  <label><input type="radio" name="q2" value="a"> Function calls in expression position would otherwise drop their result before the parent could use it.</label>
+  <label><input type="radio" name="q2" value="b"> WASM requires drop to come from outside the call instruction's encoding.</label>
+  <label><input type="radio" name="q2" value="c"> The FunctionCall node doesn't know its own type — only the parent does.</label>
+  <label><input type="radio" name="q2" value="d"> Drop is only legal inside a block instruction.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. Why must <code>VariableDeclaration</code> be exempted from the drop emission?</p>
+  <label><input type="radio" name="q3" value="a"> Because <code>let</code> declarations are removed in a later optimisation pass.</label>
+  <label><input type="radio" name="q3" value="b"> Because the declaration's <code>local.set</code> already pops the value, so an extra drop would pop the wrong slot.</label>
+  <label><input type="radio" name="q3" value="c"> Because variable declarations have no type and would crash <code>GetType()</code>.</label>
+  <label><input type="radio" name="q3" value="d"> Because <code>local.set</code> can fail validation if its argument was already dropped.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. Recursion works in the binary backend with zero new code. What design decision from lesson 32 made this true?</p>
+  <label><input type="radio" name="q4" value="a"> <code>funcIndices</code> is built from the full <code>sigs</code> slice <em>before</em> any body is encoded, so every function's index is resolvable from any body.</label>
+  <label><input type="radio" name="q4" value="b"> WASM uses inline trampolines for self-calls, so the index doesn't need to be known statically.</label>
+  <label><input type="radio" name="q4" value="c"> <code>encodeCodeEntry</code> patches function indices after the fact, in a second pass.</label>
+  <label><input type="radio" name="q4" value="d"> The type checker rewrites self-calls into explicit loops before codegen.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>i32 / bool / f64 plumbing.</strong> Locals default to <code>i64</code> in <code>collectLocals</code>, and most opcodes are i64-only. The next step is making the binary backend genuinely type-directed end-to-end — mirroring the work you did in lesson 15 for the WAT backend.</li>
+  <li><strong>Linear memory and strings.</strong> Lesson 8 introduced linear memory in the WAT backend. The binary backend will need a memory section, a data section, and the <code>i32.load</code>/<code>i32.store</code> family of opcodes.</li>
+  <li><strong>Arrays and structs.</strong> Heap allocator + struct layout, once memory is in place.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#parametric-instructions" target="_blank">WebAssembly Core Spec §5.4.2 — Parametric Instructions</a> — defines <code>drop</code> (0x1A) and <code>select</code> (0x1B).</p>
+
+<p><a href="https://webassembly.github.io/spec/core/valid/instructions.html#parametric-instructions" target="_blank">WebAssembly Core Spec §3.3.2 — Validation of parametric instructions</a> — confirms <code>drop</code> pops any value type.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can explain why the validator catches this statically, walk through the stack state instruction-by-instruction, or compare this fix to the equivalent one in the WAT backend.
+</p>
+
+<script>
+const ANSWERS = { q1: 'a', q2: 'c', q3: 'b', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "Correct — every call sat inside <code>return ... + ...</code>, so the surrounding expression consumed the value.",
+    b: "No — wazero implements the spec faithfully. The bug was hidden by the test, not by the runtime.",
+    c: "No — <code>return</code> requires the stack to already contain exactly the declared return values; it doesn't clean up extras.",
+    d: "No — WASM validation is unconditional. There is no debug-only path."
+  },
+  q2: {
+    a: "Close, but reversed: the issue is that the FunctionCall node can't tell expression vs statement position from inside itself.",
+    b: "No — drop is a normal instruction; it can appear anywhere a value of unknown use sits on the stack.",
+    c: "Correct — only the parent context (a Block iterating its statements) knows the value will go unused.",
+    d: "No — drop is legal anywhere instructions are."
+  },
+  q3: {
+    a: "No — there is no optimisation pass in this compiler.",
+    b: "Correct — local.set already pops one value. Stacking a drop on top would pop the slot below it instead.",
+    c: "No — VariableDeclaration does have a type once typechecking has run.",
+    d: "No — local.set's validation depends only on the value on top of the stack at that point."
+  },
+  q4: {
+    a: "Correct — building the map up front turns mutual and self-reference into a non-issue.",
+    b: "No — WASM has no trampolines; <code>call</code> takes a static index.",
+    c: "No — there is no second pass; the encoder is single-pass.",
+    d: "No — the type checker doesn't rewrite calls."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>

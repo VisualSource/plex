@@ -121,6 +121,47 @@ func TestEndToEnd_FunctionCall(t *testing.T) {
 	runOne(t, src, "square", []uint64{7}, 49)           // direct call too
 }
 
+func TestEndToEnd_Recursion(t *testing.T) {
+	src := `
+        fn fib(n: i64): i64 {
+            if n < 2 { return n; }
+            return fib(n - 1) + fib(n - 2);
+        }
+    `
+	runOne(t, src, "fib", []uint64{0}, 0)
+	runOne(t, src, "fib", []uint64{1}, 1)
+	runOne(t, src, "fib", []uint64{10}, 55)
+}
+
+func TestEndToEnd_CallAsStatement(t *testing.T) {
+	src := `
+        fn square(x: i64): i64 {
+            return x * x;
+        }
+        fn warmup(n: i64): i64 {
+            square(n);          // result discarded — pure waste, but legal
+            return n + 1;
+        }
+    `
+	runOne(t, src, "warmup", []uint64{10}, 11)
+}
+
+func TestEndToEnd_ShortCircuitOr(t *testing.T) {
+	src := `
+        fn safe_or(a: bool, b: i64): bool {
+            return a || (10 / b) > 0;
+        }
+    `
+	// a=true: RHS must not be evaluated, even though 10/0 would trap
+	runOne(t, src, "safe_or", []uint64{1, 0}, 1)
+
+	// a=false: RHS runs. 10/5 = 2, 2 > 0 = true
+	runOne(t, src, "safe_or", []uint64{0, 5}, 1)
+
+	// a=false: RHS runs. 10/100 = 0, 0 > 0 = false
+	runOne(t, src, "safe_or", []uint64{0, 100}, 0)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))
