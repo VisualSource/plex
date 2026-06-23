@@ -261,6 +261,12 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 			}
 		}
 
+		if innerType == nil {
+			innerType = &script.Type{
+				Kind: script.TypeKind_Unknown,
+			}
+		}
+
 		t := &script.Type{
 			Kind:    script.TypeKind_Array,
 			Element: innerType,
@@ -537,13 +543,15 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		c.checkStmt(n.Value)
 		return nil
 	case *script.VariableDeclaration:
-		t := c.checkStmt(n.Init)
+		init := c.checkStmt(n.Init)
 
 		if n.Type != nil {
 			exp := c.checkExpression(n.Type)
-			if !isSameType(t, exp) {
-				c.error(n, errors.New("type annotation does not match init"))
-				return nil
+			if !isSameType(init, exp) {
+				if !(init.Kind == script.TypeKind_Array && init.Element != nil && init.Element.Kind == script.TypeKind_Unknown) {
+					c.error(n, fmt.Errorf("type %s annotation does not match init typeof %s", exp, init))
+					return nil
+				}
 			}
 
 			c.scope.Set(n.Name, exp)
@@ -551,15 +559,15 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 			return exp
 		}
 
-		if t == nil {
-			t = &script.Type{
+		if init == nil {
+			init = &script.Type{
 				Kind: script.TypeKind_Unknown,
 			}
 		}
 
-		c.scope.Set(n.Name, t)
-		n.SetType(t)
-		return t
+		c.scope.Set(n.Name, init)
+		n.SetType(init)
+		return init
 	case *script.Block:
 		prev := c.scope
 		c.scope = newScope(c.scope)
