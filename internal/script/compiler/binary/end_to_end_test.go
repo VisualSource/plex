@@ -652,6 +652,33 @@ func TestEndToEnd_ArrayOfStructsMethods(t *testing.T) {
 	runOne(t, src, "run", nil, api.EncodeF64(194.0))
 }
 
+func TestEndToEnd_Ternary(t *testing.T) {
+	src := `
+        fn pick(cond: bool, a: i64, b: i64): i64 {
+            return cond ? a : b;
+        }
+        fn ternary_arithmetic(x: i64): i64 {
+            return (x > 0 ? x : -x) * 2;
+        }
+    `
+	runOne(t, src, "pick", []uint64{1, 10, 20}, 10) // true  → a
+	runOne(t, src, "pick", []uint64{0, 10, 20}, 20) // false → b
+	runOne(t, src, "ternary_arithmetic", []uint64{api.EncodeI64(-5)}, 10)
+	runOne(t, src, "ternary_arithmetic", []uint64{3}, 6)
+}
+
+func TestEndToEnd_TypeCast(t *testing.T) {
+	src := `
+        fn i64_to_f64(x: i64): f64 { return x as f64; }
+        fn f64_to_i64(x: f64): i64 { return x as i64; }
+        fn i64_to_i32(x: i64): i32 { return x as i32; }
+    `
+	runOne(t, src, "i64_to_f64", []uint64{7}, api.EncodeF64(7.0))
+	runOne(t, src, "f64_to_i64", []uint64{api.EncodeF64(3.9)}, 3) // truncates
+	runOne(t, src, "f64_to_i64", []uint64{api.EncodeF64(-2.7)}, api.EncodeI64(-2))
+	runOne(t, src, "i64_to_i32", []uint64{42}, 42)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

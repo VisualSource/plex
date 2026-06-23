@@ -92,6 +92,11 @@ const (
 	OpI32WrapI64 byte = 0xA7
 
 	OpI64ExtendI32S byte = 0xAC
+
+	OpF64ConvertI64S byte = 0xB9
+	OpF64ConvertI32S byte = 0xB7
+	OpI64TruncF64S   byte = 0xB0
+	OpI32TruncF64S   byte = 0xAA
 )
 
 const (
@@ -244,4 +249,23 @@ func loadOpcode(k script.TypeKind) (op byte, align uint32) {
 	default:
 		return OpI32Load, 2 // pointer-as-i32
 	}
+}
+
+func castOpcode(from, to *script.Type) (byte, bool) {
+	fk := normKind(from.Kind)
+	tk := normKind(to.Kind)
+	if fk == tk {
+		return 0, true // no-op, same type after normalisation
+	}
+	type pair struct{ f, t script.TypeKind }
+	table := map[pair]byte{
+		{script.TypeKind_I64, script.TypeKind_I32}: OpI32WrapI64,
+		{script.TypeKind_I32, script.TypeKind_I64}: OpI64ExtendI32S,
+		{script.TypeKind_I64, script.TypeKind_F64}: OpF64ConvertI64S,
+		{script.TypeKind_I32, script.TypeKind_F64}: OpF64ConvertI32S,
+		{script.TypeKind_F64, script.TypeKind_I64}: OpI64TruncF64S,
+		{script.TypeKind_F64, script.TypeKind_I32}: OpI32TruncF64S,
+	}
+	op, ok := table[pair{fk, tk}]
+	return op, ok
 }

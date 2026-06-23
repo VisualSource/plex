@@ -462,6 +462,19 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 
 		n.SetType(targetType)
 		return targetType
+	case *script.TernaryExpression:
+		c.checkExpression(n.Condition.(script.Expression))
+
+		a := c.checkExpression(n.FalseBlock.(script.Expression))
+		b := c.checkExpression(n.TrueBlock.(script.Expression))
+
+		if !isSameType(a, b) {
+			c.error(n, errors.New("left and right no not have matching types"))
+			return nil
+		}
+
+		n.SetType(a)
+		return a
 	default:
 		c.error(n, fmt.Errorf("unhandled node %T", n))
 		return nil
@@ -598,18 +611,7 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 	case *script.NumberLiteral:
 		return c.checkExpression(n)
 	case *script.TernaryExpression:
-		c.checkStmt(n.Condition)
-
-		a := c.checkStmt(n.FalseBlock)
-		b := c.checkStmt(n.TrueBlock)
-
-		if !isSameType(a, b) {
-			c.error(n, errors.New("left and right no not have matching types"))
-			return nil
-		}
-
-		n.SetType(a)
-		return a
+		return c.checkExpression(n)
 	case *script.FunctionCall:
 		return c.checkExpression(n)
 	case *script.Identifier:
@@ -709,6 +711,7 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		return nil
 	case *script.CastExpression:
 		return c.checkExpression(n)
+
 	default:
 		c.error(n, fmt.Errorf("unhandled node %T", n))
 		return nil

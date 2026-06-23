@@ -603,6 +603,41 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		b.buf = AppendULEB128(b.buf, field.offset)
 
 		return nil
+	case *script.TernaryExpression:
+		t := n.GetType()
+		if t == nil {
+			return fmt.Errorf("ternary: no type")
+		}
+
+		if err := b.walk(n.Condition); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, OpIf, valType(t))
+		if err := b.walk(n.TrueBlock); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, OpElse)
+		if err := b.walk(n.FalseBlock); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, OpEnd)
+		return nil
+	case *script.CastExpression:
+		if err := b.walk(n.Expr); err != nil {
+			return err
+		}
+		from := n.Expr.(script.Expression).GetType()
+		to := n.GetType()
+		op, ok := castOpcode(from, to)
+
+		if !ok {
+			return fmt.Errorf("no cast from %s to %s", from, to)
+		}
+
+		if op != 0 {
+			b.buf = append(b.buf, op)
+		}
+		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}

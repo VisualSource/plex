@@ -211,3 +211,14 @@ func elemSizeOf(k script.TypeKind) uint32 {
 		return 4 // pointers (strings, arrays, structs)
 	}
 }
+
+func normKind(k script.TypeKind) script.TypeKind {
+	switch k {
+	case script.TypeKind_Int:
+		return script.TypeKind_I64
+	case script.TypeKind_Float:
+		return script.TypeKind_F64
+	default:
+		return k
+	}
+}
