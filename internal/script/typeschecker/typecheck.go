@@ -77,7 +77,11 @@ func (c *Checker) collectSignatures(program script.AstNode) {
 		}
 
 		for _, fn := range n.Methods {
-			def.Methods[fn.Name] = newFuncInfo(c.scope)
+			methodInfo := newFuncInfo(c.scope)
+			for i, arg := range fn.Params {
+				methodInfo.Args[arg.Name] = &orderedItem{Pos: i}
+			}
+			def.Methods[fn.Name] = methodInfo
 		}
 	}
 }

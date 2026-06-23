@@ -579,6 +579,53 @@ func TestEndToEnd_StructMethods(t *testing.T) {
 	runOne(t, src, "scaled", nil, api.EncodeF64(50.0))
 }
 
+func TestEndToEnd_MutatingMethod(t *testing.T) {
+	src := `
+        struct Vec2 {
+            x: f64;
+            y: f64;
+        }
+        impl Vec2 {
+            fn translate(dx: f64, dy: f64) {
+                self.x = self.x + dx;
+                self.y = self.y + dy;
+            }
+            fn sum(): f64 {
+                return self.x + self.y;
+            }
+        }
+        fn run(): f64 {
+            let v = Vec2(1.0, 2.0);
+            v.translate(10.0, 20.0);
+            return v.sum();
+        }
+    `
+	// (1+10) + (2+20) = 33
+	runOne(t, src, "run", nil, api.EncodeF64(33.0))
+}
+
+func TestEndToEnd_MethodCallsMethod(t *testing.T) {
+	src := `
+        struct Circle {
+            r: f64;
+        }
+        impl Circle {
+            fn area_approx(): f64 {
+                return self.r * self.r * 3.0;
+            }
+            fn double_area(): f64 {
+                return self.area_approx() * 2.0;
+            }
+        }
+        fn run(): f64 {
+            let c = Circle(5.0);
+            return c.double_area();
+        }
+    `
+	// 5*5*3 * 2 = 150
+	runOne(t, src, "run", nil, api.EncodeF64(150.0))
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

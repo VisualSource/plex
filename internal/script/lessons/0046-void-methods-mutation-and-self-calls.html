@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 46 – Void Methods, Mutation, and Self-Calls</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 46 – Void Methods, Mutation, and Self-Calls</h1>
+
+<p><strong>Goal:</strong> prove that <code>self.field = ...</code> mutation and <code>self.other()</code> chains work — and fix a subtle bug in the function epilogue that makes void methods trap on exit.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/section.go">section.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a> &middot;
+  <a href="../typeschecker/typecheck.go">typecheck.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Bug First: The Void Trap</h2>
+
+<p>Open <a href="../compiler/binary/section.go">section.go</a> and find <code>encodeCodeEntry</code>. Notice these two lines at the end of every function body:</p>
+
+<pre><code>body = append(body, enc.buf...)
+<span class="hl">body = append(body, OpUnreachable)</span>
+body = append(body, OpEnd)
+</code></pre>
+
+<p>The <code>OpUnreachable</code> (0x00) was added as a WASM validator trick. For a <em>non-void</em> function, code paths that return a value always end in a <code>return</code> opcode. After <code>return</code>, control never reaches <code>OpUnreachable</code> — but the WASM validator is happy because <code>unreachable</code> is polymorphic: it satisfies any type requirement.</p>
+
+<div class="warn">
+  <strong>The trap</strong>
+  For a <em>void</em> method like <code>fn translate(dx: f64, dy: f64) { self.x = self.x + dx; ... }</code>, there is no <code>return</code> statement. Execution falls through the body, hits <code>OpUnreachable</code>, and <strong>traps at runtime</strong>.
+</div>
+
+<p>The fix is one condition: only emit <code>OpUnreachable</code> when the function has results:</p>
+
+<pre><code><span class="kw">if</span> len(sig.results) &gt; 0 {
+    body = append(body, OpUnreachable)
+}
+body = append(body, OpEnd)
+</code></pre>
+
+<p>Void functions fall through to <code>OpEnd</code> with an empty stack — exactly what WASM expects for a <code>() → ()</code> function.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Why Mutation Already Works</h2>
+
+<p>Think about what <code>self.x = self.x + dx</code> means to the compiler:</p>
+
+<div class="diagram">
+<span class="cmt">// MemberAssignment(Object=Identifier("self"), Field="x", Value=...)</span>
+
+walk(Identifier("self"))   <span class="arrow">→</span>  local.get 0     <span class="cmt">; i32 ptr</span>
+walk(self.x + dx)          <span class="arrow">→</span>  f64.load ...    <span class="cmt">; load x</span>
+                           <span class="arrow">+</span>  local.get 2     <span class="cmt">; dx</span>
+                           <span class="arrow">+</span>  f64.add
+f64.store offset=0         <span class="arrow">→</span>  writes result back to field
+</div>
+
+<p><code>self</code> is just <code>locals[0]</code> — the i32 pointer threaded in by <code>newBodyEncoder</code> when <code>sig.isMethod = true</code>. The <code>MemberAssignment</code> walker from lesson 44 takes any expression as the object and emits a store at the field's compile-time offset. <strong>No new codegen needed.</strong></p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Why Self-Calls Already Work</h2>
+
+<p><code>self.area_approx()</code> inside another method is a <code>FunctionCall</code> whose callee is a <code>MemberAccess(Object=Identifier("self"), Field="area_approx")</code>. The binary walker's dispatch branch:</p>
+
+<ol>
+  <li>Resolves the object type from <code>Identifier("self").GetType()</code> → the struct type.</li>
+  <li>Pushes the receiver: <code>walk(callee.Object)</code> → <code>local.get 0</code>.</li>
+  <li>Pushes each arg.</li>
+  <li>Calls <code>__Circle__area_approx</code> by its funcidx.</li>
+</ol>
+
+<p><code>p.area_approx()</code> and <code>self.area_approx()</code> generate identical opcodes — the only difference is whether the receiver comes from a named variable or local 0.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Typechecker Fix</h2>
+
+<p>There is also a pre-existing bug in the typechecker's <code>collectSignatures</code>. Open <a href="../typeschecker/typecheck.go">typecheck.go</a> and find the <code>*script.StructImplStatement</code> case:</p>
+
+<pre><code><span class="cmt">// Before fix — method args not registered during collectSignatures:</span>
+<span class="kw">for</span> _, fn := <span class="kw">range</span> n.Methods {
+    def.Methods[fn.Name] = <span class="fn">newFuncInfo</span>(c.scope)
+}
+</code></pre>
+
+<p>Because <code>methodInfo.Args</code> was never populated here, <code>method.GetArgsInOrder()</code> returned <code>[]</code>, so <code>checkArgs</code> validated 0 expected args for every method call — silently accepting calls with the wrong number of arguments.</p>
+
+<p>The fix pre-registers param <em>positions</em> (types are filled later by <code>checkFunction</code>):</p>
+
+<pre><code><span class="kw">for</span> _, fn := <span class="kw">range</span> n.Methods {
+    methodInfo := <span class="fn">newFuncInfo</span>(c.scope)
+    <span class="kw">for</span> i, arg := <span class="kw">range</span> fn.Params {
+        methodInfo.Args[arg.Name] = &amp;orderedItem{Pos: i}
+    }
+    def.Methods[fn.Name] = methodInfo
+}
+</code></pre>
+
+<div class="insight">
+  <strong>Why not types too?</strong>
+  Types are resolved by <code>checkExpression</code>, which needs the full type-checking context. <code>collectSignatures</code> runs first as a lightweight pre-pass to register names and arities. Types are backfilled by <code>checkFunction</code> during the main pass. This is the same two-phase pattern used for free functions.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<div class="task">
+  <strong>Task 1 — Fix the void trap</strong>
+  In <a href="../compiler/binary/section.go">section.go → encodeCodeEntry</a>, wrap the <code>OpUnreachable</code> emission in <code>if len(sig.results) &gt; 0</code>.
+</div>
+
+<div class="task">
+  <strong>Task 2 — Fix the typechecker</strong>
+  In <a href="../typeschecker/typecheck.go">typecheck.go → collectSignatures → *script.StructImplStatement</a>, add the loop that pre-registers method params as shown above.
+</div>
+
+<div class="task">
+  <strong>Task 3 — Write TestEndToEnd_MutatingMethod</strong>
+  A <code>Vec2</code> struct with a <code>translate(dx, dy)</code> void method and a <code>sum()</code> reader. Call <code>v.translate(10.0, 20.0)</code> then <code>v.sum()</code>. Expected: <code>33.0</code> (1+10 + 2+20).
+</div>
+
+<div class="task">
+  <strong>Task 4 — Write TestEndToEnd_MethodCallsMethod</strong>
+  A <code>Circle</code> struct. <code>area_approx()</code> returns <code>r*r*3.0</code>. <code>double_area()</code> returns <code>self.area_approx() * 2.0</code>. Expected for r=5: <code>150.0</code>.
+</div>
+
+<p>Run <code>go test ./internal/script/...</code> — all 23 tests should pass.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What You Just Pulled Together</h2>
+
+<table>
+  <tr><th>Feature</th><th>New code?</th><th>Why it works</th></tr>
+  <tr><td><code>self.x = self.x + dx</code></td><td>No</td><td>MemberAssignment walker (lesson 44) + self is locals[0]</td></tr>
+  <tr><td><code>self.other()</code></td><td>No</td><td>Same dispatch branch as <code>p.other()</code> (lesson 45)</td></tr>
+  <tr><td>void method exit</td><td>Yes — 3 lines</td><td>Conditional OpUnreachable; void falls through to OpEnd</td></tr>
+  <tr><td>typechecker arg arity</td><td>Yes — 4 lines</td><td>Pre-register param positions in collectSignatures</td></tr>
+</table>
+
+<p>The pattern here is characteristic of a well-structured compiler: each stage (AST, typechecker, codegen) has clean contracts, so new surface syntax often compiles for free once the underlying representation is right.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+  <h3>Four questions — pick the best answer</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why does emitting <code>OpUnreachable</code> after a void method body cause a runtime trap rather than a compile-time error?</p>
+    <label><input type="radio" name="q1" value="a"> The WASM validator rejects <code>unreachable</code> in void functions.</label>
+    <label><input type="radio" name="q1" value="b"> The validator accepts it because <code>unreachable</code> is polymorphic; only the runtime notices the fall-through.</label>
+    <label><input type="radio" name="q1" value="c"> The validator flags it, but wazero ignores validation errors.</label>
+    <label><input type="radio" name="q1" value="d"> <code>unreachable</code> is only a hint; wazero chooses whether to trap.</label>
+    <div class="feedback" id="q1-fb"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. After <code>self.field = value</code> executes in WASM, what is on the value stack?</p>
+    <label><input type="radio" name="q2" value="a"> The stored value (so callers can chain assignments).</label>
+    <label><input type="radio" name="q2" value="b"> The base pointer of the struct.</label>
+    <label><input type="radio" name="q2" value="c"> Nothing — store instructions do not push a result.</label>
+    <label><input type="radio" name="q2" value="d"> An i32 status code indicating success.</label>
+    <div class="feedback" id="q2-fb"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. In <code>collectSignatures</code>, why are param <em>positions</em> registered but not param <em>types</em>?</p>
+    <label><input type="radio" name="q3" value="a"> Types are resolved lazily because the type context isn't available yet; positions are plain integers from the AST.</label>
+    <label><input type="radio" name="q3" value="b"> Types are stored in a separate map to avoid circular references.</label>
+    <label><input type="radio" name="q3" value="c"> The typechecker doesn't need types to validate arity.</label>
+    <label><input type="radio" name="q3" value="d"> Types are always inferred, never declared, so they can't be stored early.</label>
+    <div class="feedback" id="q3-fb"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. When <code>self.area_approx()</code> is compiled inside <code>double_area()</code>, what is pushed onto the WASM stack as the receiver argument?</p>
+    <label><input type="radio" name="q4" value="a"> <code>local.get 0</code> — the i32 pointer that was passed as the implicit self of <code>double_area</code>.</label>
+    <label><input type="radio" name="q4" value="b"> A freshly allocated copy of the struct.</label>
+    <label><input type="radio" name="q4" value="c"> The struct name as a string index into the data section.</label>
+    <label><input type="radio" name="q4" value="d"> The funcidx of <code>__Circle__area_approx</code>.</label>
+    <div class="feedback" id="q4-fb"></div>
+  </div>
+
+  <div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Heap allocator factoring.</strong> You now have four call sites that bump-allocate: string literals, array literals, struct constructors, and (if you ever add closures) captured environments. The skeleton is identical each time: bump <code>__heap_ptr</code>, populate with stores, leave base pointer. A helper <code>emitHeapAlloc(size uint32) (tmp uint32)</code> is worth extracting once you feel the repetition.</li>
+  <li><strong>Global struct instances.</strong> Can you declare a top-level <code>let g = MyStruct(1.0, 2.0)</code>? Currently globals are only numbers. A struct global would be an i32 global holding a heap pointer initialised in a module-level start function (or just emitted at the top of the first function that uses it).</li>
+  <li><strong>Returning structs from functions.</strong> <code>fn make(): Point { return Point(1.0, 2.0); }</code> — the Point is allocated on the heap, and the i32 pointer is the return value. Should already work — confirm with a test.</li>
+</ul>
+
+<p style="color: var(--muted); font-size: 0.9em; margin-top: 3em;">
+  Questions? Ask your teacher agent. Type your question and the lesson number to get targeted help.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Source</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions">WebAssembly Spec §5.4.1 — Control Instructions</a> — covers the formal semantics of <code>unreachable</code>, <code>return</code>, and <code>end</code>, and why <code>unreachable</code> is typed as <code>[t1*] → [t2*]</code> (polymorphic in both input and output).</p>
+
+<script>
+const ANSWERS = { q1: 'b', q2: 'c', q3: 'a', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "No — the validator accepts <code>unreachable</code> anywhere; it's polymorphic. The trap is a runtime event.",
+    b: "Correct. <code>unreachable</code> has type <code>[t*] → [t*]</code> for any <code>t</code>. The validator is satisfied. At runtime, executing it unconditionally traps.",
+    c: "No — wazero validates strictly. The module would be rejected if the bytecode were actually invalid.",
+    d: "No — <code>unreachable</code> always traps when executed. There is no opt-out."
+  },
+  q2: {
+    a: "No — WASM store instructions consume the pointer and value; they push nothing.",
+    b: "No — the pointer is consumed by the store, not left on the stack.",
+    c: "Correct. WASM <code>*.store</code> instructions are purely side-effecting: they consume two operands (base pointer, value) and push zero results.",
+    d: "No — WASM has no status codes. Errors are traps, not return values."
+  },
+  q3: {
+    a: "Correct. <code>collectSignatures</code> is a lightweight pre-pass run before type-checking begins. Resolving types requires <code>checkExpression</code>, which needs the scope chain and struct registry to be fully built first. Positions are just integers from the parsed AST — safe to extract immediately.",
+    b: "No — types and positions both live on the same <code>orderedItem</code> struct.",
+    c: "Arity validation requires knowing how many params there are (positions give count); type validation requires knowing their types.",
+    d: "Plex has explicit type annotations on parameters. They're declared — just not resolved until the main type-checking pass."
+  },
+  q4: {
+    a: "Correct. <code>double_area</code> receives <code>self</code> as its own local 0. Walking <code>Identifier(\"self\")</code> emits <code>local.get 0</code>. That same pointer is then pushed as the receiver for the nested <code>area_approx</code> call.",
+    b: "No — structs are heap-allocated once at construction. Methods pass a pointer, not a copy.",
+    c: "No — struct names have no runtime representation; they exist only in the type section.",
+    d: "No — the funcidx is encoded in the <code>call</code> opcode itself, not pushed as a stack argument."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>

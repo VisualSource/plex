@@ -65,7 +65,13 @@ func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map
 	}
 
 	body = append(body, enc.buf...)
-	body = append(body, OpUnreachable)
+	// Emit unreachable only for non-void functions: it satisfies the WASM
+	// validator when a non-void function has a missing return path, and traps
+	// at runtime if that path is ever reached. Void functions fall through to
+	// OpEnd legitimately, so we must not emit it there.
+	if len(sig.results) > 0 {
+		body = append(body, OpUnreachable)
+	}
 	body = append(body, OpEnd)
 
 	var entry []byte
