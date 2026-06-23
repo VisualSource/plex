@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 42 – Array Element Assignment, Across the Whole Compiler</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .stage { background: linear-gradient(90deg, #14223a 0%, transparent 100%); border-left: 4px solid var(--blue); padding: 12px 18px; margin: 2em 0 1em 0; border-radius: 0 6px 6px 0; }
+  .stage h3 { margin: 0; color: var(--blue); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.95em; }
+  .stage p { margin: 6px 0 0; color: var(--muted); font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 42 – Array Element Assignment, Across the Whole Compiler</h1>
+
+<p><strong>Goal:</strong> make <code>arr[i] = x</code> work end-to-end. Every prior binary-backend lesson has touched one file. Today touches four — parser, AST, typechecker, codegen — because a real language feature has to land in every stage that touches a program.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../ast_nodes.go">ast_nodes.go</a> &middot;
+  <a href="../ast.go">ast.go</a> &middot;
+  <a href="../typeschecker/typecheck.go">typecheck.go</a> &middot;
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Why This Is the Right Shape of Lesson</h2>
+
+<p>Every binary-backend lesson so far has assumed the AST and typechecker were ready and only added codegen. Today's task isn't possible that way — the parser doesn't even <em>accept</em> <code>arr[i] = x</code> as syntax. Try it now:</p>
+
+<pre><code>let arr = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>];
+arr[<span class="num">0</span>] = <span class="num">99</span>;   <span class="err">// parse error: invalid assignment target</span></code></pre>
+
+<p>Look at <a href="../ast.go">ast.go</a>'s <code>parseAssignment</code> (around line 500). It type-switches the LHS of an <code>=</code> and only accepts <code>*Identifier</code> and <code>*MemberAccess</code>. <code>*ArrayAccess</code> falls through to the "invalid assignment target" error.</p>
+
+<div class="insight">
+<strong>This is the natural shape of "add a feature to a compiler".</strong> A language feature is a coordinated change across every stage that sees it. New syntax needs new parsing. New AST needs new types. New typed expressions need new checking. New checked expressions need new codegen. Each stage's change is small; the discipline is making them <em>consistent</em>.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="stage">
+  <h3>Stage 1 — AST</h3>
+  <p>Define the new node first. Everything downstream depends on its shape.</p>
+</div>
+
+<p>In <a href="../ast_nodes.go">ast_nodes.go</a>, add a new node next to <code>MemberAssignment</code> (around line 386). It mirrors that node, but the LHS carries an <em>index expression</em> instead of a field name:</p>
+
+<pre><code><span class="kw">type</span> <span class="ty">ArrayAssignment</span> <span class="kw">struct</span> {
+    Start, End <span class="ty">Position</span>
+    Target     *<span class="ty">ArrayAccess</span>  <span class="cmt">// the arr[i] being assigned to</span>
+    Value      <span class="ty">AstNode</span>
+}
+
+<span class="kw">func</span> (a *<span class="ty">ArrayAssignment</span>) <span class="fn">Range</span>() (<span class="ty">Position</span>, <span class="ty">Position</span>) {
+    <span class="kw">return</span> a.Start, a.End
+}</code></pre>
+
+<div class="insight">
+<strong>Why not reuse <code>MemberAssignment</code>?</strong> The shapes differ: <code>MemberAssignment</code> has a string <code>Field</code>, while array assignment has a runtime-computed <code>Index</code>. Forcing one node to hold either would mean nullable fields and switchy codegen. Two clean nodes beat one Frankenstein.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="stage">
+  <h3>Stage 2 — Parser</h3>
+  <p>Teach <code>parseAssignment</code> to recognise <code>ArrayAccess</code> on the left of <code>=</code>.</p>
+</div>
+
+<p>In <a href="../ast.go">ast.go</a>, extend the type switch in <code>parseAssignment</code>:</p>
+
+<pre><code><span class="kw">switch</span> target := expr.(<span class="kw">type</span>) {
+<span class="kw">case</span> *<span class="ty">Identifier</span>:
+    <span class="cmt">// ... existing AssignmentExpression branch ...</span>
+<span class="kw">case</span> *<span class="ty">MemberAccess</span>:
+    <span class="cmt">// ... existing MemberAssignment branch ...</span>
+<span class="hl"><span class="kw">case</span> *<span class="ty">ArrayAccess</span>:</span>
+<span class="hl">    <span class="kw">return</span> &amp;<span class="ty">ArrayAssignment</span>{</span>
+<span class="hl">        Start:  start,</span>
+<span class="hl">        End:    end,</span>
+<span class="hl">        Target: target,</span>
+<span class="hl">        Value:  value,</span>
+<span class="hl">    }, <span class="kw">nil</span></span>
+<span class="kw">default</span>:
+    <span class="kw">return nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"invalid assignment target"</span>)
+}</code></pre>
+
+<p>That's it for the parser. The <code>parseAssignment</code> path already had the precedence right (assignment as a right-associative tail of <code>parseTernary</code>) — we just teach it about one more LHS shape.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="stage">
+  <h3>Stage 3 — Typechecker</h3>
+  <p>The new node must type-check: target's element type must match value's type.</p>
+</div>
+
+<p>In <a href="../typeschecker/typecheck.go">typecheck.go</a>, add a case next to <code>*script.MemberAssignment</code> (around line 636). The shape:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.ArrayAssignment</span>:
+    <span class="cmt">// Type-check the array access as if reading from it; this populates</span>
+    <span class="cmt">// n.Target.type_ with the element type.</span>
+    elemType := c.<span class="fn">checkExpression</span>(n.Target)
+    <span class="kw">if</span> elemType == <span class="kw">nil</span> {
+        <span class="kw">return nil</span>
+    }
+
+    valType := c.<span class="fn">checkExpression</span>(n.Value.(<span class="ty">script.Expression</span>))
+    <span class="kw">if</span> valType == <span class="kw">nil</span> {
+        <span class="kw">return nil</span>
+    }
+
+    <span class="kw">if</span> !<span class="fn">isSameType</span>(elemType, valType) {
+        c.<span class="fn">error</span>(n, fmt.<span class="fn">Errorf</span>(<span class="str">"array element type %s does not match assigned value type %s"</span>, elemType.Kind, valType.Kind))
+        <span class="kw">return nil</span>
+    }
+
+    <span class="kw">return</span> valType</code></pre>
+
+<p>You'll also need a tiny dispatch entry — the <code>checkStmt</code> function near line 600 has a switch that routes statement nodes to <code>checkExpression</code>. Add an arm for <code>*script.ArrayAssignment</code> right next to the existing <code>*script.MemberAssignment</code> arm if it exists; otherwise just let it fall through to the catch-all. Run the typechecker tests after to see where coverage stopped.</p>
+
+<div class="warn">
+<strong>Don't try to be clever about <code>n.Target</code>'s walk.</strong> Calling <code>checkExpression(n.Target)</code> populates the inner <code>ArrayAccess</code>'s <code>type_</code> field with the element type. The binary backend will read that via <code>n.Target.GetType()</code>. If you short-circuit this step, codegen later won't know the element type.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="stage">
+  <h3>Stage 4 — Binary Backend (codegen)</h3>
+  <p>Compute the address — exactly like <code>arr[i]</code> — but emit a store instead of a load.</p>
+</div>
+
+<p>In <a href="../compiler/binary/body.go">body.go</a>, add a case to <code>walk</code>:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.ArrayAssignment</span>:
+    elemType := n.Target.<span class="fn">GetType</span>()
+    <span class="kw">if</span> elemType == <span class="kw">nil</span> {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"array assignment target has no element type"</span>)
+    }
+
+    elemSize := <span class="fn">elemSizeOf</span>(elemType.Kind)
+    storeOp, storeAlign := <span class="fn">storeOpcode</span>(elemType.Kind)
+
+    <span class="cmt">// 1. push the base address (the array pointer)</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Target.Target); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    <span class="cmt">// 2. push the index, narrowed to i32 for address math</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Target.Index); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32WrapI64</span>)
+
+    <span class="cmt">// 3. multiply by elemSize</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Const</span>)
+    b.buf = <span class="fn">AppendSLEB128</span>(b.buf, <span class="ty">int64</span>(elemSize))
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Mul</span>)
+
+    <span class="cmt">// 4. add to base → target address (still missing +4, comes from memarg)</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Add</span>)
+
+    <span class="cmt">// 5. push the value</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Value); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+
+    <span class="cmt">// 6. typed store at +4 (skip length prefix)</span>
+    b.buf = <span class="fn">append</span>(b.buf, storeOp)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, storeAlign)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="num">4</span>)
+    <span class="kw">return nil</span></code></pre>
+
+<div class="insight">
+<strong>This mirrors <code>ArrayAccess</code> point-for-point.</strong> Same address arithmetic, same <code>+4</code>-via-memarg trick, same element-type dispatch. The only differences: push the value before the store, emit <code>storeOp</code> instead of <code>loadOp</code>, return without pushing anything (assignment is a statement-shaped expression that produces no result).</p>
+</div>
+
+<div class="warn">
+<strong>Statement-position drop.</strong> Lesson 33's <code>Block</code> arm drops the result of any expression-typed statement that isn't a known consumer. <code>ArrayAssignment</code> as a statement should produce nothing on the stack — which the code above already achieves (the store consumes both the address and the value, pushing nothing). If the AST node satisfies <code>script.Expression</code> with a non-void type, lesson 33's drop logic would emit a stray <code>drop</code>. Either: (a) don't implement <code>GetType</code>/<code>SetType</code> on <code>ArrayAssignment</code> (it's a statement, not an expression), or (b) make <code>GetType</code> return a Void type. The cleaner choice is (a) — the node simply isn't an <code>Expression</code>.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Test</h2>
+
+<p>The end-to-end win — write to an element, read it back, prove the change persisted:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_ArrayAssignment</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn write_then_read(): int {
+            let arr = [10, 20, 30];
+            arr[1] = 99;
+            return arr[1];
+        }
+        fn rotate(): int {
+            let arr = [1, 2, 3, 4, 5];
+            arr[0] = arr[4];
+            arr[4] = 1;
+            return arr[0] + arr[4]; <span class="cmt">// 5 + 1 = 6</span>
+        }
+        fn sort_two(): int {
+            let arr = [20, 10];
+            <span class="kw">if</span> arr[0] &gt; arr[1] {
+                let tmp = arr[0];
+                arr[0] = arr[1];
+                arr[1] = tmp;
+            }
+            return arr[0] * 10 + arr[1]; <span class="cmt">// 10*10 + 20 = 120</span>
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"write_then_read"</span>, <span class="kw">nil</span>, <span class="num">99</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"rotate"</span>,          <span class="kw">nil</span>, <span class="num">6</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"sort_two"</span>,        <span class="kw">nil</span>, <span class="num">120</span>)
+}</code></pre>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<p class="ok"><code>sort_two</code> is the canary case — it tests that assignment composes with reads inside a conditional. If only <code>write_then_read</code> passed, you'd suspect a subtle ordering bug; <code>sort_two</code> covers the realistic pattern.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What You Just Learned About Compiler Stages</h2>
+
+<p>This lesson's <em>shape</em> is the lesson — not any individual stage's code. Notice:</p>
+
+<ul>
+  <li><strong>Each stage's change was tiny.</strong> One struct in the AST, one switch arm in the parser, one case in the typechecker, one case in codegen. None of them required new infrastructure.</li>
+  <li><strong>The stages depend on each other strictly downstream.</strong> Parser depends on AST. Typechecker depends on parsed-and-typed AST. Codegen depends on type-checked AST. Skipping a stage upstream makes the next stage's work harder or impossible.</li>
+  <li><strong>The hardest part is consistency, not code.</strong> The bugs in features like this come from a stage doing something <em>almost</em> right but inconsistent with another stage — typechecker assigning the wrong type, codegen reading from a different field, parser producing an unexpected variant. The fix is usually three lines spread across two files.</li>
+</ul>
+
+<div class="insight">
+<strong>Every "add a language feature" task has this shape.</strong> Imports, modules, generics, async/await, pattern matching, traits — all of them eventually decompose into "new node in AST + parse rule + check rule + emit rule". The cross-stage discipline you exercised today is the actual skill of compiler engineering.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Why does <code>ArrayAssignment</code> warrant its own AST node rather than reusing <code>MemberAssignment</code>?</p>
+  <label><input type="radio" name="q1" value="a"> The shapes differ: <code>MemberAssignment</code> has a string <code>Field</code>, while <code>arr[i] = x</code> has a runtime-computed <code>Index</code> expression. Forcing one node to hold either means nullable fields and dispatch in every consumer.</label>
+  <label><input type="radio" name="q1" value="b"> Go doesn't allow sum types, so each shape must be its own struct.</label>
+  <label><input type="radio" name="q1" value="c"> Performance — struct-field access is faster than map lookup.</label>
+  <label><input type="radio" name="q1" value="d"> The typechecker requires distinct node types to dispatch on.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. Why does the typechecker call <code>checkExpression(n.Target)</code> even though it's about to overwrite the result?</p>
+  <label><input type="radio" name="q2" value="a"> The call has the side effect of populating <code>n.Target.type_</code>, which the binary backend later reads via <code>GetType()</code>. Skipping it would leave codegen unable to determine the element type.</label>
+  <label><input type="radio" name="q2" value="b"> It triggers cache eviction in the typechecker.</label>
+  <label><input type="radio" name="q2" value="c"> WASM requires every expression to be type-checked at least twice.</label>
+  <label><input type="radio" name="q2" value="d"> It's defensive — the value might depend on the target.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. Why does the codegen mirror <code>ArrayAccess</code> almost exactly?</p>
+  <label><input type="radio" name="q3" value="a"> Reads and writes share the same addressing scheme — both need <code>base + i*elemSize + 4</code>. Only the terminal instruction differs: load for reads, store for writes.</label>
+  <label><input type="radio" name="q3" value="b"> WASM has only one memory-access instruction that handles both reads and writes.</label>
+  <label><input type="radio" name="q3" value="c"> The compiler always emits both load and store, then patches one out post-hoc.</label>
+  <label><input type="radio" name="q3" value="d"> It's a coincidence; the implementations are independent.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. Should <code>ArrayAssignment</code> implement <code>script.Expression</code> (i.e. have <code>GetType</code>/<code>SetType</code> methods)?</p>
+  <label><input type="radio" name="q4" value="a"> No — assignment is a statement that produces no value on the stack. If it satisfies <code>Expression</code> with a non-void type, lesson 33's <code>Block</code> drop logic emits an unwanted <code>drop</code>, corrupting the stack.</label>
+  <label><input type="radio" name="q4" value="b"> Yes — every AST node must implement the same interface for uniform dispatch.</label>
+  <label><input type="radio" name="q4" value="c"> Yes, returning void — the drop logic explicitly skips void-typed expressions.</label>
+  <label><input type="radio" name="q4" value="d"> No — assignment opcodes don't exist in WASM.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Bounds checks for <code>arr[i]</code> and <code>arr[i] = x</code>.</strong> Same shape on both sides: load the length, compare against the (wrapped) index, trap if out of bounds. Three instructions per access — cheap.</li>
+  <li><strong>Struct literals and field access.</strong> Same heap-allocator pattern as arrays; field offsets come from a per-struct layout table instead of <code>i * elemSize</code>.</li>
+  <li><strong>String byte-at indexing.</strong> Reconcile the typechecker's "string-of-string" view with a useful byte-indexing operation. Smaller scope than today; mostly a typechecker decision.</li>
+  <li><strong>Sorting algorithms in plex.</strong> You can now write bubble sort, selection sort, insertion sort. None of them need any new language features — they're a fun consolidation exercise.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://craftinginterpreters.com/parsing-expressions.html" target="_blank">Crafting Interpreters — Parsing Expressions</a> — the chapter where assignment-target validation typically lives. Plex's <code>parseAssignment</code> follows the same shape (parse the LHS as an expression, check it's a valid target post-hoc).</p>
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions" target="_blank">WebAssembly Core Spec §5.4.5 — Memory Instructions</a> — store family reference.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can show you why <code>arr[i].field = x</code> would need yet another node, contrast lesson 42 with the same feature in a tree-walking interpreter, or sketch the bounds-check codegen.
+</p>
+
+<script>
+const ANSWERS = { q1: 'a', q2: 'a', q3: 'a', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "Correct — each node carries exactly the fields its semantics need. A unified node would mean nullable fields and 'if Field != \"\" else use Index' dispatch in every consumer.",
+    b: "No — Go has interfaces; sum-type modelling is fine. The reason is field-shape, not language limitation.",
+    c: "No — struct vs map performance is not the bottleneck.",
+    d: "No — the typechecker dispatches on the same interface for both; distinct types make the code clearer but the dispatch works either way."
+  },
+  q2: {
+    a: "Correct — the call's side effect is exactly what matters. Codegen later reads <code>n.Target.GetType()</code> to know the element type for opcode dispatch.",
+    b: "No — there's no cache eviction in this typechecker.",
+    c: "No — the spec doesn't require double-checking; this is a property of the codebase's design.",
+    d: "No — the target's type is independent of the value's type."
+  },
+  q3: {
+    a: "Correct — addressing is the same shape; only the terminal action (read vs write) differs. The 'mirror' is structural symmetry, not implementation accident.",
+    b: "No — load and store are distinct instructions in WASM.",
+    c: "No — the compiler doesn't post-patch.",
+    d: "No — the shared shape is a design consequence of arrays' layout being read-write-symmetric."
+  },
+  q4: {
+    a: "Correct — the cleanest signal that 'this is a statement' is not implementing the Expression interface. The drop logic then ignores it automatically.",
+    b: "No — Go interface satisfaction is opt-in. Not every node needs to be an Expression.",
+    c: "Plausible-sounding, but more brittle — the drop logic explicitly checks <code>t.Kind != Void</code>, so returning void would work, but you've now manufactured a fake type just to satisfy an unrelated interface. Cleaner to just not implement the interface.",
+    d: "No — assignment opcodes are exactly what store instructions are."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>
