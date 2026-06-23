@@ -633,6 +633,22 @@ func (c *Checker) checkStmt(node script.AstNode) *script.Type {
 		n.SetType(rt)
 
 		return rt
+	case *script.ArrayAssignment:
+		elemType := c.checkExpression(n.Target)
+		if elemType == nil {
+			return nil
+		}
+
+		valType := c.checkExpression(n.Value.(script.Expression))
+		if valType == nil {
+			return nil
+		}
+
+		if !isSameType(elemType, valType) {
+			c.error(n, fmt.Errorf("array element type %s does not match assigned value type %s", elemType, valType))
+			return nil
+		}
+		return valType
 	case *script.MemberAssignment:
 		t := c.checkExpression(n.Object.(script.Expression))
 

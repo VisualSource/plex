@@ -422,3 +422,13 @@ func (c *CastExpression) GetType() *Type  { return c.type_ }
 func (c *CastExpression) Range() (Position, Position) {
 	return c.Start, c.End
 }
+
+type ArrayAssignment struct {
+	Start, End Position
+	Target     *ArrayAccess
+	Value      AstNode
+}
+
+func (a *ArrayAssignment) Range() (Position, Position) {
+	return a.Start, a.End
+}

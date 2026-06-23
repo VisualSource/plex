@@ -438,6 +438,34 @@ func TestEndToEnd_Sum(t *testing.T) {
 	runOne(t, src, "total", nil, 15)
 }
 
+func TestEndToEnd_ArrayAssignment(t *testing.T) {
+	src := `
+        fn write_then_read(): int {
+            let arr = [10, 20, 30];
+            arr[1] = 99;
+            return arr[1];
+        }
+        fn rotate(): int {
+            let arr = [1, 2, 3, 4, 5];
+            arr[0] = arr[4];
+            arr[4] = 1;
+            return arr[0] + arr[4]; // 5 + 1 = 6
+        }
+        fn sort_two(): int {
+            let arr = [20, 10];
+            if arr[0] > arr[1] {
+                let tmp = arr[0];
+                arr[0] = arr[1];
+                arr[1] = tmp;
+            }
+            return arr[0] * 10 + arr[1]; // 10*10 + 20 = 120
+        }
+    `
+	runOne(t, src, "write_then_read", nil, 99)
+	runOne(t, src, "rotate", nil, 6)
+	runOne(t, src, "sort_two", nil, 120)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

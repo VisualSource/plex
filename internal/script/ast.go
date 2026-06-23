@@ -513,6 +513,13 @@ func (p *Parser) parseAssignment() (AstNode, error) {
 			Field:  target.Field,
 			Value:  value,
 		}, nil
+	case *ArrayAccess:
+		return &ArrayAssignment{
+			Start:  start,
+			End:    end,
+			Target: target,
+			Value:  value,
+		}, nil
 	default:
 		return nil, fmt.Errorf("invalid assignment target")
 

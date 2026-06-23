@@ -417,6 +417,39 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		b.buf = AppendULEB128(b.buf, 4)
 
 		return nil
+	case *script.ArrayAssignment:
+		elemType := n.Target.GetType()
+		if elemType == nil {
+			return fmt.Errorf("array assignment target has no element type")
+		}
+
+		elemSize := elemSizeOf(elemType.Kind)
+		storeOp, storeAlign := storeOpcode(elemType.Kind)
+
+		if err := b.walk(n.Target.Target); err != nil {
+			return err
+		}
+
+		if err := b.walk(n.Target.Index); err != nil {
+			return err
+		}
+
+		b.buf = append(b.buf, OpI32WrapI64)
+
+		b.buf = append(b.buf, OpI32Const)
+		b.buf = AppendSLEB128(b.buf, int64(elemSize))
+		b.buf = append(b.buf, OpI32Mul)
+
+		b.buf = append(b.buf, OpI32Add)
+
+		if err := b.walk(n.Value); err != nil {
+			return err
+		}
+
+		b.buf = append(b.buf, storeOp)
+		b.buf = AppendULEB128(b.buf, storeAlign)
+		b.buf = AppendULEB128(b.buf, 4)
+		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}
