@@ -37,6 +37,11 @@ const (
 	OpI32Eqz byte = 0x45
 	OpI32Eq  byte = 0x46
 	OpI32Ne  byte = 0x47
+	OpI32LtS byte = 0x48
+
+	OpI32GtS byte = 0x4A
+	OpI32LeS byte = 0x4C
+	OpI32GeS byte = 0x4E
 
 	OpI64Eq  byte = 0x51
 	OpI64Ne  byte = 0x52
@@ -44,6 +49,13 @@ const (
 	OpI64GtS byte = 0x55
 	OpI64LeS byte = 0x57
 	OpI64GeS byte = 0x59
+
+	OpF64Eq byte = 0x61
+	OpF64Ne byte = 0x62
+	OpF64Lt byte = 0x63
+	OpF64Gt byte = 0x64
+	OpF64Le byte = 0x65
+	OpF64Ge byte = 0x66
 
 	OpI32Add  byte = 0x6A
 	OpI32Sub  byte = 0x6B
@@ -144,6 +156,14 @@ func cmpOpcode(k script.TypeKind, op script.TokenType) (byte, error) {
 			return OpI32Eq, nil
 		case script.TokenType_NotEqual:
 			return OpI32Ne, nil
+		case script.TokenType_LessThen:
+			return OpI32LtS, nil
+		case script.TokenType_GreaterThen:
+			return OpI32GtS, nil
+		case script.TokenType_LessThenOrEqual:
+			return OpI32LeS, nil
+		case script.TokenType_GreaterThenOrEqaul:
+			return OpI32GeS, nil
 		}
 	case script.TypeKind_Bool:
 		switch op {
@@ -151,6 +171,21 @@ func cmpOpcode(k script.TypeKind, op script.TokenType) (byte, error) {
 			return OpI32And, nil
 		case script.TokenType_OR:
 			return OpI32Or, nil
+		}
+	case script.TypeKind_F64, script.TypeKind_Float:
+		switch op {
+		case script.TokenType_EqualEqual:
+			return OpF64Eq, nil
+		case script.TokenType_NotEqual:
+			return OpF64Ne, nil
+		case script.TokenType_LessThen:
+			return OpF64Lt, nil
+		case script.TokenType_GreaterThen:
+			return OpF64Gt, nil
+		case script.TokenType_LessThenOrEqual:
+			return OpF64Le, nil
+		case script.TokenType_GreaterThenOrEqaul:
+			return OpF64Ge, nil
 		}
 	}
 	return 0, fmt.Errorf("no comparison opcode for %s %s", k, op)

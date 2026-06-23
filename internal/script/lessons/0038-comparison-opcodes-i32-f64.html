@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 38 – Filling Out the Comparison Table: i32 and f64</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 880px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  td.section { background: #14223a; color: var(--blue); font-family: Georgia, serif; font-weight: bold; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 38 – Filling Out the Comparison Table: i32 and f64</h1>
+
+<p><strong>Goal:</strong> close two long-running gaps in your <code>cmpOpcode</code> table. i32 currently has only <code>eq</code>/<code>ne</code> — no ordering. f64 has nothing at all. Today they all land, and a small but pedagogically nice asymmetry shows up: integer comparisons come in signed/unsigned flavours, floats don't.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Failing Tests</h2>
+
+<p>Add these — both crash with <code>no comparison opcode for &lt;type&gt; &lt;op&gt;</code> today:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_I32Comparisons</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn count_below(threshold: i32, n: i32): i32 {
+            <span class="kw">let</span> i: i32 = 0;
+            <span class="kw">let</span> count: i32 = 0;
+            <span class="kw">while</span> i &lt; n {
+                <span class="kw">if</span> i &lt; threshold { count = count + 1; }
+                i = i + 1;
+            }
+            <span class="kw">return</span> count;
+        }
+    `
+    <span class="cmt">// count of values in [0, 10) that are &lt; 7  →  7</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"count_below"</span>, []<span class="ty">uint64</span>{<span class="num">7</span>, <span class="num">10</span>}, <span class="num">7</span>)
+}
+
+<span class="kw">func</span> <span class="fn">TestEndToEnd_F64Comparisons</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn classify(x: f64): i64 {
+            <span class="kw">if</span> x &lt; 0.0 { <span class="kw">return</span> -1; }
+            <span class="kw">if</span> x &gt; 0.0 { <span class="kw">return</span>  1; }
+            <span class="kw">return</span> 0;
+        }
+        fn near_one(x: f64): bool {
+            <span class="kw">return</span> x &gt;= 0.99 &amp;&amp; x &lt;= 1.01;
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"classify"</span>, []<span class="ty">uint64</span>{<span class="fn">f64bits</span>(-<span class="num">3.5</span>)}, <span class="ty">uint64</span>(-<span class="num">1</span>))
+    <span class="fn">runOne</span>(t, src, <span class="str">"classify"</span>, []<span class="ty">uint64</span>{<span class="fn">f64bits</span>(<span class="num">0.0</span>)},  <span class="num">0</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"classify"</span>, []<span class="ty">uint64</span>{<span class="fn">f64bits</span>(<span class="num">42.0</span>)}, <span class="num">1</span>)
+
+    <span class="fn">runOne</span>(t, src, <span class="str">"near_one"</span>, []<span class="ty">uint64</span>{<span class="fn">f64bits</span>(<span class="num">1.00</span>)}, <span class="num">1</span>)
+    <span class="fn">runOne</span>(t, src, <span class="str">"near_one"</span>, []<span class="ty">uint64</span>{<span class="fn">f64bits</span>(<span class="num">0.95</span>)}, <span class="num">0</span>)
+}
+
+<span class="cmt">// add this helper next to runOne</span>
+<span class="kw">func</span> <span class="fn">f64bits</span>(v <span class="ty">float64</span>) <span class="ty">uint64</span> {
+    <span class="kw">return</span> math.<span class="fn">Float64bits</span>(v)
+}</code></pre>
+
+<div class="warn">
+<strong>Passing f64 args to wazero.</strong> The <code>Call</code> API takes <code>uint64</code> per stack slot. For f64 params you pass <code>math.Float64bits(v)</code> so the bits land in the same shape the engine expects. The new <code>f64bits</code> helper makes the call sites readable.
+</div>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Spec View</h2>
+
+<p>The full comparison family from the <a href="https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions" target="_blank">numeric instruction table</a>:</p>
+
+<table>
+  <tr><th>Opcode</th><th>Byte</th><th>Pops</th><th>Pushes</th></tr>
+  <tr><td class="section" colspan="4">i32 (you have eq/ne; add the ordering ops, signed)</td></tr>
+  <tr><td><code>i32.lt_s</code></td><td><code>0x48</code></td><td>i32, i32</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>i32.gt_s</code></td><td><code>0x4A</code></td><td>i32, i32</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>i32.le_s</code></td><td><code>0x4C</code></td><td>i32, i32</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>i32.ge_s</code></td><td><code>0x4E</code></td><td>i32, i32</td><td>i32 (0/1)</td></tr>
+  <tr><td class="section" colspan="4">f64 (entirely missing today)</td></tr>
+  <tr><td><code>f64.eq</code></td><td><code>0x61</code></td><td>f64, f64</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>f64.ne</code></td><td><code>0x62</code></td><td>f64, f64</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>f64.lt</code></td><td><code>0x63</code></td><td>f64, f64</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>f64.gt</code></td><td><code>0x64</code></td><td>f64, f64</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>f64.le</code></td><td><code>0x65</code></td><td>f64, f64</td><td>i32 (0/1)</td></tr>
+  <tr><td><code>f64.ge</code></td><td><code>0x66</code></td><td>f64, f64</td><td>i32 (0/1)</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Signed/Unsigned Asymmetry</h2>
+
+<p>Integer comparisons come in two flavours — <code>_s</code> and <code>_u</code>. Float comparisons don't. Why?</p>
+
+<div class="insight">
+<strong>The bit pattern alone is ambiguous for integers.</strong> The 32-bit value <code>0xFFFFFFFF</code> is <code>-1</code> read as signed, <code>4294967295</code> read as unsigned. Their orderings are different: <code>-1 &lt; 0</code> signed, but <code>0xFFFFFFFF &gt; 0</code> unsigned. So the WASM spec needs two opcodes per ordering comparison — one per interpretation. <code>eq</code> and <code>ne</code> don't need this split because equality is bit-equality regardless of sign interpretation.
+</div>
+
+<div class="insight">
+<strong>IEEE 754 floats have built-in sign.</strong> The sign bit is the highest bit of the encoding; the format is inherently signed. There is no "unsigned f64" interpretation. So <code>f64.lt</code>, <code>f64.gt</code>, etc. are unique — there's no need (or way) to split.
+</div>
+
+<p>Plex types integers as signed (its built-in <code>i32</code> and <code>i64</code> are signed). So you map plex's <code>&lt;</code> to <code>i32.lt_s</code> / <code>i64.lt_s</code>, not the unsigned variants. If plex ever grows a <code>u32</code> type, that's a future <code>lt_u</code> arm.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Add the new opcodes</h3>
+
+<p>Edit <a href="../compiler/binary/opcodes.go">opcodes.go</a>. The i32 block already has eq/ne; add the four ordering ops next to them:</p>
+
+<pre><code>OpI32Eq  <span class="ty">byte</span> = <span class="byte">0x46</span>
+OpI32Ne  <span class="ty">byte</span> = <span class="byte">0x47</span>
+<span class="hl">OpI32LtS <span class="ty">byte</span> = <span class="byte">0x48</span></span>
+<span class="hl">OpI32GtS <span class="ty">byte</span> = <span class="byte">0x4A</span></span>
+<span class="hl">OpI32LeS <span class="ty">byte</span> = <span class="byte">0x4C</span></span>
+<span class="hl">OpI32GeS <span class="ty">byte</span> = <span class="byte">0x4E</span></span></code></pre>
+
+<p>And the f64 block — currently arithmetic only. Add the six comparisons:</p>
+
+<pre><code><span class="hl">OpF64Eq <span class="ty">byte</span> = <span class="byte">0x61</span></span>
+<span class="hl">OpF64Ne <span class="ty">byte</span> = <span class="byte">0x62</span></span>
+<span class="hl">OpF64Lt <span class="ty">byte</span> = <span class="byte">0x63</span></span>
+<span class="hl">OpF64Gt <span class="ty">byte</span> = <span class="byte">0x64</span></span>
+<span class="hl">OpF64Le <span class="ty">byte</span> = <span class="byte">0x65</span></span>
+<span class="hl">OpF64Ge <span class="ty">byte</span> = <span class="byte">0x66</span></span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Extend <code>cmpOpcode</code></h3>
+
+<p>Both type arms grow. The i32 arm fills in the four ordering ops:</p>
+
+<pre><code><span class="kw">case</span> <span class="ty">script.TypeKind_I32</span>:
+    <span class="kw">switch</span> op {
+    <span class="kw">case</span> <span class="ty">script.TokenType_EqualEqual</span>:
+        <span class="kw">return</span> <span class="ty">OpI32Eq</span>, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="ty">script.TokenType_NotEqual</span>:
+        <span class="kw">return</span> <span class="ty">OpI32Ne</span>, <span class="kw">nil</span>
+<span class="hl">    <span class="kw">case</span> <span class="ty">script.TokenType_LessThen</span>:</span>
+<span class="hl">        <span class="kw">return</span> <span class="ty">OpI32LtS</span>, <span class="kw">nil</span></span>
+<span class="hl">    <span class="kw">case</span> <span class="ty">script.TokenType_GreaterThen</span>:</span>
+<span class="hl">        <span class="kw">return</span> <span class="ty">OpI32GtS</span>, <span class="kw">nil</span></span>
+<span class="hl">    <span class="kw">case</span> <span class="ty">script.TokenType_LessThenOrEqual</span>:</span>
+<span class="hl">        <span class="kw">return</span> <span class="ty">OpI32LeS</span>, <span class="kw">nil</span></span>
+<span class="hl">    <span class="kw">case</span> <span class="ty">script.TokenType_GreaterThenOrEqaul</span>:</span>
+<span class="hl">        <span class="kw">return</span> <span class="ty">OpI32GeS</span>, <span class="kw">nil</span></span>
+    }</code></pre>
+
+<p>And add a new f64 arm:</p>
+
+<pre><code><span class="kw">case</span> <span class="ty">script.TypeKind_F64</span>, <span class="ty">script.TypeKind_Float</span>:
+    <span class="kw">switch</span> op {
+    <span class="kw">case</span> <span class="ty">script.TokenType_EqualEqual</span>:
+        <span class="kw">return</span> <span class="ty">OpF64Eq</span>, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="ty">script.TokenType_NotEqual</span>:
+        <span class="kw">return</span> <span class="ty">OpF64Ne</span>, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="ty">script.TokenType_LessThen</span>:
+        <span class="kw">return</span> <span class="ty">OpF64Lt</span>, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="ty">script.TokenType_GreaterThen</span>:
+        <span class="kw">return</span> <span class="ty">OpF64Gt</span>, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="ty">script.TokenType_LessThenOrEqual</span>:
+        <span class="kw">return</span> <span class="ty">OpF64Le</span>, <span class="kw">nil</span>
+    <span class="kw">case</span> <span class="ty">script.TokenType_GreaterThenOrEqaul</span>:
+        <span class="kw">return</span> <span class="ty">OpF64Ge</span>, <span class="kw">nil</span>
+    }</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Test imports</h3>
+
+<p>If <code>math</code> isn't already imported in the test file, add it for <code>Float64bits</code>:</p>
+
+<pre><code><span class="kw">import</span> <span class="str">"math"</span></code></pre>
+
+<p>Then run:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<p class="ok">All previous tests should still pass; the two new ones should join them.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What This Lesson Cleared Up</h2>
+
+<ul>
+  <li><strong>Symmetry of the comparison table.</strong> Every primitive type now has a full ordering surface (well — i32 is signed-only and bool is just AND/OR, but every plex source program that types <em>checks</em> now also compiles).</li>
+  <li><strong>The signed/unsigned distinction is encoding-level, not arithmetic-level.</strong> <code>i32.lt_s</code> and <code>i32.lt_u</code> are different opcodes because the comparison <em>question</em> changes depending on the interpretation. Add/sub/mul don't need the split because two's complement makes them bit-identical for both signs.</li>
+  <li><strong>Floats are intrinsically signed.</strong> No <code>f64.lt_u</code> exists. The sign bit is part of the value, not a label applied externally.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Why is there an <code>i32.lt_s</code> <em>and</em> an <code>i32.lt_u</code>, but only one <code>f64.lt</code>?</p>
+  <label><input type="radio" name="q1" value="a"> Floats are slower to compare, so WASM provides only the most-used variant.</label>
+  <label><input type="radio" name="q1" value="b"> The same 32 bits answer "less than" differently depending on signed/unsigned interpretation, so the spec needs two opcodes. Floats encode their sign in the value itself.</label>
+  <label><input type="radio" name="q1" value="c"> WASM historically dropped <code>f64.lt_u</code> because it wasn't used.</label>
+  <label><input type="radio" name="q1" value="d"> Signed/unsigned only makes sense for fixed-width integers; floats are variable-width.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. Why do <code>i32.eq</code> and <code>i32.ne</code> <em>not</em> need signed/unsigned variants like <code>lt</code> does?</p>
+  <label><input type="radio" name="q2" value="a"> Equality is bit-equality — independent of how the bits are interpreted as a number. Two i32 values are equal in signed view iff they are equal in unsigned view.</label>
+  <label><input type="radio" name="q2" value="b"> The validator forbids signed/unsigned variants of equality.</label>
+  <label><input type="radio" name="q2" value="c"> <code>eq</code> internally normalises its operands to unsigned form first.</label>
+  <label><input type="radio" name="q2" value="d"> They do; <code>i32.eq_s</code> exists but is rarely used.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. The codegen dispatches comparisons via the <em>operand</em> type, not the result type. Why does that matter here?</p>
+  <label><input type="radio" name="q3" value="a"> The result type is always <code>bool</code> after lesson 34, so dispatching on it would always pick the bool arm — which doesn't have <code>lt</code>/<code>gt</code> at all.</label>
+  <label><input type="radio" name="q3" value="b"> WASM doesn't track operand types; only result types matter.</label>
+  <label><input type="radio" name="q3" value="c"> Operand and result type happen to be identical for arithmetic, so the choice is arbitrary.</label>
+  <label><input type="radio" name="q3" value="d"> Operand types are easier to compute at runtime than result types.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. <code>near_one(1.0)</code> returns 1 because <code>1.0 &gt;= 0.99 &amp;&amp; 1.0 &lt;= 1.01</code> evaluates to true. Which short-circuit semantics matter here?</p>
+  <label><input type="radio" name="q4" value="a"> If the LHS were false, the RHS could be skipped — relevant only when the RHS has side effects. For pure comparisons it's correctness-equivalent to eager evaluation.</label>
+  <label><input type="radio" name="q4" value="b"> Short-circuit makes float comparisons run faster on average.</label>
+  <label><input type="radio" name="q4" value="c"> Without short-circuit, the AND would return the wrong type.</label>
+  <label><input type="radio" name="q4" value="d"> Short-circuit ensures NaN comparisons don't crash the engine.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Globals + bump allocator.</strong> Lesson 39 introduces the global section and a heap-pointer global — the foundation arrays need. Tiny encoding for the global section, tiny opcode pair (<code>global.get</code>, <code>global.set</code>), but a real architectural step: module-level mutable state.</li>
+  <li><strong>Arrays.</strong> Once the heap is live, array literals compile to <code>alloc(4 + n * elemSize)</code>, store the length, then element-by-element <code>i32.store</code>/<code>i64.store</code>. Lesson 9 covered the WAT version.</li>
+  <li><strong>NaN behaviour.</strong> Note for later — IEEE 754 NaN is unordered with everything (including itself). <code>NaN &lt; 0.0</code>, <code>NaN &gt; 0.0</code>, and <code>NaN == 0.0</code> all return false. The opcodes you added today follow this spec faithfully; your <code>classify</code> function would return 0 for NaN, which may or may not be what you want when NaNs come along.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions" target="_blank">WebAssembly Core Spec §5.4.6 — Numeric Instructions</a> — the full opcode table with the i32/i64/f32/f64 comparison families.</p>
+
+<p><a href="https://webassembly.github.io/spec/core/exec/numerics.html" target="_blank">WebAssembly Core Spec §4.3 — Numerics</a> — formal semantics of every numeric op, including the NaN handling rules.</p>
+
+<p><a href="https://en.wikipedia.org/wiki/Two%27s_complement" target="_blank">Two's complement (Wikipedia)</a> — why <code>add</code>/<code>sub</code>/<code>mul</code> are sign-agnostic but <code>lt</code>/<code>gt</code> are not.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can demonstrate the bit-level difference between <code>lt_s</code> and <code>lt_u</code> on the same operands, sketch how plex would grow a <code>u32</code> type that requires <code>lt_u</code>, or talk through the IEEE 754 NaN trap rules.
+</p>
+
+<script>
+const ANSWERS = { q1: 'b', q2: 'a', q3: 'a', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "No — speed isn't the criterion; correctness is.",
+    b: "Correct — for integers the same 32 bits answer 'is x &lt; y?' differently depending on interpretation. Floats carry their sign in the encoding itself, so there's only one valid ordering.",
+    c: "No — <code>f64.lt_u</code> was never specified; the question doesn't apply to floats.",
+    d: "No — f64 is fixed-width (64 bits). The distinction has nothing to do with width."
+  },
+  q2: {
+    a: "Correct — two bit patterns are identical or not, full stop. The interpretation as a number doesn't change the answer to equality.",
+    b: "No — there's no validator rule about it; the asymmetry is by design, because the operation doesn't need the split.",
+    c: "No — there is no normalisation step; eq is a pure bit compare.",
+    d: "No — <code>i32.eq_s</code> does not exist in the spec."
+  },
+  q3: {
+    a: "Correct — lesson 34's fix made comparisons report bool as the result type. Dispatching on the result would land in the bool arm of cmpOpcode, which doesn't have lt/gt. Operand type is what selects the right opcode family.",
+    b: "No — operand types are very much tracked (the validator checks them on every pop).",
+    c: "No — they used to coincide for arithmetic but never for comparisons; the operand-vs-result distinction is real.",
+    d: "No — both types are decided at compile time, not runtime."
+  },
+  q4: {
+    a: "Correct — for the values in your test, eager and lazy evaluation produce the same result. Short-circuit matters once the RHS can trap, has side effects, or is expensive — none of which apply to literal comparisons.",
+    b: "No — performance is a marginal effect at best; the principal value of short-circuit is correctness, not speed.",
+    c: "No — the result type is bool regardless of evaluation strategy.",
+    d: "No — NaN comparisons return false; they don't crash the engine."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>

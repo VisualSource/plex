@@ -239,6 +239,45 @@ func TestEndToEnd_StringLen(t *testing.T) {
 	runOne(t, src, "measure_empty", nil, 0)
 }
 
+func TestEndToEnd_I32Comparisons(t *testing.T) {
+	// Plex's typechecker doesn't coerce integer literals to i32, so we exercise
+	// the new opcodes through pure parameter-driven comparisons.
+	src := `
+        fn lt_i32(a: i32, b: i32): bool { return a < b; }
+        fn gt_i32(a: i32, b: i32): bool { return a > b; }
+        fn le_i32(a: i32, b: i32): bool { return a <= b; }
+        fn ge_i32(a: i32, b: i32): bool { return a >= b; }
+    `
+	runOne(t, src, "lt_i32", []uint64{3, 7}, 1) // 3 <  7
+	runOne(t, src, "lt_i32", []uint64{7, 3}, 0)
+	runOne(t, src, "lt_i32", []uint64{3, 3}, 0) // strict — catches lt vs le confusion
+	runOne(t, src, "gt_i32", []uint64{7, 3}, 1) // 7 >  3
+	runOne(t, src, "gt_i32", []uint64{3, 7}, 0)
+	runOne(t, src, "le_i32", []uint64{3, 3}, 1) // 3 <= 3
+	runOne(t, src, "le_i32", []uint64{4, 3}, 0)
+	runOne(t, src, "ge_i32", []uint64{3, 3}, 1) // 3 >= 3
+	runOne(t, src, "ge_i32", []uint64{2, 3}, 0)
+}
+
+func TestEndToEnd_F64Comparisons(t *testing.T) {
+	src := `
+        fn classify(x: f64): i64 {
+            if x < 0.0 { return -1; }
+            if x > 0.0 { return  1; }
+            return 0;
+        }
+        fn near_one(x: f64): bool {
+            return x >= 0.99 && x <= 1.01;
+        }
+    `
+	runOne(t, src, "classify", []uint64{api.EncodeF64(-3.5)}, api.EncodeI64(-1))
+	runOne(t, src, "classify", []uint64{api.EncodeF64(0.0)}, 0)
+	runOne(t, src, "classify", []uint64{api.EncodeF64(42.0)}, 1)
+
+	runOne(t, src, "near_one", []uint64{api.EncodeF64(1.00)}, 1)
+	runOne(t, src, "near_one", []uint64{api.EncodeF64(0.95)}, 0)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))
@@ -258,10 +297,20 @@ func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 		t.Fatalf("instantiate: %v", err)
 	}
 
-	got, err := mod.ExportedFunction(fn).Call(ctx, args...)
+	exportedFn := mod.ExportedFunction(fn)
+	got, err := exportedFn.Call(ctx, args...)
 	if err != nil {
 		t.Fatalf("call: %v", err)
 	}
+
+	// wazero reuses the args slice for results. For i32 returns it only writes
+	// the low 32 bits, leaving the high 32 bits = whatever was in args[0].
+	// Mask when the declared result type is i32.
+	results := exportedFn.Definition().ResultTypes()
+	if len(results) > 0 && results[0] == api.ValueTypeI32 {
+		got[0] = uint64(uint32(got[0]))
+	}
+
 	if got[0] != want {
 		t.Fatalf("%s%v = %d, want %d", fn, args, got[0], want)
 	}

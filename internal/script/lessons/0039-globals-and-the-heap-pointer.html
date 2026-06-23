@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 39 – Globals and the Heap Pointer</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 880px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .memory-strip { display: flex; gap: 2px; margin: 1.2em 0; font-family: "Fira Code", monospace; font-size: 0.82em; }
+  .mem-cell { background: var(--surface); border: 1px solid var(--border); padding: 8px 10px; text-align: center; min-width: 38px; }
+  .mem-cell.len { background: #14223a; border-color: var(--blue); color: var(--blue); }
+  .mem-cell.data { background: #1e1e0e; border-color: var(--yellow); color: var(--yellow); }
+  .mem-cell.heap { background: #1a2e1a; border-color: var(--green); color: var(--green); }
+  .mem-cell .addr { display: block; font-size: 0.7em; color: var(--muted); margin-top: 4px; }
+  .marker { position: relative; padding-top: 32px; color: var(--green); font-weight: bold; font-size: 0.85em; }
+  .marker::before { content: "↓"; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 1.2em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 39 – Globals and the Heap Pointer</h1>
+
+<p><strong>Goal:</strong> emit a WASM global, initialise it to "one past the last byte of static data", and export it. This is the foundation arrays need — every <code>alloc</code> call will eventually bump this pointer.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/section.go">section.go</a> &middot;
+  <a href="../compiler/binary/module.go">module.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Where the Heap Begins</h2>
+
+<p>Linear memory in your module currently looks like this after instantiation (assuming one string literal <code>"hello"</code> at offset 0):</p>
+
+<div class="memory-strip">
+  <div class="mem-cell len">05<span class="addr">@0</span></div>
+  <div class="mem-cell len">00<span class="addr">@1</span></div>
+  <div class="mem-cell len">00<span class="addr">@2</span></div>
+  <div class="mem-cell len">00<span class="addr">@3</span></div>
+  <div class="mem-cell data">'h'<span class="addr">@4</span></div>
+  <div class="mem-cell data">'e'<span class="addr">@5</span></div>
+  <div class="mem-cell data">'l'<span class="addr">@6</span></div>
+  <div class="mem-cell data">'l'<span class="addr">@7</span></div>
+  <div class="mem-cell data">'o'<span class="addr">@8</span></div>
+  <div class="mem-cell heap"><span class="marker">heap</span></div>
+</div>
+
+<p>Bytes 0..8 hold the string data. The very next byte (offset 9) is where the heap starts. Your <code>stringTable</code> already tracks this — <code>st.next</code> is exactly the first unused offset after the last string.</p>
+
+<div class="insight">
+<strong>The heap pointer is the heap.</strong> There is no separate heap structure; just a single 32-bit address that says "the next allocation goes here". <code>alloc(n)</code> reads the pointer, advances it by <code>n</code>, and returns the original value. This is the simplest possible allocator — no free list, no fragmentation tracking, no GC. Everything lives until the module unloads.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What a WASM Global Is</h2>
+
+<p>A <strong>global</strong> in WASM is a typed, optionally-mutable, module-level variable. It's nothing fancier than that — just a single value slot, addressed by index, that survives across function calls. The full structure:</p>
+
+<table>
+  <tr><th>Field</th><th>Encoding</th><th>For our use</th></tr>
+  <tr><td>type</td><td>valtype byte</td><td><code>0x7F</code> (i32)</td></tr>
+  <tr><td>mutability</td><td>1 byte: 0=const, 1=mut</td><td><code>0x01</code> (mutable)</td></tr>
+  <tr><td>init expression</td><td>constant instructions + <code>end</code></td><td><code>i32.const &lt;heapStart&gt; end</code></td></tr>
+</table>
+
+<div class="insight">
+<strong>The init expression is the same shape as a data segment's offset.</strong> Both use the constant-expression form — a tiny instruction stream terminated by <code>end</code>. You already wrote one in lesson 36 for the data section's offset (<code>0x41 &lt;leb&gt; 0x0B</code>). The exact same three-byte pattern works for a global's initialiser. This is one of WASM's elegant uniformities: every place that needs a compile-time constant uses the same expression form.
+</div>
+
+<h3>The new opcodes</h3>
+
+<table>
+  <tr><th>Opcode</th><th>Byte</th><th>Operand</th><th>Stack effect</th></tr>
+  <tr><td><code>global.get</code></td><td><code>0x23</code></td><td>globalidx (ULEB128)</td><td>push the global's current value</td></tr>
+  <tr><td><code>global.set</code></td><td><code>0x24</code></td><td>globalidx (ULEB128)</td><td>pop a value, write it to the global</td></tr>
+</table>
+
+<p>You won't use <code>global.get</code>/<code>set</code> in lesson 39's code paths yet — that's lesson 40 (arrays) — but add them now to keep the opcode file complete.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Section Layout</h2>
+
+<p>Sections you already emit, with the new one in place:</p>
+
+<div class="diagram">
+type      (1)
+function  (3)
+memory    (5)
+<span class="hl">global    (6)        ; ← new</span>
+export    (7)
+code      (10)
+data      (11)
+</div>
+
+<p>Global lives between memory (5) and export (7). The validator enforces this — get it wrong and you'll see "invalid section order", exactly the error from lesson 36's first run.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Opcodes</h3>
+
+<p>Add to <a href="../compiler/binary/opcodes.go">opcodes.go</a>:</p>
+
+<pre><code>OpGlobalGet <span class="ty">byte</span> = <span class="byte">0x23</span>
+OpGlobalSet <span class="ty">byte</span> = <span class="byte">0x24</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Section encoder</h3>
+
+<p>In <a href="../compiler/binary/section.go">section.go</a>:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">encodeGlobalSection</span>(heapStart <span class="ty">uint32</span>) []<span class="ty">byte</span> {
+    <span class="kw">var</span> body []<span class="ty">byte</span>
+
+    body = <span class="fn">AppendULEB128</span>(body, <span class="num">1</span>)         <span class="cmt">// one global</span>
+
+    body = <span class="fn">append</span>(body, <span class="ty">ValI32</span>)             <span class="cmt">// type: i32</span>
+    body = <span class="fn">append</span>(body, <span class="num">0x01</span>)               <span class="cmt">// mutability: mutable</span>
+
+    body = <span class="fn">append</span>(body, <span class="ty">OpI32Const</span>)         <span class="cmt">// init: i32.const heapStart</span>
+    body = <span class="fn">AppendSLEB128</span>(body, <span class="ty">int64</span>(heapStart))
+    body = <span class="fn">append</span>(body, <span class="ty">OpEnd</span>)                <span class="cmt">// end of init expression</span>
+
+    <span class="kw">return</span> <span class="fn">section</span>(<span class="ty">SectionGlobal</span>, body)
+}</code></pre>
+
+<p><code>SectionGlobal = 6</code> is already in section.go's constants block.</p>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Wire into <code>CompileProgram</code></h3>
+
+<p>Where you currently emit memory + data, also emit the global section and add an export for the heap pointer. The emission stays conditional on "the program uses memory" — i.e. <code>len(strings.entries) &gt; 0</code> — because no allocator is needed for memory-less programs:</p>
+
+<pre><code>strings := <span class="fn">collectStrings</span>(node)
+
+<span class="kw">if</span> <span class="fn">len</span>(strings.entries) &gt; <span class="num">0</span> {
+    exports = <span class="fn">append</span>(exports, <span class="ty">exportEntry</span>{name: <span class="str">"memory"</span>, kind: <span class="ty">ExportMemory</span>, idx: <span class="num">0</span>})
+<span class="hl">    exports = <span class="fn">append</span>(exports, <span class="ty">exportEntry</span>{name: <span class="str">"__heap_ptr"</span>, kind: <span class="ty">ExportGlobal</span>, idx: <span class="num">0</span>})</span>
+}
+
+<span class="cmt">// ... existing type/function sections ...</span>
+
+<span class="kw">if</span> <span class="fn">len</span>(strings.entries) &gt; <span class="num">0</span> {
+    out = <span class="fn">append</span>(out, <span class="fn">encodeMemorySection</span>()...)
+<span class="hl">    out = <span class="fn">append</span>(out, <span class="fn">encodeGlobalSection</span>(strings.next)...)</span>
+}
+
+<span class="cmt">// ... export section, code section ...</span>
+
+<span class="kw">if</span> <span class="fn">len</span>(strings.entries) &gt; <span class="num">0</span> {
+    out = <span class="fn">append</span>(out, <span class="fn">encodeDataSection</span>(strings)...)
+}</code></pre>
+
+<div class="warn">
+<strong>Section ordering, again.</strong> Global (6) goes between memory (5) and export (7). If the validator rejects with "invalid section order", you've likely emitted globals after exports. The pattern in lesson 36 — emit memory before export, data after code — extends here naturally: emit globals immediately after memory.
+</div>
+
+<div class="insight">
+<strong>Why <code>strings.next</code> is the right starting address.</strong> Your <code>stringTable.add</code> bumps <code>next</code> by <code>4 + len(value)</code> for every literal added. So after collection, <code>next</code> is the byte index immediately after the last string's last byte. No alignment for now — when arrays of doubles arrive in a later lesson and 8-byte alignment matters, we'll round this up. Today's job is just "past the strings".
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 4 — Test</h3>
+
+<p>The test asks wazero for the exported global and reads its current value. Add to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_HeapPointer</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn label(): string { <span class="kw">return</span> "hello"; }
+    `
+    ast, err := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+    wasm, err := binary_wasm.<span class="fn">CompileProgram</span>(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    g := mod.<span class="fn">ExportedGlobal</span>(<span class="str">"__heap_ptr"</span>)
+    <span class="kw">if</span> g == <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"__heap_ptr not exported"</span>) }
+
+    got := <span class="ty">uint32</span>(g.<span class="fn">Get</span>())
+    <span class="cmt">// "hello" = 4 length bytes + 5 ASCII bytes = 9 bytes at offset 0.</span>
+    <span class="cmt">// Heap starts immediately after.</span>
+    <span class="kw">if</span> got != <span class="num">9</span> {
+        t.<span class="fn">Fatalf</span>(<span class="str">"__heap_ptr = %d, want 9"</span>, got)
+    }
+}
+
+<span class="kw">func</span> <span class="fn">TestEndToEnd_HeapPointerMultipleStrings</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn one(): string { <span class="kw">return</span> "hi"; }
+        fn two(): string { <span class="kw">return</span> "world"; }
+    `
+    <span class="cmt">// "hi"    → 4 + 2 = 6 bytes at offset 0..5</span>
+    <span class="cmt">// "world" → 4 + 5 = 9 bytes at offset 6..14</span>
+    <span class="cmt">// heap starts at 15</span>
+    ast, _ := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    wasm, _ := binary_wasm.<span class="fn">CompileProgram</span>(ast)
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    got := <span class="ty">uint32</span>(mod.<span class="fn">ExportedGlobal</span>(<span class="str">"__heap_ptr"</span>).<span class="fn">Get</span>())
+    <span class="kw">if</span> got != <span class="num">15</span> {
+        t.<span class="fn">Fatalf</span>(<span class="str">"__heap_ptr = %d, want 15"</span>, got)
+    }
+}</code></pre>
+
+<p>Run:</p>
+
+<pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+<div class="warn">
+<strong>Mutability matters for the test.</strong> If you mark the global as <em>immutable</em> (<code>0x00</code>) instead of mutable (<code>0x01</code>), <code>mod.ExportedGlobal</code> returns a non-mutable handle, which is fine for `Get` but disallows future allocator writes. Mutable from the start — the allocator will need to write to it in lesson 40.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Architectural Step You Just Took</h2>
+
+<p>Until now your WASM modules had only <em>function-local</em> mutable state — params and locals, scoped to a single body. With globals, the module gains <em>module-level</em> mutable state that survives between calls. That's the structural prerequisite for any allocator, garbage collector, instance counter, lazy-init cache, or any other "remembers something between calls" pattern.</p>
+
+<p>The next lesson uses this for the cheapest possible payoff: a bump allocator inline at every array-construction site.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Why does WASM use a "constant expression" (instructions terminated by <code>end</code>) for a global's initialiser instead of a raw integer?</p>
+  <label><input type="radio" name="q1" value="a"> The same expression form is reused for data offsets, element offsets, and global inits — one shape for all compile-time constants. Generalises to e.g. <code>global.get</code>-based inits without redesign.</label>
+  <label><input type="radio" name="q1" value="b"> The validator runs the expression at instantiation; raw integers can't be type-checked.</label>
+  <label><input type="radio" name="q1" value="c"> WASM has no LEB128 representation shorter than an expression.</label>
+  <label><input type="radio" name="q1" value="d"> Sections of different IDs require different value-encoding strategies.</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. The global is initialised to <code>strings.next</code>. Why is that the correct heap-start address?</p>
+  <label><input type="radio" name="q2" value="a"> Because <code>add</code> in the string table bumps <code>next</code> by <code>4 + len(value)</code> per literal; after collection, <code>next</code> is the first byte past the last string.</label>
+  <label><input type="radio" name="q2" value="b"> Because WASM mandates heaps begin at <code>0x10000</code> in every module.</label>
+  <label><input type="radio" name="q2" value="c"> Because the data section automatically reserves room past <code>strings.next</code>.</label>
+  <label><input type="radio" name="q2" value="d"> Because alignment is computed at runtime, so any value works.</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. Why must the global be marked mutable (<code>0x01</code>) even though this lesson never writes to it?</p>
+  <label><input type="radio" name="q3" value="a"> Because lesson 40's allocator <em>will</em> write to it. Marking it immutable now would block all <code>global.set</code> instructions later — a re-encoding job.</label>
+  <label><input type="radio" name="q3" value="b"> Because wazero doesn't allow exporting immutable globals.</label>
+  <label><input type="radio" name="q3" value="c"> Because immutable globals can't be read with <code>global.get</code>.</label>
+  <label><input type="radio" name="q3" value="d"> Because the host (wazero) refuses to instantiate modules that contain immutable i32 globals.</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. The global section goes between memory (5) and export (7). What would happen if you swapped it with export?</p>
+  <label><input type="radio" name="q4" value="a"> The validator would reject the module — section IDs must appear in strictly increasing order.</label>
+  <label><input type="radio" name="q4" value="b"> The export would silently lose track of the global.</label>
+  <label><input type="radio" name="q4" value="c"> Nothing — section order is informational, not normative.</label>
+  <label><input type="radio" name="q4" value="d"> The global would still be created, but its initialiser would not run.</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Inline bump allocator and array literals.</strong> An <code>ArrayLiteral</code> compiles to: read heapPtr, save it locally, advance heapPtr by <code>4 + n*elemSize</code>, store the length at the base, store each element after. A small but complete piece of dynamic memory management.</li>
+  <li><strong>Array access and length.</strong> Once arrays exist, <code>arr.len()</code> is <code>i32.load</code> at the base (same shape as <code>s.len()</code> from lesson 37). <code>arr[i]</code> is <code>base + 4 + i*elemSize</code> followed by <code>(i64|f64|i32).load</code>.</li>
+  <li><strong>Alignment.</strong> Today we use raw <code>strings.next</code> with no padding. Once arrays of doubles arrive, the heap start should round up to 8-byte alignment; otherwise <code>f64.load</code>/<code>store</code> takes the slow path on most engines. Easy fix — <code>(strings.next + 7) &amp; ~7</code> — to land when it actually matters.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Sources</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/modules.html#global-section" target="_blank">WebAssembly Core Spec §5.5.9 — Global Section</a></p>
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#variable-instructions" target="_blank">WebAssembly Core Spec §5.4.4 — Variable Instructions</a> — defines <code>global.get</code> (0x23) and <code>global.set</code> (0x24).</p>
+<p><a href="https://webassembly.github.io/spec/core/syntax/instructions.html#expressions" target="_blank">WebAssembly Core Spec §2.4.8 — Constant Expressions</a> — the form used by global inits, data offsets, and element offsets.</p>
+<p><a href="https://pkg.go.dev/github.com/tetratelabs/wazero/api#Global" target="_blank">wazero — <code>api.Global</code></a> — the surface for host-side global access.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can sketch what lesson 40's inline allocator will look like, explain how mutable globals interact with the export/import surface, or compare bump allocation to free-list and arena strategies.
+</p>
+
+<script>
+const ANSWERS = { q1: 'a', q2: 'a', q3: 'a', q4: 'a' };
+const FEEDBACK = {
+  q1: {
+    a: "Correct — the expression form unifies every place a compile-time constant is needed. The bytes you emit for the global init are the same shape as the data section's offset expression from lesson 36.",
+    b: "No — the validator validates the expression's type, but it doesn't run user expressions. Constant exprs are also restricted to a small instruction set.",
+    c: "No — LEB128 is shorter; the expression form is a design choice, not a fallback.",
+    d: "No — section IDs are unrelated to inline value encodings."
+  },
+  q2: {
+    a: "Correct — the table builds up exactly the offset that's free after the last string. No extra arithmetic needed.",
+    b: "No — WASM doesn't mandate a heap layout. The host doesn't define heaps at all; you do, inside your module.",
+    c: "No — the data section consumes the exact byte range your offsets specified; it doesn't pad.",
+    d: "No — alignment is statically determined when the compiler emits memarg-bearing instructions."
+  },
+  q3: {
+    a: "Correct — the next lesson's allocator emits <code>global.set</code>. Validators reject <code>global.set</code> on immutable globals statically.",
+    b: "No — wazero exports immutable globals fine; you just can't write to them from the host.",
+    c: "No — <code>global.get</code> works on any global, mutable or not.",
+    d: "No — modules with immutable globals are valid; they're just read-only."
+  },
+  q4: {
+    a: "Correct — section order is mandated by the spec for single-pass parsing. Out-of-order sections trigger 'invalid section order' at instantiation, the same error lesson 36's first run hit.",
+    b: "No — there's no silent failure mode; the validator rejects upfront.",
+    c: "No — section order is normative. Compare lesson 36's debugging.",
+    d: "No — globals' initialisers always run during instantiation, but only if the module passes validation, which it wouldn't."
+  }
+};
+
+document.querySelectorAll('.q').forEach(q => {
+  const id = q.id;
+  q.querySelectorAll('input').forEach(input => {
+    input.addEventListener('change', () => {
+      const chosen = input.value;
+      const correct = ANSWERS[id];
+      q.querySelectorAll('label').forEach(l => {
+        l.classList.remove('correct', 'wrong');
+        const v = l.querySelector('input').value;
+        if (v === correct) l.classList.add('correct');
+        else if (v === chosen) l.classList.add('wrong');
+      });
+      const fb = document.getElementById(id + '-fb');
+      fb.innerHTML = FEEDBACK[id][chosen];
+      fb.style.display = 'block';
+      updateScore();
+    });
+  });
+});
+
+function updateScore() {
+  const total = Object.keys(ANSWERS).length;
+  let answered = 0, right = 0;
+  Object.keys(ANSWERS).forEach(id => {
+    const chosen = document.querySelector(`input[name=${id}]:checked`);
+    if (chosen) {
+      answered++;
+      if (chosen.value === ANSWERS[id]) right++;
+    }
+  });
+  if (answered === total) {
+    const box = document.getElementById('score-box');
+    box.style.display = 'block';
+    box.innerHTML = `Score: <strong>${right}/${total}</strong>`;
+  }
+}
+</script>
+
+</body>
+</html>
