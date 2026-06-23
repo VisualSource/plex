@@ -10,7 +10,23 @@ import (
 )
 
 type bodyEncoder struct {
-	buf []byte
+	buf    []byte
+	locals map[string]uint32
+}
+
+func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig) *bodyEncoder {
+	b := &bodyEncoder{locals: make(map[string]uint32)}
+	var idx uint32
+	if sig.isMethod {
+		b.locals["self"] = idx
+		idx++
+	}
+	for _, p := range f.Params {
+		b.locals[p.Name] = idx
+		idx++
+	}
+
+	return b
 }
 
 func (b *bodyEncoder) walk(node script.AstNode) error {
@@ -54,7 +70,75 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		}
 		b.buf = append(b.buf, OpReturn)
 		return nil
+	case *script.Identifier:
+		idx, ok := b.locals[n.Value]
+		if !ok {
+			return fmt.Errorf("unknown identifier %s", n.Value)
+		}
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, idx)
+		return nil
+	case *script.BinaryExpression:
+		if err := b.walk(n.Left); err != nil {
+			return err
+		}
+		if err := b.walk(n.Right); err != nil {
+			return err
+		}
+		t := n.GetType()
+		if t == nil {
+			return fmt.Errorf("no type on binary expression")
+		}
+		op, err := arithOpcode(t.Kind, n.Operator)
+		if err != nil {
+			return err
+		}
+		b.buf = append(b.buf, op)
+		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}
+}
+
+func arithOpcode(k script.TypeKind, op script.TokenType) (byte, error) {
+	switch k {
+	case script.TypeKind_I32:
+		switch op {
+		case script.TokenType_Plus:
+			return OpI32Add, nil
+		case script.TokenType_Minus:
+			return OpI32Sub, nil
+		case script.TokenType_Star:
+			return OpI32Mul, nil
+		case script.TokenType_Div:
+			return OpI32DivS, nil
+		case script.TokenType_Mod:
+			return OpI32RemS, nil
+		}
+	case script.TypeKind_I64, script.TypeKind_Int:
+		switch op {
+		case script.TokenType_Plus:
+			return OpI64Add, nil
+		case script.TokenType_Minus:
+			return OpI64Sub, nil
+		case script.TokenType_Star:
+			return OpI64Mul, nil
+		case script.TokenType_Div:
+			return OpI64DivS, nil
+		case script.TokenType_Mod:
+			return OpI64RemS, nil
+		}
+	case script.TypeKind_Float, script.TypeKind_F64:
+		switch op {
+		case script.TokenType_Plus:
+			return OpF64Add, nil
+		case script.TokenType_Minus:
+			return OpF64Sub, nil
+		case script.TokenType_Star:
+			return OpF64Mul, nil
+		case script.TokenType_Div:
+			return OpF64Div, nil
+		}
+	}
+	return 0, fmt.Errorf("no opcode for %s %v", k, op)
 }

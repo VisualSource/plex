@@ -64,5 +64,7 @@ func signatureOf(f *script.FunctionDeclaration, implName string) (funcSig, error
 		name = fmt.Sprintf("__%s__%s", implName, f.Name)
 	}
 
-	return funcSig{name, params, results}, nil
+	isMethod := implName != ""
+
+	return funcSig{name, params, results, isMethod}, nil
 }

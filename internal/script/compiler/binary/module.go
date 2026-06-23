@@ -30,7 +30,7 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 			out = append(out, encodeExportSection(exports)...)
 		}
 
-		code, err := encodeCodeSection(funcs)
+		code, err := encodeCodeSection(funcs, sigs)
 		if err != nil {
 			return nil, err
 		}
