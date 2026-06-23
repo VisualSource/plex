@@ -21,6 +21,9 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 
 	if len(strings.entries) > 0 {
 		exports = append(exports, exportEntry{name: "memory", kind: ExportMemory, idx: 0})
+		exports = append(exports, exportEntry{
+			name: "__heap_ptr", kind: ExportGlobal, idx: 0,
+		})
 	}
 
 	funcIndexes := make(map[string]uint32, len(sigs))
@@ -38,6 +41,7 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 
 		if len(strings.entries) > 0 {
 			out = append(out, encodeMemorySection()...)
+			out = append(out, encodeGlobalSection(strings.next)...)
 		}
 
 		if len(exports) > 0 {

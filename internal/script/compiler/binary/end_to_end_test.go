@@ -278,6 +278,65 @@ func TestEndToEnd_F64Comparisons(t *testing.T) {
 	runOne(t, src, "near_one", []uint64{api.EncodeF64(0.95)}, 0)
 }
 
+func TestEndToEnd_HeapPointer(t *testing.T) {
+	src := `
+        fn label(): string { return "hello"; }
+    `
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wasm, err := binary_wasm.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+	mod, err := r.Instantiate(ctx, wasm)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	g := mod.ExportedGlobal("__heap_ptr")
+	if g == nil {
+		t.Fatalf("__heap_ptr not exported")
+	}
+
+	got := api.DecodeU32(g.Get())
+	// "hello" = 4 length bytes + 5 ASCII bytes = 9 bytes at offset 0.
+	// Heap starts immediately after.
+	if got != 9 {
+		t.Fatalf("__heap_ptr = %d, want 9", got)
+	}
+}
+
+func TestEndToEnd_HeapPointerMultipleStrings(t *testing.T) {
+	src := `
+        fn one(): string { return "hi"; }
+        fn two(): string { return "world"; }
+    `
+	// "hi"    → 4 + 2 = 6 bytes at offset 0..5
+	// "world" → 4 + 5 = 9 bytes at offset 6..14
+	// heap starts at 15
+	ast, _ := script.Parse(strings.NewReader(src))
+	wasm, _ := binary_wasm.CompileProgram(ast)
+
+	ctx := t.Context()
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+	mod, err := r.Instantiate(ctx, wasm)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	got := api.DecodeU32(mod.ExportedGlobal("__heap_ptr").Get())
+	if got != 15 {
+		t.Fatalf("__heap_ptr = %d, want 15", got)
+	}
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

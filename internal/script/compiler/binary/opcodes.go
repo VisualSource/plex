@@ -18,7 +18,9 @@ const (
 	OpBr   byte = 0x0C
 	OpBrIf byte = 0x0D
 
-	OpReturn byte = 0x0F
+	OpReturn    byte = 0x0F
+	OpGlobalGet byte = 0x23
+	OpGlobalSet byte = 0x24
 
 	OpDrop byte = 0x1A
 

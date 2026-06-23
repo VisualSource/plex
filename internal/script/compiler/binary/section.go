@@ -130,3 +130,17 @@ func encodeDataSection(st *stringTable) []byte {
 
 	return section(SectionData, body)
 }
+
+func encodeGlobalSection(heapStart uint32) []byte {
+	var body []byte
+
+	body = AppendULEB128(body, 1)
+	body = append(body, ValI32)
+	body = append(body, 0x01)
+
+	body = append(body, OpI32Const)
+	body = AppendSLEB128(body, int64(heapStart))
+	body = append(body, OpEnd)
+
+	return section(SectionGlobal, body)
+}
