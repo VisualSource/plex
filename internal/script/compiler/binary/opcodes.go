@@ -1,12 +1,37 @@
 package binary_wasm
 
+import (
+	"fmt"
+
+	"github.com/VisualSource/plex/internal/script"
+)
+
 const (
+	OpUnreachable byte = 0x00
+	OpIf          byte = 0x04
+	OpElse        byte = 0x05
+
 	OpEnd      byte = 0x0B
 	OpReturn   byte = 0x0F
 	OpLocalGet byte = 0x20
+	OpLocalSet byte = 0x21
+	OpLocalTee byte = 0x22
+
+	BlockTypeEmpty byte = 0x40
+
 	OpI32Const byte = 0x41
 	OpI64Const byte = 0x42
 	OpF64Const byte = 0x44
+
+	OpI32Eq byte = 0x46
+	OpI32Ne byte = 0x47
+
+	OpI64Eq  byte = 0x51
+	OpI64Ne  byte = 0x52
+	OpI64LtS byte = 0x53
+	OpI64GtS byte = 0x55
+	OpI64LeS byte = 0x57
+	OpI64GeS byte = 0x59
 
 	OpI32Add  byte = 0x6A
 	OpI32Sub  byte = 0x6B
@@ -14,9 +39,12 @@ const (
 	OpI32DivS byte = 0x6D
 	OpI32RemS byte = 0x6F
 
+	OpI32And byte = 0x71
+	OpI32Or  byte = 0x72
+
 	OpI64Add  byte = 0x7C
 	OpI64Sub  byte = 0x7D
-	OpI64Mul  byte = 0x7F
+	OpI64Mul  byte = 0x7E
 	OpI64DivS byte = 0x7F
 	OpI64RemS byte = 0x81
 
@@ -32,3 +60,99 @@ const (
 	ExportMemory byte = 0x02
 	ExportGlobal byte = 0x03
 )
+
+func arithOpcode(k script.TypeKind, op script.TokenType) (byte, error) {
+	switch k {
+	case script.TypeKind_I32:
+		switch op {
+		case script.TokenType_Plus:
+			return OpI32Add, nil
+		case script.TokenType_Minus:
+			return OpI32Sub, nil
+		case script.TokenType_Star:
+			return OpI32Mul, nil
+		case script.TokenType_Div:
+			return OpI32DivS, nil
+		case script.TokenType_Mod:
+			return OpI32RemS, nil
+		}
+	case script.TypeKind_I64, script.TypeKind_Int:
+		switch op {
+		case script.TokenType_Plus:
+			return OpI64Add, nil
+		case script.TokenType_Minus:
+			return OpI64Sub, nil
+		case script.TokenType_Star:
+			return OpI64Mul, nil
+		case script.TokenType_Div:
+			return OpI64DivS, nil
+		case script.TokenType_Mod:
+			return OpI64RemS, nil
+		}
+	case script.TypeKind_Float, script.TypeKind_F64:
+		switch op {
+		case script.TokenType_Plus:
+			return OpF64Add, nil
+		case script.TokenType_Minus:
+			return OpF64Sub, nil
+		case script.TokenType_Star:
+			return OpF64Mul, nil
+		case script.TokenType_Div:
+			return OpF64Div, nil
+		}
+	}
+	return 0, fmt.Errorf("no opcode for %s %v", k, op)
+}
+
+func cmpOpcode(k script.TypeKind, op script.TokenType) (byte, error) {
+	switch k {
+	case script.TypeKind_I64, script.TypeKind_Int:
+		switch op {
+		case script.TokenType_EqualEqual:
+			return OpI64Eq, nil
+		case script.TokenType_NotEqual:
+			return OpI64Ne, nil
+		case script.TokenType_LessThen:
+			return OpI64LtS, nil
+		case script.TokenType_GreaterThen:
+			return OpI64GtS, nil
+		case script.TokenType_LessThenOrEqual:
+			return OpI64LeS, nil
+		case script.TokenType_GreaterThenOrEqaul:
+			return OpI64GeS, nil
+
+		}
+	case script.TypeKind_I32:
+		switch op {
+		case script.TokenType_EqualEqual:
+			return OpI32Eq, nil
+		case script.TokenType_NotEqual:
+			return OpI32Ne, nil
+		}
+	case script.TypeKind_Bool:
+		switch op {
+		case script.TokenType_AND:
+			return OpI32And, nil
+		case script.TokenType_OR:
+			return OpI32Or, nil
+		}
+	}
+	return 0, fmt.Errorf("no comparison opcode for %s %s", k, op)
+}
+
+func isCmpOp(op script.TokenType) bool {
+	switch op {
+	case script.TokenType_EqualEqual,
+		script.TokenType_NotEqual,
+		script.TokenType_LessThen,
+		script.TokenType_GreaterThen,
+		script.TokenType_LessThenOrEqual,
+		script.TokenType_GreaterThenOrEqaul,
+		script.TokenType_AND,
+		script.TokenType_OR:
+		return true
+
+	default:
+		return false
+	}
+}

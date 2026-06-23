@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 29 – Locals via let</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; }
+  th { background: var(--surface); color: var(--blue); }
+  .phase { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.82em; font-weight: bold; }
+  .phase-1 { background: #1a2a1a; color: var(--green); border: 1px solid var(--green); }
+  .phase-2 { background: #1a1a2a; color: var(--blue); border: 1px solid var(--blue); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 29 – Locals via <code>let</code></h1>
+
+<p><strong>Goal:</strong> compile <code>let x: i64 = a + b;</code> to valid WASM binary. By the end of this lesson, <code>let</code> declarations will work end-to-end through wazero.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/section.go">section.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Broken Right Now</h2>
+
+<p>Two independent gaps prevent <code>let</code> from working:</p>
+
+<ol>
+  <li><strong><code>walk()</code> has no case for <code>*script.VariableDeclaration</code></strong> — any <code>let</code> statement falls through to <code>return fmt.Errorf("unhandled AST node %T")</code>.</li>
+  <li><strong><code>encodeCodeEntry</code> hardcodes <code>0</code> for the locals vec</strong> — even if we emitted <code>local.set</code>, the WASM engine would reject the module because the local index doesn't exist.</li>
+</ol>
+
+<p>Fix both and <code>let</code> works. This lesson shows you how, and why the fix isn't as simple as just adding a <code>case</code> to the switch.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The WASM Code Entry Format</h2>
+
+<p>The binary format for a code entry (<a href="https://webassembly.github.io/spec/core/binary/modules.html#code-section" target="_blank">spec §5.5.10</a>) is:</p>
+
+<pre><code>code_entry  = size:u32  code
+code        = locals:<span class="ty">vec(local_group)</span>  expr  end
+local_group = count:<span class="num">u32</span>  type:<span class="ty">valtype</span></code></pre>
+
+<p>A <code>local_group</code> is a run-length-encoded batch: <em>count</em> locals all of the same <em>type</em>. For example, <code>[{2, i64}, {1, i32}]</code> declares two i64 locals followed by one i32 local. The total number of locals declared is <code>sum(count)</code>.</p>
+
+<div class="insight">
+<strong>Critical constraint:</strong> the locals vec appears at the <em>top</em> of the code body, before any bytecode. The engine parses it once, allocates space for all locals, then executes the bytecode. There is no inline <code>local.declare</code> instruction.
+</div>
+
+<h3>Index space</h3>
+
+<p>Params and locals share a single flat index space:</p>
+
+<table>
+  <tr><th>Slot</th><th>Who owns it</th></tr>
+  <tr><td><code>0..n-1</code></td><td>Function parameters (in declaration order)</td></tr>
+  <tr><td><code>n..n+k-1</code></td><td><code>let</code>-declared locals (in order of first appearance)</td></tr>
+</table>
+
+<p>The <code>bodyEncoder</code> already assigns params in <code>newBodyEncoder</code>. Locals will continue from where params left off — <code>len(b.locals)</code> at the moment a <code>VariableDeclaration</code> is first seen is exactly the right next index.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Two-Phase Problem</h2>
+
+<p>Here's the fundamental tension:</p>
+
+<ul>
+  <li>The locals vec must be written <em>first</em> — before any bytecode.</li>
+  <li>But <code>let</code> declarations can appear anywhere inside the function body.</li>
+</ul>
+
+<p>You can't know what locals to declare until you've walked the body. But you can't start walking the body (for bytecode) until you've written the locals declaration. The solution is two passes:</p>
+
+<div style="display:flex; gap: 24px; margin: 1.6em 0; flex-wrap: wrap;">
+  <div style="flex:1; min-width: 260px; background: #0e1a10; border: 1px solid var(--green); border-radius: 6px; padding: 14px 18px;">
+    <div style="color: var(--green); font-weight: bold; margin-bottom: 8px;">Pass 1 — Collect <span class="phase phase-1">scan</span></div>
+    Walk the AST to find every <code>VariableDeclaration</code>. Assign each a local index (continuing from after params). Record its WASM valtype. <em>No bytecode is emitted yet.</em>
+  </div>
+  <div style="flex:1; min-width: 260px; background: #0e1020; border: 1px solid var(--blue); border-radius: 6px; padding: 14px 18px;">
+    <div style="color: var(--blue); font-weight: bold; margin-bottom: 8px;">Pass 2 — Emit <span class="phase phase-2">walk</span></div>
+    Walk the AST again to emit bytecode. <code>VariableDeclaration</code> emits <code>local.set</code>; <code>Identifier</code> emits <code>local.get</code> — both using the indices assigned in Pass 1.
+  </div>
+</div>
+
+<div class="insight">
+<strong>Compiler theory note:</strong> this two-phase pattern is everywhere. Hoisting in JavaScript, forward declarations in C, function-body pre-scanning in many bytecode VMs — all solve the same problem: the output format has ordering constraints the AST doesn't share.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<div class="warn">
+<strong>Step 0 — Fix a latent bug first</strong>
+Open <a href="../compiler/binary/opcodes.go">opcodes.go</a>. Notice that both <code>OpI64Mul</code> and <code>OpI64DivS</code> are declared as <code>0x7F</code>. This means any i64 multiplication silently emits the <em>division</em> opcode — a silent correctness bug with no test to catch it yet.
+
+Fix: <code>OpI64Mul</code> should be <code>0x7E</code>.
+</div>
+
+<p>After the fix, the relevant i64 opcodes are:</p>
+<pre><code><span class="cmt">// i64 arithmetic — from the WASM binary spec §5.4.1</span>
+OpI64Add  <span class="ty">byte</span> = <span class="byte">0x7C</span>
+OpI64Sub  <span class="ty">byte</span> = <span class="byte">0x7D</span>
+OpI64Mul  <span class="ty">byte</span> = <span class="byte">0x7E</span>  <span class="cmt">// was 0x7F — now correct</span>
+OpI64DivS <span class="ty">byte</span> = <span class="byte">0x7F</span>
+OpI64RemS <span class="ty">byte</span> = <span class="byte">0x81</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 1 — Add <code>OpLocalSet</code></h3>
+
+<p>Still in <a href="../compiler/binary/opcodes.go">opcodes.go</a>, add the missing opcode alongside <code>OpLocalGet</code>:</p>
+
+<pre><code>OpLocalGet <span class="ty">byte</span> = <span class="byte">0x20</span>
+<span class="hl">OpLocalSet <span class="ty">byte</span> = <span class="byte">0x21</span></span></code></pre>
+
+<p>(<code>local.tee</code> = <code>0x22</code> pushes <em>and</em> sets — useful later for expressions like <code>x = x + 1</code> in a larger expression context, but not needed today.)</p>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Extend <code>bodyEncoder</code> with a <code>localTypes</code> slice</h3>
+
+<p>Open <a href="../compiler/binary/body.go">body.go</a>. The struct currently holds only the index map. Add a field to track the WASM valtype for each let-declared local (in order):</p>
+
+<pre><code><span class="kw">type</span> <span class="ty">bodyEncoder</span> <span class="kw">struct</span> {
+    buf        []<span class="ty">byte</span>
+    locals     <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>
+<span class="hl">    localTypes []<span class="ty">byte</span>   <span class="cmt">// WASM valtype for each let local, in order</span></span>
+}</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Write <code>collectLocals</code> (Pass 1)</h3>
+
+<p>Add this method to <code>bodyEncoder</code>. It walks the AST looking only for <code>VariableDeclaration</code> nodes. It does <em>not</em> emit any bytecode.</p>
+
+<pre><code><span class="kw">func</span> (b *<span class="ty">bodyEncoder</span>) <span class="fn">collectLocals</span>(node <span class="ty">script.AstNode</span>) {
+    <span class="kw">switch</span> n := node.(<span class="kw">type</span>) {
+    <span class="kw">case</span> *<span class="ty">script.Block</span>:
+        <span class="kw">for</span> _, s := <span class="kw">range</span> n.Stmts {
+            b.<span class="fn">collectLocals</span>(s)
+        }
+    <span class="kw">case</span> *<span class="ty">script.VariableDeclaration</span>:
+        b.locals[n.Name] = <span class="ty">uint32</span>(<span class="fn">len</span>(b.locals))
+        t := n.<span class="fn">GetType</span>()
+        <span class="kw">if</span> t != <span class="kw">nil</span> {
+            b.localTypes = <span class="fn">append</span>(b.localTypes, <span class="fn">valType</span>(t))
+        } <span class="kw">else</span> {
+            b.localTypes = <span class="fn">append</span>(b.localTypes, <span class="ty">ValI64</span>)
+        }
+    }
+}</code></pre>
+
+<div class="insight">
+<strong>Why <code>len(b.locals)</code>?</strong> Params are already in the map. If a function has 2 params (indices 0 and 1), <code>len(b.locals) == 2</code> when the first <code>let</code> is encountered — so the first local gets index 2. Each subsequent declaration advances the count naturally.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 4 — Call <code>collectLocals</code> in <code>newBodyEncoder</code></h3>
+
+<p>After registering params, run the pre-scan:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">newBodyEncoder</span>(f *<span class="ty">script.FunctionDeclaration</span>, sig <span class="ty">funcSig</span>) *<span class="ty">bodyEncoder</span> {
+    b := &amp;<span class="ty">bodyEncoder</span>{locals: <span class="fn">make</span>(<span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>)}
+    <span class="kw">var</span> idx <span class="ty">uint32</span>
+    <span class="kw">if</span> sig.isMethod {
+        b.locals[<span class="str">"self"</span>] = idx
+        idx++
+    }
+    <span class="kw">for</span> _, p := <span class="kw">range</span> f.Params {
+        b.locals[p.Name] = idx
+        idx++
+    }
+<span class="hl">    b.<span class="fn">collectLocals</span>(f.Body)  <span class="cmt">// pre-scan: assign indices to all let declarations</span></span>
+    <span class="kw">return</span> b
+}</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 5 — Encode the real locals vec in <code>encodeCodeEntry</code></h3>
+
+<p>Open <a href="../compiler/binary/section.go">section.go</a>. Replace the hardcoded <code>0</code> with the actual locals declaration. Use the simple form — one group per local — which the spec allows even if it's not maximally compact:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">encodeCodeEntry</span>(f *<span class="ty">script.FunctionDeclaration</span>, sig <span class="ty">funcSig</span>) ([]<span class="ty">byte</span>, <span class="ty">error</span>) {
+    <span class="kw">var</span> body []<span class="ty">byte</span>
+
+    enc := <span class="fn">newBodyEncoder</span>(f, sig)
+
+<span class="hl">    <span class="cmt">// Locals vec: one group per local (count=1, valtype)</span>
+<span class="hl">    body = <span class="fn">AppendULEB128</span>(body, <span class="ty">uint32</span>(<span class="fn">len</span>(enc.localTypes)))</span>
+<span class="hl">    <span class="kw">for</span> _, vt := <span class="kw">range</span> enc.localTypes {</span>
+<span class="hl">        body = <span class="fn">AppendULEB128</span>(body, <span class="num">1</span>)</span>
+<span class="hl">        body = <span class="fn">append</span>(body, vt)</span>
+<span class="hl">    }</span>
+
+    <span class="kw">if</span> err := enc.<span class="fn">walk</span>(f.Body); err != <span class="kw">nil</span> {
+        <span class="kw">return nil</span>, err
+    }
+
+    body = <span class="fn">append</span>(body, enc.buf...)
+    body = <span class="fn">append</span>(body, <span class="ty">OpEnd</span>)
+
+    <span class="kw">var</span> entry []<span class="ty">byte</span>
+    entry = <span class="fn">AppendULEB128</span>(entry, <span class="ty">uint32</span>(<span class="fn">len</span>(body)))
+    entry = <span class="fn">append</span>(entry, body...)
+    <span class="kw">return</span> entry, <span class="kw">nil</span>
+}</code></pre>
+
+<p>The old hardcoded line — <code>body = AppendULEB128(body, 0)</code> — is gone. The count is now <code>len(enc.localTypes)</code>, and each type is emitted as its own group of 1.</p>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 6 — Handle <code>*VariableDeclaration</code> in <code>walk</code> (Pass 2)</h3>
+
+<p>Back in <a href="../compiler/binary/body.go">body.go</a>, add the missing case. The index was already assigned in Pass 1 — just look it up:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.VariableDeclaration</span>:
+    <span class="kw">if</span> n.Init != <span class="kw">nil</span> {
+        <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Init); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> err
+        }
+    }
+    idx := b.locals[n.Name]  <span class="cmt">// assigned in collectLocals</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalSet</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, idx)
+    <span class="kw">return nil</span></code></pre>
+
+<div class="insight">
+<strong>Stack discipline:</strong> <code>walk(n.Init)</code> pushes the computed value onto the WASM stack. <code>local.set</code> pops that value and stores it in the local slot. The net effect on the stack is zero — which is correct for a statement.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 7 — Handle <code>*AssignmentExpression</code> in <code>walk</code> (bonus)</h3>
+
+<p>While you're here, also handle re-assignment (<code>x = x + 1</code>) so the switch doesn't reject it later:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.AssignmentExpression</span>:
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Value); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    idx, ok := b.locals[n.Name]
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"unknown local %s"</span>, n.Name)
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLocalSet</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, idx)
+    <span class="kw">return nil</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 8 — Write the test</h3>
+
+<p>Add to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>. This test chains two let bindings to verify both locals get distinct indices and both values are live at the same time:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_Locals</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn accumulate(a: i64, b: i64): i64 {
+            <span class="kw">let</span> x: i64 = a + b;
+            <span class="kw">let</span> y: i64 = x + 1;
+            <span class="kw">return</span> y;
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"accumulate"</span>, []<span class="ty">uint64</span>{<span class="num">20</span>, <span class="num">21</span>}, <span class="num">42</span>)
+}</code></pre>
+
+<p>Run with: <code>go test ./compiler/binary/... -run TestEndToEnd -v</code></p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What the Bytes Look Like</h2>
+
+<p>For <code>fn accumulate(a: i64, b: i64): i64 { let x: i64 = a+b; let y: i64 = x+1; return y; }</code>, the code entry body (after the size prefix) will contain:</p>
+
+<table>
+  <tr><th>Bytes</th><th>Meaning</th></tr>
+  <tr><td><code class="byte">02</code></td><td>2 local groups</td></tr>
+  <tr><td><code class="byte">01 7E</code></td><td>group 0: 1 local of type i64</td></tr>
+  <tr><td><code class="byte">01 7E</code></td><td>group 1: 1 local of type i64</td></tr>
+  <tr><td><code class="byte">20 00</code></td><td>local.get 0 (= a)</td></tr>
+  <tr><td><code class="byte">20 01</code></td><td>local.get 1 (= b)</td></tr>
+  <tr><td><code class="byte">7C</code></td><td>i64.add</td></tr>
+  <tr><td><code class="byte">21 02</code></td><td>local.set 2 (= x)</td></tr>
+  <tr><td><code class="byte">20 02</code></td><td>local.get 2 (= x)</td></tr>
+  <tr><td><code class="byte">42 01</code></td><td>i64.const 1</td></tr>
+  <tr><td><code class="byte">7C</code></td><td>i64.add</td></tr>
+  <tr><td><code class="byte">21 03</code></td><td>local.set 3 (= y)</td></tr>
+  <tr><td><code class="byte">20 03</code></td><td>local.get 3 (= y)</td></tr>
+  <tr><td><code class="byte">0F</code></td><td>return</td></tr>
+  <tr><td><code class="byte">0B</code></td><td>end</td></tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. Where in the code entry must the locals declaration appear?</p>
+  <label><input type="radio" name="q1" value="a"> Inline, immediately before each local.set instruction</label>
+  <label><input type="radio" name="q1" value="b"> At the very top, before any bytecode instructions</label>
+  <label><input type="radio" name="q1" value="c"> At the very end, after the last instruction</label>
+  <label><input type="radio" name="q1" value="d"> In a separate locals section alongside the type section</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. A function has 3 params and 2 let-declared locals. What index does the first local get?</p>
+  <label><input type="radio" name="q2" value="a"> 0</label>
+  <label><input type="radio" name="q2" value="b"> 2</label>
+  <label><input type="radio" name="q2" value="c"> 3</label>
+  <label><input type="radio" name="q2" value="d"> 5</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. Why does <code>collectLocals</code> run before <code>walk</code>, rather than assigning indices as locals are encountered during the bytecode walk?</p>
+  <label><input type="radio" name="q3" value="a"> To enable better register allocation by the JIT compiler</label>
+  <label><input type="radio" name="q3" value="b"> To avoid allocating a map during the hot bytecode emit path</label>
+  <label><input type="radio" name="q3" value="c"> So the locals vec can be written before the bytecode, as required by the format</label>
+  <label><input type="radio" name="q3" value="d"> To handle shadowed variable names in nested blocks correctly</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. What WASM opcode does <code>let x: i64 = expr;</code> emit after the value is on the stack?</p>
+  <label><input type="radio" name="q4" value="a"> <code>local.get 0x20</code></label>
+  <label><input type="radio" name="q4" value="b"> <code>local.set 0x21</code></label>
+  <label><input type="radio" name="q4" value="c"> <code>local.tee 0x22</code></label>
+  <label><input type="radio" name="q4" value="d"> <code>i64.store 0x37</code></label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<p>With locals working, you can now compile any function whose body is pure arithmetic over params and let bindings. The next pieces that open up:</p>
+
+<ul>
+  <li><strong>If expressions</strong> — WASM's <code>block</code>/<code>if</code>/<code>else</code>/<code>end</code> structured control flow</li>
+  <li><strong>Call expressions</strong> — <code>call funcidx</code> to invoke other compiled functions</li>
+  <li><strong>Loops</strong> — <code>loop</code> + <code>br</code> for iteration</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Source</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/modules.html#code-section" target="_blank">WebAssembly Core Spec §5.5.10 — Code Section</a> — defines the code entry format: <code>vec(locals) expr end</code>.</p>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#variable-instructions" target="_blank">WebAssembly Core Spec §5.4.4 — Variable Instructions</a> — defines <code>local.get</code> (0x20), <code>local.set</code> (0x21), and <code>local.tee</code> (0x22).</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question about anything here? Ask your teacher agent — it can clarify any step, explain why the format works this way, or point you to the right part of the spec.
+</p>
+<p style="color: var(--muted); font-size: 0.85em;">
+  Prev: <a href="0028-params-identifiers-arithmetic.html">Lesson 28 — Params, Identifiers &amp; Arithmetic</a>
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'c', q3: 'c', q4: 'b' };
+const explanations = {
+  q1: 'Correct — the locals vec is at the top of the code body, before any bytecode. The engine makes a single pass and allocates space for all locals up front.',
+  q2: 'Correct — indices 0, 1, 2 are taken by the 3 params. The first local gets index 3.',
+  q3: 'Correct — the binary format demands the locals declaration precede all bytecode. Without a pre-scan you cannot know what to write at the top.',
+  q4: 'Correct — local.set (0x21) pops the top-of-stack value and stores it in the named local slot.'
+};
+const wrong = {
+  q1: 'No — there is no inline declare instruction in WASM. All locals for a function are declared together at the top of the code entry.',
+  q2: 'Params occupy indices 0..n-1. With 3 params the next available index is 3, not 0 or 2.',
+  q3: 'The real reason is the binary format constraint: locals must be declared before bytecode, so you must know them all up front.',
+  q4: 'local.get reads a local; local.tee reads and sets simultaneously. For a plain assignment you want local.set (0x21).'
+};
+
+let answered = {};
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    if (answered[qid]) return;
+    answered[qid] = true;
+    const correct = answers[qid] === this.value;
+    this.closest('label').classList.add(correct ? 'correct' : 'wrong');
+    const fb = document.getElementById(qid + '-fb');
+    fb.style.display = 'block';
+    fb.style.color = correct ? 'var(--green)' : 'var(--accent)';
+    fb.textContent = correct ? '✓ ' + explanations[qid] : '✗ ' + wrong[qid];
+    if (Object.keys(answered).length === Object.keys(answers).length) {
+      const box = document.getElementById('score-box');
+      const n = Object.entries(answered).filter(([k]) => answers[k] === document.querySelector(`input[name=${k}]:checked`)?.value).length;
+      box.style.display = 'block';
+      box.innerHTML = `Score: <strong>${n} / ${Object.keys(answers).length}</strong> — ${n === Object.keys(answers).length ? '🏆 Perfect. Run the test.' : 'Review the highlighted answers, then run the test.'}`;
+    }
+  });
+});
+</script>
+</body>
+</html>

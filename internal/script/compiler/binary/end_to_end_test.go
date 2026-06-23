@@ -65,6 +65,31 @@ func TestEndToEnd_Sub(t *testing.T) {
 	runOne(t, src, "sub3", []uint64{100, 50, 8}, 42)
 }
 
+func TestEndToEnd_Locals(t *testing.T) {
+	src := `
+        fn accumulate(a: i64, b: i64): i64 {
+            let x: i64 = a + b;
+            let y: i64 = x + 1;
+            return y;
+        }
+    `
+	runOne(t, src, "accumulate", []uint64{20, 21}, 42)
+}
+
+func TestEndToEnd_IfElse(t *testing.T) {
+	src := `
+        fn max(a: i64, b: i64): i64 {
+            if a > b {
+                return a;
+            } else {
+                return b;
+            }
+        }
+    `
+	runOne(t, src, "max", []uint64{42, 17}, 42) // takes then branch
+	runOne(t, src, "max", []uint64{17, 42}, 42) // takes else branch
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

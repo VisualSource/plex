@@ -10,8 +10,9 @@ import (
 )
 
 type bodyEncoder struct {
-	buf    []byte
-	locals map[string]uint32
+	buf        []byte
+	locals     map[string]uint32
+	localTypes []byte
 }
 
 func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig) *bodyEncoder {
@@ -25,6 +26,7 @@ func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig) *bodyEncoder {
 		b.locals[p.Name] = idx
 		idx++
 	}
+	b.collectLocals(f.Body)
 
 	return b
 }
@@ -36,6 +38,14 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			if err := b.walk(s); err != nil {
 				return err
 			}
+		}
+		return nil
+	case *script.BooleanLiteral:
+		b.buf = append(b.buf, OpI32Const)
+		if n.Value {
+			b.buf = append(b.buf, 1)
+		} else {
+			b.buf = append(b.buf, 0)
 		}
 		return nil
 	case *script.NumberLiteral:
@@ -89,56 +99,77 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		if t == nil {
 			return fmt.Errorf("no type on binary expression")
 		}
+
+		if isCmpOp(n.Operator) {
+			op, err := cmpOpcode(t.Kind, n.Operator)
+			if err != nil {
+				return err
+			}
+			b.buf = append(b.buf, op)
+			return nil
+		}
+
 		op, err := arithOpcode(t.Kind, n.Operator)
 		if err != nil {
 			return err
 		}
 		b.buf = append(b.buf, op)
 		return nil
+	case *script.VariableDeclaration:
+		if n.Init != nil {
+			if err := b.walk(n.Init); err != nil {
+				return err
+			}
+		}
+		idx := b.locals[n.Name]
+		b.buf = append(b.buf, OpLocalSet)
+		b.buf = AppendULEB128(b.buf, idx)
+		return nil
+	case *script.AssignmentExpression:
+		if err := b.walk(n.Value); err != nil {
+			return err
+		}
+		idx, ok := b.locals[n.Name]
+		if !ok {
+			return fmt.Errorf("unknown local %s", n.Name)
+		}
+		b.buf = append(b.buf, OpLocalSet)
+		b.buf = AppendULEB128(b.buf, idx)
+		return nil
+	case *script.IfStatement:
+		if err := b.walk(n.Condition); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, OpIf, BlockTypeEmpty)
+		if err := b.walk(n.Body); err != nil {
+			return err
+		}
+		if n.Else != nil {
+			b.buf = append(b.buf, OpElse)
+			if err := b.walk(n.Else); err != nil {
+				return err
+			}
+		}
+		b.buf = append(b.buf, OpEnd)
+		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}
 }
 
-func arithOpcode(k script.TypeKind, op script.TokenType) (byte, error) {
-	switch k {
-	case script.TypeKind_I32:
-		switch op {
-		case script.TokenType_Plus:
-			return OpI32Add, nil
-		case script.TokenType_Minus:
-			return OpI32Sub, nil
-		case script.TokenType_Star:
-			return OpI32Mul, nil
-		case script.TokenType_Div:
-			return OpI32DivS, nil
-		case script.TokenType_Mod:
-			return OpI32RemS, nil
+func (b *bodyEncoder) collectLocals(node script.AstNode) {
+	switch n := node.(type) {
+	case *script.Block:
+		for _, s := range n.Stmts {
+			b.collectLocals(s)
 		}
-	case script.TypeKind_I64, script.TypeKind_Int:
-		switch op {
-		case script.TokenType_Plus:
-			return OpI64Add, nil
-		case script.TokenType_Minus:
-			return OpI64Sub, nil
-		case script.TokenType_Star:
-			return OpI64Mul, nil
-		case script.TokenType_Div:
-			return OpI64DivS, nil
-		case script.TokenType_Mod:
-			return OpI64RemS, nil
-		}
-	case script.TypeKind_Float, script.TypeKind_F64:
-		switch op {
-		case script.TokenType_Plus:
-			return OpF64Add, nil
-		case script.TokenType_Minus:
-			return OpF64Sub, nil
-		case script.TokenType_Star:
-			return OpF64Mul, nil
-		case script.TokenType_Div:
-			return OpF64Div, nil
+	case *script.VariableDeclaration:
+		b.locals[n.Name] = uint32(len(b.locals))
+		t := n.GetType()
+		if t != nil {
+			b.localTypes = append(b.localTypes, valType(t))
+		} else {
+			b.localTypes = append(b.localTypes, ValI64)
 		}
 	}
-	return 0, fmt.Errorf("no opcode for %s %v", k, op)
 }

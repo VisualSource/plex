@@ -48,14 +48,21 @@ func encodeFunctionSection(sigs []funcSig) []byte {
 func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig) ([]byte, error) {
 	var body []byte
 
-	body = AppendULEB128(body, 0)
-
 	enc := newBodyEncoder(f, sig)
+
+	body = AppendULEB128(body, uint32(len(enc.localTypes)))
+
+	for _, vt := range enc.localTypes {
+		body = AppendULEB128(body, 1)
+		body = append(body, vt)
+	}
+
 	if err := enc.walk(f.Body); err != nil {
 		return nil, err
 	}
 
 	body = append(body, enc.buf...)
+	body = append(body, OpUnreachable)
 	body = append(body, OpEnd)
 
 	var entry []byte
