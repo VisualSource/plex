@@ -236,14 +236,17 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 	case *script.FunctionCall:
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:
+			// Check for struct constructor first — walkStructConstructor
+			// handles its own arg walking. If we fall through to the generic
+			// arg-walk below, we must not walk args twice.
+			if layout, ok := b.structs[callee.Value]; ok {
+				return b.walkStructConstructor(layout, n.Args)
+			}
+
 			for _, arg := range n.Args {
 				if err := b.walk(arg); err != nil {
 					return err
 				}
-			}
-
-			if layout, ok := b.structs[callee.Value]; ok {
-				return b.walkStructConstructor(layout, n.Args)
 			}
 
 			idx, ok := b.funcIndices[callee.Value]

@@ -626,6 +626,32 @@ func TestEndToEnd_MethodCallsMethod(t *testing.T) {
 	runOne(t, src, "run", nil, api.EncodeF64(150.0))
 }
 
+func TestEndToEnd_ArrayOfStructs(t *testing.T) {
+	src := `
+        struct Point { x: f64; y: f64; }
+        fn run(): f64 {
+            let pts = [Point(1.0, 2.0), Point(10.0, 20.0)];
+            let p = pts[1];
+            return p.x + p.y;
+        }
+    `
+	// pts[1] = Point(10, 20) → x+y = 30
+	runOne(t, src, "run", nil, api.EncodeF64(30.0))
+}
+
+func TestEndToEnd_ArrayOfStructsMethods(t *testing.T) {
+	src := `
+        struct Vec2 { x: f64; y: f64; }
+        impl Vec2 { fn magnitude_sq(): f64 { return self.x * self.x + self.y * self.y; } }
+        fn run(): f64 {
+            let vs: Vec2[] = [Vec2(3.0, 4.0), Vec2(5.0, 12.0)];
+            return vs[0].magnitude_sq() + vs[1].magnitude_sq();
+        }
+    `
+	// 9+16=25, 25+144=169 → 25+169=194
+	runOne(t, src, "run", nil, api.EncodeF64(194.0))
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))
