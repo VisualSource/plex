@@ -195,7 +195,7 @@ func (c *Compiler) Compile(node script.AstNode) error {
 			return err
 		}
 
-		t := n.GetType()
+		t := n.Left.(script.Expression).GetType()
 		if t == nil {
 			return fmt.Errorf("no type set for operation")
 		}
