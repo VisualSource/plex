@@ -304,9 +304,6 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 					if len(n.Args) != 1 {
 						return fmt.Errorf("append method was expecting 1 arg but was given %d", len(n.Args))
 					}
-					if err := b.walk(n.Args[0]); err != nil {
-						return err
-					}
 
 					arr := b.addSyntheticLocal(ValI32)
 					if err := b.walk(callee.Object); err != nil {
@@ -353,6 +350,138 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 					b.buf = append(b.buf, OpI32Store)
 					b.buf = AppendULEB128(b.buf, 2)
 					b.buf = AppendULEB128(b.buf, 0)
+					return nil
+				case "remove":
+					if len(n.Args) != 1 {
+						return fmt.Errorf("remove method was expecting 1 arg but was given %d", len(n.Args))
+					}
+					eKind := objType.Element.Kind
+					eSize := elemSizeOf(eKind)
+					loadOp, loadAlign := loadOpcode(eKind)
+					stOp, stAlign := storeOpcode(eKind)
+
+					arrLocal := b.addSyntheticLocal(ValI32)
+					idxLocal := b.addSyntheticLocal(ValI32)
+					retLocal := b.addSyntheticLocal(valType(objType.Element))
+					lenLocal := b.addSyntheticLocal(ValI32)
+					curLocal := b.addSyntheticLocal(ValI32)
+
+					// save arr
+					if err := b.walk(callee.Object); err != nil {
+						return err
+					}
+					b.buf = append(b.buf, OpLocalSet)
+					b.buf = AppendULEB128(b.buf, arrLocal)
+
+					// save idx (int arrives as i64 → unwrap to i32)
+					if err := b.walk(n.Args[0]); err != nil {
+						return err
+					}
+					b.buf = append(b.buf, OpI32WrapI64, OpLocalSet)
+					b.buf = AppendULEB128(b.buf, idxLocal)
+
+					// save elem to return: arr + 4 + idx*eSize
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arrLocal)
+					b.buf = append(b.buf, OpI32Const, 4, OpI32Add)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, idxLocal)
+					b.buf = append(b.buf, OpI32Const)
+					b.buf = AppendULEB128(b.buf, eSize)
+					b.buf = append(b.buf, OpI32Mul, OpI32Add)
+					b.buf = append(b.buf, loadOp)
+					b.buf = AppendULEB128(b.buf, loadAlign)
+					b.buf = AppendULEB128(b.buf, 0)
+					b.buf = append(b.buf, OpLocalSet)
+					b.buf = AppendULEB128(b.buf, retLocal)
+
+					// new_len = old_len - 1
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arrLocal)
+					b.buf = append(b.buf, OpI32Load)
+					b.buf = AppendULEB128(b.buf, 2)
+					b.buf = AppendULEB128(b.buf, 0)
+					b.buf = append(b.buf, OpI32Const, 1, OpI32Sub)
+					b.buf = append(b.buf, OpLocalSet)
+					b.buf = AppendULEB128(b.buf, lenLocal)
+
+					// cur = idx
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, idxLocal)
+					b.buf = append(b.buf, OpLocalSet)
+					b.buf = AppendULEB128(b.buf, curLocal)
+
+					// internal shift loop — NOT on loopStack
+					b.buf = append(b.buf, OpBlock, BlockTypeEmpty)
+					b.blockDepth++
+					blockMark := uint32(b.blockDepth)
+					b.buf = append(b.buf, OpLoop, BlockTypeEmpty)
+					b.blockDepth++
+					loopMark := uint32(b.blockDepth)
+
+					// exit: cur >= len → br_if out of block
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, curLocal)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, lenLocal)
+					b.buf = append(b.buf, OpI32GeS, OpBrIf)
+					b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-blockMark)
+
+					// dst: arr + 4 + cur*eSize
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arrLocal)
+					b.buf = append(b.buf, OpI32Const, 4, OpI32Add)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, curLocal)
+					b.buf = append(b.buf, OpI32Const)
+					b.buf = AppendULEB128(b.buf, eSize)
+					b.buf = append(b.buf, OpI32Mul, OpI32Add)
+
+					// src: arr + 4 + (cur+1)*eSize
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arrLocal)
+					b.buf = append(b.buf, OpI32Const, 4, OpI32Add)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, curLocal)
+					b.buf = append(b.buf, OpI32Const, 1, OpI32Add)
+					b.buf = append(b.buf, OpI32Const)
+					b.buf = AppendULEB128(b.buf, eSize)
+					b.buf = append(b.buf, OpI32Mul, OpI32Add)
+					b.buf = append(b.buf, loadOp)
+					b.buf = AppendULEB128(b.buf, loadAlign)
+					b.buf = AppendULEB128(b.buf, 0)
+
+					// store dst ← src
+					b.buf = append(b.buf, stOp)
+					b.buf = AppendULEB128(b.buf, uint32(stAlign))
+					b.buf = AppendULEB128(b.buf, 0)
+
+					// cur++
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, curLocal)
+					b.buf = append(b.buf, OpI32Const, 1, OpI32Add)
+					b.buf = append(b.buf, OpLocalSet)
+					b.buf = AppendULEB128(b.buf, curLocal)
+
+					// continue loop
+					b.buf = append(b.buf, OpBr)
+					b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-loopMark)
+
+					b.blockDepth -= 2
+					b.buf = append(b.buf, OpEnd, OpEnd)
+
+					// write new length
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arrLocal)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, lenLocal)
+					b.buf = append(b.buf, OpI32Store)
+					b.buf = AppendULEB128(b.buf, 2)
+					b.buf = AppendULEB128(b.buf, 0)
+
+					// return removed element
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, retLocal)
 					return nil
 				default:
 					return fmt.Errorf("array has no method %s", callee.Field)

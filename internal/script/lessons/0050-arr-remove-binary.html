@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 50 – arr.remove in the Binary Backend</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .dim   { color: #555; }
+  .del   { background: #3a1a1a; text-decoration: line-through; padding: 2px 6px; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 50 – arr.remove in the Binary Backend</h1>
+
+<p><em>Previous: <a href="0049-arr-append-binary.html">Lesson 49 – arr.append in the Binary Backend</a></em></p>
+
+<p>
+This lesson has two parts. First, a warm-up bug-fix in the <code>append</code> implementation from lesson 49.
+Then the main event: implementing <code>arr.remove(idx)</code>, which introduces a <strong>shift loop</strong>
+generated entirely in binary bytes — and forces you to think carefully about what WASM's loop labels mean
+when they live inside a built-in, not in user code.
+</p>
+
+<h2>Part 1 — Fix the Double-Walk Bug in append</h2>
+
+<p>
+The <code>append</code> case in <a href="../compiler/binary/body.go"><code>body.go</code></a> walks
+<code>n.Args[0]</code> <em>twice</em>: once before <code>addSyntheticLocal</code> and once at the
+correct position inside the instruction sequence.
+</p>
+
+<div class="warn">
+  <strong>Why didn't the tests catch it?</strong>
+  The stray i64 pushed by the first walk ends up below the i32 ptr left by the append body.
+  The Block-level <code>OpDrop</code> (emitted for every expression-as-statement) removes
+  the top value — the i32 ptr. That leaves the stray i64 sitting below all subsequent
+  values, including the return value. WASM's <code>return</code> is <em>polymorphic</em>:
+  it takes the topmost return-count values and discards everything below. The validator never
+  sees a problem. The tests produce the right answers by accident.
+</div>
+
+<div class="task">
+  <strong>Fix — one deletion</strong>
+  <p>In <a href="../compiler/binary/body.go"><code>body.go</code></a>, inside the <code>"append"</code> case,
+  delete the premature first walk of <code>n.Args[0]</code>:</p>
+  <pre><code><span class="kw">case</span> <span class="str">"append"</span>:
+    <span class="kw">if</span> len(n.Args) != <span class="num">1</span> {
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"append method was expecting 1 arg but was given %d"</span>, len(n.Args))
+    }
+    <span class="del">if err := b.walk(n.Args[0]); err != nil { return err }</span>   <span class="cmt">// DELETE THIS</span>
+
+    arr := b.addSyntheticLocal(ValI32)
+    ...</code></pre>
+  <p>Re-run <code>go test ./internal/script/compiler/binary/...</code>. All tests should still pass.</p>
+</div>
+
+<div class="insight">
+  <strong>Lesson:</strong> A test suite that passes despite a latent bug is more dangerous than a failing one —
+  it gives false confidence. The mask here was WASM's polymorphic validation.
+  This pattern (masked by a consuming Drop + polymorphic return) can hide double-walks whenever
+  the stray type happens to cancel with a surrounding Drop.
+</div>
+
+<h2>Part 2 — Implementing arr.remove</h2>
+
+<p>
+<code>arr.remove(idx)</code> removes the element at <code>idx</code>, shifts all elements after
+it one position to the left, decrements the length, and <strong>returns the removed element</strong>.
+Unlike <code>append</code>, it is an expression with a value.
+</p>
+
+<h2>Memory Layout After a Remove</h2>
+
+<p>Before: <code>int[]</code> = [10, 20, 30] at ptr:</p>
+<div class="diagram">
+ptr+0   <span class="byte">[ len: 3   ]</span>
+ptr+4   <span class="byte">[ 10 : i64 ]</span>  <span class="dim">← idx 0</span>
+ptr+12  <span class="byte">[ 20 : i64 ]</span>  <span class="dim">← idx 1 (being removed)</span>
+ptr+20  <span class="byte">[ 30 : i64 ]</span>  <span class="dim">← idx 2</span>
+</div>
+
+<p>After <code>arr.remove(1)</code>:</p>
+<div class="diagram">
+ptr+0   <span class="byte">[ len: 2   ]</span>
+ptr+4   <span class="byte">[ 10 : i64 ]</span>  <span class="dim">← idx 0 (unchanged)</span>
+ptr+12  <span class="byte">[ 30 : i64 ]</span>  <span class="dim">← idx 1 (shifted left from idx 2)</span>
+ptr+20  <span class="dim">[ stale    ]</span>  <span class="dim">← length field says 2, so this slot is invisible</span>
+</div>
+
+<p>The shift loop walks <code>cur</code> from <code>idx</code> to <code>new_len - 1</code>,
+copying element <code>cur+1</code> into slot <code>cur</code> each iteration.</p>
+
+<h2>Five Synthetic Locals</h2>
+
+<p>
+<code>remove</code> needs scratch space for five values that must survive across
+multiple instruction sequences:
+</p>
+
+<table>
+  <tr><th>Local</th><th>WASM type</th><th>Holds</th></tr>
+  <tr><td>arr</td><td>i32</td><td>array pointer</td></tr>
+  <tr><td>idx</td><td>i32</td><td>removal index (unwrapped from i64)</td></tr>
+  <tr><td>ret</td><td>element valtype</td><td>the removed element (return value)</td></tr>
+  <tr><td>len</td><td>i32</td><td>old_len − 1 = new_len</td></tr>
+  <tr><td>cur</td><td>i32</td><td>shift cursor, starts at idx</td></tr>
+</table>
+
+<p>
+All of these follow the <code>addSyntheticLocal</code> pattern from lesson 49.
+The only new wrinkle: <code>ret</code> takes type <code>valType(objType.Element)</code>
+rather than <code>ValI32</code>, because the removed element might be i64 or f64.
+</p>
+
+<h2>The Internal Shift Loop</h2>
+
+<p>
+The shift loop is a <code>block + loop</code> pair emitted entirely in binary bytes.
+It is structurally identical to a <code>while</code> loop — but it must <strong>not</strong>
+be added to <code>b.loopStack</code>.
+</p>
+
+<div class="insight">
+  <strong>Why not loopStack?</strong>
+  <code>loopStack</code> tracks loops that user code can reach with <code>break</code>
+  and <code>continue</code>. The shift loop is an internal compiler artifact — if a
+  <code>break</code> branched into it, it would corrupt the shift and leave the array
+  half-modified. The loop must be invisible to user control flow.
+</div>
+
+<p>
+Because the loop is not on <code>loopStack</code>, you must compute branch depths directly
+from <code>b.blockDepth</code>. This is the same arithmetic the while-loop encoder uses —
+you just don't expose the labels to <code>break</code>/<code>continue</code>.
+</p>
+
+<h3>blockDepth must be maintained</h3>
+
+<p>
+Even though the shift loop is invisible to user code, <strong>it still must properly
+increment and decrement <code>b.blockDepth</code></strong>. If a user-visible while loop
+<em>contains</em> a <code>remove</code> call, the outer loop's break/continue computes
+its branch depth as <code>b.blockDepth − entry.blockLabel</code>. An unbalanced internal
+<code>blockDepth</code> would produce wrong relative depths and broken branch targets.
+</p>
+
+<h3>Branch depth arithmetic for the internal loop</h3>
+
+<p>Entering the shift loop from outside (current blockDepth = D):</p>
+<div class="diagram">
+emit OpBlock  →  b.blockDepth++  →  D+1   <span class="dim">← blockMark = D+1</span>
+emit OpLoop   →  b.blockDepth++  →  D+2   <span class="dim">← loopMark  = D+2</span>
+
+inside loop (blockDepth = D+2):
+  br_if exit: depth − blockMark = D+2 − (D+1) = <span class="byte">1</span>
+  br continue: depth − loopMark  = D+2 − (D+2) = <span class="byte">0</span>
+
+emit OpEnd (loop)   →  b.blockDepth--  →  D+1
+emit OpEnd (block)  →  b.blockDepth--  →  D
+</div>
+
+<h2>Full Instruction Sequence</h2>
+
+<pre><code><span class="cmt">// 1 — allocate 5 synthetic locals</span>
+arrLocal := b.addSyntheticLocal(ValI32)
+idxLocal := b.addSyntheticLocal(ValI32)
+retLocal := b.addSyntheticLocal(valType(objType.Element))
+lenLocal := b.addSyntheticLocal(ValI32)
+curLocal := b.addSyntheticLocal(ValI32)
+
+<span class="cmt">// 2 — save array pointer</span>
+walk(callee.Object)   <span class="arrow">→</span> [ptr:i32]
+<span class="byte">local.set</span> $arr        <span class="arrow">→</span> []
+
+<span class="cmt">// 3 — save index (source integers arrive as i64)</span>
+walk(n.Args[0])       <span class="arrow">→</span> [idx:i64]
+<span class="byte">i32.wrap_i64</span>          <span class="arrow">→</span> [idx:i32]
+<span class="byte">local.set</span> $idx        <span class="arrow">→</span> []
+
+<span class="cmt">// 4 — save the element to return: arr + 4 + idx*eSize</span>
+<span class="byte">local.get</span> $arr
+<span class="byte">i32.const</span> 4
+<span class="byte">i32.add</span>
+<span class="byte">local.get</span> $idx
+<span class="byte">i32.const</span> &lt;eSize&gt;
+<span class="byte">i32.mul</span>
+<span class="byte">i32.add</span>               <span class="arrow">→</span> [elem_addr:i32]
+<span class="byte">&lt;loadOp&gt;</span>              <span class="arrow">→</span> [elem:elemType]
+<span class="byte">local.set</span> $ret        <span class="arrow">→</span> []
+
+<span class="cmt">// 5 — new_len = old_len - 1</span>
+<span class="byte">local.get</span> $arr
+<span class="byte">i32.load</span> align=2
+<span class="byte">i32.const</span> 1
+<span class="byte">i32.sub</span>               <span class="arrow">→</span> [new_len:i32]
+<span class="byte">local.set</span> $len        <span class="arrow">→</span> []
+
+<span class="cmt">// 6 — cursor starts at idx</span>
+<span class="byte">local.get</span> $idx
+<span class="byte">local.set</span> $cur
+
+<span class="cmt">// 7 — internal shift loop</span>
+<span class="byte">block</span> []              <span class="cmt">← blockDepth++, blockMark = blockDepth</span>
+<span class="byte">loop</span>  []              <span class="cmt">← blockDepth++, loopMark  = blockDepth</span>
+
+  <span class="cmt">exit check: cur >= len → break to outer block</span>
+  <span class="byte">local.get</span> $cur
+  <span class="byte">local.get</span> $len
+  <span class="byte">i32.ge_s</span>
+  <span class="byte">br_if</span> (blockDepth−blockMark)
+
+  <span class="cmt">dst addr: arr + 4 + cur*eSize</span>
+  <span class="byte">local.get</span> $arr
+  <span class="byte">i32.const</span> 4
+  <span class="byte">i32.add</span>
+  <span class="byte">local.get</span> $cur
+  <span class="byte">i32.const</span> &lt;eSize&gt;
+  <span class="byte">i32.mul</span>
+  <span class="byte">i32.add</span>
+
+  <span class="cmt">src value: arr[(cur+1)] = arr + 4 + (cur+1)*eSize</span>
+  <span class="byte">local.get</span> $arr
+  <span class="byte">i32.const</span> 4
+  <span class="byte">i32.add</span>
+  <span class="byte">local.get</span> $cur
+  <span class="byte">i32.const</span> 1
+  <span class="byte">i32.add</span>
+  <span class="byte">i32.const</span> &lt;eSize&gt;
+  <span class="byte">i32.mul</span>
+  <span class="byte">i32.add</span>
+  <span class="byte">&lt;loadOp&gt;</span>
+
+  <span class="cmt">store dst ← src</span>
+  <span class="byte">&lt;storeOp&gt;</span>
+
+  <span class="cmt">cur++</span>
+  <span class="byte">local.get</span> $cur
+  <span class="byte">i32.const</span> 1
+  <span class="byte">i32.add</span>
+  <span class="byte">local.set</span> $cur
+
+  <span class="byte">br</span> (blockDepth−loopMark)   <span class="cmt">← continue loop</span>
+
+<span class="byte">end</span>   <span class="cmt">← end loop  (blockDepth--)</span>
+<span class="byte">end</span>   <span class="cmt">← end block (blockDepth--)</span>
+
+<span class="cmt">// 8 — write new length back to arr</span>
+<span class="byte">local.get</span> $arr
+<span class="byte">local.get</span> $len
+<span class="byte">i32.store</span> align=2
+
+<span class="cmt">// 9 — leave removed element on stack as return value</span>
+<span class="byte">local.get</span> $ret        <span class="arrow">→</span> [elem:elemType]
+</code></pre>
+
+<h2>Implementation Task</h2>
+
+<div class="task">
+  <strong>Task — add the "remove" case and tests</strong>
+
+  <p><strong>1.</strong> In <a href="../compiler/binary/body.go"><code>body.go</code></a>, inside the
+  <code>TypeKind_Array</code> method switch, add a <code>"remove"</code> case after <code>"append"</code>,
+  replacing the existing <code>default: return error</code>. Use the sequence above. Key Go snippets:</p>
+
+  <pre><code><span class="kw">case</span> <span class="str">"remove"</span>:
+    <span class="kw">if</span> len(n.Args) != <span class="num">1</span> {
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"remove method was expecting 1 arg but was given %d"</span>, len(n.Args))
+    }
+    eKind    := objType.Element.Kind
+    eSize    := elemSizeOf(eKind)
+    loadOp, loadAlign := loadOpcode(eKind)
+    stOp, stAlign     := storeOpcode(eKind)
+
+    arrLocal := b.addSyntheticLocal(ValI32)
+    idxLocal := b.addSyntheticLocal(ValI32)
+    retLocal := b.addSyntheticLocal(valType(objType.Element))
+    lenLocal := b.addSyntheticLocal(ValI32)
+    curLocal := b.addSyntheticLocal(ValI32)
+
+    <span class="cmt">// save arr</span>
+    <span class="kw">if</span> err := b.walk(callee.Object); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    b.buf = append(b.buf, OpLocalSet)
+    b.buf = AppendULEB128(b.buf, arrLocal)
+
+    <span class="cmt">// save idx (int arrives as i64 → unwrap to i32)</span>
+    <span class="kw">if</span> err := b.walk(n.Args[<span class="num">0</span>]); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    b.buf = append(b.buf, OpI32WrapI64, OpLocalSet)
+    b.buf = AppendULEB128(b.buf, idxLocal)
+
+    <span class="cmt">// save elem to return: arr + 4 + idx*eSize</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, arrLocal)
+    b.buf = append(b.buf, OpI32Const, <span class="num">4</span>, OpI32Add)
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, idxLocal)
+    b.buf = append(b.buf, OpI32Const); b.buf = AppendULEB128(b.buf, eSize)
+    b.buf = append(b.buf, OpI32Mul, OpI32Add)
+    b.buf = append(b.buf, loadOp); b.buf = AppendULEB128(b.buf, loadAlign); b.buf = AppendULEB128(b.buf, <span class="num">0</span>)
+    b.buf = append(b.buf, OpLocalSet); b.buf = AppendULEB128(b.buf, retLocal)
+
+    <span class="cmt">// new_len = old_len - 1</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, arrLocal)
+    b.buf = append(b.buf, OpI32Load);  b.buf = AppendULEB128(b.buf, <span class="num">2</span>); b.buf = AppendULEB128(b.buf, <span class="num">0</span>)
+    b.buf = append(b.buf, OpI32Const, <span class="num">1</span>, OpI32Sub)
+    b.buf = append(b.buf, OpLocalSet); b.buf = AppendULEB128(b.buf, lenLocal)
+
+    <span class="cmt">// cur = idx</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, idxLocal)
+    b.buf = append(b.buf, OpLocalSet); b.buf = AppendULEB128(b.buf, curLocal)
+
+    <span class="cmt">// internal shift loop — NOT on loopStack</span>
+    b.buf = append(b.buf, OpBlock, BlockTypeEmpty)
+    b.blockDepth++
+    blockMark := uint32(b.blockDepth)
+    b.buf = append(b.buf, OpLoop, BlockTypeEmpty)
+    b.blockDepth++
+    loopMark := uint32(b.blockDepth)
+
+    <span class="cmt">// exit: cur >= len → br_if out of block</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, curLocal)
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, lenLocal)
+    b.buf = append(b.buf, OpI32GeS, OpBrIf)
+    b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-blockMark)
+
+    <span class="cmt">// dst: arr + 4 + cur*eSize</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, arrLocal)
+    b.buf = append(b.buf, OpI32Const, <span class="num">4</span>, OpI32Add)
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, curLocal)
+    b.buf = append(b.buf, OpI32Const); b.buf = AppendULEB128(b.buf, eSize)
+    b.buf = append(b.buf, OpI32Mul, OpI32Add)
+
+    <span class="cmt">// src: arr + 4 + (cur+1)*eSize</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, arrLocal)
+    b.buf = append(b.buf, OpI32Const, <span class="num">4</span>, OpI32Add)
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, curLocal)
+    b.buf = append(b.buf, OpI32Const, <span class="num">1</span>, OpI32Add)
+    b.buf = append(b.buf, OpI32Const); b.buf = AppendULEB128(b.buf, eSize)
+    b.buf = append(b.buf, OpI32Mul, OpI32Add)
+    b.buf = append(b.buf, loadOp); b.buf = AppendULEB128(b.buf, loadAlign); b.buf = AppendULEB128(b.buf, <span class="num">0</span>)
+
+    <span class="cmt">// store dst ← src</span>
+    b.buf = append(b.buf, stOp); b.buf = AppendULEB128(b.buf, uint32(stAlign)); b.buf = AppendULEB128(b.buf, <span class="num">0</span>)
+
+    <span class="cmt">// cur++</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, curLocal)
+    b.buf = append(b.buf, OpI32Const, <span class="num">1</span>, OpI32Add)
+    b.buf = append(b.buf, OpLocalSet); b.buf = AppendULEB128(b.buf, curLocal)
+
+    <span class="cmt">// continue loop</span>
+    b.buf = append(b.buf, OpBr)
+    b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-loopMark)
+
+    b.blockDepth -= <span class="num">2</span>
+    b.buf = append(b.buf, OpEnd, OpEnd)
+
+    <span class="cmt">// write new length</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, arrLocal)
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, lenLocal)
+    b.buf = append(b.buf, OpI32Store); b.buf = AppendULEB128(b.buf, <span class="num">2</span>); b.buf = AppendULEB128(b.buf, <span class="num">0</span>)
+
+    <span class="cmt">// return removed element</span>
+    b.buf = append(b.buf, OpLocalGet); b.buf = AppendULEB128(b.buf, retLocal)
+    <span class="kw">return nil</span></code></pre>
+
+  <p><strong>2.</strong> Add to <a href="../compiler/binary/end_to_end_test.go"><code>end_to_end_test.go</code></a>:</p>
+
+  <pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_ArrayRemove</span>(t *testing.T) {
+    src := <span class="str">`
+        fn remove_middle(): int {
+            let arr: int[] = [10, 20, 30];
+            let r = arr.remove(1);
+            return r;
+        }
+        fn remove_shifts(): int {
+            let arr: int[] = [10, 20, 30];
+            arr.remove(0);
+            return arr[0];
+        }
+        fn remove_len(): int {
+            let arr: int[] = [10, 20, 30];
+            arr.remove(2);
+            return arr.len();
+        }
+    `</span>
+    runOne(t, src, <span class="str">"remove_middle"</span>, nil, <span class="num">20</span>)   <span class="cmt">// returns the element</span>
+    runOne(t, src, <span class="str">"remove_shifts"</span>, nil, <span class="num">20</span>)   <span class="cmt">// arr[0] becomes 20 after remove(0)</span>
+    runOne(t, src, <span class="str">"remove_len"</span>,   nil, <span class="num">2</span>)    <span class="cmt">// length decremented</span>
+}</code></pre>
+</div>
+
+<h2>Checklist Before Calling It Done</h2>
+<ul>
+  <li>The double-walk deletion in <code>append</code> is in place</li>
+  <li><code>TestEndToEnd_ArrayRemove</code> passes (all three sub-cases)</li>
+  <li>The full binary suite is still green: <code>go test ./internal/script/compiler/binary/...</code></li>
+  <li><code>remove</code> leaves the removed element on the stack — verify by using <code>let r = arr.remove(...)</code> and returning it</li>
+</ul>
+
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why must <code>b.blockDepth</code> be incremented for the internal shift loop, even though user code can never <code>break</code> into it?</p>
+    <label><input type="radio" name="q1" value="a"> WASM validation requires all blocks to be counted in the module's block table</label>
+    <label><input type="radio" name="q1" value="b"> Surrounding user loops compute their branch depths relative to the current blockDepth; an unbalanced depth produces wrong br targets</label>
+    <label><input type="radio" name="q1" value="c"> addSyntheticLocal uses blockDepth to compute the local index</label>
+    <label><input type="radio" name="q1" value="d"> The Go runtime requires symmetric depth increments for garbage collection</label>
+    <div class="feedback" id="q1-fb"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. Inside the shift loop (blockDepth = D+2, blockMark = D+1), what relative depth does the <code>br_if</code> exit use?</p>
+    <label><input type="radio" name="q2" value="a"> 0 — always jump to innermost block</label>
+    <label><input type="radio" name="q2" value="b"> 2 — skip two levels</label>
+    <label><input type="radio" name="q2" value="c"> 1 — (D+2) − (D+1) = 1, targets the outer block</label>
+    <label><input type="radio" name="q2" value="d"> It varies depending on surrounding user loops</label>
+    <div class="feedback" id="q2-fb"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. Why does the index argument need <code>OpI32WrapI64</code> before saving it to the idx local?</p>
+    <label><input type="radio" name="q3" value="a"> WASM does not allow storing i64 values in i32 locals</label>
+    <label><input type="radio" name="q3" value="b"> Plex integers are i64 on the stack, but address arithmetic requires i32 operands for i32.add/mul</label>
+    <label><input type="radio" name="q3" value="c"> i32.wrap_i64 performs a bounds check before the conversion</label>
+    <label><input type="radio" name="q3" value="d"> The typechecker emits i32 for array indices, so this matches what the typechecker expects</label>
+    <div class="feedback" id="q3-fb"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. <code>remove</code> saves the element to return into <code>$ret</code> before the shift loop, not after. Why?</p>
+    <label><input type="radio" name="q4" value="a"> The loop overwrites arr[idx] during the first iteration, so the value must be captured first</label>
+    <label><input type="radio" name="q4" value="b"> The WASM validator requires all local.set instructions to precede loop blocks</label>
+    <label><input type="radio" name="q4" value="c"> addSyntheticLocal cannot be called inside a loop block</label>
+    <label><input type="radio" name="q4" value="d"> The load opcode is not valid inside OpLoop blocks</label>
+    <div class="feedback" id="q4-fb"></div>
+  </div>
+
+  <div class="score-box" id="score"></div>
+</div>
+
+<h2>Primary Source</h2>
+<p>
+  <a href="https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions">
+    WebAssembly Spec — Control Instructions
+  </a> — the <code>block</code>, <code>loop</code>, and <code>br</code>/<code>br_if</code> semantics,
+  including how label indices are resolved relative to the nesting stack.
+</p>
+
+<hr style="margin-top:3em; border-color: var(--border);">
+<p style="color:var(--muted); font-size:0.9em;">
+  Questions? Ask your teacher agent — paste any part of the lesson or your code and ask for clarification.
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'c', q3: 'b', q4: 'a' };
+const explanations = {
+  q1: {
+    b: 'Correct — user-visible while loops record their blockLabel/loopLabel as absolute depths. Break/continue compute br depth as blockDepth − savedLabel. If an internal loop unbalances blockDepth, those subtractions produce wrong numbers and branch to the wrong place.',
+    wrong: 'Not quite — the issue is that surrounding user loops store absolute blockDepth values and compute relative branch targets from the current blockDepth. Internal loops must keep it balanced.'
+  },
+  q2: {
+    c: 'Correct — relative depth = current blockDepth − blockMark = (D+2) − (D+1) = 1. br_if 1 from inside the loop targets the outer block, exiting the shift loop.',
+    wrong: 'Check the arithmetic: relative depth = current blockDepth − blockMark. blockDepth is D+2 inside the loop; blockMark (set when we emitted OpBlock) is D+1. So depth = 1.'
+  },
+  q3: {
+    b: 'Correct — Plex ints are i64 (64-bit). WASM address arithmetic instructions (i32.add, i32.mul) operate on i32 operands. The index must be narrowed to i32 before use in address calculations, and saved as i32 in the local.',
+    wrong: 'Think about types: Plex integer literals produce i64 on the stack. But the loop counter $cur is i32 (ValI32), and address arithmetic uses i32.add/i32.mul. The conversion is necessary for type correctness.'
+  },
+  q4: {
+    a: 'Correct — the first shift loop iteration copies arr[idx+1] into arr[idx], overwriting the element we want to return. The value must be loaded and saved to $ret before the loop starts.',
+    wrong: 'Think about what the first shift loop iteration does: it writes arr[cur+1] into arr[cur], where cur starts at idx. That overwrites arr[idx]. So the return value must be captured first.'
+  },
+};
+
+let score = 0, answered = 0, total = Object.keys(answers).length;
+
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    const labels = document.querySelectorAll(`[name=${qid}]`);
+    if (document.querySelector(`#${qid} label.correct, #${qid} label.wrong`)) return;
+
+    const correct = answers[qid];
+    const isCorrect = this.value === correct;
+    if (isCorrect) score++;
+    answered++;
+
+    labels.forEach(r => {
+      const lbl = r.closest('label');
+      if (r.value === correct) lbl.className = 'correct';
+      else if (r.checked)      lbl.className = 'wrong';
+    });
+
+    const fb = document.getElementById(`${qid}-fb`);
+    const exp = explanations[qid];
+    fb.textContent = isCorrect ? exp[correct] : exp.wrong;
+    fb.style.display = 'block';
+    fb.style.color = isCorrect ? 'var(--green)' : 'var(--accent)';
+
+    if (answered === total) {
+      document.getElementById('score').textContent = `Score: ${score} / ${total}`;
+    }
+  });
+});
+</script>
+</body>
+</html>

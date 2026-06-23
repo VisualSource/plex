@@ -703,6 +703,29 @@ func TestEndToEnd_ArrayAppend(t *testing.T) {
 	runOne(t, src, "grow_twice", nil, 6)
 }
 
+func TestEndToEnd_ArrayRemove(t *testing.T) {
+	src := `
+        fn remove_middle(): int {
+            let arr: int[] = [10, 20, 30];
+            let r = arr.remove(1);
+            return r;
+        }
+        fn remove_shifts(): int {
+            let arr: int[] = [10, 20, 30];
+            arr.remove(0);
+            return arr[0];
+        }
+        fn remove_len(): int {
+            let arr: int[] = [10, 20, 30];
+            arr.remove(2);
+            return arr.len();
+        }
+    `
+	runOne(t, src, "remove_middle", nil, 20) // returns the element
+	runOne(t, src, "remove_shifts", nil, 20) // arr[0] becomes 20 after remove(0)
+	runOne(t, src, "remove_len", nil, 2)     // length decremented
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))
