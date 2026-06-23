@@ -274,6 +274,22 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 				default:
 					return fmt.Errorf("string has no method %s", callee.Field)
 				}
+			case script.TypeKind_Array:
+				switch callee.Field {
+				case "len":
+					if err := b.walk(callee.Object); err != nil {
+						return err
+					}
+
+					b.buf = append(b.buf, OpI32Load)
+					b.buf = AppendULEB128(b.buf, 2) // Align
+					b.buf = AppendULEB128(b.buf, 0) // Offset
+					b.buf = append(b.buf, OpI64ExtendI32S)
+
+					return nil
+				default:
+					return fmt.Errorf("array has no method %s", callee.Field)
+				}
 			default:
 				return fmt.Errorf("method calls on %s not supported", objType)
 			}
@@ -321,6 +337,85 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 
 		b.buf = append(b.buf, OpI32Const)
 		b.buf = AppendSLEB128(b.buf, int64(off))
+		return nil
+	case *script.ArrayLiteral:
+		t := n.GetType()
+		if t == nil || t.Element == nil {
+			return fmt.Errorf("array literal missing element type")
+		}
+
+		elemSize := elemSizeOf(t.Element.Kind)
+		storeOp, storeAlign := storeOpcode(t.Element.Kind)
+		totalSize := uint32(4) + uint32(len(n.Elements))*elemSize
+
+		arrTmp := b.addSyntheticLocal(ValI32)
+
+		// bump: arrTmp = heapPtr; heapPtr += totalSize
+		b.buf = append(b.buf, OpGlobalGet)
+		b.buf = AppendULEB128(b.buf, 0)
+		b.buf = append(b.buf, OpLocalTee)
+		b.buf = AppendULEB128(b.buf, arrTmp)
+		b.buf = append(b.buf, OpI32Const)
+		b.buf = AppendSLEB128(b.buf, int64(totalSize))
+		b.buf = append(b.buf, OpI32Add)
+		b.buf = append(b.buf, OpGlobalSet)
+		b.buf = AppendULEB128(b.buf, 0)
+		// end allocator
+
+		// store length at base+0
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrTmp)
+		b.buf = append(b.buf, OpI32Const)
+		b.buf = AppendSLEB128(b.buf, int64(len(n.Elements)))
+		b.buf = append(b.buf, OpI32Store)
+		b.buf = AppendULEB128(b.buf, 2)
+		b.buf = AppendULEB128(b.buf, 0)
+
+		// store each element at base + 4 + i*elemSize
+		for i, el := range n.Elements {
+			offset := uint32(4) + uint32(i)*elemSize
+			b.buf = append(b.buf, OpLocalGet)
+			b.buf = AppendULEB128(b.buf, arrTmp)
+			if err := b.walk(el); err != nil {
+				return err
+			}
+			b.buf = append(b.buf, storeOp)
+			b.buf = AppendULEB128(b.buf, storeAlign)
+			b.buf = AppendULEB128(b.buf, offset)
+		}
+
+		// leave the base ptr on the stack for the parent
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, arrTmp)
+		return nil
+	case *script.ArrayAccess:
+		elemType := n.GetType()
+		if elemType == nil {
+			return fmt.Errorf("array access has no element type")
+		}
+
+		elemSize := elemSizeOf(elemType.Kind)
+		loadOp, loadAlign := loadOpcode(elemType.Kind)
+		if err := b.walk(n.Target); err != nil {
+			return err
+		}
+
+		if err := b.walk(n.Index); err != nil {
+			return err
+		}
+
+		b.buf = append(b.buf, OpI32WrapI64)
+
+		b.buf = append(b.buf, OpI32Const)
+		b.buf = AppendSLEB128(b.buf, int64(elemSize))
+		b.buf = append(b.buf, OpI32Mul)
+
+		b.buf = append(b.buf, OpI32Add)
+
+		b.buf = append(b.buf, loadOp)
+		b.buf = AppendULEB128(b.buf, loadAlign)
+		b.buf = AppendULEB128(b.buf, 4)
+
 		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
@@ -377,4 +472,14 @@ func (b *bodyEncoder) walkShortCircuit(n *script.BinaryExpression) error {
 	b.buf = append(b.buf, OpEnd)
 	b.blockDepth--
 	return nil
+}
+
+func (b *bodyEncoder) addSyntheticLocal(vt byte) uint32 {
+	idx := uint32(len(b.locals))
+	// The placeholder name keeps b.locals's len() advancing so the next
+	// synthetic local gets a fresh index. Source code can't reference it
+	// because plex identifiers don't start with "__".
+	b.locals[fmt.Sprintf("__synth_%d", idx)] = idx
+	b.localTypes = append(b.localTypes, vt)
+	return idx
 }

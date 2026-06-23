@@ -19,7 +19,9 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		return nil, err
 	}
 
-	if len(strings.entries) > 0 {
+	needsHeap := len(strings.entries) > 0 || programHasArrays(node)
+
+	if needsHeap {
 		exports = append(exports, exportEntry{name: "memory", kind: ExportMemory, idx: 0})
 		exports = append(exports, exportEntry{
 			name: "__heap_ptr", kind: ExportGlobal, idx: 0,
@@ -39,7 +41,7 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		out = append(out, encodeTypeSection(sigs)...)
 		out = append(out, encodeFunctionSection(sigs)...)
 
-		if len(strings.entries) > 0 {
+		if needsHeap {
 			out = append(out, encodeMemorySection()...)
 			out = append(out, encodeGlobalSection(strings.next)...)
 		}

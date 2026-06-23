@@ -337,6 +337,107 @@ func TestEndToEnd_HeapPointerMultipleStrings(t *testing.T) {
 	}
 }
 
+func TestEndToEnd_ArrayLiteral(t *testing.T) {
+	src := `
+        fn make_arr(): int[] {
+            return [10, 20, 30];
+        }
+    `
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wasm, err := binary_wasm.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+	mod, err := r.Instantiate(ctx, wasm)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	got, err := mod.ExportedFunction("make_arr").Call(ctx)
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+
+	ptr := api.DecodeU32(got[0])
+	mem := mod.Memory()
+
+	n, _ := mem.ReadUint32Le(ptr)
+	if n != 3 {
+		t.Fatalf("length = %d, want 3", n)
+	}
+
+	want := []uint64{10, 20, 30}
+	for i, w := range want {
+		v, _ := mem.ReadUint64Le(ptr + 4 + uint32(i)*8)
+		if v != w {
+			t.Fatalf("arr[%d] = %d, want %d", i, v, w)
+		}
+	}
+}
+
+func TestEndToEnd_ArrayLen(t *testing.T) {
+	src := `
+        fn three(): int {
+            let arr = [10, 20, 30];
+            return arr.len();
+        }
+        fn empty(): int {
+            let arr: int[] = [];
+            return arr.len();
+        }
+    `
+	runOne(t, src, "three", nil, 3)
+	runOne(t, src, "empty", nil, 0)
+}
+
+func TestEndToEnd_ArrayIndex(t *testing.T) {
+	src := `
+        fn first(): int {
+            let arr = [10, 20, 30];
+            return arr[0];
+        }
+        fn middle(): int {
+            let arr = [10, 20, 30];
+            return arr[1];
+        }
+        fn last(): int {
+            let arr = [10, 20, 30];
+            return arr[2];
+        }
+        fn sum_all(): int {
+            let arr = [10, 20, 30];
+            return arr[0] + arr[1] + arr[2];
+        }
+    `
+	runOne(t, src, "first", nil, 10)
+	runOne(t, src, "middle", nil, 20)
+	runOne(t, src, "last", nil, 30)
+	runOne(t, src, "sum_all", nil, 60)
+}
+
+func TestEndToEnd_Sum(t *testing.T) {
+	src := `
+       fn total(): int {
+			let arr = [1, 2, 3, 4, 5];
+			let i: int = 0;
+			let sum: int = 0;
+			while i < arr.len() {
+				sum = sum + arr[i];
+				i = i + 1;
+			}
+			return sum;
+		}
+    `
+	runOne(t, src, "total", nil, 15)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

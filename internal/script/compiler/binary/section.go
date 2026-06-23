@@ -50,15 +50,18 @@ func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map
 
 	enc := newBodyEncoder(f, sig, funcIndices, strs)
 
-	body = AppendULEB128(body, uint32(len(enc.localTypes)))
+	// Walk first so any synthetic locals added during codegen (e.g. array
+	// allocator temporaries) land in enc.localTypes before we write the
+	// locals vec. The locals declaration must precede the body bytes in the
+	// section, but it can't be finalised until the body is fully encoded.
+	if err := enc.walk(f.Body); err != nil {
+		return nil, err
+	}
 
+	body = AppendULEB128(body, uint32(len(enc.localTypes)))
 	for _, vt := range enc.localTypes {
 		body = AppendULEB128(body, 1)
 		body = append(body, vt)
-	}
-
-	if err := enc.walk(f.Body); err != nil {
-		return nil, err
 	}
 
 	body = append(body, enc.buf...)

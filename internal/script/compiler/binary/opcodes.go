@@ -28,7 +28,14 @@ const (
 	OpLocalSet byte = 0x21
 	OpLocalTee byte = 0x22
 	OpI32Load  byte = 0x28
+	OpI64Load  byte = 0x29
+
+	OpF64Load byte = 0x2B
+
 	OpI32Store byte = 0x36
+	OpI64Store byte = 0x37
+
+	OpF64Store byte = 0x39
 
 	BlockTypeEmpty byte = 0x40
 
@@ -80,6 +87,8 @@ const (
 	OpF64Sub byte = 0xA1
 	OpF64Mul byte = 0xA2
 	OpF64Div byte = 0xA3
+
+	OpI32WrapI64 byte = 0xA7
 
 	OpI64ExtendI32S byte = 0xAC
 )
@@ -207,5 +216,31 @@ func isCmpOp(op script.TokenType) bool {
 
 	default:
 		return false
+	}
+}
+
+func storeOpcode(k script.TypeKind) (op byte, align uint32) {
+	switch k {
+	case script.TypeKind_I32:
+		return OpI32Store, 2
+	case script.TypeKind_I64, script.TypeKind_Int:
+		return OpI64Store, 3
+	case script.TypeKind_F64, script.TypeKind_Float:
+		return OpF64Store, 3
+	default:
+		return OpI32Store, 2 // pointer-as-i32
+	}
+}
+
+func loadOpcode(k script.TypeKind) (op byte, align uint32) {
+	switch k {
+	case script.TypeKind_I32:
+		return OpI32Load, 2
+	case script.TypeKind_I64, script.TypeKind_Int:
+		return OpI64Load, 3
+	case script.TypeKind_F64, script.TypeKind_Float:
+		return OpF64Load, 3
+	default:
+		return OpI32Load, 2 // pointer-as-i32
 	}
 }

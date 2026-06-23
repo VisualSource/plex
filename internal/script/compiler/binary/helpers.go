@@ -116,3 +116,68 @@ func collectStrings(p *script.Program) *stringTable {
 	walk(p)
 	return st
 }
+
+func programHasArrays(p *script.Program) bool {
+	found := false
+	var walk func(script.AstNode)
+	walk = func(n script.AstNode) {
+		if found {
+			return
+		}
+		switch v := n.(type) {
+		case *script.ArrayLiteral:
+			found = true
+		case *script.Program:
+			for _, s := range v.Stmts {
+				walk(s)
+			}
+		case *script.FunctionDeclaration:
+			walk(v.Body)
+		case *script.Block:
+			for _, s := range v.Stmts {
+				walk(s)
+			}
+		case *script.ReturnStatement:
+			if v.Value != nil {
+				walk(v.Value)
+			}
+		case *script.VariableDeclaration:
+			if v.Init != nil {
+				walk(v.Init)
+			}
+		case *script.BinaryExpression:
+			walk(v.Left)
+			walk(v.Right)
+		case *script.IfStatement:
+			walk(v.Condition)
+			walk(v.Body)
+			if v.Else != nil {
+				walk(v.Else)
+			}
+		case *script.WhileStatement:
+			walk(v.Condition)
+			walk(v.Body)
+		case *script.FunctionCall:
+			walk(v.Callee)
+			for _, a := range v.Args {
+				walk(a)
+			}
+		case *script.MemberAccess:
+			walk(v.Object)
+		}
+	}
+	walk(p)
+	return found
+}
+
+func elemSizeOf(k script.TypeKind) uint32 {
+	switch k {
+	case script.TypeKind_I32:
+		return 4
+	case script.TypeKind_I64, script.TypeKind_Int,
+		script.TypeKind_F64, script.TypeKind_Float:
+		return 8
+	default:
+		return 4 // pointers (strings, arrays, structs)
+	}
+}
