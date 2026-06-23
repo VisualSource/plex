@@ -14,12 +14,15 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 	}
 
 	strings := collectStrings(node)
+
+	structs := collectStructs(node)
+
 	sigs, funcs, exports, err := collectSignatures(node)
 	if err != nil {
 		return nil, err
 	}
 
-	needsHeap := len(strings.entries) > 0 || programHasArrays(node)
+	needsHeap := len(strings.entries) > 0 || programHasHeapAllocation(node, structs)
 
 	if needsHeap {
 		exports = append(exports, exportEntry{name: "memory", kind: ExportMemory, idx: 0})
@@ -50,7 +53,7 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 			out = append(out, encodeExportSection(exports)...)
 		}
 
-		code, err := encodeCodeSection(funcs, sigs, funcIndexes, strings)
+		code, err := encodeCodeSection(funcs, sigs, funcIndexes, strings, structs)
 		if err != nil {
 			return nil, err
 		}

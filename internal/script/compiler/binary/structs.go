@@ -1,5 +1,7 @@
 package binary_wasm
 
+import "github.com/VisualSource/plex/internal/script"
+
 type funcSig struct {
 	name     string
 	params   []byte
@@ -42,4 +44,25 @@ func (st *stringTable) add(v string) uint32 {
 	st.byValue[v] = off
 	st.next += uint32(4 + len(v))
 	return off
+}
+
+type structField struct {
+	name   string
+	kind   script.TypeKind
+	offset uint32
+}
+
+type structLayout struct {
+	name   string
+	fields []structField
+	size   uint32
+}
+
+func (s *structLayout) findField(name string) (structField, bool) {
+	for _, f := range s.fields {
+		if f.name == name {
+			return f, true
+		}
+	}
+	return structField{}, false
 }

@@ -45,10 +45,10 @@ func encodeFunctionSection(sigs []funcSig) []byte {
 	return section(SectionFunction, body)
 }
 
-func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32, strs *stringTable) ([]byte, error) {
+func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32, strs *stringTable, structs map[string]*structLayout) ([]byte, error) {
 	var body []byte
 
-	enc := newBodyEncoder(f, sig, funcIndices, strs)
+	enc := newBodyEncoder(f, sig, funcIndices, strs, structs)
 
 	// Walk first so any synthetic locals added during codegen (e.g. array
 	// allocator temporaries) land in enc.localTypes before we write the
@@ -75,13 +75,13 @@ func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map
 	return entry, nil
 }
 
-func encodeCodeSection(funcs []*script.FunctionDeclaration, sigs []funcSig, funcIndices map[string]uint32, strings *stringTable) ([]byte, error) {
+func encodeCodeSection(funcs []*script.FunctionDeclaration, sigs []funcSig, funcIndices map[string]uint32, strings *stringTable, structs map[string]*structLayout) ([]byte, error) {
 	var body []byte
 	body = AppendULEB128(body, uint32(len(funcs)))
 	for i, f := range funcs {
 		sig := sigs[i]
 
-		entry, err := encodeCodeEntry(f, sig, funcIndices, strings)
+		entry, err := encodeCodeEntry(f, sig, funcIndices, strings, structs)
 		if err != nil {
 			return nil, err
 		}

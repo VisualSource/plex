@@ -20,10 +20,12 @@ type bodyEncoder struct {
 	funcIndices map[string]uint32
 
 	strings *stringTable
+
+	structs map[string]*structLayout
 }
 
-func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32, strings *stringTable) *bodyEncoder {
-	b := &bodyEncoder{locals: make(map[string]uint32), funcIndices: funcIndices, strings: strings}
+func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32, strings *stringTable, structs map[string]*structLayout) *bodyEncoder {
+	b := &bodyEncoder{locals: make(map[string]uint32), funcIndices: funcIndices, strings: strings, structs: structs}
 	var idx uint32
 	if sig.isMethod {
 		b.locals["self"] = idx
@@ -239,6 +241,10 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		}
 		switch callee := n.Callee.(type) {
 		case *script.Identifier:
+			if layout, ok := b.structs[callee.Value]; ok {
+				return b.walkStructConstructor(layout, n.Args)
+			}
+
 			idx, ok := b.funcIndices[callee.Value]
 			if !ok {
 				return fmt.Errorf("unknown function %s", callee.Value)
@@ -517,6 +523,59 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		b.buf = AppendULEB128(b.buf, storeAlign)
 		b.buf = AppendULEB128(b.buf, 4)
 		return nil
+	case *script.MemberAccess:
+		objExpr, ok := n.Object.(script.Expression)
+		if !ok {
+			return fmt.Errorf("member access object has no type")
+		}
+		objType := objExpr.GetType()
+		if objType == nil || objType.Kind != script.TypeKind_Struct {
+			return fmt.Errorf("member access on non-struct type")
+		}
+		layout, ok := b.structs[objType.Struct]
+		if !ok {
+			return fmt.Errorf("unknown struct %s", objType.Struct)
+		}
+		field, ok := layout.findField(n.Field)
+		if !ok {
+			return fmt.Errorf("struct %s has no field %s", layout.name, n.Field)
+		}
+		loadOp, loadAlign := loadOpcode(field.kind)
+
+		if err := b.walk(n.Object); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, loadOp)
+		b.buf = AppendULEB128(b.buf, loadAlign)
+		b.buf = AppendULEB128(b.buf, field.offset)
+		return nil
+	case *script.MemberAssignment:
+		objExpr, ok := n.Object.(script.Expression)
+		if !ok {
+			return fmt.Errorf("member assignment object has no type")
+		}
+		objType := objExpr.GetType()
+		if objType == nil || objType.Kind != script.TypeKind_Struct {
+			return fmt.Errorf("member assignment on non-struct type")
+		}
+		layout, _ := b.structs[objType.Struct]
+		field, ok := layout.findField(n.Field)
+		if !ok {
+			return fmt.Errorf("struct %s has no field %s", layout.name, n.Field)
+		}
+		storeOp, storeAlign := storeOpcode(field.kind)
+
+		if err := b.walk(n.Object); err != nil {
+			return err
+		}
+		if err := b.walk(n.Value); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, storeOp)
+		b.buf = AppendULEB128(b.buf, storeAlign)
+		b.buf = AppendULEB128(b.buf, field.offset)
+
+		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}
@@ -582,4 +641,41 @@ func (b *bodyEncoder) addSyntheticLocal(vt byte) uint32 {
 	b.locals[fmt.Sprintf("__synth_%d", idx)] = idx
 	b.localTypes = append(b.localTypes, vt)
 	return idx
+}
+
+func (b *bodyEncoder) walkStructConstructor(layout *structLayout, args []script.AstNode) error {
+	tmp := b.addSyntheticLocal(ValI32)
+
+	// bump: tmp = heapPtr; heapPtr += layout.size
+	b.buf = append(b.buf, OpGlobalGet)
+	b.buf = AppendULEB128(b.buf, 0)
+	b.buf = append(b.buf, OpLocalTee)
+	b.buf = AppendULEB128(b.buf, tmp)
+	b.buf = append(b.buf, OpI32Const)
+	b.buf = AppendSLEB128(b.buf, int64(layout.size))
+	b.buf = append(b.buf, OpI32Add)
+	b.buf = append(b.buf, OpGlobalSet)
+	b.buf = AppendULEB128(b.buf, 0)
+
+	// end allocator
+
+	// store each field at its layout offset
+	for i, arg := range args {
+		f := layout.fields[i]
+		storeOp, storeAlign := storeOpcode(f.kind)
+
+		b.buf = append(b.buf, OpLocalGet)
+		b.buf = AppendULEB128(b.buf, tmp)
+		if err := b.walk(arg); err != nil {
+			return err
+		}
+		b.buf = append(b.buf, storeOp)
+		b.buf = AppendULEB128(b.buf, storeAlign)
+		b.buf = AppendULEB128(b.buf, f.offset)
+	}
+
+	// leave base pointer on the stack
+	b.buf = append(b.buf, OpLocalGet)
+	b.buf = AppendULEB128(b.buf, tmp)
+	return nil
 }

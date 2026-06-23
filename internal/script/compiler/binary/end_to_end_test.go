@@ -521,6 +521,37 @@ func TestEndToEnd_BoundsOutOfRange(t *testing.T) {
 		t.Fatalf("expected a trap on out-of-bounds write; got nil error")
 	}
 }
+
+func TestEndToEnd_StructFields(t *testing.T) {
+	src := `
+        struct Point {
+            x: f64;
+            y: f64;
+        }
+        fn make_point_x(): f64 {
+            let p = Point(3.0, 4.0);
+            return p.x;
+        }
+        fn make_point_y(): f64 {
+            let p = Point(3.0, 4.0);
+            return p.y;
+        }
+        fn distance_squared(): f64 {
+            let p = Point(3.0, 4.0);
+            return p.x * p.x + p.y * p.y;  // 9 + 16 = 25
+        }
+        fn mutate_y(): f64 {
+            let p = Point(3.0, 4.0);
+            p.y = 99.0;
+            return p.y;
+        }
+    `
+	runOne(t, src, "make_point_x", nil, api.EncodeF64(3.0))
+	runOne(t, src, "make_point_y", nil, api.EncodeF64(4.0))
+	runOne(t, src, "distance_squared", nil, api.EncodeF64(25.0))
+	runOne(t, src, "mutate_y", nil, api.EncodeF64(99.0))
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

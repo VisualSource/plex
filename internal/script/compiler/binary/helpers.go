@@ -6,6 +6,29 @@ import (
 	"github.com/VisualSource/plex/internal/script"
 )
 
+func collectStructs(p *script.Program) map[string]*structLayout {
+	out := map[string]*structLayout{}
+	for _, stmt := range p.Stmts {
+		decl, ok := stmt.(*script.StructStatement)
+		if !ok {
+			continue
+		}
+		layout := &structLayout{name: decl.Name}
+		var offset uint32
+		for _, p := range decl.Fields {
+			ft := p.GetType().Kind
+			sz := elemSizeOf(ft)
+			layout.fields = append(layout.fields, structField{
+				name: p.Name, kind: ft, offset: offset,
+			})
+			offset += sz
+		}
+		layout.size = offset
+		out[decl.Name] = layout
+	}
+	return out
+}
+
 func collectSignatures(p *script.Program) ([]funcSig, []*script.FunctionDeclaration, []exportEntry, error) {
 	var sigs []funcSig
 	var funcs []*script.FunctionDeclaration
@@ -117,7 +140,7 @@ func collectStrings(p *script.Program) *stringTable {
 	return st
 }
 
-func programHasArrays(p *script.Program) bool {
+func programHasHeapAllocation(p *script.Program, structs map[string]*structLayout) bool {
 	found := false
 	var walk func(script.AstNode)
 	walk = func(n script.AstNode) {
@@ -158,6 +181,13 @@ func programHasArrays(p *script.Program) bool {
 			walk(v.Condition)
 			walk(v.Body)
 		case *script.FunctionCall:
+			if id, ok := v.Callee.(*script.Identifier); ok {
+				if _, isStruct := structs[id.Value]; isStruct {
+					found = true
+					return
+				}
+			}
+
 			walk(v.Callee)
 			for _, a := range v.Args {
 				walk(a)
