@@ -8,8 +8,12 @@ import (
 
 const (
 	OpUnreachable byte = 0x00
+	OpBlock       byte = 0x02
+	OpLoop        byte = 0x03
 	OpIf          byte = 0x04
 	OpElse        byte = 0x05
+	OpBr          byte = 0x0C
+	OpBrIf        byte = 0x0D
 
 	OpEnd      byte = 0x0B
 	OpReturn   byte = 0x0F
@@ -23,8 +27,9 @@ const (
 	OpI64Const byte = 0x42
 	OpF64Const byte = 0x44
 
-	OpI32Eq byte = 0x46
-	OpI32Ne byte = 0x47
+	OpI32Eqz byte = 0x45
+	OpI32Eq  byte = 0x46
+	OpI32Ne  byte = 0x47
 
 	OpI64Eq  byte = 0x51
 	OpI64Ne  byte = 0x52

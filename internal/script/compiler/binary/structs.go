@@ -12,3 +12,8 @@ type exportEntry struct {
 	kind byte
 	idx  uint32
 }
+
+type loopEntry struct {
+	blockLabel uint32
+	loopLabel  uint32
+}

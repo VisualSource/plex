@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 31 – While Loops: block + loop + br</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 860px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .depth { color: var(--purple); font-size: 0.82em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 31 – While Loops: <code>block</code> + <code>loop</code> + <code>br</code></h1>
+
+<p><strong>Goal:</strong> compile <code>while cond { body }</code>, <code>break</code>, and <code>continue</code> to valid WASM binary. By the end you can write <code>sum(10)</code> and get 55.</p>
+
+<p><strong>Files you'll touch:</strong>
+  <a href="../compiler/binary/opcodes.go">opcodes.go</a> &middot;
+  <a href="../compiler/binary/body.go">body.go</a> &middot;
+  <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>
+</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>The Big Idea: WASM Has No <code>while</code> Opcode</h2>
+
+<p>In x86 assembly a while loop is a conditional forward jump (skip the body) plus an unconditional backward jump (restart). WASM disallows arbitrary jumps — but it <em>does</em> allow structured backward edges via a two-level nesting:</p>
+
+<div class="diagram">
+<span class="byte">02 40</span>   <span class="cmt">; block (empty blocktype) — the BREAK target</span>
+  <span class="byte">03 40</span> <span class="cmt">; loop  (empty blocktype) — the CONTINUE target</span>
+    <span class="cmt">; ... emit condition ...</span>
+    <span class="byte">45</span>   <span class="cmt">; i32.eqz — negate: push 1 when condition was 0 (false)</span>
+    <span class="byte">0D 01</span> <span class="cmt">; br_if 1  — if negated condition is 1, exit the outer block</span>
+    <span class="cmt">; ... emit body ...</span>
+    <span class="byte">0C 00</span> <span class="cmt">; br 0     — unconditional restart: jump to top of loop</span>
+  <span class="byte">0B</span>   <span class="cmt">; end (loop)</span>
+<span class="byte">0B</span>     <span class="cmt">; end (block)</span>
+</div>
+
+<div class="insight">
+<strong>The crucial asymmetry:</strong>
+A <code>block</code> label points to its <strong>END</strong> — <code>br</code> into a block is a forward jump (skip to the closing <code>end</code>).
+A <code>loop</code> label points to its <strong>START</strong> — <code>br</code> into a loop is a backward jump (restart from the top).
+This is why <code>br 0</code> inside a <code>loop</code> restarts the loop, not exits it.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Label Depth Arithmetic</h2>
+
+<p>WASM branch instructions take a <em>relative depth index</em>. Depth 0 is the innermost enclosing block/loop/if; depth 1 is the next one out; and so on.</p>
+
+<p>From inside the while loop body, with no extra nesting:</p>
+
+<div class="diagram">
+<span class="depth">depth=2 →</span> <span class="kw">block</span>                <span class="cmt">; label index from inside loop body: 1</span>
+<span class="depth">depth=2 →</span>   <span class="kw">loop</span>               <span class="cmt">; label index from inside loop body: 0</span>
+               <span class="cmt">; === loop body (no extra nesting) ===</span>
+               <span class="kw">break</span>  <span class="arrow">→</span> <span class="byte">br 1</span>   <span class="cmt">; exits block (forward to end)</span>
+               <span class="kw">continue</span> <span class="arrow">→</span> <span class="byte">br 0</span> <span class="cmt">; restarts loop (backward to top)</span>
+             <span class="kw">end</span>
+           <span class="kw">end</span>
+</div>
+
+<p>But when <code>break</code> or <code>continue</code> appear inside an <code>if</code> block within the loop, an extra level is added:</p>
+
+<div class="diagram">
+<span class="kw">block</span>                                   <span class="cmt">; label: 1 from loop body, 2 from inside if</span>
+  <span class="kw">loop</span>                                  <span class="cmt">; label: 0 from loop body, 1 from inside if</span>
+    <span class="cmt">; depth=2 here — no extra blocks open</span>
+    <span class="kw">if</span> <span class="byte">0x40</span>                             <span class="cmt">; opens one more level</span>
+      <span class="cmt">; depth=3 here — one extra block open</span>
+      <span class="kw">break</span>    <span class="arrow">→</span> <span class="byte">br 2</span>  <span class="cmt">; +1 past the if, then exits block</span>
+      <span class="kw">continue</span> <span class="arrow">→</span> <span class="byte">br 1</span>  <span class="cmt">; +1 past the if, then restarts loop</span>
+    <span class="kw">end</span>
+    <span class="byte">br 0</span>  <span class="cmt">; unconditional back-edge</span>
+  <span class="kw">end</span>
+<span class="kw">end</span>
+</div>
+
+<p>The implementation tracks a <code>blockDepth</code> counter on <code>bodyEncoder</code>, incremented whenever a <code>block</code>, <code>loop</code>, or <code>if</code> is opened and decremented on <code>end</code>. The <code>loopStack</code> records the blockDepth at the moment each loop's labels were created, so the correct depth can be computed at the point of any <code>break</code> or <code>continue</code>.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Implementation</h2>
+
+<h3>Step 1 — Add opcodes</h3>
+
+<p>Open <a href="../compiler/binary/opcodes.go">opcodes.go</a>. Add to the constant block:</p>
+
+<pre><code><span class="cmt">// Structured loops</span>
+OpBlock  <span class="ty">byte</span> = <span class="byte">0x02</span>  <span class="cmt">// label points to END  — br exits forward</span>
+OpLoop   <span class="ty">byte</span> = <span class="byte">0x03</span>  <span class="cmt">// label points to START — br restarts backward</span>
+OpBr     <span class="ty">byte</span> = <span class="byte">0x0C</span>  <span class="cmt">// unconditional branch</span>
+OpBrIf   <span class="ty">byte</span> = <span class="byte">0x0D</span>  <span class="cmt">// conditional branch (pops i32; branches if non-zero)</span>
+OpI32Eqz <span class="ty">byte</span> = <span class="byte">0x45</span>  <span class="cmt">// i32.eqz: 0→1, anything else→0 (logical not)</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 2 — Add depth tracking to <code>bodyEncoder</code></h3>
+
+<p>Open <a href="../compiler/binary/body.go">body.go</a>. Extend the struct:</p>
+
+<pre><code><span class="kw">type</span> <span class="ty">loopEntry</span> <span class="kw">struct</span> {
+    blockLabel <span class="ty">uint32</span>  <span class="cmt">// blockDepth when the block was opened (break target)</span>
+    loopLabel  <span class="ty">uint32</span>  <span class="cmt">// blockDepth when the loop was opened (continue target)</span>
+}
+
+<span class="kw">type</span> <span class="ty">bodyEncoder</span> <span class="kw">struct</span> {
+    buf        []<span class="ty">byte</span>
+    locals     <span class="kw">map</span>[<span class="ty">string</span>]<span class="ty">uint32</span>
+    localTypes []<span class="ty">byte</span>
+<span class="hl">    blockDepth <span class="ty">int</span>         <span class="cmt">// number of open block/loop/if instructions</span></span>
+<span class="hl">    loopStack  []<span class="ty">loopEntry</span> <span class="cmt">// one entry per enclosing while loop</span></span>
+}</code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 3 — Track depth in the existing <code>IfStatement</code> case</h3>
+
+<p>The <code>if</code> instruction opens a new label level, so <code>blockDepth</code> must be updated there too — otherwise <code>break</code>/<code>continue</code> inside a conditional will emit wrong depths.</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.IfStatement</span>:
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Condition); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpIf</span>, <span class="ty">BlockTypeEmpty</span>)
+<span class="hl">    b.blockDepth++</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Body); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    <span class="kw">if</span> n.Else != <span class="kw">nil</span> {
+        b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpElse</span>)
+        <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Else); err != <span class="kw">nil</span> {
+            <span class="kw">return</span> err
+        }
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpEnd</span>)
+<span class="hl">    b.blockDepth--</span>
+    <span class="kw">return nil</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 4 — Handle <code>WhileStatement</code></h3>
+
+<p>Add this case to the <code>walk</code> switch. The pattern is: emit <code>block</code>, emit <code>loop</code>, record depths, emit negated condition + <code>br_if</code>, emit body, emit back-edge <code>br</code>, close both blocks.</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.WhileStatement</span>:
+    <span class="cmt">// outer block: break target (label points to END)</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpBlock</span>, <span class="ty">BlockTypeEmpty</span>)
+    b.blockDepth++
+    blockLabel := <span class="ty">uint32</span>(b.blockDepth)
+
+    <span class="cmt">// inner loop: continue target (label points to START)</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpLoop</span>, <span class="ty">BlockTypeEmpty</span>)
+    b.blockDepth++
+    loopLabel := <span class="ty">uint32</span>(b.blockDepth)
+
+    b.loopStack = <span class="fn">append</span>(b.loopStack, <span class="ty">loopEntry</span>{blockLabel: blockLabel, loopLabel: loopLabel})
+
+    <span class="cmt">// condition — negate then branch-if to exit</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Condition); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpI32Eqz</span>)
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpBrIf</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="ty">uint32</span>(b.blockDepth)-blockLabel)
+
+    <span class="cmt">// body</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Body); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> err
+    }
+
+    <span class="cmt">// unconditional back-edge to loop top</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpBr</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="ty">uint32</span>(b.blockDepth)-loopLabel)
+
+    b.loopStack = b.loopStack[:len(b.loopStack)-<span class="num">1</span>]
+    b.blockDepth -= <span class="num">2</span>
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpEnd</span>, <span class="ty">OpEnd</span>)
+    <span class="kw">return nil</span></code></pre>
+
+<div class="insight">
+<strong>Why emit <code>OpEnd, OpEnd</code> together?</strong> The first <code>end</code> closes the <code>loop</code>; the second closes the <code>block</code>. They're adjacent bytes with no instruction between them — valid because the <code>br 0</code> back-edge above prevents fall-through reaching the first <code>end</code> at runtime.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 5 — Handle <code>BreakStatement</code> and <code>ContinueStatement</code></h3>
+
+<p><code>break</code> and <code>continue</code> are unconditional branches. The depth is computed from the stored label against the current <code>blockDepth</code>:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.BreakStatement</span>:
+    <span class="kw">if</span> <span class="fn">len</span>(b.loopStack) == <span class="num">0</span> {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"break outside loop"</span>)
+    }
+    entry := b.loopStack[<span class="fn">len</span>(b.loopStack)-<span class="num">1</span>]
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpBr</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="ty">uint32</span>(b.blockDepth)-entry.blockLabel)
+    <span class="kw">return nil</span>
+
+<span class="kw">case</span> *<span class="ty">script.ContinueStatement</span>:
+    <span class="kw">if</span> <span class="fn">len</span>(b.loopStack) == <span class="num">0</span> {
+        <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"continue outside loop"</span>)
+    }
+    entry := b.loopStack[<span class="fn">len</span>(b.loopStack)-<span class="num">1</span>]
+    b.buf = <span class="fn">append</span>(b.buf, <span class="ty">OpBr</span>)
+    b.buf = <span class="fn">AppendULEB128</span>(b.buf, <span class="ty">uint32</span>(b.blockDepth)-entry.loopLabel)
+    <span class="kw">return nil</span></code></pre>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 6 — Extend <code>collectLocals</code> to recurse into while bodies</h3>
+
+<p>The two-phase local pre-scan needs to walk into while loop bodies so that <code>let</code> declarations inside loops get assigned indices before any bytecode is emitted. Add a case to <code>collectLocals</code>:</p>
+
+<pre><code><span class="kw">case</span> *<span class="ty">script.WhileStatement</span>:
+    b.<span class="fn">collectLocals</span>(n.Body)
+<span class="kw">case</span> *<span class="ty">script.IfStatement</span>:
+    b.<span class="fn">collectLocals</span>(n.Body)
+    <span class="kw">if</span> n.Else != <span class="kw">nil</span> {
+        b.<span class="fn">collectLocals</span>(n.Else)
+    }</code></pre>
+
+<div class="warn">
+<strong>This is a real bug waiting to happen.</strong> Without this, a <code>let x</code> inside a <code>while</code> body won't appear in the locals vec, so <code>local.get</code>/<code>local.set</code> will emit an index that is out of bounds — wazero will reject the module at instantiation time with a validation error, not a runtime trap.
+</div>
+
+<hr style="border-color: var(--border); margin: 2em 0;">
+
+<h3>Step 7 — Write the test</h3>
+
+<p>Open <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>. A triangular sum exercises <code>while</code>, a local counter, and mutation:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_WhileSum</span>(t *<span class="ty">testing.T</span>) {
+    src := `
+        fn sum(n: i64): i64 {
+            <span class="kw">let</span> i: i64 = <span class="num">1</span>;
+            <span class="kw">let</span> acc: i64 = <span class="num">0</span>;
+            <span class="kw">while</span> i &lt;= n {
+                acc = acc + i;
+                i = i + <span class="num">1</span>;
+            }
+            <span class="kw">return</span> acc;
+        }
+    `
+    <span class="fn">runOne</span>(t, src, <span class="str">"sum"</span>, []<span class="ty">uint64</span>{<span class="num">10</span>}, <span class="num">55</span>)   <span class="cmt">// 1+2+…+10 = 55</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"sum"</span>, []<span class="ty">uint64</span>{<span class="num">0</span>}, <span class="num">0</span>)    <span class="cmt">// zero iterations</span>
+    <span class="fn">runOne</span>(t, src, <span class="str">"sum"</span>, []<span class="ty">uint64</span>{<span class="num">1</span>}, <span class="num">1</span>)    <span class="cmt">// exactly one iteration</span>
+}</code></pre>
+
+<p>Run with:</p>
+<pre><code>go test ./compiler/binary/... -run TestEndToEnd -v</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Byte Trace for <code>sum(3)</code></h2>
+
+<p>Walking through the compiled body for <code>sum(3)</code> helps confirm the encoding is right:</p>
+
+<div class="diagram">
+<span class="byte">02</span>            <span class="cmt">; 2 local groups: (1 × i64) for i, (1 × i64) for acc</span>
+<span class="byte">  01 7E</span>        <span class="cmt">; 1 × i64 (i)</span>
+<span class="byte">  01 7E</span>        <span class="cmt">; 1 × i64 (acc)</span>
+
+<span class="cmt">; let i: i64 = 1</span>
+<span class="byte">42 01</span>          <span class="cmt">; i64.const 1</span>
+<span class="byte">21 01</span>          <span class="cmt">; local.set 1   (i is param-count + 0 = index 1, since n is index 0)</span>
+
+<span class="cmt">; let acc: i64 = 0</span>
+<span class="byte">42 00</span>          <span class="cmt">; i64.const 0</span>
+<span class="byte">21 02</span>          <span class="cmt">; local.set 2   (acc is index 2)</span>
+
+<span class="byte">02 40</span>          <span class="cmt">; block  (break target)</span>
+  <span class="byte">03 40</span>        <span class="cmt">; loop   (continue target)</span>
+
+  <span class="cmt">; while i &lt;= n</span>
+  <span class="byte">20 01</span>        <span class="cmt">; local.get 1   (i)</span>
+  <span class="byte">20 00</span>        <span class="cmt">; local.get 0   (n)</span>
+  <span class="byte">57</span>           <span class="cmt">; i64.le_s      → i32: 1 if i&lt;=n, 0 if i&gt;n</span>
+  <span class="byte">45</span>           <span class="cmt">; i32.eqz       → 1 if i&gt;n (condition false), 0 if i&lt;=n</span>
+  <span class="byte">0D 01</span>        <span class="cmt">; br_if 1       → exit block if condition was false</span>
+
+  <span class="cmt">; acc = acc + i</span>
+  <span class="byte">20 02</span>        <span class="cmt">; local.get 2   (acc)</span>
+  <span class="byte">20 01</span>        <span class="cmt">; local.get 1   (i)</span>
+  <span class="byte">7C</span>           <span class="cmt">; i64.add</span>
+  <span class="byte">21 02</span>        <span class="cmt">; local.set 2   (acc)</span>
+
+  <span class="cmt">; i = i + 1</span>
+  <span class="byte">20 01</span>        <span class="cmt">; local.get 1   (i)</span>
+  <span class="byte">42 01</span>        <span class="cmt">; i64.const 1</span>
+  <span class="byte">7C</span>           <span class="cmt">; i64.add</span>
+  <span class="byte">21 01</span>        <span class="cmt">; local.set 1   (i)</span>
+
+  <span class="byte">0C 00</span>        <span class="cmt">; br 0          → restart loop</span>
+  <span class="byte">0B</span>           <span class="cmt">; end (loop)</span>
+<span class="byte">0B</span>             <span class="cmt">; end (block)</span>
+
+<span class="cmt">; return acc</span>
+<span class="byte">20 02</span>          <span class="cmt">; local.get 2</span>
+<span class="byte">0F</span>             <span class="cmt">; return</span>
+<span class="byte">00 0B</span>          <span class="cmt">; unreachable + end (function body)</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Knowledge Check</h2>
+
+<div class="quiz-section">
+<h3>Quiz</h3>
+
+<div class="q" id="q1">
+  <p>1. In WASM, what does <code>br 0</code> do when it appears inside a <code>loop</code> block?</p>
+  <label><input type="radio" name="q1" value="a"> Exits the loop and jumps past its closing <code>end</code></label>
+  <label><input type="radio" name="q1" value="b"> Jumps to the top of the loop and restarts execution</label>
+  <label><input type="radio" name="q1" value="c"> Jumps to the bottom of the next outer block</label>
+  <label><input type="radio" name="q1" value="d"> Raises an unreachable trap at runtime</label>
+  <div class="feedback" id="q1-fb"></div>
+</div>
+
+<div class="q" id="q2">
+  <p>2. Why is <code>i32.eqz</code> emitted immediately after the while condition, before <code>br_if</code>?</p>
+  <label><input type="radio" name="q2" value="a"> To convert the i64 condition to i32 so <code>br_if</code> accepts it</label>
+  <label><input type="radio" name="q2" value="b"> To negate it — <code>br_if</code> fires when the stack top is 1, so we exit on false (0)</label>
+  <label><input type="radio" name="q2" value="c"> To handle the case where the condition is a boolean literal</label>
+  <label><input type="radio" name="q2" value="d"> To reset the stack before entering the loop body</label>
+  <div class="feedback" id="q2-fb"></div>
+</div>
+
+<div class="q" id="q3">
+  <p>3. A <code>break</code> appears inside an <code>if</code> inside a <code>while</code> (no further nesting). What <code>br</code> depth does it emit?</p>
+  <label><input type="radio" name="q3" value="a"> br 0 — the innermost enclosing block is the loop</label>
+  <label><input type="radio" name="q3" value="b"> br 1 — same as break outside a nested block</label>
+  <label><input type="radio" name="q3" value="c"> br 2 — one extra level for the enclosing if, plus one for the while block</label>
+  <label><input type="radio" name="q3" value="d"> br 3 — block + loop + if counts as three levels</label>
+  <div class="feedback" id="q3-fb"></div>
+</div>
+
+<div class="q" id="q4">
+  <p>4. What is the key difference between a <code>block</code> and a <code>loop</code> in WASM?</p>
+  <label><input type="radio" name="q4" value="a"> A block can hold any bytecode; a loop is restricted to numeric instructions</label>
+  <label><input type="radio" name="q4" value="b"> A block label points to its start; a loop label points to its end</label>
+  <label><input type="radio" name="q4" value="c"> A block label points to its end; a loop label points to its start</label>
+  <label><input type="radio" name="q4" value="d"> They are identical; the names are conventions for readability only</label>
+  <div class="feedback" id="q4-fb"></div>
+</div>
+
+<div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>What's Next</h2>
+
+<ul>
+  <li><strong>Function calls</strong> — <code>call funcidx</code> to invoke other compiled functions and pass return values on the stack.</li>
+  <li><strong>Nested loops</strong> — the depth arithmetic already handles them; writing a matrix-traversal test would confirm it.</li>
+</ul>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>Primary Source</h2>
+
+<p><a href="https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions" target="_blank">WebAssembly Core Spec §5.4.1 — Control Instructions</a> — defines <code>block</code> (0x02), <code>loop</code> (0x03), <code>br</code> (0x0C), <code>br_if</code> (0x0D), and the label semantics (block labels at end, loop labels at start).</p>
+
+<p><a href="https://webassembly.github.io/spec/core/valid/instructions.html#control-instructions" target="_blank">WebAssembly Core Spec §3.3.5 — Validation of Control Instructions</a> — explains why structured control flow can be validated in one O(n) pass.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<hr style="border-color: var(--border); margin: 2.5em 0 1em;">
+<p style="color: var(--muted); font-size: 0.9em;">
+  Have a question? Ask your teacher agent — it can clarify label depth arithmetic, help debug a failing test, or explain what the wazero validation error means.
+</p>
+<p style="color: var(--muted); font-size: 0.85em;">
+  Prev: <a href="0030-if-statements-and-comparisons.html">Lesson 30 — If Statements &amp; Comparisons</a>
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'c', q4: 'c' };
+const explanations = {
+  q1: 'Correct — a loop\'s label points to its START. br 0 inside a loop is a backward jump that restarts from the top. This is the key asymmetry: block labels point to the end (forward), loop labels to the start (backward).',
+  q2: 'Correct — br_if branches when the stack top is non-zero. The while condition is 1 when true (keep looping) and 0 when false (exit). i32.eqz flips this: 0→1 (false condition → branch to exit), 1→0 (true condition → fall through to body).',
+  q3: 'Correct — inside the if, blockDepth is one higher than inside the plain loop body. The if block itself is label 0, the loop is label 1, and the outer break-target block is label 2.',
+  q4: 'Correct — block labels point to the END (so br into a block is a forward skip). Loop labels point to the START (so br into a loop is a backward restart). This asymmetry is what makes the block+loop two-level pattern work for while loops.'
+};
+const wrong = {
+  q1: 'A loop label points to the START, not the end. br 0 restarts the loop. br 1 (from inside) would exit the outer block.',
+  q2: 'i32.eqz is a logical NOT — it converts the condition into a signal for br_if. br_if exits when top-of-stack is 1, so we need to flip: eqz(false condition = 0) = 1, which fires the branch.',
+  q3: 'Three open blocks at the point of break: the outer block (break target), the loop (continue target), and the if. From inside the if, break exits the block at label 2 — one more than the unnestedcase.',
+  q4: 'The distinction is where the label points. Block labels point to the END (forward jumps exit past it). Loop labels point to the START (backward jumps restart it). They are not interchangeable.'
+};
+
+let answered = {};
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    if (answered[qid]) return;
+    answered[qid] = true;
+    const correct = answers[qid] === this.value;
+    this.closest('label').classList.add(correct ? 'correct' : 'wrong');
+    const fb = document.getElementById(qid + '-fb');
+    fb.style.display = 'block';
+    fb.style.color = correct ? 'var(--green)' : 'var(--accent)';
+    fb.textContent = correct ? '✓ ' + explanations[qid] : '✗ ' + wrong[qid];
+    if (Object.keys(answered).length === Object.keys(answers).length) {
+      const box = document.getElementById('score-box');
+      const n = Object.entries(answered).filter(([k]) => answers[k] === document.querySelector(`input[name=${k}]:checked`)?.value).length;
+      box.style.display = 'block';
+      box.innerHTML = `Score: <strong>${n} / ${Object.keys(answers).length}</strong> — ${n === Object.keys(answers).length ? 'All correct. Implement it.' : 'Review highlighted answers, then implement.'}`;
+    }
+  });
+});
+</script>
+</body>
+</html>

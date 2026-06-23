@@ -90,6 +90,23 @@ func TestEndToEnd_IfElse(t *testing.T) {
 	runOne(t, src, "max", []uint64{17, 42}, 42) // takes else branch
 }
 
+func TestEndToEnd_WhileSum(t *testing.T) {
+	src := `
+        fn sum(n: i64): i64 {
+            let i: i64 = 1;
+            let acc: i64 = 0;
+            while i <= n {
+                acc = acc + i;
+                i = i + 1;
+            }
+            return acc;
+        }
+    `
+	runOne(t, src, "sum", []uint64{10}, 55) // 1+2+…+10 = 55
+	runOne(t, src, "sum", []uint64{0}, 0)   // zero iterations
+	runOne(t, src, "sum", []uint64{1}, 1)   // exactly one iteration
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

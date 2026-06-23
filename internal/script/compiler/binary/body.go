@@ -13,6 +13,9 @@ type bodyEncoder struct {
 	buf        []byte
 	locals     map[string]uint32
 	localTypes []byte
+
+	blockDepth int
+	loopStack  []loopEntry
 }
 
 func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig) *bodyEncoder {
@@ -141,6 +144,8 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			return err
 		}
 		b.buf = append(b.buf, OpIf, BlockTypeEmpty)
+		b.blockDepth++
+
 		if err := b.walk(n.Body); err != nil {
 			return err
 		}
@@ -151,6 +156,58 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			}
 		}
 		b.buf = append(b.buf, OpEnd)
+		b.blockDepth--
+
+		return nil
+	case *script.WhileStatement:
+		b.buf = append(b.buf, OpBlock, BlockTypeEmpty)
+		b.blockDepth++
+		blockLabel := uint32(b.blockDepth)
+
+		b.buf = append(b.buf, OpLoop, BlockTypeEmpty)
+		b.blockDepth++
+		loopLabel := uint32(b.blockDepth)
+
+		b.loopStack = append(b.loopStack, loopEntry{
+			blockLabel,
+			loopLabel,
+		})
+
+		if err := b.walk(n.Condition); err != nil {
+			return err
+		}
+
+		b.buf = append(b.buf, OpI32Eqz)
+		b.buf = append(b.buf, OpBrIf)
+		b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-blockLabel)
+
+		if err := b.walk(n.Body); err != nil {
+			return err
+		}
+
+		b.buf = append(b.buf, OpBr)
+
+		b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-loopLabel)
+		b.loopStack = b.loopStack[:len(b.loopStack)-1]
+		b.blockDepth -= 2
+
+		b.buf = append(b.buf, OpEnd, OpEnd)
+		return nil
+	case *script.BreakStatement:
+		if len(b.loopStack) == 0 {
+			return fmt.Errorf("break outside loop")
+		}
+		entry := b.loopStack[len(b.loopStack)-1]
+		b.buf = append(b.buf, OpBr)
+		b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-entry.blockLabel)
+		return nil
+	case *script.ContinueStatement:
+		if len(b.loopStack) == 0 {
+			return fmt.Errorf("continue outside loop")
+		}
+		entry := b.loopStack[len(b.loopStack)-1]
+		b.buf = append(b.buf, OpBr)
+		b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-entry.loopLabel)
 		return nil
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
@@ -170,6 +227,13 @@ func (b *bodyEncoder) collectLocals(node script.AstNode) {
 			b.localTypes = append(b.localTypes, valType(t))
 		} else {
 			b.localTypes = append(b.localTypes, ValI64)
+		}
+	case *script.WhileStatement:
+		b.collectLocals(n.Body)
+	case *script.IfStatement:
+		b.collectLocals(n.Body)
+		if n.Else != nil {
+			b.collectLocals(n.Else)
 		}
 	}
 }
