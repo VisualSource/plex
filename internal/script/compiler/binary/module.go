@@ -18,6 +18,11 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		return nil, err
 	}
 
+	funcIndexes := make(map[string]uint32, len(sigs))
+	for i, s := range sigs {
+		funcIndexes[s.name] = uint32(i)
+	}
+
 	var out []byte
 	out = append(out, magic...)
 	out = append(out, version...)
@@ -30,7 +35,7 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 			out = append(out, encodeExportSection(exports)...)
 		}
 
-		code, err := encodeCodeSection(funcs, sigs)
+		code, err := encodeCodeSection(funcs, sigs, funcIndexes)
 		if err != nil {
 			return nil, err
 		}

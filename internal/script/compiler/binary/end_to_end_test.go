@@ -107,6 +107,20 @@ func TestEndToEnd_WhileSum(t *testing.T) {
 	runOne(t, src, "sum", []uint64{1}, 1)   // exactly one iteration
 }
 
+func TestEndToEnd_FunctionCall(t *testing.T) {
+	src := `
+        fn square(x: i64): i64 {
+            return x * x;
+        }
+        fn sum_squares(a: i64, b: i64): i64 {
+            return square(a) + square(b);
+        }
+    `
+	runOne(t, src, "sum_squares", []uint64{3, 4}, 25)   // 3²+4²=25
+	runOne(t, src, "sum_squares", []uint64{5, 12}, 169) // 5²+12²=169=13²
+	runOne(t, src, "square", []uint64{7}, 49)           // direct call too
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

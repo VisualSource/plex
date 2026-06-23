@@ -12,10 +12,12 @@ const (
 	OpLoop        byte = 0x03
 	OpIf          byte = 0x04
 	OpElse        byte = 0x05
-	OpBr          byte = 0x0C
-	OpBrIf        byte = 0x0D
 
-	OpEnd      byte = 0x0B
+	OpCall byte = 0x10
+	OpEnd  byte = 0x0B
+	OpBr   byte = 0x0C
+	OpBrIf byte = 0x0D
+
 	OpReturn   byte = 0x0F
 	OpLocalGet byte = 0x20
 	OpLocalSet byte = 0x21

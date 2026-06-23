@@ -16,10 +16,12 @@ type bodyEncoder struct {
 
 	blockDepth int
 	loopStack  []loopEntry
+
+	funcIndices map[string]uint32
 }
 
-func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig) *bodyEncoder {
-	b := &bodyEncoder{locals: make(map[string]uint32)}
+func newBodyEncoder(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32) *bodyEncoder {
+	b := &bodyEncoder{locals: make(map[string]uint32), funcIndices: funcIndices}
 	var idx uint32
 	if sig.isMethod {
 		b.locals["self"] = idx
@@ -209,6 +211,25 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		b.buf = append(b.buf, OpBr)
 		b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-entry.loopLabel)
 		return nil
+	case *script.FunctionCall:
+		for _, arg := range n.Args {
+			if err := b.walk(arg); err != nil {
+				return err
+			}
+		}
+		switch callee := n.Callee.(type) {
+		case *script.Identifier:
+			idx, ok := b.funcIndices[callee.Value]
+			if !ok {
+				return fmt.Errorf("unknown function %s", callee.Value)
+			}
+
+			b.buf = append(b.buf, OpCall)
+			b.buf = AppendULEB128(b.buf, idx)
+			return nil
+		default:
+			return fmt.Errorf("unsupported callee type %T", n.Callee)
+		}
 	default:
 		return fmt.Errorf("unhandled AST node %T", n)
 	}

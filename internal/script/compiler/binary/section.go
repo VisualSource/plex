@@ -45,10 +45,10 @@ func encodeFunctionSection(sigs []funcSig) []byte {
 	return section(SectionFunction, body)
 }
 
-func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig) ([]byte, error) {
+func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig, funcIndices map[string]uint32) ([]byte, error) {
 	var body []byte
 
-	enc := newBodyEncoder(f, sig)
+	enc := newBodyEncoder(f, sig, funcIndices)
 
 	body = AppendULEB128(body, uint32(len(enc.localTypes)))
 
@@ -72,13 +72,13 @@ func encodeCodeEntry(f *script.FunctionDeclaration, sig funcSig) ([]byte, error)
 	return entry, nil
 }
 
-func encodeCodeSection(funcs []*script.FunctionDeclaration, sigs []funcSig) ([]byte, error) {
+func encodeCodeSection(funcs []*script.FunctionDeclaration, sigs []funcSig, funcIndices map[string]uint32) ([]byte, error) {
 	var body []byte
 	body = AppendULEB128(body, uint32(len(funcs)))
 	for i, f := range funcs {
 		sig := sigs[i]
 
-		entry, err := encodeCodeEntry(f, sig)
+		entry, err := encodeCodeEntry(f, sig, funcIndices)
 		if err != nil {
 			return nil, err
 		}
