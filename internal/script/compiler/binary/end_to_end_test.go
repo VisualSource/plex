@@ -679,6 +679,30 @@ func TestEndToEnd_TypeCast(t *testing.T) {
 	runOne(t, src, "i64_to_i32", []uint64{42}, 42)
 }
 
+func TestEndToEnd_ArrayAppend(t *testing.T) {
+	src := `
+        fn grow(): int {
+            let arr: int[] = [1, 2, 3];
+            arr.append(4);
+            return arr.len();
+        }
+        fn grow_read(): int {
+            let arr: int[] = [10, 20];
+            arr.append(30);
+            return arr[2];
+        }
+        fn grow_twice(): int {
+            let arr: int[] = [1];
+            arr.append(2);
+            arr.append(3);
+            return arr[0] + arr[1] + arr[2]; // 1 + 2 + 3 = 6
+        }
+    `
+	runOne(t, src, "grow", nil, 4)
+	runOne(t, src, "grow_read", nil, 30)
+	runOne(t, src, "grow_twice", nil, 6)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

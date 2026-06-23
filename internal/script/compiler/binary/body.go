@@ -285,13 +285,11 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 					return fmt.Errorf("string has no method %s", callee.Field)
 				}
 			case script.TypeKind_Array:
-				for _, arg := range n.Args {
-					if err := b.walk(arg); err != nil {
-						return err
-					}
-				}
 				switch callee.Field {
 				case "len":
+					if len(n.Args) != 0 {
+						return fmt.Errorf("len method was expecting no args but was given %d", len(n.Args))
+					}
 					if err := b.walk(callee.Object); err != nil {
 						return err
 					}
@@ -301,6 +299,60 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 					b.buf = AppendULEB128(b.buf, 0) // Offset
 					b.buf = append(b.buf, OpI64ExtendI32S)
 
+					return nil
+				case "append":
+					if len(n.Args) != 1 {
+						return fmt.Errorf("append method was expecting 1 arg but was given %d", len(n.Args))
+					}
+					if err := b.walk(n.Args[0]); err != nil {
+						return err
+					}
+
+					arr := b.addSyntheticLocal(ValI32)
+					if err := b.walk(callee.Object); err != nil {
+						return err
+					}
+					b.buf = append(b.buf, OpLocalTee)
+					b.buf = AppendULEB128(b.buf, arr)
+
+					// compute write_addr = ptr + 4 + len*elemSize
+					eSize := elemSizeOf(objType.Element.Kind)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arr)
+					b.buf = append(b.buf, OpI32Load)
+					b.buf = AppendULEB128(b.buf, 2)
+					b.buf = AppendULEB128(b.buf, 0)
+					b.buf = append(b.buf, OpI32Const)
+					b.buf = AppendULEB128(b.buf, eSize)
+					b.buf = append(b.buf, OpI32Mul)
+					b.buf = append(b.buf, OpI32Const, 4)
+					b.buf = append(b.buf, OpI32Add)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arr)
+					b.buf = append(b.buf, OpI32Add)
+
+					// store the new element
+					if err := b.walk(n.Args[0]); err != nil {
+						return err
+					}
+					stOp, stAlign := storeOpcode(objType.Element.Kind)
+					b.buf = append(b.buf, stOp)
+					b.buf = AppendULEB128(b.buf, uint32(stAlign))
+					b.buf = AppendULEB128(b.buf, 0)
+
+					// increment length at ptr
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arr)
+					b.buf = append(b.buf, OpLocalGet)
+					b.buf = AppendULEB128(b.buf, arr)
+					b.buf = append(b.buf, OpI32Load)
+					b.buf = AppendULEB128(b.buf, 2)
+					b.buf = AppendULEB128(b.buf, 0)
+					b.buf = append(b.buf, OpI32Const, 1)
+					b.buf = append(b.buf, OpI32Add)
+					b.buf = append(b.buf, OpI32Store)
+					b.buf = AppendULEB128(b.buf, 2)
+					b.buf = AppendULEB128(b.buf, 0)
 					return nil
 				default:
 					return fmt.Errorf("array has no method %s", callee.Field)
