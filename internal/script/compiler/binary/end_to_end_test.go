@@ -1018,6 +1018,19 @@ func TestEndToEnd_StringIndex(t *testing.T) {
 	runOne(t, src, "sum_bytes", nil, 131)
 }
 
+func TestEndToEnd_Power(t *testing.T) {
+	src := `
+        export fn square(x: int): int { return x ** 2; }
+        export fn cube(x: int): int { return x ** 3; }
+        export fn pow_zero(x: int): int { return x ** 0; }
+        export fn right_assoc(): int { return 2 ** 3 ** 2; }
+    `
+	runOne(t, src, "square", []uint64{4}, 16)
+	runOne(t, src, "cube", []uint64{3}, 27)
+	runOne(t, src, "pow_zero", []uint64{999}, 1)
+	runOne(t, src, "right_assoc", nil, 512) // 2 ** (3**2) = 2**9
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

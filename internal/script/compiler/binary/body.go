@@ -111,6 +111,9 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		if n.Operator == script.TokenType_AND || n.Operator == script.TokenType_OR {
 			return b.walkShortCircuit(n)
 		}
+		if n.Operator == script.TokenType_Power {
+			return b.walkPower(n)
+		}
 
 		// Extract type BEFORE walking — string concat needs a separate path
 		leftExpr, ok := n.Left.(script.Expression)
@@ -1246,5 +1249,67 @@ func (b *bodyEncoder) walkStringIndex(n *script.ArrayAccess) error {
 
 	// widen to i64 (plex int)
 	b.buf = append(b.buf, OpI64ExtendI32S)
+	return nil
+}
+
+func (b *bodyEncoder) walkPower(n *script.BinaryExpression) error {
+	base := b.addSyntheticLocal(ValI64)
+	exp := b.addSyntheticLocal(ValI64)
+	result := b.addSyntheticLocal(ValI64)
+
+	if err := b.walk(n.Left); err != nil {
+		return err
+	}
+	b.appendOpCode(OpLocalSet, base)
+
+	if err := b.walk(n.Right); err != nil {
+		return err
+	}
+	b.appendOpCode(OpLocalSet, exp)
+
+	// result = 1
+	b.buf = append(b.buf, OpI64Const)
+	b.buf = AppendSLEB128(b.buf, 1)
+	b.appendOpCode(OpLocalSet, result)
+
+	b.buf = append(b.buf, OpBlock, BlockTypeEmpty)
+	b.blockDepth++
+	blockLabel := uint32(b.blockDepth)
+
+	b.buf = append(b.buf, OpLoop, BlockTypeEmpty)
+	b.blockDepth++
+	loopLabel := uint32(b.blockDepth)
+
+	// exit when exp <= 0
+	b.appendOpCode(OpLocalGet, exp)
+	b.buf = append(b.buf, OpI64Const)
+	b.buf = AppendSLEB128(b.buf, 0)
+	b.buf = append(b.buf, OpI64LeS)
+	b.buf = append(b.buf, OpBrIf)
+	b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-blockLabel)
+
+	// result *= base
+	b.appendOpCode(OpLocalGet, result)
+	b.appendOpCode(OpLocalGet, base)
+	b.buf = append(b.buf, OpI64Mul)
+	b.appendOpCode(OpLocalSet, result)
+
+	// exp--
+	b.appendOpCode(OpLocalGet, exp)
+	b.buf = append(b.buf, OpI64Const)
+	b.buf = AppendSLEB128(b.buf, 1)
+	b.buf = append(b.buf, OpI64Sub)
+	b.appendOpCode(OpLocalSet, exp)
+
+	// loop back
+	b.buf = append(b.buf, OpBr)
+	b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-loopLabel)
+
+	b.buf = append(b.buf, OpEnd) // end loop
+	b.blockDepth--
+	b.buf = append(b.buf, OpEnd) // end block
+	b.blockDepth--
+
+	b.appendOpCode(OpLocalGet, result)
 	return nil
 }
