@@ -66,3 +66,11 @@ func (s *structLayout) findField(name string) (structField, bool) {
 	}
 	return structField{}, false
 }
+
+type importSig struct {
+	modName   string
+	fieldName string
+	funcName  string
+	params    []byte
+	results   []byte
+}

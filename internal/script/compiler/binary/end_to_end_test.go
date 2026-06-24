@@ -1,6 +1,7 @@
 package binary_wasm_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -724,6 +725,64 @@ func TestEndToEnd_ArrayRemove(t *testing.T) {
 	runOne(t, src, "remove_middle", nil, 20) // returns the element
 	runOne(t, src, "remove_shifts", nil, 20) // arr[0] becomes 20 after remove(0)
 	runOne(t, src, "remove_len", nil, 2)     // length decremented
+}
+
+func TestEndToEnd_Import_Print(t *testing.T) {
+	src := `
+        import print from "plex:console";
+        fn say_hello() {
+            print("hello");
+        }
+    `
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wasm, err := binary_wasm.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+
+	var gotPtr uint32
+	printCalled := false
+	_, err = r.NewHostModuleBuilder("plex:console").
+		NewFunctionBuilder().
+		WithFunc(func(ctx context.Context, m api.Module, ptr uint32) {
+			printCalled = true
+			gotPtr = ptr
+		}).
+		Export("print").
+		Instantiate(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mod, err := r.Instantiate(ctx, wasm)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	_, err = mod.ExportedFunction("say_hello").Call(ctx)
+	if err != nil {
+		t.Fatalf("call: %v", err)
+	}
+
+	if !printCalled {
+		t.Fatal("print was never called")
+	}
+
+	// Read the string out of WASM memory to verify content
+	mem := mod.Memory()
+	n, _ := mem.ReadUint32Le(gotPtr)
+	data, _ := mem.Read(gotPtr+4, n)
+	if string(data) != "hello" {
+		t.Fatalf("got %q, want \"hello\"", string(data))
+	}
 }
 
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {

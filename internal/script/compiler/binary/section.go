@@ -36,11 +36,11 @@ func encodeTypeSection(sigs []funcSig) []byte {
 	return section(SectionType, body)
 }
 
-func encodeFunctionSection(sigs []funcSig) []byte {
+func encodeFunctionSection(sigs []funcSig, typeOffset uint32) []byte {
 	var body []byte
 	body = AppendULEB128(body, uint32(len(sigs)))
 	for i := range sigs {
-		body = AppendULEB128(body, uint32(i))
+		body = AppendULEB128(body, typeOffset+uint32(i))
 	}
 	return section(SectionFunction, body)
 }
@@ -152,4 +152,18 @@ func encodeGlobalSection(heapStart uint32) []byte {
 	body = append(body, OpEnd)
 
 	return section(SectionGlobal, body)
+}
+
+func encodeImportSection(imports []importSig) []byte {
+	var body []byte
+
+	body = AppendULEB128(body, uint32(len(imports)))
+	for i, imp := range imports {
+		body = encodeName(body, imp.modName)
+		body = encodeName(body, imp.fieldName)
+		body = append(body, 0x00)
+		body = AppendULEB128(body, uint32(i))
+	}
+
+	return section(SectionImport, body)
 }

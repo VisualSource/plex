@@ -13,8 +13,8 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		return nil, err
 	}
 
+	imports := collectImports(node)
 	strings := collectStrings(node)
-
 	structs := collectStructs(node)
 
 	sigs, funcs, exports, err := collectSignatures(node)
@@ -23,7 +23,6 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 	}
 
 	needsHeap := len(strings.entries) > 0 || programHasHeapAllocation(node, structs)
-
 	if needsHeap {
 		exports = append(exports, exportEntry{name: "memory", kind: ExportMemory, idx: 0})
 		exports = append(exports, exportEntry{
@@ -31,18 +30,42 @@ func CompileProgram(node *script.Program) ([]byte, error) {
 		})
 	}
 
-	funcIndexes := make(map[string]uint32, len(sigs))
-	for i, s := range sigs {
-		funcIndexes[s.name] = uint32(i)
+	importOffset := uint32(len(imports))
+	funcIndexes := make(map[string]uint32, len(imports)+len(sigs))
+	for i, imp := range imports {
+		funcIndexes[imp.funcName] = uint32(i)
 	}
+	for i, s := range sigs {
+		funcIndexes[s.name] = importOffset + uint32(i)
+	}
+	for i := range exports {
+		if exports[i].kind == ExportFunc {
+			exports[i].idx = funcIndexes[exports[i].name]
+		}
+	}
+
+	// Build the type section: import types first, then local types.
+	allSigs := make([]funcSig, 0, len(imports)+len(sigs))
+	for _, imp := range imports {
+		allSigs = append(allSigs, funcSig{
+			name:    imp.funcName,
+			params:  imp.params,
+			results: imp.results,
+		})
+	}
+	allSigs = append(allSigs, sigs...)
 
 	var out []byte
 	out = append(out, magic...)
 	out = append(out, version...)
 
-	if len(sigs) > 0 {
-		out = append(out, encodeTypeSection(sigs)...)
-		out = append(out, encodeFunctionSection(sigs)...)
+	if len(allSigs) > 0 {
+		out = append(out, encodeTypeSection(allSigs)...)
+		if len(imports) > 0 {
+			out = append(out, encodeImportSection(imports)...) // NEW — before function section
+		}
+
+		out = append(out, encodeFunctionSection(sigs, importOffset)...)
 
 		if needsHeap {
 			out = append(out, encodeMemorySection()...)

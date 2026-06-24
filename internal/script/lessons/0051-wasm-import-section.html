@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 51 – The WASM Import Section</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .dim   { color: #555; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 51 – The WASM Import Section</h1>
+
+<p><em>Previous: <a href="0050-arr-remove-binary.html">Lesson 50 – arr.remove in the Binary Backend</a></em></p>
+
+<p>
+So far every plex function has been self-contained: the module produces values, and the test harness reads them. But real programs need to <em>do</em> things — print output, read input, call a clock. WASM cannot do any of these by itself; it depends entirely on functions provided by the host. This lesson wires up that link.
+</p>
+
+<h2>The Import Section in the WASM Binary Format</h2>
+
+<p>
+A WASM module may import functions, globals, tables, or memories from the host. Each import carries three pieces of information:
+</p>
+
+<ul>
+  <li><strong>module name</strong> — a string identifying the host namespace (e.g. <code>"plex:console"</code>)</li>
+  <li><strong>field name</strong> — the specific export within that namespace (e.g. <code>"print"</code>)</li>
+  <li><strong>description</strong> — what is being imported: for a function, a type index into the type section</li>
+</ul>
+
+<p>The import section has section ID <code>0x02</code> and must appear <strong>before</strong> the function section.</p>
+
+<div class="diagram">
+<span class="byte">§1 type</span>     <span class="dim">← all type signatures (imports AND locals)</span>
+<span class="byte">§2 import</span>   <span class="dim">← imported functions point at type indices in §1</span>
+<span class="byte">§3 function</span> <span class="dim">← local functions point at type indices in §1</span>
+<span class="byte">§7 export</span>
+<span class="byte">§10 code</span>    <span class="dim">← bodies for local functions only (not imports)</span>
+</div>
+
+<h2>The Critical Constraint: Import Indices Come First</h2>
+
+<p>
+Every function in a WASM module occupies a <strong>function index</strong>. The key rule is:
+</p>
+
+<blockquote style="border-left:4px solid var(--purple); padding-left:16px; color:var(--purple);">
+Imported functions occupy the lowest indices. Local functions are indexed starting at <em>numImports</em>.
+</blockquote>
+
+<p>
+If a module imports 1 function and defines 3 local functions:
+</p>
+
+<div class="diagram">
+func index 0  <span class="arrow">←</span> <span class="byte">import[0]</span>   <span class="cmt">e.g. "plex:console"."print"</span>
+func index 1  <span class="arrow">←</span> <span class="byte">local[0]</span>    <span class="cmt">first locally defined function</span>
+func index 2  <span class="arrow">←</span> <span class="byte">local[1]</span>
+func index 3  <span class="arrow">←</span> <span class="byte">local[2]</span>
+</div>
+
+<p>
+Every <code>call</code> instruction uses these absolute indices. If the compiler assigns local functions indices 0, 1, 2 and later adds an import at index 0, every existing <code>call</code> is wrong. The fix: decide how many imports exist <em>before</em> assigning local indices.
+</p>
+
+<h2>How Plex Declares Imports</h2>
+
+<p>The plex grammar for imports (already parsed):</p>
+
+<pre><code><span class="kw">import</span> print <span class="kw">from</span> <span class="str">"plex:console"</span>;
+</code></pre>
+
+<p>
+The typechecker's <a href="../typeschecker/modules.go"><code>modules.go</code></a> already recognises <code>"plex:console"</code> and registers <code>print</code> as a function taking one <code>string</code> (= i32 pointer) and returning <code>void</code>. The binary backend simply needs to trust that declaration and emit the right bytes.
+</p>
+
+<h2>What the Binary Backend Needs to Do</h2>
+
+<p>Four coordinated changes, all in existing files:</p>
+
+<table>
+  <tr><th>Where</th><th>What</th></tr>
+  <tr><td>helpers.go</td><td>Add <code>collectImports</code> — scan the AST for <code>ImportStatement</code> nodes and return a list of <code>importSig</code> structs</td></tr>
+  <tr><td>types.go (or helpers.go)</td><td>Add the <code>importSig</code> struct</td></tr>
+  <tr><td>section.go</td><td>Add <code>encodeImportSection</code>; update <code>encodeFunctionSection</code> to accept a type-index offset</td></tr>
+  <tr><td>module.go</td><td>Call <code>collectImports</code>, prepend import types to the type section, offset local function indices, emit the import section</td></tr>
+</table>
+
+<h2>The importSig Struct</h2>
+
+<pre><code><span class="kw">type</span> <span class="ty">importSig</span> <span class="kw">struct</span> {
+    modName   <span class="ty">string</span>  <span class="cmt">// e.g. "plex:console"</span>
+    fieldName <span class="ty">string</span>  <span class="cmt">// e.g. "print"</span>
+    funcName  <span class="ty">string</span>  <span class="cmt">// as called in plex code</span>
+    params    []<span class="ty">byte</span>
+    results   []<span class="ty">byte</span>
+}
+</code></pre>
+
+<h2>collectImports</h2>
+
+<pre><code><span class="kw">func</span> <span class="fn">collectImports</span>(p *script.Program) []importSig {
+    <span class="kw">var</span> out []importSig
+    <span class="kw">for</span> _, stmt := <span class="kw">range</span> p.Stmts {
+        imp, ok := stmt.(*script.ImportStatement)
+        <span class="kw">if</span> !ok {
+            <span class="kw">continue</span>
+        }
+        <span class="kw">switch</span> imp.Source {
+        <span class="kw">case</span> <span class="str">"plex:console"</span>:
+            <span class="kw">for</span> _, name := <span class="kw">range</span> imp.Imports {
+                <span class="kw">if</span> name == <span class="str">"print"</span> {
+                    out = append(out, importSig{
+                        modName:   imp.Source,
+                        fieldName: name,
+                        funcName:  name,
+                        params:    []<span class="ty">byte</span>{ValI32}, <span class="cmt">// string pointer</span>
+                        results:   nil,             <span class="cmt">// void</span>
+                    })
+                }
+            }
+        }
+    }
+    <span class="kw">return</span> out
+}
+</code></pre>
+
+<div class="insight">
+  <strong>Why only ValI32 for a string?</strong>
+  In plex's memory model, a <code>string</code> is an i32 pointer into linear memory — exactly the same encoding as an array or struct pointer. The actual string bytes live at <code>ptr+4</code> with length at <code>ptr+0</code>. The host's <code>print</code> function receives that pointer and reads the string out of the WASM memory.
+</div>
+
+<h2>encodeImportSection</h2>
+
+<p>In <a href="../compiler/binary/section.go"><code>section.go</code></a>, add:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">encodeImportSection</span>(imports []importSig) []<span class="ty">byte</span> {
+    <span class="kw">var</span> body []<span class="ty">byte</span>
+    body = AppendULEB128(body, uint32(len(imports)))
+    <span class="kw">for</span> i, imp := <span class="kw">range</span> imports {
+        body = encodeName(body, imp.modName)
+        body = encodeName(body, imp.fieldName)
+        body = append(body, <span class="num">0x00</span>)                 <span class="cmt">// kind: function</span>
+        body = AppendULEB128(body, uint32(i))      <span class="cmt">// type index (imports come first in type section)</span>
+    }
+    <span class="kw">return</span> section(SectionImport, body)
+}
+</code></pre>
+
+<p>Also update <code>encodeFunctionSection</code> to accept a <code>typeOffset</code>:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">encodeFunctionSection</span>(sigs []funcSig, typeOffset uint32) []<span class="ty">byte</span> {
+    <span class="kw">var</span> body []<span class="ty">byte</span>
+    body = AppendULEB128(body, uint32(len(sigs)))
+    <span class="kw">for</span> i := <span class="kw">range</span> sigs {
+        body = AppendULEB128(body, typeOffset+uint32(i))  <span class="cmt">// type index with offset</span>
+    }
+    <span class="kw">return</span> section(SectionFunction, body)
+}
+</code></pre>
+
+<h2>Updating module.go</h2>
+
+<p>The full flow in <a href="../compiler/binary/module.go"><code>module.go</code></a>:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">CompileProgram</span>(node *script.Program) ([]<span class="ty">byte</span>, <span class="ty">error</span>) {
+    <span class="kw">if</span> err := typeschecker.Check(node); err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+
+    strings := collectStrings(node)
+    structs := collectStructs(node)
+    imports := collectImports(node)          <span class="cmt">// NEW</span>
+
+    sigs, funcs, exports, err := collectSignatures(node)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+
+    needsHeap := len(strings.entries) > <span class="num">0</span> || programHasHeapAllocation(node, structs)
+    <span class="kw">if</span> needsHeap {
+        exports = append(exports, exportEntry{name: <span class="str">"memory"</span>, kind: ExportMemory, idx: <span class="num">0</span>})
+        exports = append(exports, exportEntry{name: <span class="str">"__heap_ptr"</span>, kind: ExportGlobal, idx: <span class="num">0</span>})
+    }
+
+    <span class="cmt">// Build the unified function index map: imports first, then locals.</span>
+    importOffset := uint32(len(imports))
+    funcIndexes := make(map[string]uint32, len(imports)+len(sigs))
+    <span class="kw">for</span> i, imp := <span class="kw">range</span> imports {
+        funcIndexes[imp.funcName] = uint32(i)
+    }
+    <span class="kw">for</span> i, s := <span class="kw">range</span> sigs {
+        funcIndexes[s.name] = importOffset + uint32(i)
+    }
+
+    <span class="cmt">// Build the type section: import types first, then local types.</span>
+    allSigs := make([]funcSig, <span class="num">0</span>, len(imports)+len(sigs))
+    <span class="kw">for</span> _, imp := <span class="kw">range</span> imports {
+        allSigs = append(allSigs, funcSig{
+            name:    imp.funcName,
+            params:  imp.params,
+            results: imp.results,
+        })
+    }
+    allSigs = append(allSigs, sigs...)
+
+    <span class="kw">var</span> out []<span class="ty">byte</span>
+    out = append(out, magic...)
+    out = append(out, version...)
+
+    <span class="kw">if</span> len(allSigs) > <span class="num">0</span> {
+        out = append(out, encodeTypeSection(allSigs)...)
+        <span class="kw">if</span> len(imports) > <span class="num">0</span> {
+            out = append(out, encodeImportSection(imports)...)   <span class="cmt">// NEW — before function section</span>
+        }
+        out = append(out, encodeFunctionSection(sigs, importOffset)...)  <span class="cmt">// CHANGED — pass offset</span>
+
+        <span class="kw">if</span> needsHeap {
+            out = append(out, encodeMemorySection()...)
+            out = append(out, encodeGlobalSection(strings.next)...)
+        }
+        <span class="kw">if</span> len(exports) > <span class="num">0</span> {
+            out = append(out, encodeExportSection(exports)...)
+        }
+
+        code, err := encodeCodeSection(funcs, sigs, funcIndexes, strings, structs)
+        <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, err }
+        out = append(out, code...)
+
+        <span class="kw">if</span> len(strings.entries) > <span class="num">0</span> {
+            out = append(out, encodeDataSection(strings)...)
+        }
+    }
+    <span class="kw">return</span> out, <span class="kw">nil</span>
+}
+</code></pre>
+
+<div class="warn">
+  <strong>Export index adjustment for memory/global</strong>
+  The existing exports for <code>"memory"</code> (ExportMemory, idx: 0) and <code>"__heap_ptr"</code> (ExportGlobal, idx: 0) use indices into the <em>memory</em> and <em>global</em> spaces, not the function space. These are unaffected by the import offset. Only function export indices would need adjustment — and currently all exported functions are built in <code>collectSignatures</code> using <code>len(funcs)</code> at collection time, which produces local-only indices. After adding the import offset in <code>funcIndexes</code>, you also need to fix the export entries emitted by <code>collectSignatures</code>. The cleanest fix: build export indices from <code>funcIndexes</code> after the map is complete, not during collection.
+</div>
+
+<h2>Fixing Export Indices</h2>
+
+<p>
+<code>collectSignatures</code> currently sets <code>idx: uint32(len(funcs))</code> which gives a local-relative index (0, 1, 2, …). After we add an import offset, that's wrong. The fix is to not set <code>idx</code> during collection and instead fill it in after <code>funcIndexes</code> is built:
+</p>
+
+<pre><code><span class="cmt">// In module.go, after funcIndexes is built:</span>
+<span class="kw">for</span> i := <span class="kw">range</span> exports {
+    <span class="kw">if</span> exports[i].kind == ExportFunc {
+        exports[i].idx = funcIndexes[exports[i].name]
+    }
+}
+</code></pre>
+
+<p>This requires that <code>exportEntry</code> stores the function name, not just the index. Add a <code>name</code> field to <code>exportEntry</code> (it already has <code>name</code> for the export key — you can reuse it, since the plex function name <em>is</em> the export name).</p>
+
+<p>A simpler approach: since <code>collectSignatures</code> already stores the function declaration, you can pass the fully-built <code>funcIndexes</code> map to a second pass that builds exports.</p>
+
+<h2>Implementation Task</h2>
+
+<div class="task">
+  <strong>Task — wire up imports end to end</strong>
+
+  <p><strong>Step 1.</strong> Add the <code>importSig</code> struct and <code>collectImports</code> to <a href="../compiler/binary/helpers.go"><code>helpers.go</code></a>.</p>
+
+  <p><strong>Step 2.</strong> Add <code>encodeImportSection</code> to <a href="../compiler/binary/section.go"><code>section.go</code></a>. Update <code>encodeFunctionSection</code> to accept <code>typeOffset uint32</code>.</p>
+
+  <p><strong>Step 3.</strong> Rewrite the function-index and type-section assembly in <a href="../compiler/binary/module.go"><code>module.go</code></a> as shown above. Fix export indices for the function space.</p>
+
+  <p><strong>Step 4.</strong> Add the test:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_Import_Print</span>(t *testing.T) {
+    src := <span class="str">`
+        import print from "plex:console";
+        fn say_hello() {
+            print("hello");
+        }
+    `</span>
+    ast, err := script.Parse(strings.NewReader(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.Fatal(err) }
+
+    wasm, err := binary_wasm.CompileProgram(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.Fatal(err) }
+
+    ctx := t.Context()
+    r := wazero.NewRuntime(ctx)
+    <span class="kw">defer</span> r.Close(ctx)
+
+    <span class="kw">var</span> gotPtr uint32
+    _, err = r.NewHostModuleBuilder(<span class="str">"plex:console"</span>).
+        NewFunctionBuilder().
+        WithFunc(<span class="kw">func</span>(ctx context.Context, m api.Module, ptr uint32) {
+            gotPtr = ptr
+        }).
+        Export(<span class="str">"print"</span>).
+        Instantiate(ctx)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.Fatal(err) }
+
+    mod, err := r.Instantiate(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.Fatalf(<span class="str">"instantiate: %v"</span>, err) }
+
+    _, err = mod.ExportedFunction(<span class="str">"say_hello"</span>).Call(ctx)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.Fatalf(<span class="str">"call: %v"</span>, err) }
+
+    <span class="kw">if</span> gotPtr == <span class="num">0</span> {
+        t.Fatal(<span class="str">"print was never called"</span>)
+    }
+
+    <span class="cmt">// Read the string out of WASM memory to verify content</span>
+    mem := mod.Memory()
+    n, _ := mem.ReadUint32Le(gotPtr)
+    data, _ := mem.Read(gotPtr+<span class="num">4</span>, n)
+    <span class="kw">if</span> string(data) != <span class="str">"hello"</span> {
+        t.Fatalf(<span class="str">"got %q, want \"hello\""</span>, string(data))
+    }
+}
+</code></pre>
+
+  <p>You'll need <code>"context"</code> added to the test imports.</p>
+
+  <p><strong>Step 5.</strong> Run the full suite to ensure existing tests still pass:</p>
+  <pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+</div>
+
+<h2>Checklist Before Calling It Done</h2>
+<ul>
+  <li><code>TestEndToEnd_Import_Print</code> passes — the host's <code>print</code> is called with the right string pointer</li>
+  <li>All previously passing tests still pass (the import offset must not break existing <code>call</code> instructions)</li>
+  <li>A plex program with no imports still compiles correctly (import offset = 0, behaviour unchanged)</li>
+</ul>
+
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. A module imports 3 functions and defines 5 local functions. What function index does the second local function get?</p>
+    <label><input type="radio" name="q1" value="a"> 1 — it is the second function defined</label>
+    <label><input type="radio" name="q1" value="b"> 4 — imports are 0, 1, 2; locals are 3, 4, 5, 6, 7</label>
+    <label><input type="radio" name="q1" value="c"> 5 — locals are numbered 3, 4, 5, 6, 7 so the second is 4</label>
+    <label><input type="radio" name="q1" value="d"> 3 — first local is 3, second local is 4</label>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. Why must the import section appear before the function section in the binary format?</p>
+    <label><input type="radio" name="q2" value="a"> WASM validators require alphabetical section order</label>
+    <label><input type="radio" name="q2" value="b"> Imports establish the lowest function indices; the function section refers to type indices; validators process sections in order and expect to resolve imports first</label>
+    <label><input type="radio" name="q2" value="c"> The function section's byte count would overflow if imports appear after it</label>
+    <label><input type="radio" name="q2" value="d"> The import section must be skipped during execution, so it comes first</label>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. The import section entry for a function contains a type index. Where does that index point?</p>
+    <label><input type="radio" name="q3" value="a"> Into the function section, giving the body index</label>
+    <label><input type="radio" name="q3" value="b"> Into the type section, giving the function's signature</label>
+    <label><input type="radio" name="q3" value="c"> Into the export section, linking import to a re-export</label>
+    <label><input type="radio" name="q3" value="d"> Into the code section, giving the fallback body</label>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. After adding import support, why must export function indices also be updated?</p>
+    <label><input type="radio" name="q4" value="a"> The export section encodes absolute function indices; local functions shifted from 0,1,2 to importOffset,importOffset+1,importOffset+2</label>
+    <label><input type="radio" name="q4" value="b"> Exports refer to type indices, which changed when import types were prepended</label>
+    <label><input type="radio" name="q4" value="c"> The WASM runtime validates that export indices are contiguous starting from 0</label>
+    <label><input type="radio" name="q4" value="d"> Export indices are relative to the end of the import list, not absolute</label>
+  </div>
+
+  <div class="score-box" id="score"></div>
+</div>
+
+<h2>Primary Source</h2>
+<p>
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html#import-section">
+    WebAssembly Core Spec — §5.5.5 Import Section
+  </a> — the normative binary encoding of each import entry, including the kind byte (0x00 for function) and type index.
+</p>
+
+<hr style="margin-top:3em; border-color: var(--border);">
+<p style="color:var(--muted); font-size:0.9em;">
+  Questions? Ask your teacher agent — paste any part of the lesson or your code and ask for clarification.
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'b', q4: 'a' };
+const explanations = {
+  q1: {
+    b: 'Correct — 3 imports occupy indices 0, 1, 2. The 5 local functions get indices 3, 4, 5, 6, 7. The second local function is at index 4.',
+    wrong: 'Remember: imported functions get the lowest indices (0 to numImports−1). Local functions are offset by numImports. With 3 imports the locals start at index 3.'
+  },
+  q2: {
+    b: 'Correct — the WASM binary format has a defined section order. Validators process sections sequentially. Imports must precede the function section because imported functions occupy the lowest function indices, which must be resolved before the function section is interpreted.',
+    wrong: 'The reason is structural: WASM section IDs have a defined ordering (§2 before §3), and imported functions fill the lowest function index slots. Local function indices in the function section are relative to numImports.'
+  },
+  q3: {
+    b: 'Correct — each import entry\'s function descriptor holds a type index that indexes into the type section (§1). This is how the host knows what parameter and result types the imported function must have.',
+    wrong: 'Import entries contain a type index (0x00 kind byte followed by a u32 type index). That index refers to the type section, giving the function signature the host must satisfy.'
+  },
+  q4: {
+    a: 'Correct — the export section stores absolute function indices. Before imports, local function 0 was at index 0. After adding N imports, it is at index N. Export entries that were set during collectSignatures (using local-relative indices) must be updated to use the absolute index from funcIndexes.',
+    wrong: 'Think about what the export section contains: absolute function indices. Before imports, local fn 0 had absolute index 0. After 1 import, it has absolute index 1. Any export that was pointing to 0 now points to the wrong function.'
+  },
+};
+
+let score = 0, answered = 0, total = Object.keys(answers).length;
+
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    const labels = document.querySelectorAll(`[name=${qid}]`);
+    if (document.querySelector(`#${qid} label.correct, #${qid} label.wrong`)) return;
+
+    const correct = answers[qid];
+    const isCorrect = this.value === correct;
+    if (isCorrect) score++;
+    answered++;
+
+    labels.forEach(r => {
+      const lbl = r.closest('label');
+      if (r.value === correct) lbl.className = 'correct';
+      else if (r.checked)      lbl.className = 'wrong';
+    });
+
+    const fb = document.getElementById(`${qid}-fb`);
+    const exp = explanations[qid];
+    fb.textContent = isCorrect ? exp[correct] : exp.wrong;
+    fb.style.display = 'block';
+    fb.style.color = isCorrect ? 'var(--green)' : 'var(--accent)';
+
+    if (answered === total) {
+      document.getElementById('score').textContent = `Score: ${score} / ${total}`;
+    }
+  });
+});
+</script>
+</body>
+</html>

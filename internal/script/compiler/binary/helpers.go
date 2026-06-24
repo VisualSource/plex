@@ -222,3 +222,28 @@ func normKind(k script.TypeKind) script.TypeKind {
 		return k
 	}
 }
+
+func collectImports(p *script.Program) []importSig {
+	var out []importSig
+	for _, stmt := range p.Stmts {
+		imp, ok := stmt.(*script.ImportStatement)
+		if !ok {
+			continue
+		}
+		switch imp.Source {
+		case "plex:console":
+			for _, name := range imp.Imports {
+				if name == "print" {
+					out = append(out, importSig{
+						modName:   imp.Source,
+						fieldName: name,
+						funcName:  name,
+						params:    []byte{ValI32}, // string pointer
+						results:   nil,            // void
+					})
+				}
+			}
+		}
+	}
+	return out
+}
