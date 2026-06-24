@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 57 – Increment and Decrement (++ / --)</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; color: var(--muted); }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.8; margin: 1.4em 0; }
+  .stack-state { color: var(--muted); float: right; font-size: 0.82em; }
+  .instr { color: var(--yellow); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 57 – Increment and Decrement (<code>++</code> / <code>--</code>)</h1>
+
+<p><em>Previous: <a href="0056-logical-not.html">Lesson 56 – Logical NOT</a></em></p>
+
+<p>
+<code>x++</code> and <code>x--</code> are already tokenized and parsed in plex — the parser produces a <code>UnaryExpression{Operator: TokenType_Incrment, Postfix: true}</code>. They have no codegen yet; the binary backend will error. This lesson adds them and introduces two new concepts: <strong>lvalues</strong> and <strong><code>local.tee</code></strong>.
+</p>
+
+<h2>What Is an Lvalue?</h2>
+
+<p>
+Every expression in a compiler is either an <em>rvalue</em> (a value you can read) or an <em>lvalue</em> (a storage location you can also write to). Addition, function calls, and literals are rvalues. Local variables, array slots, and struct fields are lvalues — they have an identity beyond their value.
+</p>
+
+<p>
+<code>++</code> and <code>--</code> are read-modify-write operators: they read the current value, compute a new one, and write it back. This requires an <strong>lvalue operand</strong>. The type alone is not enough:
+</p>
+
+<pre><code>x++        <span class="cmt">// ✓ — x is an lvalue (a named local)</span>
+(x + 1)++  <span class="cmt">// ✗ — x+1 is an rvalue; there is no location to write back to</span>
+arr[i]++   <span class="cmt">// not implemented here — requires array-write logic</span></code></pre>
+
+<p>
+In plex's binary backend, lvalue restriction means: the operand of <code>++</code>/<code>--</code> must be an <code>*script.Identifier</code> so the compiler can look up the local index and emit both a read and a write.
+</p>
+
+<div class="insight">
+<strong>Lvalues in other compilers.</strong> C formalises lvalue rules in the language spec. LLVM SSA uses <code>alloca</code> for stack slots that can be written. WASM locals are the closest WASM equivalent to an lvalue — they have a persistent slot index you can both get and set.
+</div>
+
+<h2>The WASM Pattern: <code>local.tee</code></h2>
+
+<p>
+<code>local.tee n</code> (opcode <code>0x22</code>) writes the top-of-stack value into local <code>n</code> <em>without consuming it</em>. It's the read+write operation in one instruction:
+</p>
+
+<div class="diagram">
+<span class="cmt">; x++ on a local at index 2 (i64 type)</span>
+
+<span class="instr">local.get 2</span>    <span class="stack-state">stack: [x]</span>
+<span class="instr">i64.const 1</span>    <span class="stack-state">stack: [x, 1]</span>
+<span class="instr">i64.add</span>        <span class="stack-state">stack: [x+1]</span>
+<span class="instr">local.tee 2</span>    <span class="stack-state">stack: [x+1]  — also stores x+1 into local 2</span>
+</div>
+
+<p>
+After this sequence, local 2 holds <code>x+1</code>, and the stack holds <code>x+1</code> — the new value is left for any parent expression to consume. If the statement discards the result (the <code>drop</code> in the Block handler fires), that's fine too.
+</p>
+
+<div class="warn">
+<strong>These are pre-increment semantics, not postfix.</strong> The value left on the stack is the <em>new</em> value (x+1), not the original. True C-style postfix <code>x++</code> would return the original: <code>local.get x</code>, then a second local to save the original, then compute and write x+1, then push the saved original. For statement use — which is by far the most common — the difference is invisible. We implement the simpler version and note the semantic shortcut.
+</div>
+
+<h2>Implementation: body.go</h2>
+
+<p>
+In the <code>UnaryExpression</code> case in <a href="../compiler/binary/body.go">body.go</a>, add handling between the <code>!</code> block and the <code>-</code> block:
+</p>
+
+<pre><code><span class="kw">if</span> n.Operator == script.TokenType_Incrment || n.Operator == script.TokenType_Decrement {
+    id, ok := n.Operand.(*script.Identifier)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"++ and -- require an identifier operand"</span>)
+    }
+    idx, ok := b.locals[id.Value]
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"unknown identifier %s"</span>, id.Value)
+    }
+    t := n.Operand.GetType()
+    <span class="kw">if</span> t == nil {
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"no type on operand of ++/--"</span>)
+    }
+
+    b.buf = append(b.buf, OpLocalGet)
+    b.buf = AppendULEB128(b.buf, idx)
+
+    <span class="kw">switch</span> t.Kind {
+    <span class="kw">case</span> script.TypeKind_I64, script.TypeKind_Int:
+        b.buf = append(b.buf, OpI64Const)
+        b.buf = AppendSLEB128(b.buf, 1)
+        <span class="kw">if</span> n.Operator == script.TokenType_Incrment {
+            b.buf = append(b.buf, OpI64Add)
+        } <span class="kw">else</span> {
+            b.buf = append(b.buf, OpI64Sub)
+        }
+    <span class="kw">case</span> script.TypeKind_I32:
+        b.buf = append(b.buf, OpI32Const, 1)
+        <span class="kw">if</span> n.Operator == script.TokenType_Incrment {
+            b.buf = append(b.buf, OpI32Add)
+        } <span class="kw">else</span> {
+            b.buf = append(b.buf, OpI32Sub)
+        }
+    <span class="kw">default</span>:
+        <span class="kw">return</span> fmt.Errorf(<span class="str">"++/-- not supported for type %s"</span>, t)
+    }
+
+    b.buf = append(b.buf, OpLocalTee)
+    b.buf = AppendULEB128(b.buf, idx)
+    <span class="kw">return</span> nil
+}</code></pre>
+
+<h2>Why No Typechecker Change Is Needed</h2>
+
+<p>
+The current typechecker propagates the operand's type unchanged for all <code>UnaryExpression</code> nodes. For <code>x++</code>, the type of the expression is the type of <code>x</code> — which is exactly what propagation gives. No change needed in <a href="../typeschecker/typecheck.go">typecheck.go</a>.
+</p>
+
+<p>
+The lvalue restriction (operand must be an <code>Identifier</code>) is enforced at codegen time rather than at typechecking time. This is a deliberate simplification — a production compiler would add an lvalue-checking pass after parsing so that <code>(x+1)++</code> gives a clear error message rather than a codegen panic.
+</p>
+
+<h2>The <code>collectLocals</code> Gap</h2>
+
+<p>
+<a href="../compiler/binary/body.go">body.go</a>'s <code>collectLocals</code> walks the AST to pre-declare all local variables. It currently traverses <code>VariableDeclaration</code>, <code>Block</code>, <code>WhileStatement</code>, and <code>IfStatement</code>. It does <em>not</em> traverse <code>UnaryExpression</code> — but that's fine here: <code>x++</code> doesn't introduce a new local, it mutates an existing one.
+</p>
+
+<div class="quiz-section">
+  <h3>Lvalue Literacy</h3>
+
+  <div class="q" id="q1">
+    <p>Why does <code>(x + 1)++</code> fail even if <code>x</code> is an <code>i64</code>?</p>
+    <label><input type="radio" name="q1" value="a"> The type of x+1 is wrong — ++ only works on i32</label>
+    <label><input type="radio" name="q1" value="b"> x+1 is an rvalue — there is no location to write the incremented value back to</label>
+    <label><input type="radio" name="q1" value="c"> The parser refuses to parse postfix on a parenthesised expression</label>
+    <label><input type="radio" name="q1" value="d"> ++ is only defined for identifiers in the grammar</label>
+    <div class="feedback" id="q1-fb">x+1 computes a temporary value on the WASM stack. There is no local index to write back to — the value exists only in the moment. An lvalue is a location; an rvalue is a value without a backing location.</div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>What does <code>local.tee n</code> do that <code>local.set n</code> does not?</p>
+    <label><input type="radio" name="q2" value="a"> It reads the local before writing it</label>
+    <label><input type="radio" name="q2" value="b"> It writes the local and leaves the value on the stack</label>
+    <label><input type="radio" name="q2" value="c"> It only writes if the value changed</label>
+    <label><input type="radio" name="q2" value="d"> It writes to two locals simultaneously</label>
+    <div class="feedback" id="q2-fb">local.tee writes the top-of-stack to a local without consuming it. local.set pops and discards. The "tee" name is from the Unix tee command — split one stream to two destinations.</div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>The implementation above gives <code>x++</code> the semantics of returning the new value. What extra instruction sequence would true C-style postfix need?</p>
+    <label><input type="radio" name="q3" value="a"> An extra i64.const 1 to subtract at the end</label>
+    <label><input type="radio" name="q3" value="b"> Save the original value to a synthetic local before computing x+1, then return the saved original</label>
+    <label><input type="radio" name="q3" value="c"> Use local.get twice instead of local.tee</label>
+    <label><input type="radio" name="q3" value="d"> No change needed — local.tee already preserves the original</label>
+    <div class="feedback" id="q3-fb">True postfix: local.get x (save original), local.tee tmp, i64.const 1, i64.add, local.set x, local.get tmp. The saved original is what the expression evaluates to. This requires a synthetic local — the same addSyntheticLocal pattern used in string concat and array ops.</div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>Where in the WASM instruction sequence does the lvalue restriction actually matter?</p>
+    <label><input type="radio" name="q4" value="a"> In the local.get — only locals can be read</label>
+    <label><input type="radio" name="q4" value="b"> In the local.tee — you need a local index to write back, which only an Identifier provides</label>
+    <label><input type="radio" name="q4" value="c"> In the i64.add — it requires two locals as operands</label>
+    <label><input type="radio" name="q4" value="d"> In the type system — rvalues have a different type than lvalues</label>
+    <div class="feedback" id="q4-fb">local.tee takes a local index. For an Identifier you can look up b.locals[name]. For an arbitrary expression (x+1, a function call, a literal) there is no index to provide.</div>
+  </div>
+
+  <div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<h2>Your Task</h2>
+
+<div class="task">
+  <strong>Steps</strong>
+  <ol style="margin:0; padding-left:1.2em;">
+    <li>Add the <code>++</code>/<code>--</code> block to the <code>UnaryExpression</code> case in <a href="../compiler/binary/body.go">body.go</a></li>
+    <li>Run the tests below to confirm correctness</li>
+    <li>Note: no changes needed in tokens.go, parser, or typechecker</li>
+  </ol>
+</div>
+
+<h3>Tests to write</h3>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_Increment</span>(t *testing.T) {
+    src := `
+        <span class="kw">export fn</span> <span class="fn">count_up</span>(): <span class="ty">int</span> {
+            <span class="kw">let</span> i: <span class="ty">int</span> = 0;
+            i++;
+            i++;
+            i++;
+            <span class="kw">return</span> i;    <span class="cmt">// 3</span>
+        }
+        <span class="kw">export fn</span> <span class="fn">count_in_loop</span>(n: <span class="ty">i64</span>): <span class="ty">i64</span> {
+            <span class="kw">let</span> i: <span class="ty">i64</span> = 0;
+            <span class="kw">while</span> i &lt; n { i++; }
+            <span class="kw">return</span> i;    <span class="cmt">// n</span>
+        }
+    `
+    runOne(t, src, <span class="str">"count_up"</span>, nil, <span class="num">3</span>)
+    runOne(t, src, <span class="str">"count_in_loop"</span>, []uint64{<span class="num">10</span>}, <span class="num">10</span>)
+}
+
+<span class="kw">func</span> <span class="fn">TestEndToEnd_Decrement</span>(t *testing.T) {
+    src := `
+        <span class="kw">export fn</span> <span class="fn">count_down</span>(n: <span class="ty">i64</span>): <span class="ty">i64</span> {
+            <span class="kw">let</span> i: <span class="ty">i64</span> = n;
+            <span class="kw">while</span> i &gt; 0 { i--; }
+            <span class="kw">return</span> i;    <span class="cmt">// 0</span>
+        }
+    `
+    runOne(t, src, <span class="str">"count_down"</span>, []uint64{<span class="num">5</span>}, <span class="num">0</span>)
+}</code></pre>
+
+<p>The <code>count_in_loop</code> case is the key one: it replaces the <code>i = i + 1;</code> pattern used in many earlier tests with the idiomatic <code>i++</code>. If the result is correct, the read-modify-write sequence works.</p>
+
+<h2>Going Further</h2>
+
+<p>
+To support <code>arr[i]++</code> or <code>p.x++</code>, you'd need array-write or struct-write logic alongside the read. The pattern is the same (read, compute, write back), but you'd use <code>local.tee</code> on a synthetic pointer local to avoid walking the address expression twice. That's left as a future extension.
+</p>
+
+<h2>Primary Source</h2>
+<p>
+<a href="https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions">WebAssembly Spec: Variable Instructions</a> — covers <code>local.get</code>, <code>local.set</code>, and <code>local.tee</code> with their precise stack signatures.
+</p>
+
+<p style="margin-top: 2.5em; color: var(--muted); font-size: 0.9em;">
+  Ask your teacher — try: "How would you implement true C-style postfix using a synthetic local?" or "Why doesn't the typechecker need to change for ++/--?"
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'b', q4: 'b' };
+const explanations = {
+  q1: 'x+1 computes a temporary value on the WASM stack. There is no local index to write back to — the value exists only in the moment.',
+  q2: 'local.tee writes to a local and leaves the value on the stack. local.set pops and discards. "tee" is from the Unix tee command.',
+  q3: 'True postfix: save original to a synthetic local first, compute x+1, write back, then push the saved original.',
+  q4: 'local.tee takes a local index. For an Identifier you can look up b.locals[name]. For an arbitrary expression there is no index.'
+};
+
+let answered = 0; let correct = 0;
+const total = Object.keys(answers).length;
+
+document.querySelectorAll('input[type=radio]').forEach(input => {
+  input.addEventListener('change', () => {
+    const name = input.name;
+    const container = document.getElementById(name);
+    if (container.dataset.done) return;
+    container.dataset.done = '1';
+    answered++;
+    const isCorrect = input.value === answers[name];
+    if (isCorrect) correct++;
+    container.querySelectorAll('label').forEach(label => {
+      const val = label.querySelector('input').value;
+      if (val === answers[name]) label.classList.add('correct');
+      else if (val === input.value && !isCorrect) label.classList.add('wrong');
+    });
+    const fb = document.getElementById(name + '-fb');
+    fb.style.display = 'block';
+    fb.textContent = explanations[name];
+    if (answered === total) {
+      const box = document.getElementById('score-box');
+      box.style.display = 'block';
+      box.innerHTML = `Score: <strong>${correct} / ${total}</strong>${correct === total ? ' — perfect.' : ' — review above.'}`;
+    }
+  });
+});
+</script>
+</body>
+</html>

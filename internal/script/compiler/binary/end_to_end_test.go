@@ -969,6 +969,36 @@ func TestEndToEnd_Not(t *testing.T) {
 	runOne(t, src, "not_eq", []uint64{3, 4}, 1)  // !(3==4) = true
 }
 
+func TestEndToEnd_Increment(t *testing.T) {
+	src := `
+        export fn count_up(): int {
+            let i: int = 0;
+            i++;
+            i++;
+            i++;
+            return i;    // 3
+        }
+        export fn count_in_loop(n: i64): i64 {
+            let i: i64 = 0;
+            while i < n { i++; }
+            return i;    // n
+        }
+    `
+	runOne(t, src, "count_up", nil, 3)
+	runOne(t, src, "count_in_loop", []uint64{10}, 10)
+}
+
+func TestEndToEnd_Decrement(t *testing.T) {
+	src := `
+        export fn count_down(n: i64): i64 {
+            let i: i64 = n;
+            while i > 0 { i--; }
+            return i;    // 0
+        }
+    `
+	runOne(t, src, "count_down", []uint64{5}, 0)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

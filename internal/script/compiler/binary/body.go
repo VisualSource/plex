@@ -523,6 +523,48 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			return fmt.Errorf("unsupported callee type %T", n.Callee)
 		}
 	case *script.UnaryExpression:
+		if n.Operator == script.TokenType_Incrment || n.Operator == script.TokenType_Decrement {
+			id, ok := n.Operand.(*script.Identifier)
+			if !ok {
+				return fmt.Errorf("++ and -- require an identifier operand")
+			}
+			idx, ok := b.locals[id.Value]
+			if !ok {
+				return fmt.Errorf("unknown identifier %s", id.Value)
+			}
+			t := n.Operand.GetType()
+			if t == nil {
+				return fmt.Errorf("no type on operand of ++/--")
+			}
+
+			b.buf = append(b.buf, OpLocalGet)
+			b.buf = AppendULEB128(b.buf, idx)
+
+			switch t.Kind {
+			case script.TypeKind_I64, script.TypeKind_Int:
+				b.buf = append(b.buf, OpI64Const)
+				b.buf = AppendSLEB128(b.buf, 1)
+				if n.Operator == script.TokenType_Incrment {
+					b.buf = append(b.buf, OpI64Add)
+				} else {
+					b.buf = append(b.buf, OpI64Sub)
+				}
+			case script.TypeKind_I32:
+				b.buf = append(b.buf, OpI32Const, 1)
+				if n.Operator == script.TokenType_Incrment {
+					b.buf = append(b.buf, OpI32Add)
+				} else {
+					b.buf = append(b.buf, OpI32Sub)
+				}
+			default:
+				return fmt.Errorf("++/-- not supported for type %s", t)
+			}
+
+			b.buf = append(b.buf, OpLocalTee)
+			b.buf = AppendULEB128(b.buf, idx)
+			return nil
+		}
+
 		if n.Operator == script.TokenType_Plus {
 			return b.walk(n.Operand)
 		}
