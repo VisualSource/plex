@@ -112,12 +112,7 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			return b.walkShortCircuit(n)
 		}
 
-		if err := b.walk(n.Left); err != nil {
-			return err
-		}
-		if err := b.walk(n.Right); err != nil {
-			return err
-		}
+		// Extract type BEFORE walking — string concat needs a separate path
 		leftExpr, ok := n.Left.(script.Expression)
 		if !ok {
 			return fmt.Errorf("binary expression left has no type info")
@@ -125,6 +120,17 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		opType := leftExpr.GetType()
 		if opType == nil {
 			return fmt.Errorf("no type on binary expression operand")
+		}
+
+		if opType.Kind == script.TypeKind_String && n.Operator == script.TokenType_Plus {
+			return b.walkStringConcat(n)
+		}
+
+		if err := b.walk(n.Left); err != nil {
+			return err
+		}
+		if err := b.walk(n.Right); err != nil {
+			return err
 		}
 
 		if isCmpOp(n.Operator) {
@@ -921,4 +927,101 @@ func (b *bodyEncoder) walkStructConstructor(layout *structLayout, args []script.
 	b.buf = append(b.buf, OpLocalGet)
 	b.buf = AppendULEB128(b.buf, tmp)
 	return nil
+}
+
+func (b *bodyEncoder) walkStringConcat(n *script.BinaryExpression) error {
+
+	//#region str ptr
+	leftPtr := b.addSyntheticLocal(ValI32)
+	if err := b.walk(n.Left); err != nil {
+		return err
+	}
+	b.appendOpCode(OpLocalSet, leftPtr)
+
+	rightPtr := b.addSyntheticLocal(ValI32)
+	if err := b.walk(n.Right); err != nil {
+		return err
+	}
+	b.appendOpCode(OpLocalSet, rightPtr)
+	//#endregion
+
+	//#region read len
+	// read left string len
+	leftLen := b.addSyntheticLocal(ValI32)
+	b.appendOpCode(OpLocalGet, leftPtr)
+	b.appendOpCode(OpI32Load, 2, 0)
+	b.appendOpCode(OpLocalSet, leftLen)
+
+	// read right string len
+	rightLen := b.addSyntheticLocal(ValI32)
+	b.appendOpCode(OpLocalGet, rightPtr)
+	b.appendOpCode(OpI32Load, 2, 0)
+	b.appendOpCode(OpLocalSet, rightLen)
+	//#endregion
+
+	//#region alloc and write length
+
+	// global
+	resultPtr := b.addSyntheticLocal(ValI32)
+	b.appendOpCode(OpGlobalGet, 0)
+	b.appendOpCode(OpLocalTee, resultPtr)
+
+	// set len for new str
+	b.appendOpCode(OpLocalGet, leftLen)
+	b.appendOpCode(OpLocalGet, rightLen)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpI32Store, 2, 0)
+
+	//
+	b.appendOpCode(OpLocalGet, resultPtr)
+	b.appendOpCode(OpI32Const, 4)
+	b.buf = append(b.buf, OpI32Add)
+
+	b.appendOpCode(OpLocalGet, leftLen)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpLocalGet, rightLen)
+	b.buf = append(b.buf, OpI32Add)
+
+	b.appendOpCode(OpGlobalSet, 0)
+	//#endregion
+
+	//#region copy
+
+	// memory.copy(ptr + 4, leftptr+4, leftLen)
+	b.appendOpCode(OpLocalGet, resultPtr)
+	b.appendOpCode(OpI32Const, 4)
+	b.buf = append(b.buf, OpI32Add)
+
+	b.appendOpCode(OpLocalGet, leftPtr)
+	b.appendOpCode(OpI32Const, 4)
+	b.buf = append(b.buf, OpI32Add)
+
+	b.appendOpCode(OpLocalGet, leftLen)
+
+	b.buf = append(b.buf, 0xFC, 0x0A, 0x00, 0x00) // memory.copy 0 0
+
+	// memory.copy(resultPtr+4+leftLen, rightPtr+4, rightLen)
+	b.appendOpCode(OpLocalGet, resultPtr)
+	b.appendOpCode(OpI32Const, 4)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpLocalGet, leftLen)
+	b.buf = append(b.buf, OpI32Add)
+
+	b.appendOpCode(OpLocalGet, rightPtr)
+	b.appendOpCode(OpI32Const, 4)
+	b.buf = append(b.buf, OpI32Add)
+
+	b.appendOpCode(OpLocalGet, rightLen)
+
+	b.buf = append(b.buf, 0xFC, 0x0A, 0x00, 0x00) // memory.copy 0 0
+
+	b.appendOpCode(OpLocalGet, resultPtr)
+	return nil
+}
+
+func (b *bodyEncoder) appendOpCode(op byte, args ...uint32) {
+	b.buf = append(b.buf, op)
+	for _, arg := range args {
+		b.buf = AppendULEB128(b.buf, arg)
+	}
 }

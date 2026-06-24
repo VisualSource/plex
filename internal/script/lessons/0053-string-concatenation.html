@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 53 – String Concatenation</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .stack { font-family: "Fira Code", monospace; font-size: 0.85em; }
+  .stack td:last-child { color: var(--muted); }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .dim   { color: #555; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 53 – String Concatenation</h1>
+
+<p><em>Previous: <a href="0052-the-export-keyword.html">Lesson 52 – The export Keyword</a></em></p>
+
+<p>
+The plex interpreter handles <code>"hello" + " world"</code> trivially — just concatenate the Go strings. The binary backend is different: it must emit WASM instructions that allocate a new region on the heap, copy both strings' bytes into it, and leave an i32 pointer as the result. This lesson adds that capability.
+</p>
+
+<h2>The Current Gap</h2>
+
+<p>Try to compile this plex program today:</p>
+
+<pre><code><span class="kw">export fn</span> <span class="fn">greet</span>(): string {
+    <span class="kw">return</span> <span class="str">"hello"</span> + <span class="str">" world"</span>;
+}</code></pre>
+
+<p>The compiler will error: <code>no opcode for string +</code>. Tracing why shows a design tension in the current <code>BinaryExpression</code> handler.</p>
+
+<h3>The current handler flow</h3>
+<pre><code><span class="cmt">// body.go — simplified</span>
+<span class="kw">case</span> *script.<span class="ty">BinaryExpression</span>:
+    <span class="kw">if</span> short-circuit { ... }
+    b.<span class="fn">walk</span>(n.Left)   <span class="cmt">// ← both operands already evaluated before type check</span>
+    b.<span class="fn">walk</span>(n.Right)
+    opType := leftExpr.<span class="fn">GetType</span>()
+    ...
+    <span class="fn">arithOpcode</span>(opType.Kind, n.Operator)  <span class="cmt">// ← errors for TypeKind_String</span></code></pre>
+
+<p>
+The problem: <strong>both operands are walked before the type is inspected</strong>. For numeric types this is fine — the result opcode is trivially applied to two stack values. But string concatenation needs a completely different strategy: save the two pointers to locals, read lengths, allocate, copy. You can't do that if the stack already has the two pointers sitting there from the walk.
+</p>
+
+<p>The fix is to extract the type <em>before</em> the walk, so a string-typed <code>+</code> can take its own code path from the start.</p>
+
+<h2>WASM Bulk Memory: <code>memory.copy</code></h2>
+
+<p>
+Copying bytes from one region to another inside WASM linear memory once required a hand-written loop. Since WASM 2.0 (standardised in 2022 and supported by default in wazero), the <strong>bulk memory proposal</strong> adds <code>memory.copy</code> — a single instruction that handles the entire copy:
+</p>
+
+<pre><code><span class="cmt">; memory.copy dst src len</span>
+<span class="cmt">; copies len bytes from memory[src..src+len] to memory[dst..dst+len]</span>
+<span class="byte">FC 0A</span> <span class="num">00 00</span>   <span class="cmt">; opcode prefix + copy opcode + dst_memidx=0 + src_memidx=0</span></code></pre>
+
+<p>
+In binary: the <em>miscellaneous prefix</em> byte <code>0xFC</code> signals a multi-byte opcode, then <code>0x0A</code> is the memory.copy code, and the two trailing <code>0x00</code> bytes are the destination and source memory indices (always 0 in single-memory modules).
+</p>
+
+<p>
+Stack convention: <code>memory.copy</code> pops <strong>(dst i32) (src i32) (len i32)</strong> — dst is pushed first, then src, then len.
+</p>
+
+<h2>Plex String Memory Layout (Review)</h2>
+
+<p>Every plex string is stored in the heap as:</p>
+
+<div class="diagram">
+offset  <span class="arrow">+0</span>  <span class="byte">len</span>    <span class="cmt">← i32, number of bytes in the string</span>
+offset  <span class="arrow">+4</span>  <span class="byte">byte₀</span>
+        <span class="arrow">+5</span>  <span class="byte">byte₁</span>
+        <span class="arrow">…</span>
+        <span class="arrow">+4+len-1</span>  <span class="byte">byteₙ₋₁</span>
+</div>
+
+<p>For <code>"ab" + "c"</code>, the result needs:</p>
+<ul>
+  <li>4 bytes for length (= 3)</li>
+  <li>3 bytes for content: <code>'a'</code>, <code>'b'</code>, <code>'c'</code></li>
+</ul>
+<p>Total: 7 bytes allocated on the heap.</p>
+
+<h2>The walkStringConcat Strategy</h2>
+
+<p>Five synthetic locals are needed. Each is declared with <code>addSyntheticLocal(ValI32)</code> at the top of the function, so the local section is correct before any body bytes reference them.</p>
+
+<table>
+  <tr><th>Local</th><th>Type</th><th>Holds</th></tr>
+  <tr><td>leftPtr</td><td>i32</td><td>pointer to the left string</td></tr>
+  <tr><td>rightPtr</td><td>i32</td><td>pointer to the right string</td></tr>
+  <tr><td>leftLen</td><td>i32</td><td>byte count of the left string</td></tr>
+  <tr><td>rightLen</td><td>i32</td><td>byte count of the right string</td></tr>
+  <tr><td>resultPtr</td><td>i32</td><td>pointer to the new concatenated string</td></tr>
+</table>
+
+<h3>Phase 1 — Evaluate operands, save pointers</h3>
+
+<pre><code><span class="cmt">; evaluate left → i32 ptr</span>
+walk(n.Left)
+<span class="byte">21</span> leftPtr     <span class="cmt">; local.set leftPtr</span>
+
+<span class="cmt">; evaluate right → i32 ptr</span>
+walk(n.Right)
+<span class="byte">21</span> rightPtr    <span class="cmt">; local.set rightPtr</span></code></pre>
+
+<h3>Phase 2 — Read lengths</h3>
+
+<pre><code><span class="cmt">; leftLen = i32 at leftPtr+0</span>
+<span class="byte">20</span> leftPtr     <span class="cmt">; local.get leftPtr</span>
+<span class="byte">28 02 00</span>      <span class="cmt">; i32.load align=2 offset=0</span>
+<span class="byte">21</span> leftLen     <span class="cmt">; local.set leftLen</span>
+
+<span class="cmt">; rightLen = i32 at rightPtr+0</span>
+<span class="byte">20</span> rightPtr
+<span class="byte">28 02 00</span>
+<span class="byte">21</span> rightLen</code></pre>
+
+<h3>Phase 3 — Allocate and write the length</h3>
+
+<pre><code><span class="cmt">; resultPtr = current __heap_ptr  (global 0)</span>
+<span class="byte">23 00</span>         <span class="cmt">; global.get 0   → stack: [heapPtr]</span>
+<span class="byte">22</span> resultPtr  <span class="cmt">; local.tee resultPtr  → stack: [heapPtr]  (copy saved)</span>
+
+<span class="cmt">; memory[resultPtr+0] = leftLen + rightLen</span>
+<span class="byte">20</span> leftLen    <span class="cmt">; stack: [resultPtr, leftLen]</span>
+<span class="byte">20</span> rightLen
+<span class="byte">6A</span>            <span class="cmt">; i32.add  → stack: [resultPtr, newLen]</span>
+<span class="byte">36 02 00</span>      <span class="cmt">; i32.store align=2 offset=0  → stores newLen at resultPtr, stack: []</span>
+
+<span class="cmt">; bump __heap_ptr = resultPtr + 4 + leftLen + rightLen</span>
+<span class="byte">20</span> resultPtr
+<span class="byte">41 04</span>         <span class="cmt">; i32.const 4</span>
+<span class="byte">6A</span>            <span class="cmt">; i32.add</span>
+<span class="byte">20</span> leftLen
+<span class="byte">6A</span>
+<span class="byte">20</span> rightLen
+<span class="byte">6A</span>
+<span class="byte">24 00</span>         <span class="cmt">; global.set 0</span></code></pre>
+
+<h3>Phase 4 — Copy bytes</h3>
+
+<pre><code><span class="cmt">; memory.copy(resultPtr+4, leftPtr+4, leftLen)</span>
+<span class="byte">20</span> resultPtr  <span class="cmt">; dst</span>
+<span class="byte">41 04</span>
+<span class="byte">6A</span>
+<span class="byte">20</span> leftPtr    <span class="cmt">; src</span>
+<span class="byte">41 04</span>
+<span class="byte">6A</span>
+<span class="byte">20</span> leftLen    <span class="cmt">; len</span>
+<span class="byte">FC 0A 00 00</span>   <span class="cmt">; memory.copy</span>
+
+<span class="cmt">; memory.copy(resultPtr+4+leftLen, rightPtr+4, rightLen)</span>
+<span class="byte">20</span> resultPtr  <span class="cmt">; dst = resultPtr + 4 + leftLen</span>
+<span class="byte">41 04</span>
+<span class="byte">6A</span>
+<span class="byte">20</span> leftLen
+<span class="byte">6A</span>
+<span class="byte">20</span> rightPtr   <span class="cmt">; src = rightPtr + 4</span>
+<span class="byte">41 04</span>
+<span class="byte">6A</span>
+<span class="byte">20</span> rightLen   <span class="cmt">; len</span>
+<span class="byte">FC 0A 00 00</span>
+
+<span class="cmt">; push result value</span>
+<span class="byte">20</span> resultPtr</code></pre>
+
+<div class="insight">
+  <strong>Why local.tee instead of local.set + local.get?</strong> — <code>local.tee</code> (0x22) is the "tee" from Unix pipes: it stores the top-of-stack value into a local <em>without consuming it</em>. The value stays on the stack to be used as the destination address for the immediately following <code>i32.store</code>. Using <code>local.set</code> then <code>local.get</code> would require two instructions and the same effect; <code>local.tee</code> saves one.
+</div>
+
+<h2>Restructuring BinaryExpression in body.go</h2>
+
+<p>The key refactor: move the type extraction before the walk, and add a string-concat early exit:</p>
+
+<pre><code><span class="kw">case</span> *script.<span class="ty">BinaryExpression</span>:
+    <span class="kw">if</span> n.Operator == script.TokenType_AND || n.Operator == script.TokenType_OR {
+        <span class="kw">return</span> b.<span class="fn">walkShortCircuit</span>(n)
+    }
+
+    <span class="hl"><span class="kw">    </span><span class="cmt">// Extract type BEFORE walking — string concat needs a separate path</span>
+        leftExpr, ok := n.Left.(script.Expression)
+        <span class="kw">if</span> !ok {
+            <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"binary expression left has no type info"</span>)
+        }
+        opType := leftExpr.<span class="fn">GetType</span>()
+        <span class="kw">if</span> opType == <span class="kw">nil</span> {
+            <span class="kw">return</span> fmt.<span class="fn">Errorf</span>(<span class="str">"no type on binary expression operand"</span>)
+        }
+        <span class="kw">if</span> opType.Kind == script.TypeKind_String && n.Operator == script.TokenType_Plus {
+            <span class="kw">return</span> b.<span class="fn">walkStringConcat</span>(n)
+        }
+</span>
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Left); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+    <span class="kw">if</span> err := b.<span class="fn">walk</span>(n.Right); err != <span class="kw">nil</span> { <span class="kw">return</span> err }
+
+    <span class="cmt">// opType already computed above — remove the duplicate extraction below</span>
+
+    <span class="kw">if</span> <span class="fn">isCmpOp</span>(n.Operator) { ... }
+    op, err := <span class="fn">arithOpcode</span>(opType.Kind, n.Operator)
+    ...</code></pre>
+
+<div class="warn">
+  <strong>Remove the duplicate type extraction.</strong> The current code extracts <code>leftExpr</code> and <code>opType</code> after the walk calls. After this refactor, those same variables exist before the walk. Delete the old extraction lines — otherwise you get a compile error (redeclared variable) or a redundant extraction.
+</div>
+
+<h2>Implementation Task</h2>
+
+<div class="task">
+  <strong>Task — add string concatenation to the binary backend</strong>
+
+  <p><strong>Step 1.</strong> In <a href="../compiler/binary/body.go">body.go</a>, restructure the <code>BinaryExpression</code> case as shown above. Extract <code>opType</code> before the walk calls and add the early-exit for string <code>+</code>.</p>
+
+  <p><strong>Step 2.</strong> Add the <code>walkStringConcat</code> method to <a href="../compiler/binary/body.go">body.go</a>. The five locals, the four phases, and the final <code>local.get resultPtr</code> are all shown above. Translate each bytecode phase directly.</p>
+
+  <p>The <code>memory.copy</code> instruction is not in the existing opcode constants — emit it as raw bytes:</p>
+
+  <pre><code>b.buf = append(b.buf, <span class="byte">0xFC</span>, <span class="byte">0x0A</span>, <span class="byte">0x00</span>, <span class="byte">0x00</span>) <span class="cmt">// memory.copy 0 0</span></code></pre>
+
+  <p><strong>Step 3.</strong> Add the test:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_StringConcat</span>(t *testing.T) {
+    src := <span class="str">`
+        export fn greet(): string {
+            return "hello" + " world";
+        }
+    `</span>
+    ast, err := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    wasm, err := binary_wasm.<span class="fn">CompileProgram</span>(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    got, err := mod.<span class="fn">ExportedFunction</span>(<span class="str">"greet"</span>).<span class="fn">Call</span>(ctx)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"call: %v"</span>, err) }
+
+    ptr := api.<span class="fn">DecodeU32</span>(got[<span class="num">0</span>])
+    mem := mod.<span class="fn">Memory</span>()
+    n, _ := mem.<span class="fn">ReadUint32Le</span>(ptr)
+    data, _ := mem.<span class="fn">Read</span>(ptr+<span class="num">4</span>, n)
+    <span class="kw">if</span> string(data) != <span class="str">"hello world"</span> {
+        t.<span class="fn">Fatalf</span>(<span class="str">"got %q, want \"hello world\""</span>, string(data))
+    }
+}</code></pre>
+
+  <p><strong>Step 4.</strong> Add a second test that concatenates via a variable:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_StringConcatVar</span>(t *testing.T) {
+    src := <span class="str">`
+        export fn build(): string {
+            let a: string = "foo";
+            let b: string = "bar";
+            return a + b;
+        }
+    `</span>
+    <span class="cmt">// … same harness pattern, expect "foobar"</span>
+}</code></pre>
+
+  <p><strong>Step 5.</strong> Run the full suite:</p>
+  <pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+</div>
+
+<h2>Checklist Before Calling It Done</h2>
+<ul>
+  <li><code>TestEndToEnd_StringConcat</code> passes — <code>"hello" + " world"</code> returns a pointer to <code>"hello world"</code></li>
+  <li><code>TestEndToEnd_StringConcatVar</code> passes — concatenating string locals works</li>
+  <li>All previously passing tests still pass — the refactored <code>BinaryExpression</code> handler is backwards-compatible for numeric types</li>
+  <li>The result string's length field equals the sum of both input lengths</li>
+  <li>The result string's bytes equal the left bytes followed by the right bytes</li>
+</ul>
+
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why must the type be extracted before walking both operands in <code>BinaryExpression</code>, rather than after?</p>
+    <label><input type="radio" name="q1" value="a"> The walk calls clear the type annotation on the AST node</label>
+    <label><input type="radio" name="q1" value="b"> String concat must save both operand values to locals before any arithmetic — it cannot take over a stack that already has two values on it</label>
+    <label><input type="radio" name="q1" value="c"> The typechecker only annotates nodes before the first walk pass</label>
+    <label><input type="radio" name="q1" value="d"> Walking both sides first would cause a stack underflow for string operands</label>
+    <div class="feedback" id="q1-fb"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. The <code>memory.copy</code> encoding is <code>FC 0A 00 00</code>. What do the two trailing <code>00</code> bytes represent?</p>
+    <label><input type="radio" name="q2" value="a"> Alignment and byte offset, matching the format of i32.store</label>
+    <label><input type="radio" name="q2" value="b"> The destination and source memory indices — both 0 because plex modules have a single linear memory</label>
+    <label><input type="radio" name="q2" value="c"> Flags that control whether the copy is atomic or non-atomic</label>
+    <label><input type="radio" name="q2" value="d"> Reserved padding bytes required by the WASM validator</label>
+    <div class="feedback" id="q2-fb"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. Why is <code>resultPtr</code> captured with <code>local.tee</code> <em>before</em> bumping <code>__heap_ptr</code>?</p>
+    <label><input type="radio" name="q3" value="a"> local.tee is required before any global.set instruction by the WASM validator</label>
+    <label><input type="radio" name="q3" value="b"> The new string begins at the old heap pointer; capturing first gives us the base address before the bump advances it past the allocation</label>
+    <label><input type="radio" name="q3" value="c"> global.get cannot be called twice in the same function, so the value must be cached</label>
+    <label><input type="radio" name="q3" value="d"> The bump calculation depends on resultPtr's value being already set</label>
+    <div class="feedback" id="q3-fb"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. For <code>"ab" + "c"</code>, how many bytes does the heap pointer advance, and what is stored at the new string's base address (offset 0)?</p>
+    <label><input type="radio" name="q4" value="a"> Advances by 7; stores 3 (= 2 + 1) as the new length</label>
+    <label><input type="radio" name="q4" value="b"> Advances by 3; stores 3 as the new length (the 4-byte header is not counted)</label>
+    <label><input type="radio" name="q4" value="c"> Advances by 8; stores 3, aligned to 4 bytes</label>
+    <label><input type="radio" name="q4" value="d"> Advances by 7; stores 2 (only the left string's length, the right is appended separately)</label>
+    <div class="feedback" id="q4-fb"></div>
+  </div>
+
+  <div class="score-box" id="score"></div>
+</div>
+
+<h2>Primary Source</h2>
+<p>
+  <a href="https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions">
+    WebAssembly Core Spec — §5.4.6 Memory Instructions
+  </a> — the normative binary encoding of all memory instructions including the miscellaneous-prefix (<code>0xFC</code>) instructions added by the bulk-memory proposal. Look for opcode <code>0x0A</code> within the <code>0xFC</code> group.
+</p>
+
+<hr style="margin-top:3em; border-color: var(--border);">
+<p style="color:var(--muted); font-size:0.9em;">
+  Questions? Ask your teacher agent — paste any part of the lesson or your code and ask for clarification.
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'b', q4: 'a' };
+const explanations = {
+  q1: {
+    b: 'Correct — walkStringConcat needs to save both pointer values to synthetic locals immediately, then read lengths from those pointers, then allocate. If the walk had already run, the two i32 pointers would be sitting on the stack with no local.set to save them. Starting fresh (before any walk) lets the function control the full evaluation order.',
+    wrong: 'The key insight is ordering: walkStringConcat must be in control from the very beginning — before either operand is evaluated. The type check is the gate that routes to walkStringConcat instead of the generic walk-then-opcode path.'
+  },
+  q2: {
+    b: 'Correct — the bulk-memory spec defines memory.copy as 0xFC 0x0A followed by a destination memory index (u32) and a source memory index (u32). Since plex modules have exactly one linear memory (index 0), both indices are 0. In the future, multi-memory WASM could use non-zero indices here.',
+    wrong: 'These bytes are not alignment or atomic flags. Look at the WASM bulk-memory spec: memory.copy takes two memory index operands after the opcode, specifying which memory the destination and source refer to. With one memory (index 0 for both), the encoding is 0x00 0x00.'
+  },
+  q3: {
+    b: 'Correct — the heap bump allocator assigns the region [old_ptr .. old_ptr+size) to the new allocation. The base address of that region IS the old heap pointer. If we bumped first, global 0 would point past the allocation and we\'d have no way to recover the base address. Capturing with local.tee before global.set preserves the base.',
+    wrong: 'Think about what the heap pointer represents: the address where the next allocation begins. The new string starts exactly there. After we write to it and bump the pointer, the base address is gone from global 0 — so we must save it first.'
+  },
+  q4: {
+    a: 'Correct — "ab" has length 2, "c" has length 1, so the new length is 3. The allocation is 4 (header) + 3 (bytes) = 7 bytes, so the heap pointer advances by 7. At resultPtr+0, the i32 value 3 is stored as the new string\'s length.',
+    wrong: 'Recall the plex string layout: 4 bytes of length header followed by the string bytes. "ab" + "c" produces a 3-character string, so the header is 3 and the content is 3 bytes, totalling 7 bytes. The heap pointer advances by exactly that amount.'
+  },
+};
+
+let score = 0, answered = 0, total = Object.keys(answers).length;
+
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    const labels = document.querySelectorAll(`[name=${qid}]`);
+    if (document.querySelector(`#${qid} label.correct, #${qid} label.wrong`)) return;
+
+    const correct = answers[qid];
+    const isCorrect = this.value === correct;
+    if (isCorrect) score++;
+    answered++;
+
+    labels.forEach(r => {
+      const lbl = r.closest('label');
+      if (r.value === correct) lbl.className = 'correct';
+      else if (r.checked)      lbl.className = 'wrong';
+    });
+
+    const fb = document.getElementById(`${qid}-fb`);
+    const exp = explanations[qid];
+    fb.textContent = isCorrect ? exp[correct] : exp.wrong;
+    fb.style.display = 'block';
+    fb.style.color = isCorrect ? 'var(--green)' : 'var(--accent)';
+
+    if (answered === total) {
+      document.getElementById('score').textContent = `Score: ${score} / ${total}`;
+    }
+  });
+});
+</script>
+</body>
+</html>
