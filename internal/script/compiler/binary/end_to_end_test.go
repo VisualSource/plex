@@ -999,6 +999,25 @@ func TestEndToEnd_Decrement(t *testing.T) {
 	runOne(t, src, "count_down", []uint64{5}, 0)
 }
 
+func TestEndToEnd_StringIndex(t *testing.T) {
+	src := `
+        export fn first_byte(): int { return "hello"[0]; }   // 'h' = 104
+        export fn last_byte():  int { return "hello"[4]; }   // 'o' = 111
+        export fn from_var(): int {
+            let s: string = "hello";
+            return s[1];  // 'e' = 101
+        }
+        export fn sum_bytes(): int {
+            let s: string = "AB";  // 'A'=65, 'B'=66
+            return s[0] + s[1];  // 131
+        }
+    `
+	runOne(t, src, "first_byte", nil, 104)
+	runOne(t, src, "last_byte", nil, 111)
+	runOne(t, src, "from_var", nil, 101)
+	runOne(t, src, "sum_bytes", nil, 131)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

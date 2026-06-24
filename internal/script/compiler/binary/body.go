@@ -664,6 +664,13 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 		b.buf = AppendULEB128(b.buf, arrTmp)
 		return nil
 	case *script.ArrayAccess:
+		if targetExpr, ok := n.Target.(script.Expression); ok {
+			tt := targetExpr.GetType()
+			if tt != nil && tt.Kind == script.TypeKind_String {
+				return b.walkStringIndex(n)
+			}
+		}
+
 		elemType := n.GetType()
 		if elemType == nil {
 			return fmt.Errorf("array access has no element type")
@@ -1195,4 +1202,49 @@ func (b *bodyEncoder) appendOpCode(op byte, args ...uint32) {
 	for _, arg := range args {
 		b.buf = AppendULEB128(b.buf, arg)
 	}
+}
+
+func (b *bodyEncoder) walkStringIndex(n *script.ArrayAccess) error {
+	strBase := b.addSyntheticLocal(ValI32)
+	strIdx := b.addSyntheticLocal(ValI32)
+
+	// save string pointer
+	if err := b.walk(n.Target); err != nil {
+		return err
+	}
+	b.buf = append(b.buf, OpLocalSet)
+	b.buf = AppendULEB128(b.buf, strBase)
+
+	// save index (i64 → i32)
+	if err := b.walk(n.Index); err != nil {
+		return err
+	}
+	b.buf = append(b.buf, OpI32WrapI64, OpLocalSet)
+	b.buf = AppendULEB128(b.buf, strIdx)
+
+	// bounds check: strIdx >= string.len → unreachable
+	b.buf = append(b.buf, OpLocalGet)
+	b.buf = AppendULEB128(b.buf, strIdx)
+	b.buf = append(b.buf, OpLocalGet)
+	b.buf = AppendULEB128(b.buf, strBase)
+	b.buf = append(b.buf, OpI32Load)
+	b.buf = AppendULEB128(b.buf, 2) // align=2 (4-byte length field)
+	b.buf = AppendULEB128(b.buf, 0) // offset=0
+	b.buf = append(b.buf, OpI32GeU, OpIf, BlockTypeEmpty)
+	b.blockDepth++
+	b.buf = append(b.buf, OpUnreachable, OpEnd)
+	b.blockDepth--
+
+	// load byte: base + 4 + idx
+	b.buf = append(b.buf, OpLocalGet)
+	b.buf = AppendULEB128(b.buf, strBase)
+	b.buf = append(b.buf, OpLocalGet)
+	b.buf = AppendULEB128(b.buf, strIdx)
+	b.buf = append(b.buf, OpI32Add, OpI32Load8U)
+	b.buf = AppendULEB128(b.buf, 0) // align=0 (byte)
+	b.buf = AppendULEB128(b.buf, 4) // offset=4 (skip length header)
+
+	// widen to i64 (plex int)
+	b.buf = append(b.buf, OpI64ExtendI32S)
+	return nil
 }

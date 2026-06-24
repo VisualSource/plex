@@ -302,10 +302,10 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 
 		switch target := n.Target.(type) {
 		case *script.StringLiteral:
-			t := c.checkExpression(target)
-
-			n.SetType(t)
-			return t
+			c.checkExpression(target)
+			result := &script.Type{Kind: script.TypeKind_Int}
+			n.SetType(result)
+			return result
 
 		case *script.ArrayLiteral:
 			t := c.checkExpression(target)
@@ -313,10 +313,9 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 			n.SetType(t.Element)
 			return t.Element
 		case *script.Identifier:
-			i := c.scope.Get(target.Value)
+			i := c.checkExpression(target)
 
 			if i == nil {
-				c.error(n, fmt.Errorf("unknown identifier %s", target.Value))
 				return nil
 			}
 
@@ -326,8 +325,9 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 
 				return i.Element
 			case script.TypeKind_String:
-				n.SetType(i)
-				return i
+				result := &script.Type{Kind: script.TypeKind_Int}
+				n.SetType(result)
+				return result
 			default:
 				c.error(n, errors.New("unable to index into given target"))
 				return nil
