@@ -280,6 +280,15 @@ func (c *Checker) checkExpression(expr script.Expression) *script.Type {
 		return t
 	case *script.UnaryExpression:
 		t := c.checkExpression(n.Operand)
+		if n.Operator == script.TokenType_Not {
+			if t == nil || t.Kind != script.TypeKind_Bool {
+				c.error(n, fmt.Errorf("! requires a bool operand, got %s", t))
+			}
+
+			result := &script.Type{Kind: script.TypeKind_Bool}
+			n.SetType(result)
+			return result
+		}
 
 		n.SetType(t)
 		return t

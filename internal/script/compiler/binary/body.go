@@ -527,6 +527,14 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			return b.walk(n.Operand)
 		}
 
+		if n.Operator == script.TokenType_Not {
+			if err := b.walk(n.Operand); err != nil {
+				return err
+			}
+			b.buf = append(b.buf, OpI32Eqz)
+			return nil
+		}
+
 		if n.Operator != script.TokenType_Minus {
 			return fmt.Errorf("unsupported unary operator %v", n.Operator)
 		}

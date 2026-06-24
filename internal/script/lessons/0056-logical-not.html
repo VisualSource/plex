@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 56 – Logical NOT (!)</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; color: var(--muted); }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .pipeline { display: flex; gap: 0; margin: 1.4em 0; flex-wrap: wrap; }
+  .stage { background: var(--surface); border: 1px solid var(--border); padding: 10px 16px; font-family: "Fira Code", monospace; font-size: 0.84em; position: relative; }
+  .stage:not(:last-child)::after { content: "→"; position: absolute; right: -13px; top: 50%; transform: translateY(-50%); color: var(--accent); font-size: 1.1em; z-index: 1; }
+  .stage.changed { border-color: var(--yellow); color: var(--yellow); }
+  .file-ref { font-size: 0.85em; color: var(--muted); display: block; margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 56 – Logical NOT (<code>!</code>)</h1>
+
+<p><em>Previous: <a href="0055-break-and-continue-binary.html">Lesson 55 – Break and Continue</a></em></p>
+
+<p>
+Adding <code>!</code> to plex is the minimal example of a full-stack feature: one operator, seven files, one new concept at each layer. The WASM opcode already exists in <a href="../compiler/binary/opcodes.go">opcodes.go</a> — all the work is wiring.
+</p>
+
+<h2>The Compiler Pipeline</h2>
+
+<p>Every new language feature must clear every stage:</p>
+
+<div class="pipeline">
+  <div class="stage changed">Tokenizer<span class="file-ref">tokenizer.go</span></div>
+  <div class="stage" style="border-color:#444; width:8px; border-left:none; border-right:none; padding:10px 0"></div>
+  <div class="stage changed">Parser<span class="file-ref">ast.go</span></div>
+  <div class="stage" style="border-color:#444; width:8px; border-left:none; border-right:none; padding:10px 0"></div>
+  <div class="stage changed">Type checker<span class="file-ref">typecheck.go</span></div>
+  <div class="stage" style="border-color:#444; width:8px; border-left:none; border-right:none; padding:10px 0"></div>
+  <div class="stage changed">WAT codegen<span class="file-ref">compiler.go</span></div>
+  <div class="stage" style="border-color:#444; width:8px; border-left:none; border-right:none; padding:10px 0"></div>
+  <div class="stage changed">Binary codegen<span class="file-ref">body.go</span></div>
+</div>
+
+<p>Plus one token definition file that feeds both the tokenizer and parser.</p>
+
+<h2>Stage 1 – Token Definition</h2>
+
+<p>
+<a href="../tokens.go">tokens.go</a> defines every token type. Add <code>TokenType_Not</code> after <code>TokenType_NotEqual</code>:
+</p>
+
+<pre><code><span class="cmt">// in the const iota block</span>
+TokenType_NotEqual
+<span class="ok">TokenType_Not         <span class="cmt">// !  (standalone, not !=)</span></span></code></pre>
+
+<p>And in the <code>String()</code> switch:</p>
+
+<pre><code><span class="kw">case</span> TokenType_Not:
+    <span class="kw">return</span> <span class="str">"!"</span></code></pre>
+
+<p>And in the <code>tokenSymbol</code> map in <a href="../ast.go">ast.go</a>:</p>
+
+<pre><code>TokenType_Not: <span class="str">"!"</span>,</code></pre>
+
+<h2>Stage 2 – Tokenizer</h2>
+
+<p>
+<a href="../tokenizer.go">tokenizer.go</a> already handles <code>!</code>: when the next character is <code>=</code> it emits <code>TokenType_NotEqual</code>. If it's <em>not</em> <code>=</code>, it currently falls through to <code>default</code>, hitting <code>ErrUnexpectedCharacter</code>. Replace the <code>fallthrough</code> with an explicit emit:
+</p>
+
+<pre><code><span class="kw">case</span> <span class="str">'!'</span>:
+    next, err := t.isNext(<span class="str">'='</span>)
+    <span class="kw">if</span> err != nil {
+        <span class="kw">return</span> nil, err
+    }
+    <span class="kw">if</span> next {
+        start := NewPosition(t.col, t.row)
+        <span class="kw">if</span> err := t.stream.Discard(1); err != nil {
+            <span class="kw">return</span> nil, err
+        }
+        t.row++
+        t.tokens = append(t.tokens, NewDataToken(TokenType_NotEqual, start, NewPosition(t.row, t.col)))
+        <span class="kw">continue</span>
+    }
+    <span class="cmt"><span class="ok">// NEW: standalone ! is TokenType_Not</span></span>
+    <span class="ok">t.tokens = append(t.tokens, NewDataToken(TokenType_Not, NewPosition(t.col, t.row), NewPosition(t.col, t.row)))</span>
+    <span class="ok"><span class="kw">continue</span>    <span class="cmt">// was: fallthrough</span></span></code></pre>
+
+<div class="insight">
+<strong>Disambiguation at lex time.</strong> The tokenizer decides <code>!</code> vs <code>!=</code> by peeking one character ahead. The parser never sees a raw <code>!</code> — it only sees <code>TokenType_Not</code> or <code>TokenType_NotEqual</code>. This is the standard lookahead-1 pattern used for every two-character operator (<code>==</code>, <code>&&</code>, <code>||</code>, etc.).
+</div>
+
+<h2>Stage 3 – Parser</h2>
+
+<p>
+<code>!</code> is a prefix unary operator, so it belongs in <code>parseUnary()</code> in <a href="../ast.go">ast.go</a>. The existing code already handles <code>-</code> and <code>+</code>; add <code>!</code> to the same condition:
+</p>
+
+<pre><code><span class="cmt">// was: if tt == TokenType_Minus || tt == TokenType_Plus</span>
+<span class="kw">if</span> tt == TokenType_Minus || tt == TokenType_Plus <span class="ok">|| tt == TokenType_Not</span> {
+    op := p.advance()
+    operand, err := p.parseUnary()
+    ...
+    <span class="kw">return</span> &amp;UnaryExpression{ Operator: op.IsToken(), Operand: operand.(Expression), ... }, nil
+}</code></pre>
+
+<p>The resulting AST node is a <code>UnaryExpression</code> with <code>Operator = TokenType_Not</code>. No new AST node type needed.</p>
+
+<h2>Stage 4 – Type Checker</h2>
+
+<p>
+In <a href="../typeschecker/typecheck.go">typecheck.go</a>, the <code>UnaryExpression</code> case currently just propagates the operand's type unchanged. That's wrong for <code>!</code>: it requires a <code>bool</code> operand and always returns <code>bool</code>.
+</p>
+
+<pre><code><span class="kw">case</span> *script.UnaryExpression:
+    t := c.checkExpression(n.Operand)
+    <span class="ok"><span class="kw">if</span> n.Operator == script.TokenType_Not {
+        <span class="kw">if</span> t == nil || t.Kind != script.TypeKind_Bool {
+            c.error(n, fmt.Errorf("! requires a bool operand, got %s", t))
+        }
+        result := &amp;script.Type{Kind: script.TypeKind_Bool}
+        n.SetType(result)
+        <span class="kw">return</span> result
+    }</span>
+    n.SetType(t)
+    <span class="kw">return</span> t</code></pre>
+
+<h2>Stage 5 – WAT Codegen</h2>
+
+<p>
+In <a href="../compiler/compiler.go">compiler.go</a>, the <code>UnaryExpression</code> case handles <code>+</code> and <code>-</code>. Add <code>!</code>:
+</p>
+
+<pre><code><span class="ok"><span class="kw">case</span> n.Operator == script.TokenType_Not && !n.Postfix:
+    operand, err := c.compileExpr(n.Operand)
+    <span class="kw">if</span> err != nil { <span class="kw">return</span> "", err }
+    <span class="kw">return</span> operand + "\ni32.eqz", nil</span></code></pre>
+
+<h2>Stage 6 – Binary Codegen</h2>
+
+<p>
+In <a href="../compiler/binary/body.go">body.go</a>, the <code>UnaryExpression</code> case handles <code>+</code> and <code>-</code>. Add <code>!</code>:
+</p>
+
+<pre><code><span class="kw">case</span> *script.UnaryExpression:
+    <span class="kw">if</span> n.Operator == script.TokenType_Plus {
+        <span class="kw">return</span> b.walk(n.Operand)
+    }
+    <span class="ok"><span class="kw">if</span> n.Operator == script.TokenType_Not {
+        <span class="kw">if</span> err := b.walk(n.Operand); err != nil {
+            <span class="kw">return</span> err
+        }
+        b.buf = append(b.buf, OpI32Eqz)
+        <span class="kw">return</span> nil
+    }</span>
+    <span class="kw">if</span> n.Operator != script.TokenType_Minus { ... }</code></pre>
+
+<h2>The WASM Opcode: <code>i32.eqz</code></h2>
+
+<p>
+<code>i32.eqz</code> (opcode <code>0x45</code>) pops one i32, pushes 1 if it was 0, pushes 0 otherwise. It's "equals zero". Since plex booleans are i32 (false=0, true=1):
+</p>
+
+<table>
+  <tr><th>Input (i32)</th><th>i32.eqz output</th><th>Meaning</th></tr>
+  <tr><td>0</td><td>1</td><td>!false = true</td></tr>
+  <tr><td>1</td><td>0</td><td>!true = false</td></tr>
+  <tr><td>any non-zero</td><td>0</td><td>truthy → !truthy = false</td></tr>
+</table>
+
+<p>
+<code>OpI32Eqz = 0x45</code> is already defined in <a href="../compiler/binary/opcodes.go">opcodes.go</a> — it's the same instruction used to invert the while-loop condition: <code>condition; i32.eqz; br_if (exit)</code>.
+</p>
+
+<div class="quiz-section">
+  <h3>Quick Check</h3>
+
+  <div class="q" id="q1">
+    <p>Why does the tokenizer need to peek one character ahead when it sees <code>!</code>?</p>
+    <label><input type="radio" name="q1" value="a"> To determine whether to emit TokenType_Not or TokenType_NotEqual</label>
+    <label><input type="radio" name="q1" value="b"> To check for the end of file</label>
+    <label><input type="radio" name="q1" value="c"> To skip whitespace after the operator</label>
+    <label><input type="radio" name="q1" value="d"> To detect string interpolation</label>
+    <div class="feedback" id="q1-fb">! and != share the same first character. Peeking at the next char disambiguates them at lex time, so the parser only ever sees one of two unambiguous token types.</div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>What does <code>i32.eqz</code> return when its input is 1?</p>
+    <label><input type="radio" name="q2" value="a"> 1</label>
+    <label><input type="radio" name="q2" value="b"> 0</label>
+    <label><input type="radio" name="q2" value="c"> -1</label>
+    <label><input type="radio" name="q2" value="d"> Trap</label>
+    <div class="feedback" id="q2-fb">eqz = "equals zero". Input 1 is not zero, so it returns 0. That's !true = false. ✓</div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>Why does adding <code>!</code> to the typechecker require more than just propagating the operand type?</p>
+    <label><input type="radio" name="q3" value="a"> Because ! has lower precedence than &&</label>
+    <label><input type="radio" name="q3" value="b"> Because ! requires the operand to be bool, which must be enforced</label>
+    <label><input type="radio" name="q3" value="c"> Because ! can only appear as a postfix operator</label>
+    <label><input type="radio" name="q3" value="d"> Because the binary backend uses a different opcode per type</label>
+    <div class="feedback" id="q3-fb">!42 would be a type error in plex. The typechecker is the right place to reject it before codegen tries to emit i32.eqz on an i64 value.</div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>What precedence level does <code>!</code> belong to in the parser?</p>
+    <label><input type="radio" name="q4" value="a"> parsePrimary — it's a literal</label>
+    <label><input type="radio" name="q4" value="b"> parseUnary — it's a prefix operator, same level as - and +</label>
+    <label><input type="radio" name="q4" value="c"> parseLogicOr — it's a logical operator</label>
+    <label><input type="radio" name="q4" value="d"> parseEquality — it's a comparison</label>
+    <div class="feedback" id="q4-fb">All prefix operators (-x, +x, !x) bind tighter than binary operators. They live in parseUnary, above postfix and below cast/power.</div>
+  </div>
+
+  <div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<h2>Your Task</h2>
+
+<div class="task">
+  <strong>Implementation steps</strong>
+  <ol style="margin:0; padding-left:1.2em;">
+    <li>Add <code>TokenType_Not</code> to <a href="../tokens.go">tokens.go</a> (iota constant + String() case)</li>
+    <li>Add <code>TokenType_Not: "!"</code> to <code>tokenSymbol</code> in <a href="../ast.go">ast.go</a></li>
+    <li>Fix the <code>fallthrough</code> in <a href="../tokenizer.go">tokenizer.go</a> to emit <code>TokenType_Not</code></li>
+    <li>Extend <code>parseUnary()</code> in <a href="../ast.go">ast.go</a> to handle <code>TokenType_Not</code></li>
+    <li>Add the bool-check + result type in <a href="../typeschecker/typecheck.go">typecheck.go</a></li>
+    <li>Add <code>i32.eqz</code> to the WAT compiler <a href="../compiler/compiler.go">compiler.go</a></li>
+    <li>Add <code>OpI32Eqz</code> to <a href="../compiler/binary/body.go">body.go</a></li>
+    <li>Add <code>TestEndToEnd_Not</code> to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a></li>
+  </ol>
+</div>
+
+<h3>Test to Write</h3>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_Not</span>(t *testing.T) {
+    src := `
+        <span class="kw">export fn</span> <span class="fn">not_true</span>(): bool  { <span class="kw">return</span> !<span class="kw">true</span>; }
+        <span class="kw">export fn</span> <span class="fn">not_false</span>(): bool { <span class="kw">return</span> !<span class="kw">false</span>; }
+        <span class="kw">export fn</span> <span class="fn">double_not</span>(x: bool): bool { <span class="kw">return</span> !!x; }
+        <span class="kw">export fn</span> <span class="fn">not_eq</span>(a: i64, b: i64): bool { <span class="kw">return</span> !(a == b); }
+    `
+    runOne(t, src, <span class="str">"not_true"</span>,  nil, <span class="num">0</span>)           <span class="cmt">// !true  = false</span>
+    runOne(t, src, <span class="str">"not_false"</span>, nil, <span class="num">1</span>)           <span class="cmt">// !false = true</span>
+    runOne(t, src, <span class="str">"double_not"</span>, []uint64{<span class="num">1</span>}, <span class="num">1</span>) <span class="cmt">// !!true = true</span>
+    runOne(t, src, <span class="str">"double_not"</span>, []uint64{<span class="num">0</span>}, <span class="num">0</span>) <span class="cmt">// !!false = false</span>
+    runOne(t, src, <span class="str">"not_eq"</span>, []uint64{<span class="num">3</span>, <span class="num">3</span>}, <span class="num">0</span>)  <span class="cmt">// !(3==3) = false</span>
+    runOne(t, src, <span class="str">"not_eq"</span>, []uint64{<span class="num">3</span>, <span class="num">4</span>}, <span class="num">1</span>)  <span class="cmt">// !(3==4) = true</span>
+}</code></pre>
+
+<p>The <code>double_not</code> and <code>not_eq</code> cases are the most interesting: <code>!!</code> checks that two <code>i32.eqz</code> instructions cancel out, and <code>!(a==b)</code> checks that <code>!</code> correctly wraps a comparison result.</p>
+
+<div class="warn">
+  <strong>WAT compiler note.</strong> If you're not sure what the WAT compiler's <code>UnaryExpression</code> handler looks like, search for <code>TokenType_Minus</code> in <a href="../compiler/compiler.go">compiler.go</a> — the <code>!</code> case should slot in right alongside it.
+</div>
+
+<h2>Why This Matters</h2>
+
+<p>
+Adding <code>!</code> is a template for every future operator. The same seven-file pattern applies to <code>++</code>, <code>**</code> (power), bitwise NOT, etc. Once you've done it once with the simplest possible operator, you know exactly what's required.
+</p>
+
+<h2>Primary Source</h2>
+<p>
+<a href="https://webassembly.github.io/spec/core/syntax/instructions.html#numeric-instructions">WebAssembly Spec: Numeric Instructions</a> — the section on i32 test instructions (<code>eqz</code>) explains the full semantics.
+</p>
+
+<p style="margin-top: 2.5em; color: var(--muted); font-size: 0.9em;">
+  Ask your teacher a follow-up — try: "What would happen if someone wrote <code>!42</code>? When exactly would the error fire?" or "How would I add bitwise NOT (<code>~</code>) to plex?"
+</p>
+
+<script>
+const answers = { q1: 'a', q2: 'b', q3: 'b', q4: 'b' };
+const explanations = {
+  q1: '! and != share the same first character. Peeking at the next char disambiguates them at lex time, so the parser only ever sees one of two unambiguous token types.',
+  q2: 'eqz = "equals zero". Input 1 is not zero, so it returns 0. That\'s !true = false.',
+  q3: '!42 would be a type error in plex. The typechecker is the right place to reject it before codegen tries to emit i32.eqz on an i64 value.',
+  q4: 'All prefix operators (-x, +x, !x) bind tighter than binary operators. They live in parseUnary, above postfix and below cast/power.'
+};
+
+let answered = 0;
+let correct = 0;
+const total = Object.keys(answers).length;
+
+document.querySelectorAll('input[type=radio]').forEach(input => {
+  input.addEventListener('change', () => {
+    const name = input.name;
+    const container = document.getElementById(name);
+    if (container.dataset.done) return;
+    container.dataset.done = '1';
+    answered++;
+
+    const isCorrect = input.value === answers[name];
+    if (isCorrect) correct++;
+
+    container.querySelectorAll('label').forEach(label => {
+      const val = label.querySelector('input').value;
+      if (val === answers[name]) label.classList.add('correct');
+      else if (val === input.value && !isCorrect) label.classList.add('wrong');
+    });
+
+    const fb = document.getElementById(name + '-fb');
+    fb.style.display = 'block';
+    fb.textContent = explanations[name];
+
+    if (answered === total) {
+      const box = document.getElementById('score-box');
+      box.style.display = 'block';
+      box.innerHTML = `Score: <strong>${correct} / ${total}</strong>${correct === total ? ' — perfect.' : ' — review the missed items above.'}`;
+    }
+  });
+});
+</script>
+</body>
+</html>

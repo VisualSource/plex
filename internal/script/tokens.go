@@ -39,6 +39,7 @@ const (
 	TokenType_AND
 	TokenType_Number
 	TokenType_Power
+	TokenType_Not
 )
 
 func (t TokenType) String() string {
@@ -109,31 +110,34 @@ func (t TokenType) String() string {
 		return "#number"
 	case TokenType_Power:
 		return "**"
+	case TokenType_Not:
+		return "!"
 	default:
 		return fmt.Sprintf("TokenType(%d)", t)
 	}
 }
 
 var delimMap = map[rune]TokenType{
-	'.':  TokenType_Dot,
-	'%':  TokenType_Mod,
-	'{':  TokenType_BracketCurlyOpen,
-	'}':  TokenType_BracketCulryClose,
-	'[':  TokenType_BracketSquareOpen,
-	']':  TokenType_BracketSquareClose,
-	'(':  TokenType_BracketParamOpen,
-	')':  TokenType_BracketParamClose,
-	'/':  TokenType_Div,
-	'*':  TokenType_Star,
-	':':  TokenType_Colon,
-	',':  TokenType_Comma,
-	';':  TokenType_Semicolon,
-	'-':  TokenType_Minus,
-	'+':  TokenType_Plus,
-	'?':  TokenType_Question,
-	'=':  TokenType_Equal,
-	'>':  TokenType_GreaterThen,
-	'<':  TokenType_LessThen,
+	'.': TokenType_Dot,
+	'%': TokenType_Mod,
+	'{': TokenType_BracketCurlyOpen,
+	'}': TokenType_BracketCulryClose,
+	'[': TokenType_BracketSquareOpen,
+	']': TokenType_BracketSquareClose,
+	'(': TokenType_BracketParamOpen,
+	')': TokenType_BracketParamClose,
+	'/': TokenType_Div,
+	'*': TokenType_Star,
+	':': TokenType_Colon,
+	',': TokenType_Comma,
+	';': TokenType_Semicolon,
+	'-': TokenType_Minus,
+	'+': TokenType_Plus,
+	'?': TokenType_Question,
+	'=': TokenType_Equal,
+	'>': TokenType_GreaterThen,
+	'<': TokenType_LessThen,
+	'!': TokenType_Not,
 }
 
 type Position struct {

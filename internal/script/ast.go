@@ -319,7 +319,7 @@ func (p *Parser) parsePostfix() (AstNode, error) {
 func (p *Parser) parseUnary() (AstNode, error) {
 	tt := p.peek().IsToken()
 
-	if tt == TokenType_Minus || tt == TokenType_Plus {
+	if tt == TokenType_Minus || tt == TokenType_Plus || tt == TokenType_Not {
 		op := p.advance()
 		operand, err := p.parseUnary()
 		if err != nil {

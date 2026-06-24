@@ -954,6 +954,21 @@ func TestEndToEnd_Continue(t *testing.T) {
 	runOne(t, src, "sum_evens", []uint64{10}, 30)
 }
 
+func TestEndToEnd_Not(t *testing.T) {
+	src := `
+        export fn not_true(): bool  { return !true; }
+        export fn not_false(): bool { return !false; }
+        export fn double_not(x: bool): bool { return !!x; }
+        export fn not_eq(a: i64, b: i64): bool { return !(a == b); }
+    `
+	runOne(t, src, "not_true", nil, 0)           // !true  = false
+	runOne(t, src, "not_false", nil, 1)          // !false = true
+	runOne(t, src, "double_not", []uint64{1}, 1) // !!true = true
+	runOne(t, src, "double_not", []uint64{0}, 0) // !!false = false
+	runOne(t, src, "not_eq", []uint64{3, 3}, 0)  // !(3==3) = false
+	runOne(t, src, "not_eq", []uint64{3, 4}, 1)  // !(3==4) = true
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

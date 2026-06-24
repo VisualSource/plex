@@ -236,12 +236,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 
 			return nil, ErrUnexpectedCharacter
 		case '!':
+			start := NewPosition(t.row, t.col)
 			next, err := t.isNext('=')
 			if err != nil {
 				return nil, err
 			}
 			if next {
-				start := NewPosition(t.col, t.row)
 				if err := t.stream.Discard(1); err != nil {
 					return nil, err
 				}
@@ -250,7 +250,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				continue
 			}
 
-			fallthrough
+			t.tokens = append(t.tokens, NewDataToken(delimMap[char], start, NewPosition(t.row, t.col)))
 		default:
 			if unicode.IsDigit(char) {
 				if err := t.stream.UnreadRune(); err != nil {
