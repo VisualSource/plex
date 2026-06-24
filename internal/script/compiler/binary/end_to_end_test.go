@@ -13,7 +13,7 @@ import (
 
 func TestEndToEnd_FortyTwo(t *testing.T) {
 	src := `
-        fn forty_two(): i64 {
+        export fn forty_two(): i64 {
             return 42;
         }
     `
@@ -49,7 +49,7 @@ func TestEndToEnd_FortyTwo(t *testing.T) {
 
 func TestEndToEnd_Add(t *testing.T) {
 	src := `
-        fn add(a: i64, b: i64): i64 {
+        export fn add(a: i64, b: i64): i64 {
             return a + b;
         }
     `
@@ -58,7 +58,7 @@ func TestEndToEnd_Add(t *testing.T) {
 
 func TestEndToEnd_Sub(t *testing.T) {
 	src := `
-        fn sub3(a: i64, b: i64, c: i64): i64 {
+        export fn sub3(a: i64, b: i64, c: i64): i64 {
             return a - b - c;
         }
     `
@@ -69,7 +69,7 @@ func TestEndToEnd_Sub(t *testing.T) {
 
 func TestEndToEnd_Locals(t *testing.T) {
 	src := `
-        fn accumulate(a: i64, b: i64): i64 {
+        export fn accumulate(a: i64, b: i64): i64 {
             let x: i64 = a + b;
             let y: i64 = x + 1;
             return y;
@@ -80,7 +80,7 @@ func TestEndToEnd_Locals(t *testing.T) {
 
 func TestEndToEnd_IfElse(t *testing.T) {
 	src := `
-        fn max(a: i64, b: i64): i64 {
+        export fn max(a: i64, b: i64): i64 {
             if a > b {
                 return a;
             } else {
@@ -94,7 +94,7 @@ func TestEndToEnd_IfElse(t *testing.T) {
 
 func TestEndToEnd_WhileSum(t *testing.T) {
 	src := `
-        fn sum(n: i64): i64 {
+        export fn sum(n: i64): i64 {
             let i: i64 = 1;
             let acc: i64 = 0;
             while i <= n {
@@ -111,10 +111,10 @@ func TestEndToEnd_WhileSum(t *testing.T) {
 
 func TestEndToEnd_FunctionCall(t *testing.T) {
 	src := `
-        fn square(x: i64): i64 {
+        export fn square(x: i64): i64 {
             return x * x;
         }
-        fn sum_squares(a: i64, b: i64): i64 {
+        export fn sum_squares(a: i64, b: i64): i64 {
             return square(a) + square(b);
         }
     `
@@ -125,7 +125,7 @@ func TestEndToEnd_FunctionCall(t *testing.T) {
 
 func TestEndToEnd_Recursion(t *testing.T) {
 	src := `
-        fn fib(n: i64): i64 {
+        export fn fib(n: i64): i64 {
             if n < 2 { return n; }
             return fib(n - 1) + fib(n - 2);
         }
@@ -137,10 +137,10 @@ func TestEndToEnd_Recursion(t *testing.T) {
 
 func TestEndToEnd_CallAsStatement(t *testing.T) {
 	src := `
-        fn square(x: i64): i64 {
+        export fn square(x: i64): i64 {
             return x * x;
         }
-        fn warmup(n: i64): i64 {
+        export fn warmup(n: i64): i64 {
             square(n);          // result discarded — pure waste, but legal
             return n + 1;
         }
@@ -150,7 +150,7 @@ func TestEndToEnd_CallAsStatement(t *testing.T) {
 
 func TestEndToEnd_ShortCircuitOr(t *testing.T) {
 	src := `
-        fn safe_or(a: bool, b: i64): bool {
+        export fn safe_or(a: bool, b: i64): bool {
             return a || (10 / b) > 0;
         }
     `
@@ -166,13 +166,13 @@ func TestEndToEnd_ShortCircuitOr(t *testing.T) {
 
 func TestEndToEnd_UnaryMinus(t *testing.T) {
 	src := `
-        fn neg_then_add(x: i64, y: i64): i64 {
+        export fn neg_then_add(x: i64, y: i64): i64 {
             return -x + y;
         }
-        fn double_neg(x: i64): i64 {
+        export fn double_neg(x: i64): i64 {
             return -(-x);          // should equal x
         }
-        fn unary_plus(x: i64): i64 {
+        export fn unary_plus(x: i64): i64 {
             return +x;             // no-op
         }
     `
@@ -183,7 +183,7 @@ func TestEndToEnd_UnaryMinus(t *testing.T) {
 
 func TestEndToEnd_StringLiteral(t *testing.T) {
 	src := `
-        fn greet(): string {
+        export fn greet(): string {
             return "hello";
         }
     `
@@ -225,13 +225,13 @@ func TestEndToEnd_StringLiteral(t *testing.T) {
 
 func TestEndToEnd_StringLen(t *testing.T) {
 	src := `
-        fn measure(): int {
+        export fn measure(): int {
             return "hello".len();
         }
-        fn measure_world(): int {
+        export fn measure_world(): int {
             return "wonderful".len();
         }
-        fn measure_empty(): int {
+        export fn measure_empty(): int {
             return "".len();
         }
     `
@@ -244,10 +244,10 @@ func TestEndToEnd_I32Comparisons(t *testing.T) {
 	// Plex's typechecker doesn't coerce integer literals to i32, so we exercise
 	// the new opcodes through pure parameter-driven comparisons.
 	src := `
-        fn lt_i32(a: i32, b: i32): bool { return a < b; }
-        fn gt_i32(a: i32, b: i32): bool { return a > b; }
-        fn le_i32(a: i32, b: i32): bool { return a <= b; }
-        fn ge_i32(a: i32, b: i32): bool { return a >= b; }
+        export fn lt_i32(a: i32, b: i32): bool { return a < b; }
+        export fn gt_i32(a: i32, b: i32): bool { return a > b; }
+        export fn le_i32(a: i32, b: i32): bool { return a <= b; }
+        export fn ge_i32(a: i32, b: i32): bool { return a >= b; }
     `
 	runOne(t, src, "lt_i32", []uint64{3, 7}, 1) // 3 <  7
 	runOne(t, src, "lt_i32", []uint64{7, 3}, 0)
@@ -262,12 +262,12 @@ func TestEndToEnd_I32Comparisons(t *testing.T) {
 
 func TestEndToEnd_F64Comparisons(t *testing.T) {
 	src := `
-        fn classify(x: f64): i64 {
+        export fn classify(x: f64): i64 {
             if x < 0.0 { return -1; }
             if x > 0.0 { return  1; }
             return 0;
         }
-        fn near_one(x: f64): bool {
+        export fn near_one(x: f64): bool {
             return x >= 0.99 && x <= 1.01;
         }
     `
@@ -281,7 +281,7 @@ func TestEndToEnd_F64Comparisons(t *testing.T) {
 
 func TestEndToEnd_HeapPointer(t *testing.T) {
 	src := `
-        fn label(): string { return "hello"; }
+        export fn label(): string { return "hello"; }
     `
 	ast, err := script.Parse(strings.NewReader(src))
 	if err != nil {
@@ -315,8 +315,8 @@ func TestEndToEnd_HeapPointer(t *testing.T) {
 
 func TestEndToEnd_HeapPointerMultipleStrings(t *testing.T) {
 	src := `
-        fn one(): string { return "hi"; }
-        fn two(): string { return "world"; }
+        export fn one(): string { return "hi"; }
+        export fn two(): string { return "world"; }
     `
 	// "hi"    → 4 + 2 = 6 bytes at offset 0..5
 	// "world" → 4 + 5 = 9 bytes at offset 6..14
@@ -340,7 +340,7 @@ func TestEndToEnd_HeapPointerMultipleStrings(t *testing.T) {
 
 func TestEndToEnd_ArrayLiteral(t *testing.T) {
 	src := `
-        fn make_arr(): int[] {
+        export fn make_arr(): int[] {
             return [10, 20, 30];
         }
     `
@@ -385,11 +385,11 @@ func TestEndToEnd_ArrayLiteral(t *testing.T) {
 
 func TestEndToEnd_ArrayLen(t *testing.T) {
 	src := `
-        fn three(): int {
+        export fn three(): int {
             let arr = [10, 20, 30];
             return arr.len();
         }
-        fn empty(): int {
+        export fn empty(): int {
             let arr: int[] = [];
             return arr.len();
         }
@@ -400,19 +400,19 @@ func TestEndToEnd_ArrayLen(t *testing.T) {
 
 func TestEndToEnd_ArrayIndex(t *testing.T) {
 	src := `
-        fn first(): int {
+        export fn first(): int {
             let arr = [10, 20, 30];
             return arr[0];
         }
-        fn middle(): int {
+        export fn middle(): int {
             let arr = [10, 20, 30];
             return arr[1];
         }
-        fn last(): int {
+        export fn last(): int {
             let arr = [10, 20, 30];
             return arr[2];
         }
-        fn sum_all(): int {
+        export fn sum_all(): int {
             let arr = [10, 20, 30];
             return arr[0] + arr[1] + arr[2];
         }
@@ -425,7 +425,7 @@ func TestEndToEnd_ArrayIndex(t *testing.T) {
 
 func TestEndToEnd_Sum(t *testing.T) {
 	src := `
-       fn total(): int {
+       export fn total(): int {
 			let arr = [1, 2, 3, 4, 5];
 			let i: int = 0;
 			let sum: int = 0;
@@ -441,18 +441,18 @@ func TestEndToEnd_Sum(t *testing.T) {
 
 func TestEndToEnd_ArrayAssignment(t *testing.T) {
 	src := `
-        fn write_then_read(): int {
+        export fn write_then_read(): int {
             let arr = [10, 20, 30];
             arr[1] = 99;
             return arr[1];
         }
-        fn rotate(): int {
+        export fn rotate(): int {
             let arr = [1, 2, 3, 4, 5];
             arr[0] = arr[4];
             arr[4] = 1;
             return arr[0] + arr[4]; // 5 + 1 = 6
         }
-        fn sort_two(): int {
+        export fn sort_two(): int {
             let arr = [20, 10];
             if arr[0] > arr[1] {
                 let tmp = arr[0];
@@ -469,11 +469,11 @@ func TestEndToEnd_ArrayAssignment(t *testing.T) {
 
 func TestEndToEnd_BoundsInBounds(t *testing.T) {
 	src := `
-        fn get_at(): int {
+        export fn get_at(): int {
             let arr = [10, 20, 30];
             return arr[2];
         }
-        fn set_at(): int {
+        export fn set_at(): int {
             let arr = [10, 20, 30];
             arr[0] = 99;
             return arr[0];
@@ -485,11 +485,11 @@ func TestEndToEnd_BoundsInBounds(t *testing.T) {
 
 func TestEndToEnd_BoundsOutOfRange(t *testing.T) {
 	src := `
-        fn read_oob(): int {
+        export fn read_oob(): int {
             let arr = [10, 20, 30];
             return arr[100];
         }
-        fn write_oob(): int {
+        export fn write_oob(): int {
             let arr = [10, 20, 30];
             arr[100] = 99;
             return 0;
@@ -529,19 +529,19 @@ func TestEndToEnd_StructFields(t *testing.T) {
             x: f64;
             y: f64;
         }
-        fn make_point_x(): f64 {
+        export fn make_point_x(): f64 {
             let p = Point(3.0, 4.0);
             return p.x;
         }
-        fn make_point_y(): f64 {
+        export fn make_point_y(): f64 {
             let p = Point(3.0, 4.0);
             return p.y;
         }
-        fn distance_squared(): f64 {
+        export fn distance_squared(): f64 {
             let p = Point(3.0, 4.0);
             return p.x * p.x + p.y * p.y;  // 9 + 16 = 25
         }
-        fn mutate_y(): f64 {
+        export fn mutate_y(): f64 {
             let p = Point(3.0, 4.0);
             p.y = 99.0;
             return p.y;
@@ -567,11 +567,11 @@ func TestEndToEnd_StructMethods(t *testing.T) {
                 return self.x * factor + self.y * factor;
             }
         }
-        fn d_sq(): f64 {
+        export fn d_sq(): f64 {
             let p = Point(3.0, 4.0);
             return p.distance_squared();  // 9 + 16 = 25
         }
-        fn scaled(): f64 {
+        export fn scaled(): f64 {
             let p = Point(2.0, 3.0);
             return p.scale(10.0);          // 20 + 30 = 50
         }
@@ -595,7 +595,7 @@ func TestEndToEnd_MutatingMethod(t *testing.T) {
                 return self.x + self.y;
             }
         }
-        fn run(): f64 {
+        export fn run(): f64 {
             let v = Vec2(1.0, 2.0);
             v.translate(10.0, 20.0);
             return v.sum();
@@ -618,7 +618,7 @@ func TestEndToEnd_MethodCallsMethod(t *testing.T) {
                 return self.area_approx() * 2.0;
             }
         }
-        fn run(): f64 {
+        export fn run(): f64 {
             let c = Circle(5.0);
             return c.double_area();
         }
@@ -630,7 +630,7 @@ func TestEndToEnd_MethodCallsMethod(t *testing.T) {
 func TestEndToEnd_ArrayOfStructs(t *testing.T) {
 	src := `
         struct Point { x: f64; y: f64; }
-        fn run(): f64 {
+        export fn run(): f64 {
             let pts = [Point(1.0, 2.0), Point(10.0, 20.0)];
             let p = pts[1];
             return p.x + p.y;
@@ -644,7 +644,7 @@ func TestEndToEnd_ArrayOfStructsMethods(t *testing.T) {
 	src := `
         struct Vec2 { x: f64; y: f64; }
         impl Vec2 { fn magnitude_sq(): f64 { return self.x * self.x + self.y * self.y; } }
-        fn run(): f64 {
+        export fn run(): f64 {
             let vs: Vec2[] = [Vec2(3.0, 4.0), Vec2(5.0, 12.0)];
             return vs[0].magnitude_sq() + vs[1].magnitude_sq();
         }
@@ -655,10 +655,10 @@ func TestEndToEnd_ArrayOfStructsMethods(t *testing.T) {
 
 func TestEndToEnd_Ternary(t *testing.T) {
 	src := `
-        fn pick(cond: bool, a: i64, b: i64): i64 {
+        export fn pick(cond: bool, a: i64, b: i64): i64 {
             return cond ? a : b;
         }
-        fn ternary_arithmetic(x: i64): i64 {
+        export fn ternary_arithmetic(x: i64): i64 {
             return (x > 0 ? x : -x) * 2;
         }
     `
@@ -670,9 +670,9 @@ func TestEndToEnd_Ternary(t *testing.T) {
 
 func TestEndToEnd_TypeCast(t *testing.T) {
 	src := `
-        fn i64_to_f64(x: i64): f64 { return x as f64; }
-        fn f64_to_i64(x: f64): i64 { return x as i64; }
-        fn i64_to_i32(x: i64): i32 { return x as i32; }
+        export fn i64_to_f64(x: i64): f64 { return x as f64; }
+        export fn f64_to_i64(x: f64): i64 { return x as i64; }
+        export fn i64_to_i32(x: i64): i32 { return x as i32; }
     `
 	runOne(t, src, "i64_to_f64", []uint64{7}, api.EncodeF64(7.0))
 	runOne(t, src, "f64_to_i64", []uint64{api.EncodeF64(3.9)}, 3) // truncates
@@ -682,17 +682,17 @@ func TestEndToEnd_TypeCast(t *testing.T) {
 
 func TestEndToEnd_ArrayAppend(t *testing.T) {
 	src := `
-        fn grow(): int {
+        export fn grow(): int {
             let arr: int[] = [1, 2, 3];
             arr.append(4);
             return arr.len();
         }
-        fn grow_read(): int {
+        export fn grow_read(): int {
             let arr: int[] = [10, 20];
             arr.append(30);
             return arr[2];
         }
-        fn grow_twice(): int {
+        export fn grow_twice(): int {
             let arr: int[] = [1];
             arr.append(2);
             arr.append(3);
@@ -706,17 +706,17 @@ func TestEndToEnd_ArrayAppend(t *testing.T) {
 
 func TestEndToEnd_ArrayRemove(t *testing.T) {
 	src := `
-        fn remove_middle(): int {
+        export fn remove_middle(): int {
             let arr: int[] = [10, 20, 30];
             let r = arr.remove(1);
             return r;
         }
-        fn remove_shifts(): int {
+        export fn remove_shifts(): int {
             let arr: int[] = [10, 20, 30];
             arr.remove(0);
             return arr[0];
         }
-        fn remove_len(): int {
+        export fn remove_len(): int {
             let arr: int[] = [10, 20, 30];
             arr.remove(2);
             return arr.len();
@@ -730,7 +730,7 @@ func TestEndToEnd_ArrayRemove(t *testing.T) {
 func TestEndToEnd_Import_Print(t *testing.T) {
 	src := `
         import print from "plex:console";
-        fn say_hello() {
+        export fn say_hello() {
             print("hello");
         }
     `
@@ -782,6 +782,38 @@ func TestEndToEnd_Import_Print(t *testing.T) {
 	data, _ := mem.Read(gotPtr+4, n)
 	if string(data) != "hello" {
 		t.Fatalf("got %q, want \"hello\"", string(data))
+	}
+}
+
+func TestExport_VisibilityBoundary(t *testing.T) {
+	src := `
+        export fn public_fn(): i64 { return 1; }
+               fn private_fn(): i64 { return 2; }
+    `
+	ast, err := script.Parse(strings.NewReader(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wasm, err := binary_wasm.CompileProgram(ast)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := t.Context()
+	r := wazero.NewRuntime(ctx)
+	defer r.Close(ctx)
+
+	mod, err := r.Instantiate(ctx, wasm)
+	if err != nil {
+		t.Fatalf("instantiate: %v", err)
+	}
+
+	if mod.ExportedFunction("public_fn") == nil {
+		t.Fatal("public_fn should be exported")
+	}
+	if mod.ExportedFunction("private_fn") != nil {
+		t.Fatal("private_fn should NOT be exported")
 	}
 }
 

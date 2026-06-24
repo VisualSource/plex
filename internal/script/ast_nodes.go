@@ -193,6 +193,7 @@ type FunctionDeclaration struct {
 	Params     []*Parameter
 	ReturnType *TypeExpr
 	Body       AstNode
+	Export     bool
 }
 
 func (f *FunctionDeclaration) Range() (Position, Position) {
@@ -335,6 +336,7 @@ type StructStatement struct {
 	Start, End Position
 	Name       string
 	Fields     []*Parameter
+	Export     bool
 }
 
 func (s *StructStatement) Range() (Position, Position) {

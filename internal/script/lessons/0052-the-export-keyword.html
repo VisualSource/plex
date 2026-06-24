@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 52 – The export Keyword</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .hl   { background: #2a2a1a; border-left: 3px solid var(--yellow); padding-left: 6px; display: block; }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .arrow { color: var(--orange); }
+  .dim   { color: #555; }
+  .layer { display: flex; align-items: center; gap: 12px; margin: 6px 0; }
+  .layer-badge { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 2px 10px; font-family: "Fira Code", monospace; font-size: 0.82em; min-width: 120px; text-align: center; color: var(--yellow); }
+  .layer-file { color: var(--blue); font-family: "Fira Code", monospace; font-size: 0.85em; }
+  .layer-what { color: var(--text); font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<h1>Lesson 52 – The <code>export</code> Keyword</h1>
+
+<p><em>Previous: <a href="0051-wasm-import-section.html">Lesson 51 – The WASM Import Section</a></em></p>
+
+<p>
+Every function you write in plex today ends up in the WASM export table. Write ten helper functions and your module has ten exports, all visible to the host — whether you intended them to be public or not. This lesson adds the <code>export</code> keyword so the programmer controls visibility explicitly.
+</p>
+
+<h2>Why This Matters</h2>
+
+<p>A WASM module's export table is its <strong>public API surface</strong>. The host cannot call anything that isn't exported. But the inverse also matters: anything you <em>don't</em> export is unreachable to the outside world — a module-level encapsulation boundary. Good language design makes you opt into publicity, not privacy.</p>
+
+<p>The plex grammar already specifies this:</p>
+
+<pre><code><span class="cmt">&#60;functionDefinition&#62; = &#60;keyword:export&#62;? &#60;keyword:fn&#62; &#60;ident&#62; &#60;functionParams&#62; ...</span></code></pre>
+
+<p>The <code>?</code> means <code>export</code> is optional. But the compiler currently ignores it entirely — <code>export</code> isn't even in the tokenizer's keyword list, so the word would be scanned as an identifier, not a keyword. Today you implement the whole thing.</p>
+
+<h2>Where the Change Lives — All Four Layers</h2>
+
+<p>Adding <code>export</code> touches the compiler from top to bottom:</p>
+
+<div style="margin: 1.4em 0;">
+  <div class="layer">
+    <span class="layer-badge">Tokenizer</span>
+    <span class="layer-file"><a href="../tokenizer.go">tokenizer.go</a> line 425</span>
+    <span class="layer-what">— add <code>"export"</code> to the keyword list</span>
+  </div>
+  <div class="layer">
+    <span class="layer-badge">AST</span>
+    <span class="layer-file"><a href="../ast_nodes.go">ast_nodes.go</a></span>
+    <span class="layer-what">— add <code>Export bool</code> field to <code>FunctionDeclaration</code></span>
+  </div>
+  <div class="layer">
+    <span class="layer-badge">Parser</span>
+    <span class="layer-file"><a href="../ast.go">ast.go</a></span>
+    <span class="layer-what">— handle <code>export fn</code> in <code>parseStatement</code></span>
+  </div>
+  <div class="layer">
+    <span class="layer-badge">Binary Backend</span>
+    <span class="layer-file"><a href="../compiler/binary/helpers.go">helpers.go</a></span>
+    <span class="layer-what">— only emit export entries for <code>n.Export == true</code></span>
+  </div>
+</div>
+
+<div class="insight">
+  <strong>Compare to <code>mut</code></strong> — <code>Export bool</code> on <code>FunctionDeclaration</code> is structurally identical to <code>Mut bool</code> on <code>Parameter</code>. Both are boolean modifiers on a declaration node that the parser sets when it sees a particular keyword. The pattern recurs throughout compiler ASTs.
+</div>
+
+<h2>Layer 1 — Tokenizer</h2>
+
+<p>Open <a href="../tokenizer.go">tokenizer.go</a> and find the keyword switch (around line 425):</p>
+
+<pre><code><span class="kw">case</span> <span class="str">"continue"</span>, <span class="str">"as"</span>, <span class="str">"false"</span>, <span class="str">"true"</span>, <span class="str">"import"</span>, <span class="str">"break"</span>, <span class="str">"from"</span>,
+     <span class="str">"let"</span>, <span class="str">"return"</span>, <span class="str">"while"</span>, <span class="str">"impl"</span>, <span class="str">"if"</span>, <span class="str">"else"</span>, <span class="str">"struct"</span>, <span class="str">"fn"</span>, <span class="str">"mut"</span>:</code></pre>
+
+<p>Add <code>"export"</code> to this list. Without this change the tokenizer scans <code>export</code> as a <code>TokenType_Ident</code>, and <code>isKeyword(t, "export")</code> in the parser will never be true.</p>
+
+<h2>Layer 2 — AST</h2>
+
+<p>In <a href="../ast_nodes.go">ast_nodes.go</a>, <code>FunctionDeclaration</code> currently has:</p>
+
+<pre><code><span class="kw">type</span> <span class="ty">FunctionDeclaration</span> <span class="kw">struct</span> {
+    Start, End <span class="ty">Position</span>
+    Name       <span class="ty">string</span>
+    Params     []*<span class="ty">Parameter</span>
+    ReturnType *<span class="ty">TypeExpr</span>
+    Body       <span class="ty">AstNode</span>
+}</code></pre>
+
+<p>Add one field:</p>
+
+<pre><code>    Export     <span class="ty">bool</span>     <span class="cmt">// true if declared with "export fn"</span></code></pre>
+
+<h2>Layer 3 — Parser</h2>
+
+<p>In <a href="../ast.go">ast.go</a>, <code>parseStatement</code> currently has:</p>
+
+<pre><code><span class="kw">case</span> <span class="fn">isKeyword</span>(t, <span class="str">"fn"</span>):
+    <span class="kw">return</span> p.<span class="fn">parseFnDecl</span>()</code></pre>
+
+<p>Add a new case above it to handle <code>export fn</code>:</p>
+
+<pre><code><span class="kw">case</span> <span class="fn">isKeyword</span>(t, <span class="str">"export"</span>):
+    p.<span class="fn">advance</span>()                         <span class="cmt">// consume "export"</span>
+    <span class="kw">if</span> !<span class="fn">isKeyword</span>(p.<span class="fn">peek</span>(), <span class="str">"fn"</span>) {
+        <span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="str">"expected 'fn' after 'export'"</span>)
+    }
+    decl, err := p.<span class="fn">parseFnDecl</span>()
+    <span class="kw">if</span> err != <span class="kw">nil</span> {
+        <span class="kw">return</span> <span class="kw">nil</span>, err
+    }
+    decl.Export = <span class="kw">true</span>
+    <span class="kw">return</span> decl, <span class="kw">nil</span></code></pre>
+
+<div class="insight">
+  <strong>Why advance before checking <code>fn</code>?</strong> — <code>parseStatement</code> entered because <code>peek()</code> was <code>export</code>. After consuming it, the cursor sits on the next token. If that token isn't <code>fn</code>, it's a syntax error. This is the standard one-token-lookahead pattern used throughout the parser.
+</div>
+
+<h2>Layer 4 — Binary Backend</h2>
+
+<p>In <a href="../compiler/binary/helpers.go">helpers.go</a>, <code>collectSignatures</code> currently unconditionally appends an export entry for every <code>FunctionDeclaration</code>:</p>
+
+<pre><code><span class="kw">case</span> *script.<span class="ty">FunctionDeclaration</span>:
+    sig, err := <span class="fn">signatureOf</span>(n, <span class="str">""</span>)
+    ...
+    exports = append(exports, exportEntry{   <span class="cmt">← always</span>
+        name: n.Name,
+        kind: ExportFunc,
+        idx:  uint32(len(funcs)),
+    })
+    sigs   = append(sigs, sig)
+    funcs  = append(funcs, n)</code></pre>
+
+<p>Gate the export on <code>n.Export</code>:</p>
+
+<pre><code><span class="kw">case</span> *script.<span class="ty">FunctionDeclaration</span>:
+    sig, err := <span class="fn">signatureOf</span>(n, <span class="str">""</span>)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { <span class="kw">return</span> <span class="kw">nil</span>, <span class="kw">nil</span>, <span class="kw">nil</span>, err }
+    <span class="kw">if</span> n.Export {
+        exports = append(exports, exportEntry{name: n.Name, kind: ExportFunc})
+    }
+    sigs  = append(sigs, sig)
+    funcs = append(funcs, n)</code></pre>
+
+<p>Note that the <code>idx</code> field is intentionally omitted — the fix-up loop in <a href="../compiler/binary/module.go">module.go</a> fills it in from <code>funcIndexes</code> after the full index map is built. Both exported and unexported functions still get compiled into the code section; they're just not visible to the host.</p>
+
+<div class="warn">
+  <strong>The test suite will break immediately after step 4.</strong> Every existing test program uses bare <code>fn</code>, which now means "private". The test harness calls <code>mod.ExportedFunction("name")</code>, which returns <code>nil</code> for unexported functions, causing a panic or a nil-dereference. You must update the test programs as part of this task — see Step 5 below.
+</div>
+
+<h2>Implementation Task</h2>
+
+<div class="task">
+  <strong>Task — implement export end-to-end</strong>
+
+  <p><strong>Step 1.</strong> In <a href="../tokenizer.go">tokenizer.go</a> line 425, add <code>"export"</code> to the keyword case.</p>
+
+  <p><strong>Step 2.</strong> In <a href="../ast_nodes.go">ast_nodes.go</a>, add <code>Export bool</code> to <code>FunctionDeclaration</code>.</p>
+
+  <p><strong>Step 3.</strong> In <a href="../ast.go">ast.go</a> <code>parseStatement</code>, add the <code>export</code> case shown above (before the <code>fn</code> case).</p>
+
+  <p><strong>Step 4.</strong> In <a href="../compiler/binary/helpers.go">helpers.go</a> <code>collectSignatures</code>, gate the export append on <code>n.Export</code>.</p>
+
+  <p><strong>Step 5 — migrate the test suite.</strong> The word <code>fn</code> is used only in plex source inside the test file's backtick strings; Go uses <code>func</code>. A targeted sed replaces every plex function declaration:</p>
+
+<pre><code>sed -i <span class="str">'s/\bfn /export fn /g'</span> internal/script/compiler/binary/end_to_end_test.go</code></pre>
+
+  <p>Verify by grepping that no bare <code>fn </code> (with space) remains inside the test strings. The import-section test's program already has an <code>import</code> statement before the function — sed will prefix <em>that</em> <code>fn</code> too, which is correct.</p>
+
+  <p><strong>Step 6 — add a visibility test.</strong> Verify that an unexported function really is hidden:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestExport_VisibilityBoundary</span>(t *testing.T) {
+    src := <span class="str">`
+        export fn public_fn(): i64 { return 1; }
+               fn private_fn(): i64 { return 2; }
+    `</span>
+    ast, err := script.<span class="fn">Parse</span>(strings.<span class="fn">NewReader</span>(src))
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    wasm, err := binary_wasm.<span class="fn">CompileProgram</span>(ast)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatal</span>(err) }
+
+    ctx := t.<span class="fn">Context</span>()
+    r := wazero.<span class="fn">NewRuntime</span>(ctx)
+    <span class="kw">defer</span> r.<span class="fn">Close</span>(ctx)
+
+    mod, err := r.<span class="fn">Instantiate</span>(ctx, wasm)
+    <span class="kw">if</span> err != <span class="kw">nil</span> { t.<span class="fn">Fatalf</span>(<span class="str">"instantiate: %v"</span>, err) }
+
+    <span class="kw">if</span> mod.<span class="fn">ExportedFunction</span>(<span class="str">"public_fn"</span>) == <span class="kw">nil</span> {
+        t.<span class="fn">Fatal</span>(<span class="str">"public_fn should be exported"</span>)
+    }
+    <span class="kw">if</span> mod.<span class="fn">ExportedFunction</span>(<span class="str">"private_fn"</span>) != <span class="kw">nil</span> {
+        t.<span class="fn">Fatal</span>(<span class="str">"private_fn should NOT be exported"</span>)
+    }
+}</code></pre>
+
+  <p><strong>Step 7.</strong> Run the full suite:</p>
+  <pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+
+  <p>All existing tests (now using <code>export fn</code>) should pass. <code>TestExport_VisibilityBoundary</code> should also pass.</p>
+</div>
+
+<h2>What Didn't Change</h2>
+
+<p>Unexported functions are compiled into the code section exactly like exported ones. The function body, local variables, and internal <code>call</code> instructions are unaffected — only the export table entry is withheld. An exported function can still call an unexported helper without restriction; WASM's <code>call</code> instruction uses the absolute function index, which is module-internal and doesn't go through the export table.</p>
+
+<div class="insight">
+  <strong>Struct methods are always private.</strong> The <code>StructImplStatement</code> branch of <code>collectSignatures</code> never creates export entries — method names are mangled (<code>__TypeName__methodName</code>) and are called only via the compiler-generated dispatch, never directly by the host. This hasn't changed.
+</div>
+
+<h2>Checklist Before Calling It Done</h2>
+<ul>
+  <li><code>TestExport_VisibilityBoundary</code> passes — <code>public_fn</code> is exported, <code>private_fn</code> is not</li>
+  <li>All previously passing tests still pass (every function they call is now <code>export fn</code>)</li>
+  <li>A plex program with no <code>export fn</code> at all compiles to a module with no function exports (only memory/global exports if heap is used)</li>
+  <li>Unexported functions can still be called by other plex functions in the same module</li>
+</ul>
+
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Without adding <code>"export"</code> to the tokenizer's keyword list, what token type would the lexer emit for the word <code>export</code>?</p>
+    <label><input type="radio" name="q1" value="a"> TokenType_Keyword with value "export"</label>
+    <label><input type="radio" name="q1" value="b"> TokenType_Ident — the tokenizer emits it as a plain identifier</label>
+    <label><input type="radio" name="q1" value="c"> TokenType_EOF — unrecognised tokens are silently skipped</label>
+    <label><input type="radio" name="q1" value="d"> TokenType_Error — the tokenizer halts on unknown keywords</label>
+    <div class="feedback" id="q1-fb"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. Why does <code>collectSignatures</code> currently export every function, even ones intended as internal helpers?</p>
+    <label><input type="radio" name="q2" value="a"> The typechecker annotates all functions as public before code generation runs</label>
+    <label><input type="radio" name="q2" value="b"> The WASM spec requires every compiled function to appear in the export table</label>
+    <label><input type="radio" name="q2" value="c"> The code unconditionally appends an exportEntry for every FunctionDeclaration it encounters</label>
+    <label><input type="radio" name="q2" value="d"> The export section encoder duplicates entries from the function section automatically</label>
+    <div class="feedback" id="q2-fb"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. An unexported plex function still has a body emitted in the code section. When can it be called?</p>
+    <label><input type="radio" name="q3" value="a"> Never — it's dead code and wazero will strip it on instantiation</label>
+    <label><input type="radio" name="q3" value="b"> Only by exported functions in the same module, not by other unexported functions</label>
+    <label><input type="radio" name="q3" value="c"> By any function in the same module via a direct call instruction using its absolute function index</label>
+    <label><input type="radio" name="q3" value="d"> Only by the host, if the host knows the raw function index and uses the WASM C API directly</label>
+    <div class="feedback" id="q3-fb"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. The <code>idx</code> field is omitted from the new export entry in <code>collectSignatures</code>. What sets it correctly?</p>
+    <label><input type="radio" name="q4" value="a"> The export section encoder defaults unset indices to zero</label>
+    <label><input type="radio" name="q4" value="b"> The fix-up loop in module.go rewrites every ExportFunc entry's idx from funcIndexes after the full index map is built</label>
+    <label><input type="radio" name="q4" value="c"> The function section encoder patches idx values when it assigns local indices</label>
+    <label><input type="radio" name="q4" value="d"> wazero resolves export names to indices at instantiation time, so idx is never read</label>
+    <div class="feedback" id="q4-fb"></div>
+  </div>
+
+  <div class="score-box" id="score"></div>
+</div>
+
+<h2>Primary Source</h2>
+<p>
+  <a href="https://webassembly.github.io/spec/core/binary/modules.html#export-section">
+    WebAssembly Core Spec — §5.5.10 Export Section
+  </a> — the normative binary encoding of export entries: name (length-prefixed UTF-8), kind byte (<code>0x00</code> for function), and absolute index.
+</p>
+
+<hr style="margin-top:3em; border-color: var(--border);">
+<p style="color:var(--muted); font-size:0.9em;">
+  Questions? Ask your teacher agent — paste any part of the lesson or your code and ask for clarification.
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'c', q3: 'c', q4: 'b' };
+const explanations = {
+  q1: {
+    b: 'Correct — the tokenizer recognises a word as a keyword only if it appears in the keyword case. Without "export" in that list, the tokenizer emits TokenType_Ident. isKeyword(t, "export") in the parser checks for TokenType_Keyword, so the case never matches.',
+    wrong: 'Think about how the tokenizer decides what a word is: it reads characters, forms a string, then checks it against a list of known keywords. If the word isn\'t in the list, it falls through to the ident branch.'
+  },
+  q2: {
+    c: 'Correct — the case statement in collectSignatures has an unconditional "exports = append(exports, exportEntry{...})" for every *FunctionDeclaration it visits. There is no condition on any Export field because that field doesn\'t exist yet.',
+    wrong: 'The answer is in helpers.go. Look at the collectSignatures function and trace what happens for every FunctionDeclaration node it visits.'
+  },
+  q3: {
+    c: 'Correct — WASM\'s call instruction takes an absolute function index, which is a module-internal address. Any function in the same module can call any other via its index, regardless of whether it appears in the export table. The export table only controls what the host can invoke by name.',
+    wrong: 'The export table is about host-facing visibility, not intra-module reachability. Inside the module, all functions are peers and can call each other via their function indices. "Dead code" stripping is a separate optimisation pass that wazero does not perform.'
+  },
+  q4: {
+    b: 'Correct — module.go contains a fix-up loop that runs after funcIndexes is built: it iterates over exports and sets idx = funcIndexes[exports[i].name] for every ExportFunc entry. This is the same loop introduced in lesson 51 to handle the import-offset shift. Leaving idx at zero in collectSignatures is safe because the fix-up always overwrites it.',
+    wrong: 'Look at module.go around the block that builds funcIndexes. After the map is assembled, there is a loop that iterates over the exports slice and patches the idx field for function exports. This design lets collectSignatures produce a name-keyed entry without knowing the final absolute index.'
+  },
+};
+
+let score = 0, answered = 0, total = Object.keys(answers).length;
+
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    const labels = document.querySelectorAll(`[name=${qid}]`);
+    if (document.querySelector(`#${qid} label.correct, #${qid} label.wrong`)) return;
+
+    const correct = answers[qid];
+    const isCorrect = this.value === correct;
+    if (isCorrect) score++;
+    answered++;
+
+    labels.forEach(r => {
+      const lbl = r.closest('label');
+      if (r.value === correct) lbl.className = 'correct';
+      else if (r.checked)      lbl.className = 'wrong';
+    });
+
+    const fb = document.getElementById(`${qid}-fb`);
+    const exp = explanations[qid];
+    fb.textContent = isCorrect ? exp[correct] : exp.wrong;
+    fb.style.display = 'block';
+    fb.style.color = isCorrect ? 'var(--green)' : 'var(--accent)';
+
+    if (answered === total) {
+      document.getElementById('score').textContent = `Score: ${score} / ${total}`;
+    }
+  });
+});
+</script>
+</body>
+</html>

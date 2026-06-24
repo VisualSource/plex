@@ -568,6 +568,29 @@ func (p *Parser) parseStatement() (AstNode, error) {
 		return p.parseBreakStatement()
 	case isKeyword(t, "continue"):
 		return p.parseContinueStatement()
+	case isKeyword(t, "export"):
+		p.advance()
+
+		switch {
+		case isKeyword(p.peek(), "fn"):
+			decl, err := p.parseFnDecl()
+			if err != nil {
+				return nil, err
+			}
+
+			decl.Export = true
+			return decl, nil
+		case isKeyword(p.peek(), "struct"):
+			struc, err := p.parseStruct()
+			if err != nil {
+				return nil, err
+			}
+			struc.Export = true
+
+			return struc, nil
+		default:
+			return nil, fmt.Errorf("export in invalid location")
+		}
 	default:
 		return p.parseExprStmt()
 	}
@@ -874,7 +897,7 @@ func (p *Parser) parseWhile() (AstNode, error) {
 }
 
 // structDecl ::= "struct" IDENT "{" ( param ";" )* "}"
-func (p *Parser) parseStruct() (AstNode, error) {
+func (p *Parser) parseStruct() (*StructStatement, error) {
 	keyword := p.advance()
 	start, _ := keyword.Range()
 

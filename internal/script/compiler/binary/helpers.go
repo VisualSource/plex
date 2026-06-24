@@ -41,11 +41,9 @@ func collectSignatures(p *script.Program) ([]funcSig, []*script.FunctionDeclarat
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			exports = append(exports, exportEntry{
-				name: n.Name,
-				kind: ExportFunc,
-				idx:  uint32(len(funcs)), // funcidx == position in funcs
-			})
+			if n.Export {
+				exports = append(exports, exportEntry{name: n.Name, kind: ExportFunc})
+			}
 
 			sigs = append(sigs, sig)
 			funcs = append(funcs, n)
