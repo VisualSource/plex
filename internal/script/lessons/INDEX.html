@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Plex Compiler — Lesson Index</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Georgia, serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 960px;
+    margin: 40px auto;
+    padding: 0 24px;
+    line-height: 1.7;
+  }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 12px; color: #fff; font-size: 1.9em; }
+  h2 { color: var(--blue); margin-top: 2.8em; margin-bottom: 0.4em; font-size: 1.2em; letter-spacing: 0.02em; }
+  .subtitle { color: var(--muted); font-size: 0.95em; margin-top: -0.6em; margin-bottom: 1.6em; }
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.85em; color: #c9d1d9; }
+
+  .phase {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 2.4em;
+    overflow: hidden;
+  }
+  .phase-header {
+    background: var(--surface);
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .phase-num {
+    font-family: "Fira Code", monospace;
+    font-size: 0.78em;
+    color: var(--accent);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+  .phase-title {
+    font-size: 1.05em;
+    font-weight: bold;
+    color: #fff;
+  }
+  .phase-range {
+    font-family: "Fira Code", monospace;
+    font-size: 0.8em;
+    color: var(--muted);
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .phase-desc {
+    padding: 10px 22px 4px;
+    font-size: 0.9em;
+    color: var(--muted);
+    font-style: italic;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .lessons { padding: 6px 0; }
+  .lesson {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 7px 22px;
+    border-bottom: 1px solid #0d1a2e;
+    transition: background 0.1s;
+  }
+  .lesson:last-child { border-bottom: none; }
+  .lesson:hover { background: #111827; }
+  .lesson-num {
+    font-family: "Fira Code", monospace;
+    font-size: 0.8em;
+    color: var(--muted);
+    min-width: 2.4em;
+    text-align: right;
+  }
+  .lesson-link {
+    font-size: 0.93em;
+    color: var(--text);
+  }
+  .lesson-link:hover { color: var(--blue); }
+  .lesson-tag {
+    font-family: "Fira Code", monospace;
+    font-size: 0.72em;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+  .tag-parser   { background: #1a2e1a; color: var(--green); }
+  .tag-interp   { background: #1e1a2e; color: var(--purple); }
+  .tag-wat      { background: #1a1e2e; color: var(--blue); }
+  .tag-binary   { background: #2e1a1a; color: var(--orange); }
+
+  .group-label {
+    padding: 8px 22px 4px;
+    font-size: 0.75em;
+    font-family: "Fira Code", monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    background: #0e1118;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .group-label:first-child { border-top: none; }
+
+  .stats {
+    display: flex;
+    gap: 28px;
+    margin: 1.6em 0 2.4em;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 20px;
+    min-width: 120px;
+    text-align: center;
+  }
+  .stat-n { font-size: 2em; font-weight: bold; color: var(--accent); line-height: 1; }
+  .stat-l { font-size: 0.82em; color: var(--muted); margin-top: 4px; }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 1.8em 0 2.4em;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .pipe-stage {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 0.85em;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .pipe-stage span { display: block; font-family: "Fira Code", monospace; font-size: 0.78em; color: var(--muted); }
+  .pipe-arrow { color: var(--muted); font-size: 1.2em; padding: 0 4px; }
+</style>
+</head>
+<body>
+
+<h1>Plex Compiler — Lesson Index</h1>
+<p class="subtitle" style="margin-top:0.2em; font-style:italic;">59 lessons · tokenizer → AST → typechecker → WAT compiler → binary WASM backend</p>
+
+<div class="stats">
+  <div class="stat"><div class="stat-n">59</div><div class="stat-l">Lessons</div></div>
+  <div class="stat"><div class="stat-n">4</div><div class="stat-l">Phases</div></div>
+  <div class="stat"><div class="stat-n">5</div><div class="stat-l">Compiler stages</div></div>
+  <div class="stat"><div class="stat-n">36</div><div class="stat-l">Binary backend lessons</div></div>
+</div>
+
+<div class="pipeline">
+  <div class="pipe-stage">Source text<span>plex</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-stage">Tokenizer<span>tokenizer.go</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-stage">Parser<span>ast.go</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-stage">Typechecker<span>typeschecker/</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-stage">Binary backend<span>compiler/binary/</span></div>
+  <div class="pipe-arrow">→</div>
+  <div class="pipe-stage">.wasm<span>bytes</span></div>
+</div>
+
+<!-- ── PHASE 1 ── -->
+<div class="phase">
+  <div class="phase-header">
+    <span class="phase-num">Phase 1</span>
+    <span class="phase-title">Parser</span>
+    <span class="phase-range">Lessons 1–3</span>
+  </div>
+  <div class="phase-desc">Turning source text into a typed AST: grammar rules, operator precedence, statements.</div>
+  <div class="lessons">
+    <div class="lesson">
+      <span class="lesson-num">01</span>
+      <a class="lesson-link" href="0001-grammar-rules-to-parse-functions.html">Grammar Rules → Parse Functions</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">02</span>
+      <a class="lesson-link" href="0002-operator-precedence.html">Operator Precedence</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">03</span>
+      <a class="lesson-link" href="0003-parsing-statements.html">Parsing Statements</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── PHASE 2 ── -->
+<div class="phase">
+  <div class="phase-header">
+    <span class="phase-num">Phase 2</span>
+    <span class="phase-title">Tree-Walking Interpreter</span>
+    <span class="phase-range">Lessons 4–5</span>
+  </div>
+  <div class="phase-desc">Walk the AST directly to evaluate expressions and statements. No code generation — the simplest possible execution model.</div>
+  <div class="lessons">
+    <div class="lesson">
+      <span class="lesson-num">04</span>
+      <a class="lesson-link" href="0004-tree-walking-interpreter.html">The Tree-Walking Interpreter</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">05</span>
+      <a class="lesson-link" href="0005-structs-and-native-functions.html">Structs &amp; Native Functions</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── PHASE 3 ── -->
+<div class="phase">
+  <div class="phase-header">
+    <span class="phase-num">Phase 3</span>
+    <span class="phase-title">WAT Compiler (Text Format)</span>
+    <span class="phase-range">Lessons 6–23</span>
+  </div>
+  <div class="phase-desc">First code generation: emit WebAssembly Text Format. Introduces linear memory, the heap, structs, a separate typechecker, and the full operator set.</div>
+  <div class="lessons">
+    <div class="group-label">Code generation foundations</div>
+    <div class="lesson">
+      <span class="lesson-num">06</span>
+      <a class="lesson-link" href="0006-introduction-to-code-generation.html">Introduction to Code Generation</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">07</span>
+      <a class="lesson-link" href="0007-function-calls-and-testing.html">Function Calls and Testing the Compiler</a>
+    </div>
+    <div class="group-label">Memory model</div>
+    <div class="lesson">
+      <span class="lesson-num">08</span>
+      <a class="lesson-link" href="0008-linear-memory-and-strings.html">Linear Memory and Strings</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">09</span>
+      <a class="lesson-link" href="0009-the-heap-and-arrays.html">The Heap and Arrays</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">10</span>
+      <a class="lesson-link" href="0010-struct-layout-and-field-access.html">Struct Layout and Field Access</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">11</span>
+      <a class="lesson-link" href="0011-methods-impl-blocks-and-self.html">Methods, <code>impl</code> Blocks, and <code>self</code></a>
+    </div>
+    <div class="group-label">Type system</div>
+    <div class="lesson">
+      <span class="lesson-num">12</span>
+      <a class="lesson-link" href="0012-type-checking-as-a-separate-pass.html">Type Checking as a Separate Pass</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">13</span>
+      <a class="lesson-link" href="0013-scope-chains-and-push-pop.html">Scope Chains: The Push/Pop Pattern</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">14</span>
+      <a class="lesson-link" href="0014-type-error-diagnostics.html">Type Error Diagnostics</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">15</span>
+      <a class="lesson-link" href="0015-type-directed-code-generation.html">Type-Directed Code Generation</a>
+    </div>
+    <div class="group-label">Operators &amp; control flow</div>
+    <div class="lesson">
+      <span class="lesson-num">16</span>
+      <a class="lesson-link" href="0016-the-drop-problem.html">The Drop Problem: Stack-Balanced Code Generation</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">17</span>
+      <a class="lesson-link" href="0017-unary-operators-and-if-format.html">Unary Operators and the WAT <code>if</code> Format</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">18</span>
+      <a class="lesson-link" href="0018-completing-binary-operators.html">Completing the Binary Operator Set</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">19</span>
+      <a class="lesson-link" href="0019-break-and-ternary.html"><code>break</code> and Ternary</a>
+    </div>
+    <div class="group-label">Built-ins &amp; language features</div>
+    <div class="lesson">
+      <span class="lesson-num">20</span>
+      <a class="lesson-link" href="0020-builtin-methods-len-append.html">Built-in Methods: <code>len</code> and <code>append</code></a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">21</span>
+      <a class="lesson-link" href="0021-arr-remove.html"><code>arr.remove(i)</code></a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">22</span>
+      <a class="lesson-link" href="0022-type-coercions-as.html">Type Coercions: the <code>as</code> Keyword</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">23</span>
+      <a class="lesson-link" href="0023-continue-statement.html">The <code>continue</code> Statement</a>
+    </div>
+  </div>
+</div>
+
+<!-- ── PHASE 4 ── -->
+<div class="phase">
+  <div class="phase-header">
+    <span class="phase-num">Phase 4</span>
+    <span class="phase-title">Binary WASM Backend</span>
+    <span class="phase-range">Lessons 24–59</span>
+  </div>
+  <div class="phase-desc">Rebuild the entire backend targeting raw <code>.wasm</code> bytes — no text format intermediary. Covers LEB128 encoding, every WASM section, the full instruction set, and all language features.</div>
+  <div class="lessons">
+
+    <div class="group-label">Module skeleton &amp; sections (24–27)</div>
+    <div class="lesson">
+      <span class="lesson-num">24</span>
+      <a class="lesson-link" href="0024-wasm-binary-module-skeleton.html">WASM Binary: Module Skeleton &amp; LEB128</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">25</span>
+      <a class="lesson-link" href="0025-type-section-function-signatures.html">The Type Section: Encoding Function Signatures</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">26</span>
+      <a class="lesson-link" href="0026-function-and-code-sections.html">Function + Code Sections: First Opcodes</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">27</span>
+      <a class="lesson-link" href="0027-export-section.html">The Export Section: First Runnable <code>.wasm</code></a>
+    </div>
+
+    <div class="group-label">Core values &amp; control flow (28–35)</div>
+    <div class="lesson">
+      <span class="lesson-num">28</span>
+      <a class="lesson-link" href="0028-params-identifiers-arithmetic.html">Params, Identifiers &amp; Binary Arithmetic</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">29</span>
+      <a class="lesson-link" href="0029-locals-let-declarations.html">Locals via <code>let</code></a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">30</span>
+      <a class="lesson-link" href="0030-if-statements-and-comparisons.html">If Statements &amp; Comparison Operators</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">31</span>
+      <a class="lesson-link" href="0031-while-loops.html">While Loops: <code>block</code> + <code>loop</code> + <code>br</code></a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">32</span>
+      <a class="lesson-link" href="0032-function-calls.html">Function Calls: <code>call funcidx</code></a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">33</span>
+      <a class="lesson-link" href="0033-drop-in-the-binary-backend.html">Drop in the Binary Backend</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">34</span>
+      <a class="lesson-link" href="0034-short-circuit-and-if-as-expression.html">Short-Circuit <code>&amp;&amp;</code>/<code>||</code> and <code>if</code>-as-Expression</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">35</span>
+      <a class="lesson-link" href="0035-unary-operators.html">Unary Operators: Negate</a>
+    </div>
+
+    <div class="group-label">Linear memory &amp; strings (36–38)</div>
+    <div class="lesson">
+      <span class="lesson-num">36</span>
+      <a class="lesson-link" href="0036-linear-memory-and-string-literals.html">Linear Memory and String Literals</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">37</span>
+      <a class="lesson-link" href="0037-string-len-and-memarg.html">String Length, <code>i32.load</code>, and the <code>memarg</code> Encoding</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">38</span>
+      <a class="lesson-link" href="0038-comparison-opcodes-i32-f64.html">Filling Out the Comparison Table: i32 and f64</a>
+    </div>
+
+    <div class="group-label">Heap &amp; allocator (39–43)</div>
+    <div class="lesson">
+      <span class="lesson-num">39</span>
+      <a class="lesson-link" href="0039-globals-and-the-heap-pointer.html">Globals and the Heap Pointer</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">40</span>
+      <a class="lesson-link" href="0040-array-literals-and-bump-allocation.html">Array Literals and the Inline Bump Allocator</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">41</span>
+      <a class="lesson-link" href="0041-array-len-and-indexing.html">Array Length and Indexing</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">42</span>
+      <a class="lesson-link" href="0042-array-element-assignment-full-stack.html">Array Element Assignment, Across the Whole Compiler</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">43</span>
+      <a class="lesson-link" href="0043-bounds-checks-and-the-unreachable-trap.html">Bounds Checks and the Unreachable Trap</a>
+    </div>
+
+    <div class="group-label">Structs (44–47)</div>
+    <div class="lesson">
+      <span class="lesson-num">44</span>
+      <a class="lesson-link" href="0044-structs-construction-and-fields.html">Structs: Construction, Field Read, Field Write</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">45</span>
+      <a class="lesson-link" href="0045-struct-methods-and-self.html">Struct Methods and the Implicit <code>self</code></a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">46</span>
+      <a class="lesson-link" href="0046-void-methods-mutation-and-self-calls.html">Void Methods, Mutation, and Self-Calls</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">47</span>
+      <a class="lesson-link" href="0047-arrays-of-structs.html">Arrays of Structs</a>
+    </div>
+
+    <div class="group-label">Advanced expressions &amp; language completion (48–59)</div>
+    <div class="lesson">
+      <span class="lesson-num">48</span>
+      <a class="lesson-link" href="0048-ternary-and-type-casts.html">Ternary Expressions and Type Casts</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">49</span>
+      <a class="lesson-link" href="0049-arr-append-binary.html"><code>arr.append</code> in the Binary Backend</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">50</span>
+      <a class="lesson-link" href="0050-arr-remove-binary.html"><code>arr.remove</code> in the Binary Backend</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">51</span>
+      <a class="lesson-link" href="0051-wasm-import-section.html">The WASM Import Section</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">52</span>
+      <a class="lesson-link" href="0052-the-export-keyword.html">The <code>export</code> Keyword</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">53</span>
+      <a class="lesson-link" href="0053-string-concatenation.html">String Concatenation</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">54</span>
+      <a class="lesson-link" href="0054-string-equality.html">String Equality</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">55</span>
+      <a class="lesson-link" href="0055-break-and-continue-binary.html"><code>break</code> and <code>continue</code> in the Binary Backend</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">56</span>
+      <a class="lesson-link" href="0056-logical-not.html">Logical NOT (<code>!</code>)</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">57</span>
+      <a class="lesson-link" href="0057-increment-decrement.html">Increment and Decrement (<code>++</code> / <code>--</code>)</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">58</span>
+      <a class="lesson-link" href="0058-string-indexing.html">String Indexing (<code>s[i]</code>)</a>
+    </div>
+    <div class="lesson">
+      <span class="lesson-num">59</span>
+      <a class="lesson-link" href="0059-power-operator.html">The Power Operator (<code>**</code>)</a>
+    </div>
+
+  </div>
+</div>
+
+<h2 style="margin-top:2.4em;">Key Concepts by Topic</h2>
+
+<table style="margin-top:1em;">
+  <tr>
+    <th>Topic</th>
+    <th>Lessons</th>
+  </tr>
+  <tr><td>Parsing &amp; grammar</td><td>1, 2, 3</td></tr>
+  <tr><td>AST node types</td><td>1, 3, 5</td></tr>
+  <tr><td>Operator precedence</td><td>2, 59</td></tr>
+  <tr><td>Tree-walking evaluation</td><td>4, 5</td></tr>
+  <tr><td>Type checking &amp; scope</td><td>12, 13, 14, 15</td></tr>
+  <tr><td>Linear memory &amp; memarg</td><td>8, 36, 37</td></tr>
+  <tr><td>Heap &amp; bump allocator</td><td>9, 39, 40</td></tr>
+  <tr><td>Struct layout &amp; field access</td><td>10, 44</td></tr>
+  <tr><td>Methods &amp; self</td><td>11, 45, 46</td></tr>
+  <tr><td>Control flow (if / while / break / continue)</td><td>17, 19, 23, 30, 31, 34, 55</td></tr>
+  <tr><td>Drop &amp; stack discipline</td><td>16, 33</td></tr>
+  <tr><td>LEB128 &amp; binary encoding</td><td>24, 25, 26</td></tr>
+  <tr><td>WASM sections (type / function / export / import / global / code / data)</td><td>24–27, 39, 51, 52</td></tr>
+  <tr><td>Strings (storage / len / concat / equality / indexing)</td><td>8, 36, 37, 53, 54, 58</td></tr>
+  <tr><td>Arrays (alloc / len / index / assign / append / remove / bounds)</td><td>9, 20, 21, 40–43, 49, 50</td></tr>
+  <tr><td>Type casts &amp; coercions</td><td>22, 48</td></tr>
+  <tr><td>Synthetic locals &amp; inline loops</td><td>21, 40, 43, 50, 53, 58, 59</td></tr>
+  <tr><td>Short-circuit operators</td><td>34</td></tr>
+  <tr><td>Logical NOT / unary negation</td><td>17, 35, 56</td></tr>
+  <tr><td>Increment / decrement / <code>local.tee</code></td><td>57</td></tr>
+  <tr><td>Power operator &amp; accumulator pattern</td><td>59</td></tr>
+</table>
+
+<p style="margin-top:3em; color:var(--muted); font-size:0.88em; text-align:center;">
+  <a href="../MISSION.md">Mission</a> &nbsp;·&nbsp;
+  <a href="../RESOURCES.md">Resources</a> &nbsp;·&nbsp;
+  <a href="../NOTES.md">Teaching Notes</a>
+</p>
+
+</body>
+</html>
