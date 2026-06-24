@@ -917,6 +917,43 @@ func TestEndToEnd_StringNe(t *testing.T) {
 	runOne(t, src, "diff", nil, 1)
 }
 
+func TestEndToEnd_Break(t *testing.T) {
+	src := `
+        export fn find_first(): int {
+			let arr = [10, 20, 30, 40, 50];
+			let i: int = 0;
+			let found: int = -1;
+			while i < arr.len() {
+				if arr[i] > 25 {
+					found = arr[i];
+					break;
+				}
+				i = i + 1;
+			}
+			return found;
+		}
+    `
+	runOne(t, src, "find_first", nil, 30)
+}
+
+func TestEndToEnd_Continue(t *testing.T) {
+	src := `
+        export fn sum_evens(n: i64): i64 {
+			let i: i64 = 0;
+			let sum: i64 = 0;
+			while i < n {
+				i = i + 1;
+				if (i % 2) != 0 {
+					continue;
+				}
+				sum = sum + i;
+			}
+			return sum;
+		}
+    `
+	runOne(t, src, "sum_evens", []uint64{10}, 30)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

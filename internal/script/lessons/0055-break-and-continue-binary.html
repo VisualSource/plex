@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 55 – Break and Continue in the Binary Backend</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; color: var(--muted); }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.8; margin: 1.4em 0; }
+  .depth-label { color: var(--muted); float: right; font-size: 0.82em; }
+  .br-target { color: var(--orange); font-weight: bold; }
+  .construct { color: var(--yellow); }
+  .arrow { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 55 – Break and Continue in the Binary Backend</h1>
+
+<p><em>Previous: <a href="0054-string-equality.html">Lesson 54 – String Equality</a></em></p>
+
+<p>
+Break and continue are implemented in <a href="../compiler/binary/body.go">body.go</a> and have been there since the while-loop lesson — but they have <strong>no end-to-end tests</strong>. This lesson digs into <em>why</em> the implementation works (the depth math is subtle when break appears inside a nested <code>if</code>), then confirms it by writing the missing tests.
+</p>
+
+<h2>The Core Problem: WASM Has No Goto</h2>
+
+<p>
+Every imperative language has <code>break</code> and <code>continue</code>. In most compilers they map trivially to a <code>jmp</code> instruction. WASM has no <code>jmp</code>. Its control flow is <strong>structured</strong>: you can only branch <em>outward</em> from a named construct, and the construct must have been syntactically opened in the enclosing code.
+</p>
+
+<p>The three structured control constructs:</p>
+
+<table>
+  <tr><th>Construct</th><th>Opcode</th><th>What <code>br n</code> does here</th></tr>
+  <tr><td><code>block</code></td><td>0x02</td><td>jumps <em>past</em> its <code>end</code> (forward exit)</td></tr>
+  <tr><td><code>loop</code></td><td>0x03</td><td>jumps to its <em>beginning</em> (backward, i.e. loop again)</td></tr>
+  <tr><td><code>if</code></td><td>0x04</td><td>jumps past its <code>end</code> (forward exit)</td></tr>
+</table>
+
+<p>
+<code>br n</code> targets the <em>n-th enclosing</em> construct, counting from 0 (innermost). So <code>br 0</code> from inside a <code>loop</code> goes back to the top of the loop. <code>br 1</code> from inside a <code>loop</code> that is itself inside a <code>block</code> exits the block.
+</p>
+
+<h2>How While Loops Are Compiled</h2>
+
+<p>
+A <code>while</code> becomes a <strong>block wrapping a loop</strong>. The block is the break target; the loop is the continue target.
+</p>
+
+<div class="diagram">
+<span class="construct">block</span>                    <span class="depth-label">depth after = D+1 ← blockLabel</span>
+  <span class="construct">loop</span>                  <span class="depth-label">depth after = D+2 ← loopLabel</span>
+    &lt;condition&gt;
+    i32.eqz
+    br_if <span class="br-target">?</span>            <span class="cmt">; exits block when condition is false</span>
+    &lt;body&gt;
+    br <span class="br-target">?</span>               <span class="cmt">; goes back to top of loop (continue loop)</span>
+  end                  <span class="depth-label">depth after = D+1</span>
+end                    <span class="depth-label">depth after = D</span>
+</div>
+
+<p>In <a href="../compiler/binary/body.go">body.go</a>, the <code>WhileStatement</code> case:</p>
+
+<pre><code>b.buf = append(b.buf, OpBlock, BlockTypeEmpty)
+b.blockDepth++
+<span class="fn">blockLabel</span> := uint32(b.blockDepth)  <span class="cmt">// absolute depth of the BLOCK</span>
+
+b.buf = append(b.buf, OpLoop, BlockTypeEmpty)
+b.blockDepth++
+<span class="fn">loopLabel</span> := uint32(b.blockDepth)   <span class="cmt">// absolute depth of the LOOP</span>
+
+b.loopStack = append(b.loopStack, loopEntry{blockLabel, loopLabel})</code></pre>
+
+<p>Then at the end of the body, the backward branch is:</p>
+
+<pre><code>b.buf = append(b.buf, OpBr)
+b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-loopLabel)
+<span class="cmt">// = D+2 - (D+2) = 0  → br 0 → top of loop ✓</span></code></pre>
+
+<h2>Break: Exiting the Block</h2>
+
+<pre><code><span class="kw">case</span> *script.BreakStatement:
+    entry := b.loopStack[len(b.loopStack)-1]
+    b.buf = append(b.buf, OpBr)
+    b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-entry.blockLabel)</code></pre>
+
+<p>At the top level of the while body, <code>b.blockDepth == loopLabel == blockLabel+1</code>, so:</p>
+<p style="margin-left:1.5em"><code>blockDepth - blockLabel = (D+2) - (D+1) = 1</code> → <code>br 1</code> exits the outer block. ✓</p>
+
+<h2>The Nested Case: Break Inside an If</h2>
+
+<p>
+This is where the depth math earns its keep. When <code>break</code> appears inside an <code>if</code> inside a <code>while</code>, entering that <code>if</code> added 1 to <code>blockDepth</code>:
+</p>
+
+<div class="diagram">
+<span class="construct">block</span>                    <span class="depth-label">D+1 = blockLabel</span>
+  <span class="construct">loop</span>                  <span class="depth-label">D+2 = loopLabel</span>
+    ...
+    <span class="construct">if</span>                  <span class="depth-label">D+3  ← b.blockDepth when break emits</span>
+      <span class="arrow">break</span>             <span class="cmt">; br (D+3) - (D+1) = 2</span>
+    end
+    ...
+  end
+end
+</div>
+
+<p>
+<code>br 2</code> from inside the <code>if</code>: br 0 = top of if, br 1 = top of loop, <span class="br-target">br 2 = exit block</span>. That is exactly <code>break</code>. The formula <code>currentDepth - blockLabel</code> automatically produces the right relative depth regardless of how many extra <code>if</code>s are nested.
+</p>
+
+<div class="insight">
+<strong>Key insight.</strong> <code>blockLabel</code> and <code>loopLabel</code> are <em>absolute</em> depths recorded at compile time. <code>b.blockDepth</code> at the point a branch is emitted is the current absolute depth. Their <em>difference</em> is the relative WASM branch depth. This works at any nesting level without any special-casing.
+</div>
+
+<h2>Continue: Jumping Back to the Loop</h2>
+
+<p>
+Continue uses <code>loopLabel</code> instead of <code>blockLabel</code>:
+</p>
+
+<pre><code><span class="kw">case</span> *script.ContinueStatement:
+    entry := b.loopStack[len(b.loopStack)-1]
+    b.buf = append(b.buf, OpBr)
+    b.buf = AppendULEB128(b.buf, uint32(b.blockDepth)-entry.loopLabel)</code></pre>
+
+<p>From inside an <code>if</code> at depth D+3:</p>
+<p style="margin-left:1.5em"><code>(D+3) - (D+2) = 1</code> → <code>br 1</code> exits the if and goes back to the top of the loop. ✓</p>
+
+<p>
+From outside the if at depth D+2: <code>(D+2) - (D+2) = 0</code> → <code>br 0</code> stays in the loop. ✓
+</p>
+
+<h2>Modulo: Already Wired Up</h2>
+
+<p>
+The standard <code>continue</code> example uses <code>%</code> (modulo). In <a href="../compiler/binary/opcodes.go">opcodes.go</a>, <code>arithOpcode</code> already handles it:
+</p>
+
+<table>
+  <tr><th>Type</th><th>Operator</th><th>Opcode</th><th>Hex</th></tr>
+  <tr><td>i64</td><td>%</td><td>i64.rem_s</td><td>0x81</td></tr>
+  <tr><td>i32</td><td>%</td><td>i32.rem_s</td><td>0x6F</td></tr>
+</table>
+
+<p><code>rem_s</code> = signed remainder. Like C's <code>%</code>, it returns negative results for negative dividends. No new code needed — modulo works today.</p>
+
+<div class="quiz-section">
+  <h3>Depth Check</h3>
+
+  <div class="q" id="q1">
+    <p>A while loop starts at <code>blockDepth = 0</code>. After emitting the outer <code>block</code> and inner <code>loop</code>, what is <code>blockDepth</code>?</p>
+    <label><input type="radio" name="q1" value="0"> 0</label>
+    <label><input type="radio" name="q1" value="1"> 1</label>
+    <label><input type="radio" name="q1" value="2"> 2</label>
+    <label><input type="radio" name="q1" value="3"> 3</label>
+    <div class="feedback" id="q1-fb">blockDepth increments once for block (→1) and once for loop (→2).</div>
+  </div>
+
+  <div class="q" id="q2">
+    <p><code>blockLabel = 1</code>, <code>loopLabel = 2</code>. Break is inside two nested <code>if</code>s inside the while body. What <code>br</code> depth does break emit?</p>
+    <label><input type="radio" name="q2" value="1"> 1</label>
+    <label><input type="radio" name="q2" value="2"> 2</label>
+    <label><input type="radio" name="q2" value="3"> 3</label>
+    <label><input type="radio" name="q2" value="4"> 4</label>
+    <div class="feedback" id="q2-fb">Two nested ifs push blockDepth to 2+2=4. blockDepth - blockLabel = 4 - 1 = 3.</div>
+  </div>
+
+  <div class="q" id="q3">
+    <p><code>continue</code> appears at the top level of a while body (no extra nesting). What does the <code>br</code> depth compute to?</p>
+    <label><input type="radio" name="q3" value="0"> 0</label>
+    <label><input type="radio" name="q3" value="1"> 1</label>
+    <label><input type="radio" name="q3" value="2"> 2</label>
+    <label><input type="radio" name="q3" value="3"> 3</label>
+    <div class="feedback" id="q3-fb">blockDepth = loopLabel at the top of the body. loopLabel - loopLabel = 0. br 0 loops back.</div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>What does <code>br 0</code> do inside a <code>loop</code> construct?</p>
+    <label><input type="radio" name="q4" value="a"> Exits the loop (equivalent to break)</label>
+    <label><input type="radio" name="q4" value="b"> Jumps to the top of the loop (equivalent to continue)</label>
+    <label><input type="radio" name="q4" value="c"> Falls through to the next instruction</label>
+    <label><input type="radio" name="q4" value="d"> Traps at runtime</label>
+    <div class="feedback" id="q4-fb">For loops, <code>br 0</code> jumps to the beginning. For blocks and ifs, <code>br 0</code> exits to after the end. The construct type determines the direction.</div>
+  </div>
+
+  <div class="score-box" id="score-box" style="display:none"></div>
+</div>
+
+<h2>Your Task: Write the Missing Tests</h2>
+
+<p>Add these two test functions to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>.</p>
+
+<h3>TestEndToEnd_Break</h3>
+
+<p>Search an array and stop at the first element greater than 25:</p>
+
+<pre><code><span class="kw">export fn</span> <span class="fn">find_first</span>(): <span class="ty">int</span> {
+    <span class="kw">let</span> arr = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>, <span class="num">40</span>, <span class="num">50</span>];
+    <span class="kw">let</span> i: <span class="ty">int</span> = <span class="num">0</span>;
+    <span class="kw">let</span> found: <span class="ty">int</span> = <span class="num">-1</span>;
+    <span class="kw">while</span> i &lt; arr.len() {
+        <span class="kw">if</span> arr[i] &gt; <span class="num">25</span> {
+            found = arr[i];
+            <span class="kw">break</span>;
+        }
+        i = i + <span class="num">1</span>;
+    }
+    <span class="kw">return</span> found;
+}</code></pre>
+
+<p>Expected: <code>30</code> (stops at the first element &gt; 25, skipping 40 and 50).</p>
+
+<p>Add a second sub-case: an array where <em>no</em> element matches, so the loop runs to completion. Expected: <code>-1</code>.</p>
+
+<h3>TestEndToEnd_Continue</h3>
+
+<p>Sum only the even numbers from 1 to n using <code>continue</code> to skip odds:</p>
+
+<pre><code><span class="kw">export fn</span> <span class="fn">sum_evens</span>(n: <span class="ty">i64</span>): <span class="ty">i64</span> {
+    <span class="kw">let</span> i: <span class="ty">i64</span> = <span class="num">0</span>;
+    <span class="kw">let</span> sum: <span class="ty">i64</span> = <span class="num">0</span>;
+    <span class="kw">while</span> i &lt; n {
+        i = i + <span class="num">1</span>;
+        <span class="kw">if</span> (i % <span class="num">2</span>) != <span class="num">0</span> {
+            <span class="kw">continue</span>;
+        }
+        sum = sum + i;
+    }
+    <span class="kw">return</span> sum;
+}</code></pre>
+
+<p>Expected: <code>sum_evens(10)</code> = <code>30</code> (2+4+6+8+10).</p>
+
+<div class="task">
+  <strong>Steps</strong>
+  <ol style="margin:0; padding-left:1.2em;">
+    <li>Add both test functions to <a href="../compiler/binary/end_to_end_test.go">end_to_end_test.go</a>.</li>
+    <li>Run <code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_Break</code></li>
+    <li>Run <code>go test ./internal/script/compiler/binary/... -run TestEndToEnd_Continue</code></li>
+    <li>If either fails: check whether <code>blockDepth</code> is correctly balanced at every point that emits a branch. The tool is tracing the absolute depth at each opcode emission.</li>
+  </ol>
+</div>
+
+<div class="warn">
+  <strong>Watch for blockDepth imbalance.</strong> If the depth is wrong at the point break/continue emits, the computed relative branch depth will be wrong. The symptom is usually an unexpected result rather than a validation error — the branch jumps to the wrong target silently. Print <code>b.blockDepth</code> at the emission site if results are off.
+</div>
+
+<h2>Why This Matters</h2>
+
+<p>
+The loopStack pattern is a general technique for compiling any structured jump in SSA-less backends. Every compiler that targets a structured control flow IR (WASM, JVM bytecode, CLR CIL) uses some variant of it. The key invariant is: <em>labels are absolute; branches are relative; the difference is always correct.</em>
+</p>
+
+<h2>Primary Source</h2>
+
+<p>
+<a href="https://webassembly.github.io/spec/core/syntax/instructions.html#control-instructions">WebAssembly Core Spec: Control Instructions</a> — the normative definition of <code>br</code>, <code>br_if</code>, and how branch labels index into the label stack.
+</p>
+
+<p style="margin-top: 2.5em; color: var(--muted); font-size: 0.9em;">
+  Ask your teacher a follow-up question — try: "What happens if there are two nested while loops and break is in the inner one?" or "How would you implement a labeled break (like in Java)?"
+</p>
+
+<script>
+const answers = { q1: '2', q2: '3', q3: '0', q4: 'b' };
+const explanations = {
+  q1: 'blockDepth increments once for block (→1) and once for loop (→2).',
+  q2: 'Two nested ifs push blockDepth to 2+2=4. blockDepth − blockLabel = 4 − 1 = 3.',
+  q3: 'blockDepth = loopLabel at the top of the body. loopLabel − loopLabel = 0. br 0 loops back.',
+  q4: 'For loops, br 0 jumps to the beginning. For blocks and ifs, br 0 exits to after the end.'
+};
+
+let answered = 0;
+let correct = 0;
+const total = Object.keys(answers).length;
+
+document.querySelectorAll('input[type=radio]').forEach(input => {
+  input.addEventListener('change', () => {
+    const name = input.name;
+    const container = document.getElementById(name);
+    if (container.dataset.done) return;
+    container.dataset.done = '1';
+    answered++;
+
+    const isCorrect = input.value === answers[name];
+    if (isCorrect) correct++;
+
+    container.querySelectorAll('label').forEach(label => {
+      const val = label.querySelector('input').value;
+      if (val === answers[name]) label.classList.add('correct');
+      else if (val === input.value && !isCorrect) label.classList.add('wrong');
+    });
+
+    const fb = document.getElementById(name + '-fb');
+    fb.style.display = 'block';
+    fb.textContent = explanations[name];
+
+    if (answered === total) {
+      const box = document.getElementById('score-box');
+      box.style.display = 'block';
+      box.innerHTML = `Score: <strong>${correct} / ${total}</strong>${correct === total ? ' — perfect.' : ' — review the missed items above.'}`;
+    }
+  });
+});
+</script>
+</body>
+</html>
