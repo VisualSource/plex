@@ -897,6 +897,26 @@ func TestEndToEnd_StringConcatVar(t *testing.T) {
 	}
 }
 
+func TestEndToEnd_StringEq(t *testing.T) {
+	src := `
+        export fn same(): bool   { return "hello" == "hello"; }
+        export fn diff(): bool   { return "hello" == "world"; }
+        export fn shorter(): bool { return "hi" == "hello"; }
+    `
+	runOne(t, src, "same", nil, 1)
+	runOne(t, src, "diff", nil, 0)
+	runOne(t, src, "shorter", nil, 0)
+}
+
+func TestEndToEnd_StringNe(t *testing.T) {
+	src := `
+        export fn same(): bool { return "hello" != "hello"; }
+        export fn diff(): bool { return "hello" != "world"; }
+    `
+	runOne(t, src, "same", nil, 0)
+	runOne(t, src, "diff", nil, 1)
+}
+
 func runOne(t *testing.T, src, fn string, args []uint64, want uint64) {
 	t.Helper()
 	ast, err := script.Parse(strings.NewReader(src))

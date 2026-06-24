@@ -32,6 +32,8 @@ const (
 
 	OpF64Load byte = 0x2B
 
+	OpI32Load8U byte = 0x2D
+
 	OpI32Store byte = 0x36
 	OpI64Store byte = 0x37
 

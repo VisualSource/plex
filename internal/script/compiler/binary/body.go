@@ -122,8 +122,13 @@ func (b *bodyEncoder) walk(node script.AstNode) error {
 			return fmt.Errorf("no type on binary expression operand")
 		}
 
-		if opType.Kind == script.TypeKind_String && n.Operator == script.TokenType_Plus {
-			return b.walkStringConcat(n)
+		if opType.Kind == script.TypeKind_String {
+			switch n.Operator {
+			case script.TokenType_Plus:
+				return b.walkStringConcat(n)
+			case script.TokenType_EqualEqual, script.TokenType_NotEqual:
+				return b.walkStringEq(n)
+			}
 		}
 
 		if err := b.walk(n.Left); err != nil {
@@ -1016,6 +1021,122 @@ func (b *bodyEncoder) walkStringConcat(n *script.BinaryExpression) error {
 	b.buf = append(b.buf, 0xFC, 0x0A, 0x00, 0x00) // memory.copy 0 0
 
 	b.appendOpCode(OpLocalGet, resultPtr)
+	return nil
+}
+
+func (b *bodyEncoder) walkStringEq(n *script.BinaryExpression) error {
+	// Save left and right pointers
+	leftPtr := b.addSyntheticLocal(ValI32)
+	if err := b.walk(n.Left); err != nil {
+		return err
+	}
+	b.appendOpCode(OpLocalSet, leftPtr)
+
+	rightPtr := b.addSyntheticLocal(ValI32)
+	if err := b.walk(n.Right); err != nil {
+		return err
+	}
+	b.appendOpCode(OpLocalSet, rightPtr)
+
+	// Read lengths from the first 4 bytes of each string allocation
+	leftLen := b.addSyntheticLocal(ValI32)
+	b.appendOpCode(OpLocalGet, leftPtr)
+	b.appendOpCode(OpI32Load, 2, 0)
+	b.appendOpCode(OpLocalSet, leftLen)
+
+	rightLen := b.addSyntheticLocal(ValI32)
+	b.appendOpCode(OpLocalGet, rightPtr)
+	b.appendOpCode(OpI32Load, 2, 0)
+	b.appendOpCode(OpLocalSet, rightLen)
+
+	// isEqual starts true; cursor starts at 0
+	isEqual := b.addSyntheticLocal(ValI32)
+	b.appendOpCode(OpI32Const, 1)
+	b.appendOpCode(OpLocalSet, isEqual)
+
+	cursor := b.addSyntheticLocal(ValI32)
+	b.appendOpCode(OpI32Const, 0)
+	b.appendOpCode(OpLocalSet, cursor)
+
+	// Outer BLOCK — all three exit paths branch here
+	b.buf = append(b.buf, OpBlock, BlockTypeEmpty)
+	b.blockDepth++
+
+	// Fast path: lengths differ → not equal, exit block
+	b.appendOpCode(OpLocalGet, leftLen)
+	b.appendOpCode(OpLocalGet, rightLen)
+	b.buf = append(b.buf, OpI32Ne)
+	b.buf = append(b.buf, OpIf, BlockTypeEmpty)
+	b.blockDepth++
+	b.appendOpCode(OpI32Const, 0)
+	b.appendOpCode(OpLocalSet, isEqual)
+	b.buf = append(b.buf, OpBr)
+	b.buf = AppendULEB128(b.buf, 1) // br 1 exits the outer BLOCK
+	b.buf = append(b.buf, OpEnd)
+	b.blockDepth--
+
+	// LOOP — byte-by-byte comparison
+	b.buf = append(b.buf, OpLoop, BlockTypeEmpty)
+	b.blockDepth++
+
+	// Exit when cursor >= leftLen (all bytes matched, isEqual still 1)
+	b.appendOpCode(OpLocalGet, cursor)
+	b.appendOpCode(OpLocalGet, leftLen)
+	b.buf = append(b.buf, OpI32GeU)
+	b.buf = append(b.buf, OpBrIf)
+	b.buf = AppendULEB128(b.buf, 1) // br_if 1 exits the outer BLOCK
+
+	// Load left[cursor]: leftPtr + 4 + cursor
+	b.appendOpCode(OpLocalGet, leftPtr)
+	b.appendOpCode(OpI32Const, 4)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpLocalGet, cursor)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpI32Load8U, 0, 0)
+
+	// Load right[cursor]: rightPtr + 4 + cursor
+	b.appendOpCode(OpLocalGet, rightPtr)
+	b.appendOpCode(OpI32Const, 4)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpLocalGet, cursor)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpI32Load8U, 0, 0)
+
+	// Mismatch → not equal, exit block
+	b.buf = append(b.buf, OpI32Ne)
+	b.buf = append(b.buf, OpIf, BlockTypeEmpty)
+	b.blockDepth++
+	b.appendOpCode(OpI32Const, 0)
+	b.appendOpCode(OpLocalSet, isEqual)
+	b.buf = append(b.buf, OpBr)
+	b.buf = AppendULEB128(b.buf, 2) // br 2: skip nested if + loop, exit outer BLOCK
+	b.buf = append(b.buf, OpEnd)
+	b.blockDepth--
+
+	// cursor++
+	b.appendOpCode(OpLocalGet, cursor)
+	b.appendOpCode(OpI32Const, 1)
+	b.buf = append(b.buf, OpI32Add)
+	b.appendOpCode(OpLocalSet, cursor)
+
+	// br 0 — continue the loop
+	b.buf = append(b.buf, OpBr)
+	b.buf = AppendULEB128(b.buf, 0)
+
+	b.buf = append(b.buf, OpEnd) // END loop
+	b.blockDepth--
+
+	b.buf = append(b.buf, OpEnd) // END block
+	b.blockDepth--
+
+	// Leave result on the stack
+	b.appendOpCode(OpLocalGet, isEqual)
+
+	// != needs the result inverted
+	if n.Operator == script.TokenType_NotEqual {
+		b.buf = append(b.buf, OpI32Eqz)
+	}
+
 	return nil
 }
 

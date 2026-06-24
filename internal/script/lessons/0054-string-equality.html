@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Lesson 54 – String Equality</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
+    --text: #e0e0e0; --muted: #9e9e9e; --accent: #e94560;
+    --green: #4caf50; --yellow: #ffd54f; --blue: #64b5f6;
+    --purple: #ce93d8; --orange: #ffb74d;
+    --code-bg: #0d1117; --code-border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, serif; background: var(--bg); color: var(--text); max-width: 900px; margin: 40px auto; padding: 0 24px; line-height: 1.75; }
+  h1 { border-bottom: 2px solid var(--accent); padding-bottom: 10px; color: #fff; }
+  h2 { margin-top: 2.6em; color: var(--blue); }
+  h3 { margin-top: 1.8em; color: var(--muted); font-size: 1.05em; letter-spacing: 0.04em; text-transform: uppercase; }
+  a { color: var(--blue); }
+  code { background: var(--code-bg); border: 1px solid var(--code-border); padding: 2px 6px; border-radius: 4px; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; color: #c9d1d9; }
+  pre { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 18px 20px; overflow-x: auto; font-size: 0.88em; line-height: 1.55; margin: 1.4em 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  .kw   { color: #ff7b72; }
+  .fn   { color: #d2a8ff; }
+  .str  { color: #a5d6ff; }
+  .cmt  { color: #8b949e; font-style: italic; }
+  .num  { color: #79c0ff; }
+  .byte { color: #ffd54f; }
+  .ty   { color: #ce93d8; }
+  .ok   { color: var(--green); }
+  .err  { color: var(--accent); }
+  .task { background: #1e1e0e; border-left: 4px solid var(--yellow); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .task strong { color: var(--yellow); display: block; margin-bottom: 6px; }
+  .warn { background: #1e1010; border-left: 4px solid var(--accent); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .warn strong { color: var(--accent); display: block; margin-bottom: 6px; }
+  .insight { background: #0e1a2a; border-left: 4px solid var(--blue); padding: 14px 18px; margin: 1.6em 0; border-radius: 0 6px 6px 0; }
+  .insight strong { color: var(--blue); }
+  .quiz-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin: 2em 0; }
+  .quiz-section h3 { margin-top: 0; }
+  .q { margin-bottom: 1.4em; }
+  .q p { margin: 0 0 8px; font-weight: bold; }
+  .q label { display: block; cursor: pointer; padding: 6px 10px; border-radius: 4px; border: 1px solid transparent; margin-bottom: 4px; }
+  .q label:hover { border-color: var(--border); }
+  .q label.correct { background: #1a3a1a; border-color: var(--green); color: var(--green); }
+  .q label.wrong   { background: #3a1a1a; border-color: var(--accent); color: var(--accent); }
+  .q input[type=radio] { display: none; }
+  .feedback { display: none; margin-top: 8px; font-size: 0.9em; }
+  .score-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; text-align: center; margin-top: 1.4em; font-size: 1.1em; }
+  table { border-collapse: collapse; width: 100%; margin: 1.4em 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; font-family: "Fira Code", "Cascadia Code", monospace; font-size: 0.88em; }
+  th { background: var(--surface); color: var(--blue); font-family: Georgia, serif; }
+  .diagram { background: var(--code-bg); border: 1px solid var(--code-border); border-radius: 6px; padding: 16px 20px; font-family: "Fira Code", monospace; font-size: 0.86em; line-height: 1.6; margin: 1.4em 0; }
+  .depth { color: var(--muted); float: right; font-size: 0.82em; }
+  .br-target { color: var(--orange); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 54 – String Equality</h1>
+
+<p><em>Previous: <a href="0053-string-concatenation.html">Lesson 53 – String Concatenation</a></em></p>
+
+<p>
+With <code>+</code> on strings working, the next gap is <code>==</code> and <code>!=</code>. Comparing two i32 pointers for equality only tells you whether they point to the same allocation — not whether the strings contain the same text. A real equality check requires reading the actual bytes, and WASM has no bulk-compare instruction. This lesson compiles it to a loop.
+</p>
+
+<h2>The Current Error</h2>
+
+<pre><code><span class="kw">export fn</span> <span class="fn">is_hello</span>(s: string): bool {
+    <span class="kw">return</span> s == <span class="str">"hello"</span>;
+}</code></pre>
+
+<p>Compiler output today: <code class="err">no comparison opcode for string ==</code>. The <code>cmpOpcode</code> function in <a href="../compiler/binary/opcodes.go">opcodes.go</a> has no case for <code>TypeKind_String</code> — and correctly so, since there is no native opcode. You add a type-directed early exit in <code>BinaryExpression</code>, just like you did for <code>+</code>.</p>
+
+<h2>The New Instruction: <code>i32.load8_u</code></h2>
+
+<p>
+Comparing strings byte-by-byte requires loading single bytes from memory. <code>i32.load8_u</code> (opcode <code>0x2D</code>) loads one byte and <strong>zero-extends</strong> it to i32. Add it to <a href="../compiler/binary/opcodes.go">opcodes.go</a>:
+</p>
+
+<pre><code>OpI32Load8U byte = <span class="byte">0x2D</span>   <span class="cmt">// load 1 byte, zero-extend to i32</span></code></pre>
+
+<p>Like all load instructions, it takes two LEB128 immediates: alignment (use <code>0</code> for single bytes — no alignment requirement) and offset (use <code>0</code>).</p>
+
+<h2>The Algorithm</h2>
+
+<p>Two phases:</p>
+<ol>
+  <li><strong>Fast path</strong> — if the lengths differ, the strings cannot be equal. Skip the byte loop entirely.</li>
+  <li><strong>Byte loop</strong> — walk both strings simultaneously, exiting immediately if any byte differs.</li>
+</ol>
+
+<p>Six synthetic locals:</p>
+
+<table>
+  <tr><th>Local</th><th>Type</th><th>Holds</th></tr>
+  <tr><td>leftPtr</td><td>i32</td><td>pointer to left string</td></tr>
+  <tr><td>rightPtr</td><td>i32</td><td>pointer to right string</td></tr>
+  <tr><td>leftLen</td><td>i32</td><td>byte count of left string</td></tr>
+  <tr><td>rightLen</td><td>i32</td><td>byte count of right string</td></tr>
+  <tr><td>cursor</td><td>i32</td><td>current byte index (0 to leftLen−1)</td></tr>
+  <tr><td>isEqual</td><td>i32</td><td>1 if equal so far, 0 if mismatch found</td></tr>
+</table>
+
+<h2>Control Flow Structure</h2>
+
+<p>The key shape is one outer <code>block</code> (used as a multi-exit point) enclosing one <code>loop</code> and one nested <code>if</code>. The branch depths from each exit point are fixed:</p>
+
+<div class="diagram">
+<span class="cmt">; D = b.blockDepth before walkStringEq is entered</span>
+
+i32.const 1 / local.set isEqual          <span class="cmt">; assume equal</span>
+<span class="cmt">; read leftLen, rightLen, set cursor = 0</span>
+
+BLOCK                                    <span class="depth">depth D+1</span>
+  local.get leftLen / local.get rightLen
+  i32.ne
+  IF                                     <span class="depth">depth D+2</span>
+    i32.const 0 / local.set isEqual      <span class="cmt">; lengths differ → not equal</span>
+    br 1     <span class="br-target">────────────────────────────────► exit BLOCK</span>
+  END                                    <span class="depth">depth D+1</span>
+
+  LOOP                                   <span class="depth">depth D+2</span>
+    local.get cursor / local.get leftLen
+    i32.ge_u
+    br_if 1  <span class="br-target">────────────────────────────────► exit BLOCK (done, isEqual=1)</span>
+
+    <span class="cmt">; load left[cursor] and right[cursor]</span>
+    i32.ne
+    IF                                   <span class="depth">depth D+3</span>
+      i32.const 0 / local.set isEqual    <span class="cmt">; bytes differ</span>
+      br 2   <span class="br-target">────────────────────────────────► exit BLOCK (isEqual=0)</span>
+    END                                  <span class="depth">depth D+2</span>
+
+    <span class="cmt">; cursor++</span>
+    br 0     <span class="br-target">────────────────────────────────► continue LOOP</span>
+  END                                    <span class="depth">depth D+1</span>
+END                                      <span class="depth">depth D</span>
+
+local.get isEqual                        <span class="cmt">; result: 0 or 1</span>
+<span class="cmt">; for !=: append i32.eqz</span>
+</div>
+
+<div class="insight">
+  <strong>Branch depth rules:</strong> from inside a <code>loop</code>, <code>br 0</code> targets the loop itself (continues it). From inside the nested <code>if</code> at depth D+3, <code>br 2</code> skips over 2 enclosing constructs (the <code>if</code> at D+3 → <code>loop</code> at D+2 → <code>block</code> at D+1) and exits the block. The outer <code>block</code> is the common "done" target for all early exits.
+</div>
+
+<div class="insight">
+  <strong>blockDepth discipline (review from <a href="0050-arr-remove-binary.html">lesson 50</a>):</strong> the internal <code>block</code> and <code>loop</code> are not pushed onto <code>loopStack</code> (user <code>break</code>/<code>continue</code> must not reach them), but <code>b.blockDepth</code> must still be incremented and decremented correctly. User-visible while loops store their break/continue targets as absolute depth values; an unbalanced internal depth would corrupt those calculations if this expression appears inside a loop.
+</div>
+
+<h2>The byte-load sequence</h2>
+
+<p>Loading <code>string[cursor]</code> from a string at <code>ptr</code>:</p>
+
+<pre><code><span class="cmt">; address = ptr + 4 + cursor</span>
+<span class="byte">20</span> ptr     <span class="cmt">; local.get ptr</span>
+<span class="byte">41 04</span>      <span class="cmt">; i32.const 4</span>
+<span class="byte">6A</span>         <span class="cmt">; i32.add</span>
+<span class="byte">20</span> cursor  <span class="cmt">; local.get cursor</span>
+<span class="byte">6A</span>         <span class="cmt">; i32.add</span>
+<span class="byte">2D 00 00</span>   <span class="cmt">; i32.load8_u align=0 offset=0</span></code></pre>
+
+<p>Do this twice (once for <code>leftPtr</code>, once for <code>rightPtr</code>), then <code>i32.ne</code> to check for a mismatch.</p>
+
+<h2>Wiring into BinaryExpression</h2>
+
+<p>In <a href="../compiler/binary/body.go">body.go</a>, add a second early exit alongside the <code>+</code> check:</p>
+
+<pre><code><span class="kw">if</span> opType.Kind == script.TypeKind_String {
+    <span class="kw">switch</span> n.Operator {
+    <span class="kw">case</span> script.TokenType_Plus:
+        <span class="kw">return</span> b.<span class="fn">walkStringConcat</span>(n)
+    <span class="kw">case</span> script.TokenType_EqualEqual, script.TokenType_NotEqual:
+        <span class="kw">return</span> b.<span class="fn">walkStringEq</span>(n)
+    }
+}</code></pre>
+
+<p><code>walkStringEq</code> checks <code>n.Operator</code> at the end: emit <code>i32.eqz</code> for <code>!=</code>, nothing extra for <code>==</code>.</p>
+
+<h2>Implementation Task</h2>
+
+<div class="task">
+  <strong>Task — add string equality to the binary backend</strong>
+
+  <p><strong>Step 1.</strong> Add <code>OpI32Load8U byte = 0x2D</code> to <a href="../compiler/binary/opcodes.go">opcodes.go</a>.</p>
+
+  <p><strong>Step 2.</strong> Extend the string early-exit block in <a href="../compiler/binary/body.go">body.go</a>'s <code>BinaryExpression</code> case to a switch on the operator, routing <code>==</code> and <code>!=</code> to a new <code>walkStringEq</code> method.</p>
+
+  <p><strong>Step 3.</strong> Implement <code>walkStringEq</code>. Follow the control flow diagram exactly. Track <code>b.blockDepth</code> at each <code>block</code>, <code>loop</code>, <code>if</code>, and <code>end</code> byte. Emit hardcoded branch depths 0, 1, 2 — do not use <code>b.blockDepth</code> to compute them (they are relative to the internal structure, not the user-visible scope).</p>
+
+  <p><strong>Step 4.</strong> Add tests:</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">TestEndToEnd_StringEq</span>(t *testing.T) {
+    src := <span class="str">`
+        export fn same(): bool   { return "hello" == "hello"; }
+        export fn diff(): bool   { return "hello" == "world"; }
+        export fn shorter(): bool { return "hi" == "hello"; }
+    `</span>
+    runOne(t, src, <span class="str">"same"</span>,    <span class="kw">nil</span>, <span class="num">1</span>)
+    runOne(t, src, <span class="str">"diff"</span>,    <span class="kw">nil</span>, <span class="num">0</span>)
+    runOne(t, src, <span class="str">"shorter"</span>, <span class="kw">nil</span>, <span class="num">0</span>)
+}
+
+<span class="kw">func</span> <span class="fn">TestEndToEnd_StringNe</span>(t *testing.T) {
+    src := <span class="str">`
+        export fn same(): bool { return "hello" != "hello"; }
+        export fn diff(): bool { return "hello" != "world"; }
+    `</span>
+    runOne(t, src, <span class="str">"same"</span>, <span class="kw">nil</span>, <span class="num">0</span>)
+    runOne(t, src, <span class="str">"diff"</span>, <span class="kw">nil</span>, <span class="num">1</span>)
+}</code></pre>
+
+  <p><strong>Step 5.</strong> Run the full suite to confirm no regressions:</p>
+  <pre><code>go test ./internal/script/compiler/binary/... -v</code></pre>
+</div>
+
+<h2>Checklist Before Calling It Done</h2>
+<ul>
+  <li><code>"hello" == "hello"</code> returns 1 — same content, two separate allocations, pointer comparison would give 0 but byte comparison gives 1</li>
+  <li><code>"hello" == "world"</code> returns 0 — same length, different bytes</li>
+  <li><code>"hi" == "hello"</code> returns 0 — different lengths, fast path fires</li>
+  <li><code>"hello" != "world"</code> returns 1</li>
+  <li><code>"hello" != "hello"</code> returns 0</li>
+  <li><code>b.blockDepth</code> is balanced — net zero change from <code>walkStringEq</code></li>
+  <li>All previously passing tests still pass</li>
+</ul>
+
+<h2>Quiz</h2>
+
+<div class="quiz-section">
+  <h3>Check your understanding</h3>
+
+  <div class="q" id="q1">
+    <p>1. Why can't string <code>==</code> be implemented as a single WASM instruction, even though i32 <code>==</code> can?</p>
+    <label><input type="radio" name="q1" value="a"> WASM's i32.eq only accepts values less than 2³¹, which excludes pointer values</label>
+    <label><input type="radio" name="q1" value="b"> Two strings can have identical content but different pointer values; pointer equality tells you nothing about string equality</label>
+    <label><input type="radio" name="q1" value="c"> The typechecker annotates string expressions with a non-scalar type that i32.eq cannot accept</label>
+    <label><input type="radio" name="q1" value="d"> Strings are mutable in plex so their content could change between the comparison and the branch</label>
+    <div class="feedback" id="q1-fb"></div>
+  </div>
+
+  <div class="q" id="q2">
+    <p>2. From inside the nested <code>if</code> at depth D+3, the mismatch branch uses <code>br 2</code>. Which construct does that target?</p>
+    <label><input type="radio" name="q2" value="a"> The loop — causing it to iterate again from the start</label>
+    <label><input type="radio" name="q2" value="b"> The outer block — exiting both the inner if and the loop in one branch</label>
+    <label><input type="radio" name="q2" value="c"> The enclosing user-level while loop, if one surrounds this expression</label>
+    <label><input type="radio" name="q2" value="d"> The function itself — returning from the function with isEqual on the stack</label>
+    <div class="feedback" id="q2-fb"></div>
+  </div>
+
+  <div class="q" id="q3">
+    <p>3. <code>i32.load8_u</code> is used instead of <code>i32.load</code> to read individual bytes. What does the "u" suffix mean here?</p>
+    <label><input type="radio" name="q3" value="a"> Unaligned — allows reading from addresses that are not 4-byte aligned</label>
+    <label><input type="radio" name="q3" value="b"> Unsigned — the single byte is zero-extended to i32, not sign-extended</label>
+    <label><input type="radio" name="q3" value="c"> Unicode — interprets the byte as a UTF-8 code unit</label>
+    <label><input type="radio" name="q3" value="d"> Unsafe — bypasses the bounds-check that i32.load performs</label>
+    <div class="feedback" id="q3-fb"></div>
+  </div>
+
+  <div class="q" id="q4">
+    <p>4. After the byte loop, <code>isEqual</code> holds 1 for equal and 0 for not-equal. For the <code>!=</code> operator, which single WASM instruction converts this to the correct result?</p>
+    <label><input type="radio" name="q4" value="a"> i32.not — bitwise NOT of the i32 value</label>
+    <label><input type="radio" name="q4" value="b"> i32.neg — arithmetic negation</label>
+    <label><input type="radio" name="q4" value="c"> i32.eqz — returns 1 if the value is 0, and 0 if the value is non-zero</label>
+    <label><input type="radio" name="q4" value="d"> i32.clz — count leading zeros of the i32 value</label>
+    <div class="feedback" id="q4-fb"></div>
+  </div>
+
+  <div class="score-box" id="score"></div>
+</div>
+
+<h2>Primary Source</h2>
+<p>
+  <a href="https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions">
+    WebAssembly Core Spec — §5.4.6 Memory Instructions
+  </a> — look for the <em>load and store</em> sub-entries. <code>i32.load8_u</code> is listed as opcode <code>0x2D</code> with two immediate fields: alignment (as a power of 2) and offset.
+</p>
+
+<hr style="margin-top:3em; border-color: var(--border);">
+<p style="color:var(--muted); font-size:0.9em;">
+  Questions? Ask your teacher agent — paste any part of the lesson or your code and ask for clarification.
+</p>
+
+<script>
+const answers = { q1: 'b', q2: 'b', q3: 'b', q4: 'c' };
+const explanations = {
+  q1: {
+    b: 'Correct — a plex string is a heap allocation. Two calls to the string literal "hello" produce two separate allocations at different addresses. i32.eq on their pointers would return 0 even though the content is identical. String equality must compare the actual bytes in memory.',
+    wrong: 'Think about what a plex string value actually is on the WASM stack: an i32 pointer to a heap allocation. i32.eq on two pointers checks whether they point to the same address — but two strings with identical content typically live at different addresses. Content equality requires reading the bytes.'
+  },
+  q2: {
+    b: 'Correct — from the nested if at depth D+3, br 2 traverses: skip the if (→ D+2 loop), skip the loop (→ D+1 block), exit the block (→ D). The outer block is the single "done" point for all three exit paths: length mismatch, byte mismatch, and successful full traversal.',
+    wrong: 'Count the enclosing constructs from the nested if: the if itself (depth D+3), then the loop (D+2), then the outer block (D+1). br N from inside a construct skips N levels. br 2 from inside the nested if skips the loop and exits the outer block.'
+  },
+  q3: {
+    b: 'Correct — load8_u reads exactly one byte and zero-extends it to fill a 32-bit integer. The alternative, load8_s, would sign-extend (treating the high bit as a sign bit, turning bytes ≥ 0x80 into negative numbers). For byte-by-byte content comparison, zero extension is correct: two bytes are equal if their unsigned values match.',
+    wrong: 'The "u" in load8_u means unsigned zero-extension. load8_u reads 1 byte, then fills the upper 24 bits of the i32 with zeros. load8_s (signed) would fill those bits with the sign bit of the byte. For string comparison, you want the raw byte values to compare, so unsigned is correct.'
+  },
+  q4: {
+    c: 'Correct — i32.eqz returns 1 when its operand is 0 and 0 otherwise. Applied to isEqual: if isEqual=1 (strings are equal), eqz gives 0 (they are NOT not-equal); if isEqual=0 (strings differ), eqz gives 1 (they ARE not-equal). Exactly the inverted boolean the != operator needs.',
+    wrong: 'i32.not and i32.neg do not exist as WASM instructions. i32.clz (count leading zeros) would give 31 when the input is 0 and 0 when the input is 1 — the wrong mapping. i32.eqz is the standard WASM instruction for "test if zero", which inverts the equality result correctly.'
+  },
+};
+
+let score = 0, answered = 0, total = Object.keys(answers).length;
+
+document.querySelectorAll('.q input[type=radio]').forEach(radio => {
+  radio.addEventListener('change', function() {
+    const qid = this.name;
+    const labels = document.querySelectorAll(`[name=${qid}]`);
+    if (document.querySelector(`#${qid} label.correct, #${qid} label.wrong`)) return;
+
+    const correct = answers[qid];
+    const isCorrect = this.value === correct;
+    if (isCorrect) score++;
+    answered++;
+
+    labels.forEach(r => {
+      const lbl = r.closest('label');
+      if (r.value === correct) lbl.className = 'correct';
+      else if (r.checked)      lbl.className = 'wrong';
+    });
+
+    const fb = document.getElementById(`${qid}-fb`);
+    const exp = explanations[qid];
+    fb.textContent = isCorrect ? exp[correct] : exp.wrong;
+    fb.style.display = 'block';
+    fb.style.color = isCorrect ? 'var(--green)' : 'var(--accent)';
+
+    if (answered === total) {
+      document.getElementById('score').textContent = `Score: ${score} / ${total}`;
+    }
+  });
+});
+</script>
+</body>
+</html>
